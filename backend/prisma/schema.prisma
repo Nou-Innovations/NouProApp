@@ -1,0 +1,370 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum SubscriptionTier {
+  FREE
+  PRO
+  BUSINESS
+  ENTERPRISE
+}
+
+enum LocationMode {
+  DEPENDENT
+  INDEPENDENT
+}
+
+enum MemberRole {
+  super_admin
+  admin
+  staff
+}
+
+enum MemberStatus {
+  pending
+  accepted
+  rejected
+  locked
+}
+
+enum OrderStatus {
+  NEW
+  ASSIGNED
+  PACKED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum OrderScope {
+  PARENT
+  LOCATION
+}
+
+enum InvoiceScope {
+  PARENT
+  LOCATION
+}
+
+// ============================================================================
+// MODELS
+// ============================================================================
+
+model User {
+  id          String   @id
+  name        String?
+  email       String?
+  avatar      String?
+  phone       String?
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  businessMembers BusinessMember[]
+  locationMembers LocationMember[]
+}
+
+model Business {
+  id               String           @id
+  name             String
+  logoUrl          String?
+  description      String?
+  phone            String?
+  email            String?
+  subscriptionTier SubscriptionTier @default(FREE)
+  settings         Json?            // matches your business.settings object
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  locations        Location[]
+  products         Product[]
+  locationProducts LocationProduct[]
+  stocks           Stock[]
+  orders           Order[]
+  invoices         Invoice[]
+  chats            Chat[]
+  businessMembers  BusinessMember[]
+  locationMembers  LocationMember[]
+  deliveries       Delivery[]
+  feedPosts        FeedPost[]
+}
+
+model Location {
+  id            String       @id
+  businessId    String
+  name          String
+  address       String?
+  phone         String?
+  email         String?
+  latitude      Float?
+  longitude     Float?
+  operatingMode LocationMode @default(DEPENDENT)
+  isPublic      Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  locationProducts LocationProduct[]
+  stocks           Stock[]
+  ordersSold       Order[]           @relation("OrdersSoldByLocation")
+  ordersFulfill    Order[]           @relation("OrdersFulfilledByLocation")
+  invoices         Invoice[]
+  chats            Chat[]
+  locationMembers  LocationMember[]
+  deliveries       Delivery[]
+
+  @@index([businessId])
+}
+
+model Product {
+  id              String   @id
+  businessId      String
+  name            String
+  brand           String?
+  brandLogo       String?
+  productPicture  String?
+  price           Float?
+  category        String?
+  status          String?
+  variants        Json?    // your array
+  unit            String?
+  stockQuantity   Int?
+  is_listed       Boolean?
+  isCreatedByUser Boolean?
+  isDisplayable   Boolean?
+  isImported      Boolean?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  locationProducts LocationProduct[]
+  stocks           Stock[]
+
+  @@index([businessId])
+}
+
+model LocationProduct {
+  id            String   @id
+  businessId    String
+  locationId    String
+  productId     String
+  priceOverride Float?
+  taxOverride   Float?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, productId])
+  @@index([businessId])
+}
+
+model Stock {
+  id         String @id
+  businessId String
+  locationId String
+  productId  String
+  qtyOnHand  Int    @default(0)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, productId])
+  @@index([businessId])
+}
+
+model Order {
+  id                    String      @id
+  businessId            String
+  soldByScope           OrderScope  @default(PARENT)
+  soldByLocationId      String?
+  fulfillmentLocationId String?
+  customerId            String?
+  customerName          String?
+  customerAddress       String?
+  customerPhone         String?
+  items                 Json        // keep your current items array shape
+  totalAmount           Float?
+  status                OrderStatus @default(NEW)
+  paymentStatus         String?
+  notes                 String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  business            Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  soldByLocation      Location? @relation("OrdersSoldByLocation", fields: [soldByLocationId], references: [id])
+  fulfillmentLocation Location? @relation("OrdersFulfilledByLocation", fields: [fulfillmentLocationId], references: [id])
+
+  @@index([businessId])
+  @@index([soldByLocationId])
+  @@index([fulfillmentLocationId])
+}
+
+model Invoice {
+  id                 String       @id
+  businessId         String
+  issuedByScope      InvoiceScope @default(PARENT)
+  issuedByLocationId String?
+  orderId            String?
+  invoiceNumber      String?
+  clientName         String?
+  clientEmail        String?
+  amount             Float?
+  taxAmount          Float?
+  totalAmount        Float?
+  status             String?
+  type               String?
+  issueDate          String?
+  dueDate            String?
+  items              Json         // keep your current items array shape
+  notes              String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [issuedByLocationId], references: [id])
+
+  @@index([businessId])
+  @@index([issuedByLocationId])
+}
+
+model Chat {
+  id          String   @id
+  businessId  String
+  locationId  String?
+  type        String?
+  name        String?
+  participants Json?   // keep your array
+  lastMessage Json?    // keep your object
+  unreadCount Int?
+  avatar      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id])
+
+  messages Message[]
+
+  @@index([businessId])
+  @@index([locationId])
+}
+
+model Message {
+  id         String   @id
+  chatId     String
+  senderId   String?
+  senderName String?
+  content    String?
+  type       String?
+  timestamp  DateTime @default(now())
+  meta       Json?    // attachments, sender object, etc.
+  status     String?
+  isRead     Boolean  @default(false)
+  isOutgoing Boolean  @default(false)
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+}
+
+model BusinessMember {
+  id         String       @id
+  businessId String
+  userId     String
+  role       MemberRole
+  status     MemberStatus @default(pending)
+  createdAt  DateTime     @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
+  @@index([businessId])
+}
+
+model LocationMember {
+  id          String       @id
+  locationId  String
+  businessId  String
+  userId      String
+  role        MemberRole
+  status      MemberStatus @default(pending)
+  permissions Json?
+  createdAt   DateTime     @default(now())
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, userId])
+  @@index([locationId])
+  @@index([businessId])
+}
+
+model Delivery {
+  id                       String    @id
+  businessId               String
+  locationId               String?
+  direction                String?
+  type                     String?
+  clientId                 String?
+  clientCompanyLogo        String?
+  clientCompanyName        String?
+  clientAddress            String?
+  clientEmail              String?
+  clientPhone              String?
+  clientNotes              String?
+  distributorNotes         String?
+  fromLocation             String?
+  toLocation               String?
+  orderTime                DateTime?
+  expectedDeliveryDateTime DateTime?
+  itemCount                Int?
+  items                    Json?     // keep your items array
+  totalAmount              Float?
+  trackingNumber           String?
+  deliveryStatus           String?
+  paymentStatus            String?
+  assignedStaffId          String?
+  assignedTo               String?
+  transportMode            String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id])
+
+  @@index([businessId])
+  @@index([locationId])
+}
+
+model FeedPost {
+  id         String   @id
+  businessId String?
+  type       String   // brand_presentation, company_presentation, new_products
+  timestamp  String?
+  data       Json     // flexible data for different post types
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([type])
+}

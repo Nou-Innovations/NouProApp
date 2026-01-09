@@ -1,0 +1,1107 @@
+// ============================================================================
+// MEMORY STORE - In-memory data for development/testing
+// This file consolidates all mock data arrays from the original server.js
+// ============================================================================
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const SUBSCRIPTION_TIERS = {
+  FREE: 'FREE',
+  PRO: 'PRO',
+  BUSINESS: 'BUSINESS',
+  ENTERPRISE: 'ENTERPRISE'
+};
+
+const LOCATION_MODES = {
+  DEPENDENT: 'DEPENDENT',
+  INDEPENDENT: 'INDEPENDENT'
+};
+
+const ORDER_STATUS = {
+  NEW: 'NEW',
+  ASSIGNED: 'ASSIGNED',
+  PACKED: 'PACKED',
+  OUT_FOR_DELIVERY: 'OUT_FOR_DELIVERY',
+  DELIVERED: 'DELIVERED',
+  CANCELLED: 'CANCELLED'
+};
+
+const ORDER_SCOPE = {
+  PARENT: 'PARENT',
+  LOCATION: 'LOCATION'
+};
+
+const INVOICE_SCOPE = {
+  PARENT: 'PARENT',
+  LOCATION: 'LOCATION'
+};
+
+const MEMBER_ROLES = {
+  SUPER_ADMIN: 'super_admin',
+  ADMIN: 'admin',
+  STAFF: 'staff'
+};
+
+const MEMBER_STATUS = {
+  PENDING: 'pending',
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected',
+  LOCKED: 'locked'
+};
+
+// ============================================================================
+// MOCK DATABASE - BUSINESSES (Companies with enhanced fields)
+// ============================================================================
+
+let companies = [
+  {
+    id: 'comp-1',
+    name: 'NouPro Distribution Inc.',
+    logoUrl: 'https://picsum.photos/seed/comp1/100/100',
+    description: 'Leading distribution company serving multiple locations',
+    phone: '+1-555-123-4567',
+    email: 'info@noupro.com',
+    subscriptionTier: SUBSCRIPTION_TIERS.ENTERPRISE,
+    settings: {
+      taxRate: 0.15,
+      currency: 'MUR',
+      invoicePrefix: 'INV',
+      allowPartialPayments: true,
+      autoGenerateInvoices: false,
+      timezone: 'Indian/Mauritius',
+      allowLocationPriceOverride: true,
+      allowLocationTaxOverride: false
+    },
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'comp-2',
+    name: 'Global Supply Co.',
+    logoUrl: 'https://picsum.photos/seed/comp2/100/100',
+    description: 'Global supply chain management specialists',
+    phone: '+1-555-987-6543',
+    email: 'contact@globalsupply.com',
+    subscriptionTier: SUBSCRIPTION_TIERS.PRO,
+    settings: {
+      taxRate: 0.12,
+      currency: 'MUR',
+      invoicePrefix: 'GSC',
+      allowPartialPayments: true,
+      autoGenerateInvoices: true,
+      timezone: 'Indian/Mauritius',
+      allowLocationPriceOverride: false,
+      allowLocationTaxOverride: false
+    },
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'comp-3',
+    name: 'Small Retail Shop',
+    logoUrl: 'https://picsum.photos/seed/comp3/100/100',
+    description: 'Local corner shop',
+    phone: '+230-5999-1234',
+    email: 'shop@local.mu',
+    subscriptionTier: SUBSCRIPTION_TIERS.FREE,
+    settings: {
+      taxRate: 0.15,
+      currency: 'MUR',
+      invoicePrefix: 'SRS',
+      allowPartialPayments: false,
+      autoGenerateInvoices: false,
+      timezone: 'Indian/Mauritius',
+      allowLocationPriceOverride: false,
+      allowLocationTaxOverride: false
+    },
+    createdAt: '2024-06-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  }
+];
+
+// ============================================================================
+// MOCK DATABASE - LOCATIONS
+// ============================================================================
+
+let locations = [
+  {
+    id: 'loc-1',
+    companyId: 'comp-1',
+    name: 'Warehouse A - Port Louis',
+    address: '123 Royal Road, Port Louis, Mauritius',
+    phone: '+230-5123-4567',
+    email: 'warehouse-a@noupro.mu',
+    latitude: -20.1609,
+    longitude: 57.5012,
+    operatingMode: LOCATION_MODES.INDEPENDENT,
+    isPublic: true,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'loc-2',
+    companyId: 'comp-1',
+    name: 'Warehouse B - Curepipe',
+    address: '456 Industrial Zone, Curepipe, Mauritius',
+    phone: '+230-5987-6543',
+    email: 'warehouse-b@noupro.mu',
+    latitude: -20.3162,
+    longitude: 57.5166,
+    operatingMode: LOCATION_MODES.DEPENDENT,
+    isPublic: false,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'loc-3',
+    companyId: 'comp-1',
+    name: 'Distribution Center - Ebene',
+    address: '789 Cyber Tower, Ebene, Mauritius',
+    phone: '+230-5555-0123',
+    email: 'distribution@noupro.mu',
+    latitude: -20.2456,
+    longitude: 57.4897,
+    operatingMode: LOCATION_MODES.INDEPENDENT,
+    isPublic: true,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'loc-4',
+    companyId: 'comp-2',
+    name: 'Global Hub - Quatre Bornes',
+    address: '321 Business Park, Quatre Bornes, Mauritius',
+    phone: '+230-5999-8888',
+    email: 'hub@globalsupply.mu',
+    latitude: -20.2674,
+    longitude: 57.4791,
+    operatingMode: LOCATION_MODES.DEPENDENT,
+    isPublic: false,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'loc-5',
+    companyId: 'comp-3',
+    name: 'Main Shop',
+    address: '10 Market Street, Rose Hill, Mauritius',
+    phone: '+230-5999-1234',
+    email: 'shop@local.mu',
+    latitude: -20.2445,
+    longitude: 57.4677,
+    operatingMode: LOCATION_MODES.DEPENDENT,
+    isPublic: false,
+    createdAt: '2024-06-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  }
+];
+
+// ============================================================================
+// MOCK DATABASE - PRODUCTS
+// ============================================================================
+
+let products = [
+  {
+    id: 'PRD-001',
+    companyId: 'comp-1',
+    name: 'Coca-Cola 0.5L x10',
+    brand: 'Coca-Cola',
+    brandLogo: 'https://picsum.photos/seed/cocacola/40/40',
+    productPicture: 'https://picsum.photos/seed/PRD-001/80/80',
+    price: 25.99,
+    category: 'Beverages',
+    status: 'Available',
+    variants: ['Regular', 'Zero', 'Cherry'],
+    unit: '10 pack',
+    stockQuantity: 1500,
+    is_listed: true,
+    isCreatedByUser: true,
+    isDisplayable: true,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'PRD-002',
+    companyId: 'comp-1',
+    name: 'Fanta Orange 1L x6',
+    brand: 'Fanta',
+    brandLogo: 'https://picsum.photos/seed/fanta/40/40',
+    productPicture: 'https://picsum.photos/seed/PRD-002/80/80',
+    price: 19.50,
+    category: 'Beverages',
+    status: 'Available',
+    variants: ['Orange', 'Grape', 'Pineapple'],
+    unit: '6 pack',
+    stockQuantity: 800,
+    is_listed: true,
+    isCreatedByUser: true,
+    isDisplayable: true,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'PRD-003',
+    companyId: 'comp-1',
+    name: 'Sprite 2L x4',
+    brand: 'Sprite',
+    brandLogo: 'https://picsum.photos/seed/sprite/40/40',
+    productPicture: 'https://picsum.photos/seed/PRD-003/80/80',
+    price: 16.75,
+    category: 'Beverages',
+    status: 'Out of Stock',
+    variants: ['Regular', 'Zero'],
+    unit: '4 pack',
+    stockQuantity: 0,
+    is_listed: true,
+    isImported: true,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'PRD-004',
+    companyId: 'comp-1',
+    name: 'Rice Premium 5kg',
+    brand: 'Island Grains',
+    brandLogo: 'https://picsum.photos/seed/islandgrains/40/40',
+    productPicture: 'https://picsum.photos/seed/PRD-004/80/80',
+    price: 45.00,
+    category: 'Groceries',
+    status: 'Available',
+    variants: ['White', 'Basmati', 'Brown'],
+    unit: '5 kg bag',
+    stockQuantity: 2500,
+    is_listed: true,
+    isCreatedByUser: true,
+    isDisplayable: true,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'PRD-005',
+    companyId: 'comp-1',
+    name: 'Cooking Oil 1L',
+    brand: 'Golden Sun',
+    brandLogo: 'https://picsum.photos/seed/goldensun/40/40',
+    productPicture: 'https://picsum.photos/seed/PRD-005/80/80',
+    price: 12.99,
+    category: 'Groceries',
+    status: 'In Production',
+    unit: '1 L bottle',
+    stockQuantity: 0,
+    is_listed: false,
+    isCreatedByUser: true,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'PRD-006',
+    companyId: 'comp-1',
+    name: 'Flour All-Purpose 2kg',
+    brand: 'Island Grains',
+    brandLogo: 'https://picsum.photos/seed/islandgrains/40/40',
+    productPicture: 'https://picsum.photos/seed/PRD-006/80/80',
+    price: 8.50,
+    category: 'Groceries',
+    status: 'Available',
+    unit: '2 kg bag',
+    stockQuantity: 3200,
+    is_listed: true,
+    isImported: true,
+    isDisplayable: true,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'PRD-007',
+    companyId: 'comp-1',
+    name: 'Fresh Milk 1L',
+    brand: 'DairyBest',
+    brandLogo: 'https://picsum.photos/seed/dairybest/40/40',
+    productPicture: 'https://picsum.photos/seed/PRD-007/80/80',
+    price: 4.99,
+    category: 'Dairy',
+    status: 'Available',
+    variants: ['Full Cream', 'Low Fat', 'Skim'],
+    unit: '1 L carton',
+    stockQuantity: 450,
+    is_listed: true,
+    isImported: true,
+    isDisplayable: true,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'PRD-008',
+    companyId: 'comp-1',
+    name: 'Cheese Cheddar 250g',
+    brand: 'DairyBest',
+    brandLogo: 'https://picsum.photos/seed/dairybest/40/40',
+    productPicture: 'https://picsum.photos/seed/PRD-008/80/80',
+    price: 9.99,
+    category: 'Dairy',
+    status: 'Inactive',
+    unit: '250 g block',
+    stockQuantity: 50,
+    is_listed: false,
+    isCreatedByUser: true,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  }
+];
+
+// ============================================================================
+// MOCK DATABASE - LOCATION PRODUCT OVERRIDES
+// ============================================================================
+
+let locationProducts = [
+  {
+    id: 'lp-1',
+    businessId: 'comp-1',
+    locationId: 'loc-1',
+    productId: 'PRD-001',
+    priceOverride: 27.99,
+    taxOverride: null,
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: 'lp-2',
+    businessId: 'comp-1',
+    locationId: 'loc-3',
+    productId: 'PRD-001',
+    priceOverride: 24.99,
+    taxOverride: 0.10,
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00Z'
+  }
+];
+
+// ============================================================================
+// MOCK DATABASE - STOCKS
+// ============================================================================
+
+let stocks = [
+  { id: 'stk-1', businessId: 'comp-1', locationId: 'loc-1', productId: 'PRD-001', qtyOnHand: 500 },
+  { id: 'stk-2', businessId: 'comp-1', locationId: 'loc-1', productId: 'PRD-002', qtyOnHand: 300 },
+  { id: 'stk-3', businessId: 'comp-1', locationId: 'loc-1', productId: 'PRD-004', qtyOnHand: 1000 },
+  { id: 'stk-4', businessId: 'comp-1', locationId: 'loc-2', productId: 'PRD-001', qtyOnHand: 400 },
+  { id: 'stk-5', businessId: 'comp-1', locationId: 'loc-2', productId: 'PRD-002', qtyOnHand: 200 },
+  { id: 'stk-6', businessId: 'comp-1', locationId: 'loc-3', productId: 'PRD-001', qtyOnHand: 600 },
+  { id: 'stk-7', businessId: 'comp-1', locationId: 'loc-3', productId: 'PRD-004', qtyOnHand: 1500 }
+];
+
+// ============================================================================
+// MOCK DATABASE - ORDERS
+// ============================================================================
+
+let orders = [
+  {
+    id: 'ORD-001',
+    businessId: 'comp-1',
+    soldByScope: ORDER_SCOPE.PARENT,
+    soldByLocationId: null,
+    fulfillmentLocationId: 'loc-1',
+    customerId: 'client-1',
+    customerName: 'Grocery Mart Ltd',
+    customerAddress: '123 Main Street, Port Louis',
+    customerPhone: '+230 5123 4567',
+    items: [
+      { productId: 'PRD-001', name: 'Coca-Cola 0.5L x10', quantity: 3, unitPrice: 25.99, subtotal: 77.97 },
+      { productId: 'PRD-002', name: 'Fanta Orange 1L x6', quantity: 2, unitPrice: 19.50, subtotal: 39.00 }
+    ],
+    totalAmount: 116.97,
+    status: ORDER_STATUS.ASSIGNED,
+    paymentStatus: 'Unpaid',
+    notes: 'Please call before delivery',
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'ORD-002',
+    businessId: 'comp-1',
+    soldByScope: ORDER_SCOPE.LOCATION,
+    soldByLocationId: 'loc-1',
+    fulfillmentLocationId: 'loc-1',
+    customerId: 'client-2',
+    customerName: 'Super Store Express',
+    customerAddress: '456 Commerce Ave, Curepipe',
+    customerPhone: '+230 5234 5678',
+    items: [
+      { productId: 'PRD-004', name: 'Rice Premium 5kg', quantity: 10, unitPrice: 45.00, subtotal: 450.00 }
+    ],
+    totalAmount: 450.00,
+    status: ORDER_STATUS.OUT_FOR_DELIVERY,
+    paymentStatus: 'Paid',
+    notes: '',
+    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'ORD-003',
+    businessId: 'comp-1',
+    soldByScope: ORDER_SCOPE.PARENT,
+    soldByLocationId: null,
+    fulfillmentLocationId: null,
+    customerId: 'client-3',
+    customerName: 'Mini Mart Plus',
+    customerAddress: '789 Industrial Rd, Vacoas',
+    customerPhone: '+230 5345 6789',
+    items: [
+      { productId: 'PRD-001', name: 'Coca-Cola 0.5L x10', quantity: 5, unitPrice: 25.99, subtotal: 129.95 },
+      { productId: 'PRD-006', name: 'Flour All-Purpose 2kg', quantity: 20, unitPrice: 8.50, subtotal: 170.00 }
+    ],
+    totalAmount: 299.95,
+    status: ORDER_STATUS.NEW,
+    paymentStatus: 'Unpaid',
+    notes: 'Urgent order',
+    createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'ORD-004',
+    businessId: 'comp-1',
+    soldByScope: ORDER_SCOPE.LOCATION,
+    soldByLocationId: 'loc-3',
+    fulfillmentLocationId: 'loc-3',
+    customerId: 'client-4',
+    customerName: 'Fresh Mart Central',
+    customerAddress: '321 Market Street, Quatre Bornes',
+    customerPhone: '+230 5567 8901',
+    items: [
+      { productId: 'PRD-007', name: 'Fresh Milk 1L', quantity: 50, unitPrice: 4.99, subtotal: 249.50 }
+    ],
+    totalAmount: 249.50,
+    status: ORDER_STATUS.DELIVERED,
+    paymentStatus: 'Paid',
+    notes: '',
+    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString()
+  }
+];
+
+// ============================================================================
+// MOCK DATABASE - BUSINESS MEMBERS
+// ============================================================================
+
+let businessMembers = [
+  {
+    id: 'bm-1',
+    businessId: 'comp-1',
+    userId: 'user-1',
+    role: MEMBER_ROLES.SUPER_ADMIN,
+    status: MEMBER_STATUS.ACCEPTED,
+    createdAt: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: 'bm-2',
+    businessId: 'comp-1',
+    userId: 'user-2',
+    role: MEMBER_ROLES.ADMIN,
+    status: MEMBER_STATUS.ACCEPTED,
+    createdAt: '2024-03-01T00:00:00Z'
+  },
+  {
+    id: 'bm-3',
+    businessId: 'comp-2',
+    userId: 'user-3',
+    role: MEMBER_ROLES.SUPER_ADMIN,
+    status: MEMBER_STATUS.ACCEPTED,
+    createdAt: '2024-01-01T00:00:00Z'
+  }
+];
+
+// ============================================================================
+// MOCK DATABASE - LOCATION MEMBERS
+// ============================================================================
+
+let locationMembers = [
+  {
+    id: 'lm-1',
+    locationId: 'loc-1',
+    businessId: 'comp-1',
+    userId: 'user-1',
+    role: MEMBER_ROLES.SUPER_ADMIN,
+    status: MEMBER_STATUS.ACCEPTED,
+    permissions: ['orders', 'stock', 'deliveries', 'invoices'],
+    createdAt: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: 'lm-2',
+    locationId: 'loc-1',
+    businessId: 'comp-1',
+    userId: 'user-4',
+    role: MEMBER_ROLES.STAFF,
+    status: MEMBER_STATUS.ACCEPTED,
+    permissions: ['deliveries'],
+    createdAt: '2024-06-01T00:00:00Z'
+  },
+  {
+    id: 'lm-3',
+    locationId: 'loc-2',
+    businessId: 'comp-1',
+    userId: 'user-1',
+    role: MEMBER_ROLES.ADMIN,
+    status: MEMBER_STATUS.ACCEPTED,
+    permissions: ['orders', 'stock', 'deliveries'],
+    createdAt: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: 'lm-4',
+    locationId: 'loc-3',
+    businessId: 'comp-1',
+    userId: 'user-1',
+    role: MEMBER_ROLES.SUPER_ADMIN,
+    status: MEMBER_STATUS.ACCEPTED,
+    permissions: ['orders', 'stock', 'deliveries', 'invoices'],
+    createdAt: '2024-01-01T00:00:00Z'
+  }
+];
+
+// ============================================================================
+// MOCK DATABASE - DELIVERIES
+// ============================================================================
+
+let deliveries = [
+  {
+    id: 'DEL-001',
+    companyId: 'comp-1',
+    type: 'delivery',
+    direction: 'outgoing',
+    locationId: 'loc-1',
+    clientId: 'client-1',
+    clientCompanyLogo: 'https://picsum.photos/seed/grocerymart/100/100',
+    clientCompanyName: 'Grocery Mart Ltd',
+    clientAddress: '123 Main Street, Port Louis',
+    clientEmail: 'orders@grocerymart.mu',
+    clientPhone: '+230 5123 4567',
+    clientNotes: 'Please call before delivery',
+    distributorNotes: '',
+    orderTime: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    expectedDeliveryDateTime: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+    itemCount: 5,
+    items: [
+      { id: 'I001', productId: 'P001', name: 'Coca-Cola 0.5L x10', image: 'https://picsum.photos/seed/product1/100/100', price: 25.99, quantityOrdered: 3, isLoaded: false, status: 'In Stock' },
+      { id: 'I002', productId: 'P002', name: 'Fanta Orange 1L x6', image: 'https://picsum.photos/seed/product2/100/100', price: 19.50, quantityOrdered: 2, isLoaded: false, status: 'Available' }
+    ],
+    totalAmount: 116.97,
+    trackingNumber: 'TRK-001-2025',
+    deliveryStatus: 'new',
+    paymentStatus: 'Unpaid',
+    assignedStaffId: null,
+    assignedTo: null,
+    transportMode: null,
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'DEL-002',
+    companyId: 'comp-1',
+    type: 'delivery',
+    direction: 'outgoing',
+    locationId: 'loc-1',
+    clientId: 'client-2',
+    clientCompanyLogo: 'https://picsum.photos/seed/superstore/100/100',
+    clientCompanyName: 'Super Store Express',
+    clientAddress: '456 Commerce Ave, Curepipe',
+    clientEmail: 'purchasing@superstore.mu',
+    clientPhone: '+230 5234 5678',
+    clientNotes: 'Delivery dock at back entrance',
+    distributorNotes: 'High priority customer',
+    orderTime: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    expectedDeliveryDateTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    itemCount: 8,
+    items: [
+      { id: 'I003', productId: 'P003', name: 'Sprite 2L x4', image: 'https://picsum.photos/seed/product3/100/100', price: 16.75, quantityOrdered: 4, isLoaded: true, status: 'Available' },
+      { id: 'I004', productId: 'P004', name: 'Juice Box x12', image: 'https://picsum.photos/seed/product4/100/100', price: 35.00, quantityOrdered: 4, isLoaded: true, status: 'In Stock' }
+    ],
+    totalAmount: 207.00,
+    trackingNumber: 'TRK-002-2025',
+    deliveryStatus: 'ongoing',
+    paymentStatus: 'Paid',
+    assignedStaffId: 'S001',
+    assignedTo: 'John Doe',
+    transportMode: 'Truck',
+    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'DEL-003',
+    companyId: 'comp-1',
+    type: 'delivery',
+    direction: 'outgoing',
+    locationId: 'loc-2',
+    clientId: 'client-3',
+    clientCompanyLogo: 'https://picsum.photos/seed/minimart/100/100',
+    clientCompanyName: 'Mini Mart Plus',
+    clientAddress: '789 Industrial Rd, Vacoas',
+    clientEmail: 'orders@minimart.mu',
+    clientPhone: '+230 5345 6789',
+    clientNotes: '',
+    distributorNotes: '',
+    orderTime: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+    expectedDeliveryDateTime: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    itemCount: 3,
+    totalAmount: 89.50,
+    trackingNumber: 'TRK-003-2025',
+    deliveryStatus: 'delivered',
+    paymentStatus: 'Paid',
+    assignedStaffId: 'S002',
+    assignedTo: 'Jane Smith',
+    transportMode: 'Van',
+    createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'DEL-004',
+    companyId: 'comp-1',
+    type: 'delivery',
+    direction: 'incoming',
+    locationId: 'loc-1',
+    clientId: 'supplier-1',
+    clientCompanyLogo: 'https://picsum.photos/seed/supplier/100/100',
+    clientCompanyName: 'Phoenix Beverages Ltd',
+    clientAddress: 'Industrial Zone, Phoenix',
+    clientEmail: 'orders@phoenix.mu',
+    clientPhone: '+230 5456 7890',
+    clientNotes: 'Receiving at warehouse dock A',
+    distributorNotes: '',
+    orderTime: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+    expectedDeliveryDateTime: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(),
+    itemCount: 50,
+    totalAmount: 2500.00,
+    trackingNumber: 'TRK-004-2025',
+    deliveryStatus: 'pending',
+    paymentStatus: 'Unpaid',
+    assignedStaffId: null,
+    assignedTo: null,
+    transportMode: null,
+    createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'DEL-005',
+    companyId: 'comp-1',
+    type: 'transfer',
+    direction: 'outgoing',
+    locationId: 'loc-1',
+    fromLocation: 'Warehouse A - Port Louis',
+    toLocation: 'Warehouse B - Curepipe',
+    clientCompanyName: 'Internal Transfer',
+    clientAddress: 'Warehouse B, Industrial Zone, Curepipe',
+    clientNotes: 'Stock replenishment',
+    distributorNotes: '',
+    orderTime: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    expectedDeliveryDateTime: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
+    itemCount: 20,
+    totalAmount: 0,
+    deliveryStatus: 'pending',
+    paymentStatus: 'Paid',
+    assignedStaffId: 'S003',
+    assignedTo: 'Bob Johnson',
+    transportMode: 'Truck',
+    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'DEL-006',
+    companyId: 'comp-1',
+    type: 'delivery',
+    direction: 'outgoing',
+    locationId: 'loc-2',
+    clientId: 'client-4',
+    clientCompanyLogo: 'https://picsum.photos/seed/freshmart/100/100',
+    clientCompanyName: 'Fresh Mart Central',
+    clientAddress: '321 Market Street, Quatre Bornes',
+    clientEmail: 'supply@freshmart.mu',
+    clientPhone: '+230 5567 8901',
+    clientNotes: 'Urgent - Low stock alert',
+    distributorNotes: 'Express delivery requested',
+    orderTime: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    expectedDeliveryDateTime: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+    itemCount: 12,
+    totalAmount: 345.75,
+    trackingNumber: 'TRK-006-2025',
+    deliveryStatus: 'new',
+    paymentStatus: 'Pending Confirmation',
+    assignedStaffId: null,
+    assignedTo: null,
+    transportMode: null,
+    createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+  }
+];
+
+// ============================================================================
+// MOCK DATABASE - INVOICES
+// ============================================================================
+
+let invoices = [
+  {
+    id: 'inv-1',
+    businessId: 'comp-1',
+    issuedByScope: INVOICE_SCOPE.PARENT,
+    issuedByLocationId: null,
+    orderId: 'ORD-001',
+    invoiceNumber: 'INV-2025-001',
+    clientName: 'Grocery Mart Ltd',
+    clientEmail: 'orders@grocerymart.mu',
+    amount: 116.97,
+    taxAmount: 17.55,
+    totalAmount: 134.52,
+    status: 'sent',
+    type: 'invoice',
+    issueDate: '2025-01-15',
+    dueDate: '2025-02-14',
+    items: [
+      { productId: 'PRD-001', description: 'Coca-Cola 0.5L x10', quantity: 3, unitPrice: 25.99, totalPrice: 77.97 },
+      { productId: 'PRD-002', description: 'Fanta Orange 1L x6', quantity: 2, unitPrice: 19.50, totalPrice: 39.00 }
+    ],
+    notes: 'Payment terms: Net 30',
+    createdAt: '2025-01-15T09:00:00Z',
+    updatedAt: '2025-01-15T09:00:00Z'
+  },
+  {
+    id: 'inv-2',
+    businessId: 'comp-1',
+    issuedByScope: INVOICE_SCOPE.LOCATION,
+    issuedByLocationId: 'loc-1',
+    orderId: 'ORD-002',
+    invoiceNumber: 'WHA-2025-001',
+    clientName: 'Super Store Express',
+    clientEmail: 'purchasing@superstore.mu',
+    amount: 450.00,
+    taxAmount: 67.50,
+    totalAmount: 517.50,
+    status: 'paid',
+    type: 'invoice',
+    issueDate: '2025-01-14',
+    dueDate: '2025-02-13',
+    items: [
+      { productId: 'PRD-004', description: 'Rice Premium 5kg', quantity: 10, unitPrice: 45.00, totalPrice: 450.00 }
+    ],
+    notes: '',
+    createdAt: '2025-01-14T10:00:00Z',
+    updatedAt: '2025-01-14T14:00:00Z'
+  },
+  {
+    id: 'inv-3',
+    businessId: 'comp-1',
+    issuedByScope: INVOICE_SCOPE.LOCATION,
+    issuedByLocationId: 'loc-3',
+    orderId: 'ORD-004',
+    invoiceNumber: 'DIS-2025-001',
+    clientName: 'Fresh Mart Central',
+    clientEmail: 'supply@freshmart.mu',
+    amount: 249.50,
+    taxAmount: 37.43,
+    totalAmount: 286.93,
+    status: 'paid',
+    type: 'invoice',
+    issueDate: '2025-01-06',
+    dueDate: '2025-02-05',
+    items: [
+      { productId: 'PRD-007', description: 'Fresh Milk 1L', quantity: 50, unitPrice: 4.99, totalPrice: 249.50 }
+    ],
+    notes: '',
+    createdAt: '2025-01-06T08:00:00Z',
+    updatedAt: '2025-01-07T10:00:00Z'
+  }
+];
+
+// ============================================================================
+// MOCK DATABASE - CHATS
+// ============================================================================
+
+let chats = [
+  {
+    id: 'chat-1',
+    companyId: 'comp-1',
+    locationId: null,
+    type: 'client',
+    name: '📋 Message Types Showcase',
+    participants: ['user-1', 'demo-1'],
+    lastMessage: {
+      id: 'msg-showcase',
+      content: 'View all chat bubble types here',
+      type: 'text',
+      senderId: 'demo-1',
+      senderName: 'Demo Contact',
+      timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+      isRead: false,
+      isOutgoing: false,
+      status: 'delivered'
+    },
+    unreadCount: 10,
+    avatar: 'https://picsum.photos/seed/showcase/40/40',
+    createdAt: '2025-01-15T09:00:00Z',
+    updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'chat-2',
+    companyId: 'comp-1',
+    locationId: null,
+    type: 'client',
+    name: 'Sarah Johnson',
+    participants: ['user-1', 'sarah-1'],
+    lastMessage: {
+      id: 'msg-sarah',
+      content: 'Photo',
+      type: 'photo',
+      senderId: 'sarah-1',
+      senderName: 'Sarah Johnson',
+      timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+      isRead: false,
+      isOutgoing: false,
+      status: 'delivered'
+    },
+    unreadCount: 1,
+    avatar: 'https://picsum.photos/seed/sarah/40/40',
+    createdAt: '2025-01-14T10:00:00Z',
+    updatedAt: new Date(Date.now() - 45 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'chat-3',
+    companyId: 'comp-1',
+    locationId: null,
+    type: 'supplier',
+    name: 'XYZ Suppliers',
+    participants: ['user-1', 'xyz-1'],
+    lastMessage: {
+      id: 'msg-xyz',
+      content: 'New_Products_Catalog.pdf',
+      type: 'pdf',
+      senderId: 'xyz-1',
+      senderName: 'XYZ Suppliers',
+      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      isRead: false,
+      isOutgoing: false,
+      status: 'seen'
+    },
+    unreadCount: 1,
+    avatar: 'https://picsum.photos/seed/xyz/40/40',
+    createdAt: '2025-01-13T14:00:00Z',
+    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'chat-4',
+    companyId: 'comp-1',
+    locationId: null,
+    type: 'client',
+    name: 'Mike Chen',
+    participants: ['user-1', 'mike-1'],
+    lastMessage: {
+      id: 'msg-mike',
+      content: 'Video call ended (15 min)',
+      type: 'video_call',
+      senderId: 'user-1',
+      senderName: 'You',
+      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+      isRead: true,
+      isOutgoing: true,
+      status: 'delivered'
+    },
+    unreadCount: 0,
+    avatar: 'https://picsum.photos/seed/mike/40/40',
+    createdAt: '2025-01-12T09:00:00Z',
+    updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'chat-5',
+    companyId: 'comp-1',
+    locationId: 'loc-1',
+    type: 'internal',
+    name: 'Warehouse A Team',
+    participants: ['user-1', 'john-1', 'maria-1'],
+    lastMessage: {
+      id: 'msg-warehouse',
+      content: 'Inventory_Report_Jan2025.pdf',
+      type: 'pdf',
+      senderId: 'user-1',
+      senderName: 'You',
+      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      isRead: true,
+      isOutgoing: true,
+      status: 'sent'
+    },
+    unreadCount: 0,
+    avatar: null,
+    createdAt: '2025-01-10T08:00:00Z',
+    updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+  }
+];
+
+// ============================================================================
+// MOCK DATABASE - MESSAGES
+// ============================================================================
+
+let messages = {
+  'chat-1': [
+    {
+      id: 'msg-1-1',
+      chatId: 'chat-1',
+      type: 'event',
+      event: 'Conversation started',
+      isOutgoing: false,
+      sender: { id: 'system', name: 'System', avatar: '', role: 'system' },
+      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-1-2',
+      chatId: 'chat-1',
+      type: 'text',
+      text: '📝 TEXT MESSAGE (Incoming)\nThis is a regular text message received from another user.',
+      isOutgoing: false,
+      sender: { id: 'demo-1', name: 'Demo Contact', avatar: 'https://picsum.photos/seed/demo/40/40', role: 'client' },
+      timestamp: new Date(Date.now() - 90 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-1-3',
+      chatId: 'chat-1',
+      type: 'text',
+      text: '📝 TEXT MESSAGE (Outgoing)\nThis is a text message you sent.',
+      isOutgoing: true,
+      sender: { id: 'user-1', name: 'You', avatar: '', role: 'business' },
+      timestamp: new Date(Date.now() - 85 * 60 * 1000).toISOString(),
+      status: 'read'
+    }
+  ],
+  'chat-2': [
+    {
+      id: 'msg-2-1',
+      chatId: 'chat-2',
+      type: 'text',
+      text: 'Hi! I wanted to share some photos of the product issue.',
+      isOutgoing: false,
+      sender: { id: 'sarah-1', name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'client' },
+      timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    }
+  ],
+  'chat-3': [
+    {
+      id: 'msg-3-1',
+      chatId: 'chat-3',
+      type: 'text',
+      text: 'Hi! We have new products available for order.',
+      isOutgoing: false,
+      sender: { id: 'xyz-1', name: 'XYZ Suppliers', avatar: 'https://picsum.photos/seed/xyz/40/40', role: 'supplier' },
+      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+    }
+  ]
+};
+
+// ============================================================================
+// MOCK DATABASE - USERS
+// ============================================================================
+
+let users = [
+  {
+    id: 'user-1',
+    email: 'admin@noupro.com',
+    name: 'Admin User',
+    avatar: 'https://picsum.photos/seed/admin/100/100',
+    phone: '+230-5123-4567',
+    createdAt: '2024-01-01T00:00:00Z',
+    lastLoginAt: '2025-01-15T08:00:00Z'
+  },
+  {
+    id: 'user-2',
+    email: 'manager@noupro.com',
+    name: 'Marie Manager',
+    avatar: 'https://picsum.photos/seed/marie/100/100',
+    phone: '+230-5234-5678',
+    createdAt: '2024-03-01T00:00:00Z',
+    lastLoginAt: '2025-01-14T09:00:00Z'
+  },
+  {
+    id: 'user-3',
+    email: 'owner@globalsupply.mu',
+    name: 'Global Owner',
+    avatar: 'https://picsum.photos/seed/global/100/100',
+    phone: '+230-5345-6789',
+    createdAt: '2024-01-01T00:00:00Z',
+    lastLoginAt: '2025-01-15T07:00:00Z'
+  },
+  {
+    id: 'user-4',
+    email: 'driver@noupro.com',
+    name: 'John Driver',
+    avatar: 'https://picsum.photos/seed/driver/100/100',
+    phone: '+230-5456-7890',
+    createdAt: '2024-06-01T00:00:00Z',
+    lastLoginAt: '2025-01-15T06:00:00Z'
+  }
+];
+
+// ============================================================================
+// MOCK DATABASE - FEED POSTS
+// ============================================================================
+
+let feedPosts = [
+  {
+    id: 'post-1',
+    type: 'brand_presentation',
+    timestamp: '2h ago',
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    data: {
+      brandId: 'brand-001',
+      brandName: 'Tropicana',
+      brandLogo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Tropicana_Logo.svg/512px-Tropicana_Logo.svg.png',
+      distributorName: 'NouPro Distribution',
+      distributorId: 'comp-1',
+      products: [
+        { id: 'prod-1', name: 'Premium Orange Juice', unit: '1L', price: 125.00, image: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=400', isNew: true },
+        { id: 'prod-2', name: 'Tropical Mango Smoothie', unit: '500ml', price: 145.00, image: 'https://images.unsplash.com/photo-1623065422902-30a2d299bbe4?w=400', isNew: false }
+      ]
+    }
+  },
+  {
+    id: 'post-2',
+    type: 'company_presentation',
+    timestamp: '4h ago',
+    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    data: {
+      companyId: 'comp-2',
+      companyName: 'Phoenix Beverages',
+      companyLogo: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/Phoenix_Beverages_Limited_logo.svg/512px-Phoenix_Beverages_Limited_logo.svg.png',
+      location: 'Port Louis, Mauritius',
+      isConnected: false,
+      brands: [
+        { id: 'brand-101', name: 'Phoenix Beer', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/Phoenix_Beverages_Limited_logo.svg/200px-Phoenix_Beverages_Limited_logo.svg.png', productsCount: 24 }
+      ]
+    }
+  }
+];
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+module.exports = {
+  // Constants
+  SUBSCRIPTION_TIERS,
+  LOCATION_MODES,
+  ORDER_STATUS,
+  ORDER_SCOPE,
+  INVOICE_SCOPE,
+  MEMBER_ROLES,
+  MEMBER_STATUS,
+  
+  // Data arrays (mutable)
+  companies,
+  locations,
+  products,
+  locationProducts,
+  stocks,
+  orders,
+  businessMembers,
+  locationMembers,
+  deliveries,
+  invoices,
+  chats,
+  messages,
+  users,
+  feedPosts
+};
+

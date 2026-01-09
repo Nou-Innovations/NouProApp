@@ -1,0 +1,56 @@
+/**
+ * User Repository - Prisma Implementation
+ */
+const { prisma } = require('../../db/prisma');
+
+async function list() {
+  return prisma.user.findMany({
+    orderBy: { createdAt: 'desc' }
+  });
+}
+
+async function getById(id) {
+  return prisma.user.findUnique({
+    where: { id }
+  });
+}
+
+async function getByEmail(email) {
+  return prisma.user.findFirst({
+    where: { email }
+  });
+}
+
+async function create(data) {
+  return prisma.user.create({
+    data
+  });
+}
+
+async function update(id, patch) {
+  return prisma.user.update({
+    where: { id },
+    data: patch
+  });
+}
+
+async function remove(id) {
+  try {
+    await prisma.user.delete({
+      where: { id }
+    });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+module.exports = { 
+  list, 
+  getById, 
+  getByEmail, 
+  create, 
+  update, 
+  delete: remove 
+};
+

@@ -1,0 +1,2557 @@
+{
+  "$schema": "https://noupro.app/app-logic/v1",
+  "version": "1.0.0",
+  "name": "NouPro App Logic",
+  "description": "Complete application logic, business rules, and data structures for the NouPro B2B distribution management platform. This serves as the single source of truth for AI-assisted development.",
+
+  "product": {
+    "name": "NouPro",
+    "fullName": "NouPro Distributor & Retail Management Platform",
+    "tagline": "Take the control",
+    "vision": "Give professionals a powerful tool to have full control over their products, orders, and business operations.",
+    "positioning": "The modern distribution tool built for Mauritius.",
+    "targetMarket": "Small distributors and retailers in Mauritius",
+    "longTermVision": "The professional platform that powers the backbone of small business operations - from Mauritius to Africa to global niches."
+  },
+
+  "problemStatement": {
+    "core": "Small distributors and retailers still depend heavily on paper-based workflows for ordering, stock management, invoicing, and product tracking, causing inefficiencies, errors, and operational delays.",
+    "painPoints": [
+      "Data duplication (write on paper → rewrite into software)",
+      "Frequent miscalculations",
+      "Lost order notes during delivery",
+      "No real-time stock visibility",
+      "Slow communication with clients",
+      "No backup of important business information"
+    ],
+    "consequences": [
+      "Risk of lost orders",
+      "Stock mismatch",
+      "Revenue leakage",
+      "Poor customer experience",
+      "Harder growth",
+      "No control or analytics"
+    ]
+  },
+
+  "targetUsers": {
+    "primary": {
+      "type": "Small distributors",
+      "description": "Businesses that need to manage products, stocks, orders, invoicing, and deliveries in one place"
+    },
+    "secondary": [
+      {
+        "type": "Retail shops",
+        "description": "Shops buying from distributors"
+      },
+      {
+        "type": "Field delivery agents",
+        "description": "Staff members doing deliveries"
+      },
+      {
+        "type": "Small manufacturers",
+        "description": "Small factories supplying products"
+      }
+    ],
+    "usageContext": [
+      "At work (office or warehouse)",
+      "On the road during deliveries",
+      "On mobile devices for quick actions",
+      "Daily usage for orders, invoices, and stock checks",
+      "Weekly usage for analytics and reports"
+    ],
+    "targetIndustries": [
+      {
+        "name": "Food & Beverage Distributors",
+        "examples": ["Beverage suppliers", "Frozen food wholesalers", "Snacks distributors", "Importers doing local delivery"]
+      },
+      {
+        "name": "General Retail / Convenience Stores",
+        "examples": ["Small independent shops", "Corner shops", "Small supermarkets", "Pharmacies", "Mini-distributors"]
+      },
+      {
+        "name": "Small Factory & Local Production",
+        "examples": ["Bakeries", "Family-owned production units", "Local brands distributing in vans"]
+      }
+    ]
+  },
+
+  "identitySystem": {
+    "description": "NouPro operates on a two-layer identity model: Personal Profile and Business Profile",
+    
+    "profileTypes": {
+      "description": "There are exactly TWO types of profiles in the app",
+      
+      "userProfile": {
+        "description": "Personal profile representing an individual user. REQUIRED for everyone to use the app.",
+        "requirement": "Every user MUST have exactly ONE User Profile to access the app",
+        "purpose": [
+          "Logging into the app",
+          "Messaging businesses or other users",
+          "Receiving notifications",
+          "Viewing activity history",
+          "Browsing businesses & products",
+          "Managing personal account settings",
+          "Switching to Business Profiles they own or have access to",
+          "Being added to staff lists by businesses"
+        ],
+        "restrictions": {
+          "cannotDo": [
+            "Create products",
+            "Manage stock",
+            "Receive orders",
+            "Process orders",
+            "Manage deliveries",
+            "Publish a business page",
+            "Access business tools"
+          ],
+          "isNot": ["A business", "A retailer", "A distributor", "A shop", "A brand", "A professional entity"]
+        },
+        "importance": "Ensures one user can manage or join multiple businesses. Staff never log in 'as the business'. A user remains an individual first, then activates business identities as needed."
+      },
+
+      "businessProfile": {
+        "description": "Profile of a company/professional entity. Shows products that can be ordered by others in business mode.",
+        "types": ["Distributor", "Retailer/Shop", "Factory/Production", "Service Provider", "Independent Professional", "Multi-location Company"],
+        "visibleTo": "Anyone can view business profiles, but only users in Business Mode can order products",
+        "includes": [
+          "Products catalog",
+          "Stock levels",
+          "Orders management",
+          "Deliveries",
+          "Business Inbox",
+          "Invoices (paid plans)",
+          "Staff management",
+          "Public business page (paid)",
+          "Analytics (later)"
+        ],
+        "keyPrinciple": "A retailer is simply a business profile (no paid subscription plan) with fewer tools. No special 'retailer accounts' needed.",
+        "userCapabilities": [
+          "Create unlimited business profiles",
+          "Join multiple businesses as staff",
+          "Switch between business identities instantly"
+        ]
+      }
+    },
+
+    "profileViewingModes": {
+      "description": "How profiles appear when viewed by others vs. when viewing your own",
+      
+      "viewingOthersProfile": {
+        "description": "When viewing someone else's profile (User or Business)",
+        "buttons": {
+          "primary": "Message",
+          "secondary": "Connect"
+        },
+        "additionalOptions": ["Report", "Share", "Block"]
+      },
+      
+      "viewingOwnUserProfile": {
+        "name": "Personal User Profile Screen (User Mode)",
+        "description": "When viewing your OWN User Profile. Shows the same layout as others see.",
+        "buttons": {
+          "primary": "Edit profile",
+          "secondary": "Share"
+        },
+        "content": ["Profile picture", "Name", "Email (optional)", "Phone (optional)", "Job Title", "Description", "Company affiliation"]
+      },
+      
+      "viewingOwnBusinessProfile": {
+        "name": "Personal Business Profile Screen (Business Mode)",
+        "description": "When viewing your OWN Business Profile. Shows the same layout as others see.",
+        "buttons": {
+          "primary": "Edit profile",
+          "secondary": "Share"
+        },
+        "content": ["Cover/Banner image", "Profile picture/Logo", "Business name", "Description", "Brands", "Products catalog", "About section"]
+      }
+    },
+
+    "staffAccess": {
+      "description": "A User Profile linked to one or more Business Profiles with specific roles",
+      "loginMethod": "Staff always log in with their User Profile, never 'as the business'",
+      "accessMethod": "Gain access to specific Business Profiles through permissions",
+      "workflow": "Switch into the business identity to perform tasks"
+    },
+
+    "profileSwitching": {
+      "description": "Switching profile = switching identity, not logging out",
+      "userModeActive": "User acts as an individual (personal / Staff)",
+      "businessModeActive": "User acts as the company (distributor, retailer, service, etc.)",
+      "uiChange": "Tabs, permissions, and UI instantly change based on active profile"
+    }
+  },
+
+  "navigation": {
+    "description": "Bottom tabs depend entirely on the active profile type. Inbox and Notifications are accessed via overlays from the Home header, not as tabs.",
+
+    "personalProfileTabs": {
+      "description": "For individuals browsing, chatting, and ordering",
+      "tabs": [
+        {
+          "name": "Home",
+          "icon": "home",
+          "description": "Feed & updates from businesses, suggestions. Header contains Notifications and Inbox icons with badges. Swipe left opens Inbox overlay."
+        },
+        {
+          "name": "Explore",
+          "icon": "search",
+          "description": "Discover businesses, browse categories, search businesses/products"
+        },
+        {
+          "name": "Dashboard",
+          "icon": "grid",
+          "description": "Personal activity overview, active orders, pending deliveries, connections, favorites. Replaces Inbox tab."
+        },
+        {
+          "name": "Activity",
+          "altName": "Orders",
+          "icon": "list",
+          "description": "All orders placed as a person (status, history, notifications)"
+        },
+        {
+          "name": "Profile",
+          "icon": "person",
+          "description": "Personal settings, and entry to switch or manage business profiles"
+        }
+      ],
+      "hiddenFromPersonal": ["Products", "Stock", "Orders management", "Deliveries", "Business settings"],
+      "overlays": {
+        "description": "Screens accessible from Home header, slide from right",
+        "inbox": {
+          "accessedVia": ["Home header Inbox icon", "Swipe left on Home"],
+          "animation": "slide_from_right",
+          "tabBarHidden": true
+        },
+        "notifications": {
+          "accessedVia": ["Home header Notifications icon"],
+          "animation": "slide_from_right",
+          "tabBarHidden": true
+        }
+      }
+    },
+
+    "businessProfileTabs": {
+      "description": "For businesses performing operational tasks (Pro Mode)",
+      "tabs": [
+        {
+          "name": "Home",
+          "icon": "home",
+          "description": "Business dashboard with KPI chips, quick actions, priority queue, and activity timeline. Header contains Notifications and Inbox icons with badges. Swipe left opens Inbox overlay."
+        },
+        {
+          "name": "Deliveries",
+          "icon": "car",
+          "description": "Assign, track and create deliveries and transfers, Incoming orders, manual order creation, order status",
+          "visibleTo": ["Delivery roles", "Admin", "Super Admin", "Assigned Delivery Staff"]
+        },
+        {
+          "name": "Products",
+          "icon": "cube",
+          "description": "Product catalog management, Stock levels, adjustments, low stock alerts",
+          "visibleTo": ["Admin", "Super Admin", "Staff"]
+        },
+        {
+          "name": "Invoices",
+          "icon": "document-text",
+          "description": "Invoices, estimates, invoices status, invoices history, invoices details",
+          "visibleTo": ["Admin", "Super Admin", "Assigned Invoices Staff"]
+        },
+        {
+          "name": "Business profile",
+          "icon": "Logo of the business",
+          "description": "Business profile with the cover, profile picture, Descriptions, products and about us, Business settings, staff, subscription, public page controls",
+          "visibleTo": ["Admin", "Super Admin"]
+        }
+      ],
+      "overlays": {
+        "description": "Screens accessible from Home header, slide from right",
+        "inbox": {
+          "accessedVia": ["Home header Inbox icon", "Swipe left on Home"],
+          "animation": "slide_from_right",
+          "tabBarHidden": true
+        },
+        "notifications": {
+          "accessedVia": ["Home header Notifications icon"],
+          "animation": "slide_from_right",
+          "tabBarHidden": true
+        }
+      }
+    },
+
+    "staffViewNavigation": {
+      "description": "Staff can sees all tabs but can't have access to detailed informations"
+    },
+
+    "publicBusinessPage": {
+      "description": "Read-only profile visible to anyone",
+      "elements": {
+        "header": ["Back arrow", "Hero/banner image", "Logo", "Business name", "Description"],
+        "primaryButtons": ["Message", "Connect", "More options (Report/Share/Block)"],
+        "tabs": ["Products", "About", "Cart"]
+      }
+    }
+  },
+
+  "orderingSystem": {
+    "businessToBusiness": {
+      "description": "A business (retailer or another distributor) can order from another business",
+      "flow": [
+        "Switch to Business Profile",
+        "Visit another business's public page",
+        "Browse products",
+        "Add to cart",
+        "Place order"
+      ],
+      "note": "This unlocks B2B ordering naturally"
+    },
+    "distributorCapabilities": [
+      "Receive retailer orders",
+      "Receive distributor orders",
+      "Create orders manually for clients"
+    ],
+    "personalProfileOrdering": "Personal profiles CANNOT place orders. Everyone who wants to order needs to create a business account."
+  },
+
+  "roles": {
+    "description": "Three-tier role system within business profiles",
+    
+    "superAdmin": {
+      "description": "Business owner with full control",
+      "capabilities": [
+        "All admin capabilities",
+        "Manage staff (invite, promote, remove)",
+        "Accept/reject staff join requests",
+        "Change business plan/subscription",
+        "Delete business profile",
+        "Transfer ownership"
+      ]
+    },
+    "admin": {
+      "description": "Manager with most business operations access",
+      "capabilities": [
+        "All staff capabilities",
+        "View/edit business settings (limited)",
+        "View/edit business profile",
+        "View/edit business products",
+        "View/edit business stock",
+        "View/edit business orders",
+        "View/edit business deliveries",
+        "View/edit business invoices",
+        "View/edit business estimates",
+        "Manage invoices/estimates (paid plans)",
+        "Publish business page/products (paid plans)",
+        "Can't delete business profile",
+        "Can't transfer ownership",
+        "Can't change business plan/subscription",
+        "Limited staff management (invite and remove staff)"
+      ]
+    },
+    "staff": {
+      "description": "Employee with role-based access",
+      "capabilities": [
+        "Access only permitted tabs based on role assignment",
+        "View assigned deliveries",
+        "Update delivery status",
+        "View products (if permitted)",
+        "Process orders (if permitted)"
+      ],
+      "roleTypes": ["Delivery", "Sales", "Inventory", "Custom"]
+    }
+  },
+
+  "subscriptionPlans": {
+    "free": {
+      "name": "Free Plan",
+      "price": 0,
+      "currency": "MUR",
+      "targetUser": "Very small / testing businesses",
+      "limits": {
+        "users": 1,
+        "locations": 1,
+        "staff": 0
+      },
+      "features": {
+        "included": [
+          "Create a business profile",
+          "Create/edit/delete products (private only)",
+          "Manage basic stock",
+          "Use business Inbox"
+        ],
+        "excluded": [
+          "Create selling orders",
+          "Generate invoices/estimates",
+          "Publish public business page",
+          "Receive order requests",
+          "Create deliveries and transfers",
+          "Accept staff join requests",
+          "Price privacy"
+        ]
+      }
+    },
+    "pro": {
+      "name": "Pro Plan",
+      "price": 799,
+      "currency": "MUR",
+      "period": "month",
+      "targetUser": "Small teams",
+      "limits": {
+        "staff": 3,
+        "locations": 3
+      },
+      "features": {
+        "included": [
+          "All Free features",
+          "Full product management",
+          "Selling orders",
+          "Invoices & estimates",
+          "Delivery workflow",
+          "Publish public business page",
+          "Price privacy on LaBoutik Rouz"
+        ]
+      }
+    },
+    "business": {
+      "name": "Business Plan",
+      "price": 1999,
+      "currency": "MUR",
+      "period": "month",
+      "targetUser": "Growing businesses",
+      "limits": {
+        "staff": 9,
+        "locations": 8
+      },
+      "features": {
+        "included": [
+          "All Pro features",
+          "Product & price privacy",
+          "Informational dashboard (1-week analytics)"
+        ]
+      }
+    },
+    "enterprise": {
+      "name": "Enterprise Plan",
+      "price": 3999,
+      "currency": "MUR",
+      "period": "month",
+      "targetUser": "Large teams",
+      "limits": {
+        "staff": "unlimited",
+        "locations": "unlimited"
+      },
+      "features": {
+        "included": [
+          "All Business features",
+          "Full analytics dashboard (real-time + history)",
+          "Priority support"
+        ]
+      }
+    }
+  },
+
+  "paywallTriggers": {
+    "description": "Actions that require upgrade from Free plan",
+    "triggers": [
+      {
+        "action": "Accept staff join request",
+        "allowedOnFree": false,
+        "behavior": "Show upgrade modal: needs Paid plan"
+      },
+      {
+        "action": "Publish business page",
+        "allowedOnFree": false,
+        "behavior": "Show upgrade modal"
+      },
+      {
+        "action": "Publish product",
+        "allowedOnFree": false,
+        "behavior": "Show upgrade modal"
+      },
+      {
+        "action": "Receive incoming orders",
+        "allowedOnFree": false,
+        "behavior": "Block — inform user that orders require Paid plan"
+      },
+      {
+        "action": "Create invoices/estimates",
+        "allowedOnFree": false,
+        "behavior": "Show upgrade modal"
+      },
+      {
+        "action": "Exceed staff limit on paid tier",
+        "allowedOnFree": false,
+        "behavior": "Prompt to move to higher tier"
+      }
+    ]
+  },
+
+  "permissionsMatrix": {
+    "description": "Complete permissions by profile type, role, and plan",
+    "matrix": {
+      "viewPersonalInbox": {
+        "personalProfile": true,
+        "staff": true,
+        "admin": true,
+        "superAdmin": true
+      },
+      "receiveNotifications": {
+        "personalProfile": true,
+        "staff": true,
+        "admin": true,
+        "superAdmin": true
+      },
+      "switchToBusinessProfile": {
+        "personalProfile": true,
+        "staff": "if permitted",
+        "admin": true,
+        "superAdmin": true
+      },
+      "viewBusinessInbox": {
+        "personalProfile": false,
+        "staff": "if permitted",
+        "admin": true,
+        "superAdmin": true
+      },
+      "addEditProducts": {
+        "personalProfile": false,
+        "staff": "if permitted",
+        "admin": true,
+        "superAdmin": true,
+        "freePlan": "private only",
+        "paidPlan": "can publish"
+      },
+      "viewAddStock": {
+        "personalProfile": false,
+        "staff": "if permitted",
+        "admin": true,
+        "superAdmin": true
+      },
+      "receiveOrders": {
+        "personalProfile": false,
+        "freePlan": false,
+        "paidPlan": true
+      },
+      "placeOrders": {
+        "personalProfile": false,
+        "staff": "as business profile",
+        "admin": true,
+        "superAdmin": true
+      },
+      "accessDeliveries": {
+        "personalProfile": false,
+        "staff": "delivery role only",
+        "admin": true,
+        "superAdmin": true,
+        "freePlan": false,
+        "paidPlan": true
+      },
+      "updateDeliveryStatus": {
+        "personalProfile": false,
+        "staff": "delivery role only",
+        "admin": true,
+        "superAdmin": true
+      },
+      "manageInvoices": {
+        "personalProfile": false,
+        "staff": false,
+        "admin": "paid only",
+        "superAdmin": "paid only"
+      },
+      "editBusinessSettings": {
+        "personalProfile": false,
+        "staff": false,
+        "admin": "limited",
+        "superAdmin": true
+      },
+      "manageStaff": {
+        "personalProfile": false,
+        "staff": false,
+        "admin": false,
+        "superAdmin": true
+      },
+      "publishBusinessPage": {
+        "personalProfile": false,
+        "staff": false,
+        "admin": "paid only",
+        "superAdmin": "paid only"
+      }
+    }
+  },
+
+  "screens": {
+    "personalMode": {
+      "home": {
+        "description": "Feed cards, promoted businesses, suggestions",
+        "purpose": "Purely read/entry, no business tools",
+        "header": {
+          "icons": ["Notifications (with badge)", "Inbox (with badge)"],
+          "actions": {
+            "notificationsIcon": "Opens NotificationsOverlay",
+            "inboxIcon": "Opens InboxOverlay",
+            "swipeLeft": "Opens InboxOverlay"
+          }
+        },
+        "feedPosts": {
+          "description": "Feed contains three types of posts: brand_presentation, company_presentation, new_products",
+          "postTypes": {
+            "brand_presentation": {
+              "description": "Shows a brand with products from a distributor",
+              "navigation": {
+                "onBrandHeaderPress": "Navigate to distributor's ViewBusinessProfile with expandBrandId to auto-expand that brand's products",
+                "onDistributorPress": "Navigate to distributor's ViewBusinessProfile",
+                "onProductCardPress": "Navigate to ProductDetailPublic with productId and businessId",
+                "onOrderButtonPress": "Add product to cart"
+              }
+            },
+            "company_presentation": {
+              "description": "Shows a company/distributor with their brands",
+              "navigation": {
+                "onCompanyHeaderPress": "Navigate to ViewBusinessProfile",
+                "onConnectPress": "Toggle follow/connect state",
+                "onBrandCardPress": "Navigate to company's ViewBusinessProfile with expandBrandId to auto-expand that brand's products"
+              }
+            },
+            "new_products": {
+              "description": "Shows new products added or received by a business",
+              "types": ["distributor_added", "business_received"],
+              "navigation": {
+                "onBusinessHeaderPress": "Navigate to ViewBusinessProfile",
+                "onProductCardPress": "Navigate to ProductDetailPublic with productId and businessId",
+                "onViewAllPress": "Navigate to ViewBusinessProfile"
+              }
+            }
+          },
+          "productDetailPublicScreen": {
+            "description": "Public view of a product from feed",
+            "features": [
+              "Full-screen product image with NEW badge if applicable",
+              "Brand/business info with link to ViewBusinessProfile",
+              "Product name, unit, price",
+              "Quantity selector",
+              "Add to Order button",
+              "Total price calculation"
+            ],
+            "navigation": {
+              "onBusinessPress": "Navigate to ViewBusinessProfile"
+            }
+          }
+        }
+      },
+      "explore": {
+        "description": "Search, filters, category lists",
+        "action": "Opens Public Business Profiles when a business is tapped"
+      },
+      "dashboard": {
+        "description": "Personal activity overview replacing Inbox tab",
+        "purpose": "Quick stats and recent activity for the user",
+        "content": {
+          "statsGrid": ["Active Orders", "Pending Deliveries", "Connections", "Favorites"],
+          "recentActivity": "List of recent orders, deliveries, connections"
+        }
+      },
+      "inboxOverlay": {
+        "description": "Thread list → Chat view (overlay, not tab)",
+        "purpose": "Messages between personal user & businesses",
+        "accessedVia": ["Home header Inbox icon", "Swipe left on Home"],
+        "behavior": "Slides from right, hides tab bar"
+      },
+      "notificationsOverlay": {
+        "description": "Notifications list (overlay, not tab)",
+        "purpose": "View and manage notifications",
+        "accessedVia": ["Home header Notifications icon"],
+        "behavior": "Slides from right, hides tab bar"
+      },
+      "activity": {
+        "altName": "tasks",
+        "description": "List of personal tasks. When an admin put a staff in a delivery task, it will appear here",
+        "scope": "Only tasks placed as personal profile"
+      },
+      "profile": {
+        "name": "Personal User Profile Screen (User Mode)",
+        "description": "Shows your own User Profile with the same layout others see, but with Edit/Share buttons instead of Message/Connect",
+        "icon": "user profile picture",
+        "buttons": {
+          "primary": { "label": "Edit profile", "action": "Open profile editor" },
+          "secondary": { "label": "Share", "action": "Share profile link" }
+        },
+        "header": {
+          "elements": ["Profile Switcher", "Settings icon"],
+          "profileSwitcher": {
+            "description": "Allows user to switch between User Profile and Business Profiles",
+            "location": "Top of screen, tappable area showing current profile",
+            "behavior": "Opens profile selection modal/dropdown with all available profiles"
+          }
+        },
+        "sections": [
+          {
+            "name": "Profile Picture",
+            "items": ["Profile picture (editable)"]
+          },
+          {
+            "name": "Name",
+            "items": ["Full name"]
+          },
+          {
+            "name": "Contact Info (optional)",
+            "items": ["Email", "Phone"]
+          },
+          {
+            "name": "Job Title",
+            "items": ["Job Title"]
+          },
+          {
+            "name": "Description",
+            "items": ["Bio/Description"]
+          },
+          {
+            "name": "Company Affiliation",
+            "items": ["Company Logo", "Company Name", "Company Description"],
+            "actions": ["Go to Company Profile"]
+          }
+        ]
+      },
+      "settings": {
+        "name": "Settings", 
+        "description": "User App settings",
+        "sections": [
+          {
+            "name": "Personal Information",
+            "items": ["Name settings", "Phone/email settings", "Password settings", "Language settings", "Notification settings", "Company settings"]
+          },
+          {
+            "name": "App Settings",
+            "items": ["Theme", "Language", "Legal", "Privacy"]
+          },
+          {
+            "name": "Privacy Policy",
+            "items": ["Privacy Policy and Terms of Service"]
+          },
+          {
+            "name": "Logout",
+            "items": ["Logout button"]
+          },
+          {
+            "name": "Community",
+            "items": ["A place where users can propose new features and report bugs"]
+          }
+        ]
+      }
+    },
+
+    "businessMode": {
+      "home": {
+        "name": "Pro Home / Business Dashboard",
+        "description": "Business-operating dashboard that reduces time-to-action for Orders, Deliveries, Products/Stock, Invoices, Messages",
+        "header": {
+          "title": "Home",
+          "icons": ["Notifications (with badge)", "Inbox (with badge)"],
+          "optionalCompanySelector": true,
+          "actions": {
+            "notificationsIcon": "Opens NotificationsOverlay",
+            "inboxIcon": "Opens InboxOverlay",
+            "swipeLeft": "Opens InboxOverlay"
+          }
+        },
+        "layout": {
+          "order": ["Header", "KPI Chips Row", "Activity Timeline", "Posts Section"],
+          "blocks": {
+            "kpiChipsRow": {
+              "description": "Horizontal scrollable chips showing today's metrics",
+              "chips": ["New Orders", "Deliveries Today", "Pending Deliveries", "Low Stock", "Overdue Invoices", "Unread Messages"],
+              "behavior": "Tap chip → navigates to relevant filtered list"
+            },
+            "activityTimeline": {
+              "description": "Lightweight timeline of recent business activity (operational, not social)",
+              "itemTypes": ["Order created", "Delivery completed", "Invoice sent", "Product added", "Stock updated", "Payment received"],
+              "maxItems": 5,
+              "seeAllLink": true
+            },
+            "postsSection": {
+              "description": "Feed posts like Personal mode, displayed in white container",
+              "backgroundColor": "white",
+              "behavior": "Scrolls up to reveal info section above",
+              "postTypes": ["Brand presentation", "Company presentation", "New products"],
+              "feedNavigation": {
+                "description": "Same navigation as Personal mode - product cards → ProductDetailPublic, brand cards → ViewBusinessProfile with expandBrandId"
+              }
+            }
+          }
+        },
+        "mvpConstraints": [
+          "All blocks must support: Empty state, Loading skeleton, Error fallback",
+          "Posts section should have white background contrasting with light grey page background"
+        ]
+      },
+      "inboxOverlay": {
+        "description": "Thread list → Chat view (overlay, not tab)",
+        "purpose": "Messages between the business and clients/partners",
+        "accessedVia": ["Home header Inbox icon", "Swipe left on Home"],
+        "behavior": "Slides from right, hides tab bar"
+      },
+      "notificationsOverlay": {
+        "description": "Notifications list (overlay, not tab)",
+        "purpose": "View and manage business notifications",
+        "accessedVia": ["Home header Notifications icon"],
+        "behavior": "Slides from right, hides tab bar"
+      },
+      "products": {
+        "header": {
+          "elements": ["View selector for All products, My products, Imported products, Display products", "Edit mode button"]
+        },
+        "screens": [
+          {
+            "Search bar": "Search for a product by name or brand",
+            "Location selector": "Select a location to view products",
+            "Status selector": "Select a status to filter products",
+            "Category selector": "Select a category to filter products",
+            "Product tags": "View product tags"
+          },
+          {
+            "name": "Product List",
+            "description": "List/grid with product name, price, stock status, publish status"
+          },
+          {
+            "name": "Add Product",
+            "fields": ["Brand", "Name", "Unit", "Price", "Description", "Status", "Is Published"]
+          },
+          {
+            "name": "Edit Product",
+            "description": "Same as Add, populated with current data"
+          },
+          {
+            "name": "Product Details",
+            "description": "Full details, images, stock history link (future)"
+          }
+        ]
+      },
+      "stock": {
+        "screens": [
+          {
+            "name": "Stock Overview",
+            "description": "List of products with quantities, low-stock badges"
+          },
+          {
+            "name": "Adjust Inventory",
+            "fields": ["Quantity change (add/remove/correction)", "Reason", "Confirmation"]
+          },
+          {
+            "name": "Stock History (later)",
+            "description": "Timeline of stock adjustments per product"
+          }
+        ]
+      },
+      "orders": {
+        "screens": [
+          {
+            "name": "Order List",
+            "filters": ["All", "Pending", "Confirmed", "Completed", "Cancelled"],
+            "cardInfo": ["Customer", "Total", "Date", "Status"]
+          },
+          {
+            "name": "Order Details",
+            "content": ["Line items", "Quantities", "Prices", "Total", "Notes"],
+            "actions": ["Accept/Reject", "Mark as Prepared", "Link to Delivery"]
+          },
+          {
+            "name": "Create Order",
+            "flow": ["Choose existing customer or create new", "Select products", "Set quantities", "Review & confirm"]
+          }
+        ]
+      },
+      "deliveries": {
+        "screens": [
+          {
+            "name": "Delivery List",
+            "statuses": ["Pending", "On the way", "Delivered"]
+          },
+          {
+            "name": "Delivery Details",
+            "content": ["Order reference", "Assigned staff", "Delivery address/area", "Status changes", "Optional proof/photo"],
+            "productChecklist": {
+              "description": "Table showing products to be loaded for delivery with checkboxes",
+              "uiPattern": "checklistTable from design.json",
+              "columns": ["#", "Products", "Qty", "Loaded", "Actions"],
+              "features": {
+                "quantityDisplay": {
+                  "fontSize": 18,
+                  "reducedFontSize": 14,
+                  "reduceWhen": "quantity digits > 5"
+                },
+                "stockWarning": {
+                  "visible": "when ordered quantity > available stock",
+                  "position": "below quantity in same column",
+                  "format": {
+                    "zeroStock": "0 left",
+                    "lowStock": "Only {availableStock} left"
+                  },
+                  "color": "status.error (#FF2400)"
+                },
+                "loadedCheckbox": {
+                  "size": "small (24x24)",
+                  "iconSize": 16
+                },
+                "actionsMenu": {
+                  "icon": "ellipsis-vertical",
+                  "options": ["Available", "In Stock", "Out of Stock", "In Production", "Discontinued"]
+                }
+              }
+            }
+          },
+          {
+            "name": "Assign Delivery",
+            "fields": ["Choose staff", "Due time", "Route or region"]
+          }
+        ]
+      },
+      "business": {
+        "sections": [
+          {
+            "name": "Company Profile",
+            "fields": ["Name", "Logo", "Banner", "Industry", "Description", "Contact info"]
+          },
+          {
+            "name": "Subscription / Plan",
+            "content": ["Current plan", "Staff limit", "Features", "Upgrade/downgrade actions"]
+          },
+          {
+            "name": "Staff & Roles",
+            "actions": ["List staff", "Invite new", "Change roles", "Remove"]
+          },
+          {
+            "name": "Public Profile Controls",
+            "actions": ["Toggle Publish Profile", "Select public products", "Preview public page"]
+          },
+          {
+            "name": "Legal & Billing",
+            "content": ["VAT number (later)", "Billing history", "Payment method (future)"]
+          }
+        ]
+      }
+    },
+
+    "viewingOthersBusinessProfile": {
+      "name": "Business Profile (Viewing Others)",
+      "description": "When viewing another company's Business Profile - can browse products and order (if in Business Mode)",
+      "header": {
+        "elements": ["Back button", "Banner/Cover image", "Logo/Profile picture", "Business name", "Business type label (optional)"]
+      },
+      "buttons": {
+        "primary": { "label": "Message", "action": "Opens chat with business" },
+        "secondary": { "label": "Connect", "action": "Follow/contact business" },
+        "more": { "label": "More options", "actions": ["Report", "Share", "Block"] }
+      },
+      "tabs": [
+        {
+          "name": "Products",
+          "description": "Published products grid/list, tap = product detail, add to Cart (only in Business Mode)"
+        },
+        {
+          "name": "About",
+          "content": ["Long description", "Address", "Coverage area", "Tags", "Extra links (phone, website)"]
+        },
+        {
+          "name": "Cart",
+          "content": ["Selected products", "Quantities", "Notes", "Send Order Request button"],
+          "note": "Cart and ordering only available when viewing from Business Mode"
+        }
+      ]
+    },
+
+    "viewingOwnBusinessProfile": {
+      "name": "Personal Business Profile Screen (Business Mode)",
+      "description": "When viewing your OWN Business Profile - shows same layout as others see but with Edit/Share buttons",
+      "header": {
+        "elements": ["Profile Switcher", "Settings icon", "Banner/Cover image", "Logo/Profile picture", "Business name", "Business type label (optional)"],
+        "profileSwitcher": {
+          "description": "Allows user to switch between User Profile and Business Profiles",
+          "location": "Top of screen, tappable area showing current business profile",
+          "behavior": "Opens profile selection modal/dropdown with all available profiles"
+        }
+      },
+      "buttons": {
+        "primary": { "label": "Edit profile", "action": "Open business profile editor" },
+        "secondary": { "label": "Share", "action": "Share business profile link" }
+      },
+      "tabs": [
+        {
+          "name": "Products",
+          "description": "All products (published and unpublished), tap = product detail/edit"
+        },
+        {
+          "name": "About",
+          "content": ["Long description (editable)", "Address", "Coverage area", "Tags", "Extra links (phone, website)"]
+        }
+      ],
+      "note": "No Cart tab when viewing own profile - this is management view, not ordering view"
+    },
+
+    "viewingOthersUserProfile": {
+      "name": "User Profile (Viewing Others)",
+      "description": "When viewing another user's profile - can see their info and message them",
+      "header": {
+        "elements": ["Back button", "Profile picture", "Name"]
+      },
+      "buttons": {
+        "primary": { "label": "Message", "action": "Opens chat with user" },
+        "secondary": { "label": "Connect", "action": "Follow/contact user" },
+        "more": { "label": "More options", "actions": ["Report", "Share", "Block"] }
+      },
+      "content": ["Profile picture", "Name", "Job Title", "Description", "Company affiliation"]
+    }
+  },
+
+  "criticalFlows": {
+    "flow0_feedProductDiscovery": {
+      "name": "Feed Product Discovery and Ordering",
+      "actor": "Personal Profile or Business Profile",
+      "goal": "Discover products from feed and view/order them",
+      "steps": [
+        "View feed on Home screen",
+        "See brand_presentation, company_presentation, or new_products posts",
+        "Tap on product card → navigate to ProductDetailPublic screen",
+        "View product details (image, name, unit, price, brand info)",
+        "Adjust quantity and tap 'Add to Order'",
+        "Alternatively: Tap brand/business header → navigate to ViewBusinessProfile to see all products"
+      ]
+    },
+    "flow0b_feedBusinessDiscovery": {
+      "name": "Feed Business Discovery",
+      "actor": "Personal Profile or Business Profile",
+      "goal": "Discover businesses and their product catalogs from feed",
+      "steps": [
+        "View feed on Home screen",
+        "See company_presentation or brand_presentation post",
+        "Tap on company/brand header → navigate to ViewBusinessProfile",
+        "View business profile with all products",
+        "Browse products, add to cart, send order request"
+      ]
+    },
+    "flow1_distributorProductToDelivery": {
+      "name": "Distributor: Product to Delivery",
+      "actor": "Business Profile (Paid)",
+      "goal": "Full lifecycle from product creation to delivery",
+      "steps": [
+        "Switch to Business Profile",
+        "Products → Add Product → fill details → Save",
+        "Stock → select product → add stock quantity",
+        "Customer (another Business) places order OR distributor creates it manually",
+        "Orders → view incoming order → review → Accept",
+        "Deliveries → assign delivery staff → update status until Delivered"
+      ]
+    },
+    "flow2_retailerOrdersFromDistributor": {
+      "name": "Retailer Orders from Distributor",
+      "actor": "Business Profile (Free Plan - Retailer-type use)",
+      "goal": "Place an order to another business",
+      "steps": [
+        "Switch to Retailer's Business Profile",
+        "Go to Explore / search",
+        "Open Distributor Public Business Page",
+        "Browse Products tab → add items to Cart",
+        "Go to Cart → confirm details → submit Order Request",
+        "Order appears in Distributor's Orders tab"
+      ]
+    },
+    "flow3_manualOrderCreation": {
+      "name": "Distributor Manually Creates Order",
+      "actor": "Distributor (Business Profile – Paid Plan)",
+      "goal": "Create order for retailer from a call or offline request",
+      "steps": [
+        "Business Profile → Orders tab → 'Create Order'",
+        "Select existing Retailer (Business) or create new Business",
+        "Add products from catalog, set quantities",
+        "Review summary → Confirm",
+        "Optionally, Deliveries → create and assign delivery for that order"
+      ]
+    },
+    "flow4_staffDeliveryFlow": {
+      "name": "Staff Delivery Flow",
+      "actor": "Delivery Staff (Personal Profile + Business Staff)",
+      "goal": "Only see and update their own deliveries",
+      "steps": [
+        "Log in → Personal Profile Home",
+        "Switch to assigned Business Profile",
+        "In business mode, only Deliveries tab is visible",
+        "Open Delivery List → tap assigned delivery",
+        "Update status: Pending → On the way → Delivered",
+        "Optionally add note/photo as proof"
+      ]
+    },
+    "flow5_businessSetupAndPublish": {
+      "name": "Business Setup & Public Profile Publishing",
+      "actor": "Business Owner / Admin",
+      "goal": "Create business, configure and publish public page",
+      "steps": [
+        "From Personal Profile → 'Create Business Profile'",
+        "Enter company info: name, logo, description, industry",
+        "Switch into new Business Profile",
+        "Go to Business tab → Public Profile section",
+        "Toggle 'Publish Profile' ON",
+        "Select which products are public",
+        "Save & preview public page"
+      ]
+    }
+  },
+
+  "feedDataSource": {
+    "description": "Feed posts are fetched from the backend API with pagination",
+    "endpoint": "GET /api/feed",
+    "parameters": {
+      "limit": "Number of posts to fetch (default: 20, max: 50)",
+      "cursor": "Post ID for cursor-based pagination"
+    },
+    "postTypes": {
+      "brand_presentation": {
+        "description": "Shows a brand with multiple products from a distributor",
+        "data": {
+          "brandId": "Unique brand ID",
+          "brandName": "Display name of the brand",
+          "brandLogo": "URL to brand logo image",
+          "distributorName": "Name of the distributor/business",
+          "distributorId": "Business ID for navigation",
+          "products": "Array of products with id, name, unit, price, image, isNew"
+        }
+      },
+      "company_presentation": {
+        "description": "Shows a company/distributor with their available brands",
+        "data": {
+          "companyId": "Business ID for navigation",
+          "companyName": "Display name of the company",
+          "companyLogo": "URL to company logo image",
+          "location": "Company location string",
+          "isConnected": "Boolean - whether current user is connected to this business",
+          "brands": "Array of brands with id, name, logo, productsCount"
+        }
+      },
+      "new_products": {
+        "description": "Shows new products added by a distributor or received by a business",
+        "data": {
+          "postType": "'distributor_added' or 'business_received'",
+          "businessId": "Business ID for navigation",
+          "businessName": "Display name of the business",
+          "businessLogo": "URL to business logo image",
+          "products": "Array of products with id, name, unit, price, image, brandName"
+        }
+      }
+    },
+    "productDetailEndpoint": {
+      "endpoint": "GET /api/products/:productId",
+      "description": "Fetches single product details for ProductDetailPublic screen",
+      "response": "Product object with brand/business info attached"
+    },
+    "sampleBrands": [
+      "Tropicana", "Coca-Cola", "Schweppes", "Sprite", "Fanta", 
+      "Lay's", "Doritos", "Pringles", "Cheetos", "Perrier",
+      "Barilla", "Fairy", "Ariel", "Tide", "Kikkoman", "Maggi"
+    ]
+  },
+
+  "locationsAndModesMVP": {
+    "description": "Multi-location architecture with DEPENDENT/INDEPENDENT operating modes",
+    "version": "2.0.0",
+    
+    "locationModes": {
+      "DEPENDENT": {
+        "description": "Default mode for all locations. Orders/invoices created by Parent Business only.",
+        "capabilities": [
+          "Fulfills orders assigned by parent",
+          "Manages local stock",
+          "Cannot create own orders",
+          "Cannot issue own invoices",
+          "No public storefront"
+        ],
+        "availableTo": ["FREE", "PRO", "BUSINESS", "ENTERPRISE"]
+      },
+      "INDEPENDENT": {
+        "description": "Location operates as semi-autonomous entity with its own public page and order creation.",
+        "capabilities": [
+          "Has own public storefront (if enabled)",
+          "Creates and receives own orders",
+          "Issues own invoices",
+          "Manages local stock",
+          "Uses Parent Product Master (can override price/tax if allowed)"
+        ],
+        "availableTo": ["ENTERPRISE"],
+        "requirement": "Only available with ENTERPRISE tier subscription"
+      }
+    },
+
+    "subscriptionTierCapabilities": {
+      "FREE": {
+        "maxLocations": 1,
+        "maxStaff": 0,
+        "canChooseLocationMode": false,
+        "canHaveIndependentLocations": false,
+        "canEnablePublicLocationPages": false,
+        "canCreateOrders": false,
+        "canCreateInvoices": false,
+        "canPublishBusinessPage": false,
+        "canHaveStaff": false
+      },
+      "PRO": {
+        "maxLocations": 3,
+        "maxStaff": 3,
+        "canChooseLocationMode": false,
+        "canHaveIndependentLocations": false,
+        "canEnablePublicLocationPages": false,
+        "canCreateOrders": true,
+        "canCreateInvoices": true,
+        "canPublishBusinessPage": true,
+        "canHaveStaff": true
+      },
+      "BUSINESS": {
+        "maxLocations": 10,
+        "maxStaff": 20,
+        "canChooseLocationMode": false,
+        "canHaveIndependentLocations": false,
+        "canEnablePublicLocationPages": false,
+        "canCreateOrders": true,
+        "canCreateInvoices": true,
+        "canPublishBusinessPage": true,
+        "canHaveStaff": true
+      },
+      "ENTERPRISE": {
+        "maxLocations": 999,
+        "maxStaff": 999,
+        "canChooseLocationMode": true,
+        "canHaveIndependentLocations": true,
+        "canEnablePublicLocationPages": true,
+        "canCreateOrders": true,
+        "canCreateInvoices": true,
+        "canPublishBusinessPage": true,
+        "canHaveStaff": true
+      }
+    },
+
+    "downgradePolicy": {
+      "description": "How the system handles tier downgrades (e.g., ENTERPRISE → BUSINESS)",
+      "principle": "Preserve data, block capabilities at runtime",
+      "rules": {
+        "dataPreservation": [
+          "Independent locations remain stored as operatingMode=INDEPENDENT",
+          "location.isPublic stays true in data (not overwritten)",
+          "All location data preserved for instant re-enable on upgrade"
+        ],
+        "capabilityBlocking": [
+          "Public storefront routes return PLAN_REQUIRED (403), not 404",
+          "Direct ordering at location level blocked (PLAN_REQUIRED)",
+          "Direct invoicing at location level blocked (PLAN_REQUIRED)",
+          "New independent locations cannot be created",
+          "Switching DEPENDENT → INDEPENDENT is blocked",
+          "Switching INDEPENDENT → DEPENDENT is always allowed (one-way)"
+        ],
+        "uiGuidance": [
+          "Use publicEffective boolean for real display state",
+          "Show publicDisabledReason when isPublic=true but publicEffective=false",
+          "Badge: 'Public disabled (Enterprise required)'",
+          "Location settings: disable toggle, show upgrade CTA",
+          "Customer deep links: show 'Storefront unavailable' page"
+        ]
+      },
+      "computedFields": {
+        "publicEffective": "isLocationPublicEffective(business, location) - true only if INDEPENDENT + isPublic + Enterprise",
+        "publicDisabledReason": "getPublicDisabledReason(business, location) - null or 'Enterprise plan required'"
+      }
+    },
+
+    "capabilityDerivation": {
+      "description": "Capabilities are derived from subscriptionTier, not stored directly",
+      "principle": "Single source of truth - never sprinkle 'if tier ===' checks",
+      "implementation": "deriveCapabilities(business) function returns capability object",
+      "enforcement": "Server enforces capabilities on all API endpoints"
+    },
+
+    "orderScopes": {
+      "PARENT": {
+        "description": "Order created at business (parent) level",
+        "soldByLocationId": null,
+        "canBeAssigned": true,
+        "createdVia": "POST /api/businesses/:businessId/orders"
+      },
+      "LOCATION": {
+        "description": "Order created by an INDEPENDENT location",
+        "soldByLocationId": "The location that created the order",
+        "canBeAssigned": false,
+        "createdVia": "POST /api/locations/:locationId/orders",
+        "requirement": "Location must be INDEPENDENT mode"
+      }
+    },
+
+    "invoiceScopes": {
+      "PARENT": {
+        "description": "Invoice issued at business (parent) level",
+        "issuedByLocationId": null,
+        "createdVia": "POST /api/businesses/:businessId/invoices"
+      },
+      "LOCATION": {
+        "description": "Invoice issued by an INDEPENDENT location",
+        "issuedByLocationId": "The location that issued the invoice",
+        "createdVia": "POST /api/locations/:locationId/invoices",
+        "requirement": "Location must be INDEPENDENT mode"
+      }
+    },
+
+    "orderStatuses": {
+      "NEW": { "description": "Just created, not yet assigned", "color": "#F59E0B" },
+      "ASSIGNED": { "description": "Assigned to a location for fulfillment", "color": "#0EA5E9" },
+      "PACKED": { "description": "Items prepared for delivery", "color": "#8B5CF6" },
+      "OUT_FOR_DELIVERY": { "description": "In transit to customer", "color": "#F97316" },
+      "DELIVERED": { "description": "Successfully delivered", "color": "#22C55E" },
+      "CANCELLED": { "description": "Order cancelled", "color": "#6B7280" }
+    },
+
+    "membershipLevels": {
+      "businessMembers": {
+        "description": "User ↔ Business role mapping",
+        "roles": ["super_admin", "admin", "staff"],
+        "statuses": ["pending", "accepted", "rejected", "locked"]
+      },
+      "locationMembers": {
+        "description": "User ↔ Location role mapping with specific permissions",
+        "roles": ["super_admin", "admin", "staff"],
+        "permissions": ["orders", "stock", "deliveries", "invoices"],
+        "statuses": ["pending", "accepted", "rejected", "locked"]
+      }
+    },
+
+    "apiEndpoints": {
+      "businesses": {
+        "GET /api/businesses": "List all businesses with capabilities",
+        "GET /api/businesses/:businessId": "Get business with capabilities and locations",
+        "PATCH /api/businesses/:businessId": "Update business settings"
+      },
+      "locations": {
+        "GET /api/businesses/:businessId/locations": "List locations for a business",
+        "POST /api/businesses/:businessId/locations": "Create location (mode enforced by tier)",
+        "GET /api/locations/:locationId": "Get single location with business info",
+        "PATCH /api/locations/:locationId": "Update location (mode change requires capability)"
+      },
+      "orders": {
+        "GET /api/businesses/:businessId/orders": "All orders for business (parent view)",
+        "POST /api/businesses/:businessId/orders": "Create parent-level order",
+        "POST /api/businesses/:businessId/orders/:orderId/assign": "Assign order to location",
+        "GET /api/locations/:locationId/orders": "Orders for location (fulfillment or created)",
+        "POST /api/locations/:locationId/orders": "Create order (INDEPENDENT only)"
+      },
+      "invoices": {
+        "GET /api/businesses/:businessId/invoices": "All invoices for business",
+        "POST /api/businesses/:businessId/invoices": "Create parent-level invoice",
+        "GET /api/locations/:locationId/invoices": "Invoices issued by location",
+        "POST /api/locations/:locationId/invoices": "Create invoice (INDEPENDENT only)"
+      },
+      "stock": {
+        "GET /api/businesses/:businessId/stock": "Stock across all locations",
+        "GET /api/locations/:locationId/stock": "Stock at specific location",
+        "PATCH /api/locations/:locationId/stock/:productId": "Update stock quantity"
+      },
+      "membership": {
+        "GET /api/businesses/:businessId/members": "Business members with roles",
+        "GET /api/locations/:locationId/members": "Location members with permissions",
+        "GET /api/users/:userId/businesses": "User's business memberships",
+        "GET /api/users/:userId/locations": "User's location memberships"
+      }
+    },
+
+    "uiGuidelines": {
+      "locationSwitcher": {
+        "description": "Business → Location switcher in app header",
+        "behavior": [
+          "On login, fetch user's businesses and locations",
+          "Show Business → Location hierarchy",
+          "Store activeBusinessId and activeLocationId in state"
+        ]
+      },
+      "dependentLocationUI": {
+        "description": "UI for DEPENDENT mode locations",
+        "shows": ["Assigned Orders", "Stock Management", "Deliveries"],
+        "hides": ["Create Order", "Create Invoice", "Public Storefront"]
+      },
+      "independentLocationUI": {
+        "description": "UI for INDEPENDENT mode locations",
+        "shows": ["All Order Features", "Invoice Creation", "Storefront Settings", "Full Stock Management"]
+      },
+      "lockedModeUI": {
+        "description": "When business cannot change location modes (non-BUSINESS tier)",
+        "behavior": "Show mode selector as disabled with upgrade CTA",
+        "message": "Upgrade to Business tier to enable Independent Locations"
+      }
+    }
+  },
+
+  "dataModels": {
+    "user": {
+      "tableName": "User",
+      "description": "Personal Profile - every user has one",
+      "fields": {
+        "id": { "type": "UUID", "required": true, "description": "Unique ID" },
+        "name": { "type": "String", "required": true, "description": "Full name" },
+        "email": { "type": "String", "required": false, "description": "Optional if phone-based login" },
+        "phone": { "type": "String", "required": false, "description": "Optional if email-based login" },
+        "password_hash": { "type": "String", "required": true, "description": "Secured credentials" },
+        "language": { "type": "Enum", "values": ["EN", "FR"], "default": "EN" },
+        "notifications_on": { "type": "Boolean", "default": true },
+        "created_at": { "type": "Timestamp", "required": true }
+      }
+    },
+    "business": {
+      "tableName": "Business",
+      "description": "Business Profile - professional entity with subscription tier and capabilities",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "owner_id": { "type": "UUID", "foreignKey": "User", "description": "Primary owner / super admin" },
+        "name": { "type": "String", "required": true },
+        "industry": { "type": "String", "description": "E.g. food, cosmetics, services" },
+        "description": { "type": "Text" },
+        "logo_url": { "type": "String" },
+        "banner_url": { "type": "String", "description": "Public profile banner" },
+        "subscriptionTier": { 
+          "type": "Enum", 
+          "values": ["FREE", "PRO", "BUSINESS"], 
+          "default": "FREE",
+          "description": "Determines capabilities via deriveCapabilities()"
+        },
+        "is_published": { "type": "Boolean", "default": false, "description": "Public page visible or not" },
+        "subscription_status": { "type": "Enum", "values": ["active", "grace", "expired"] },
+        "next_billing_date": { "type": "Date" },
+        "settings": {
+          "type": "Object",
+          "description": "Business-level settings",
+          "properties": {
+            "taxRate": { "type": "Decimal", "description": "Default tax rate" },
+            "currency": { "type": "String", "default": "MUR" },
+            "invoicePrefix": { "type": "String", "description": "Prefix for invoice numbers" },
+            "allowPartialPayments": { "type": "Boolean", "default": true },
+            "autoGenerateInvoices": { "type": "Boolean", "default": false },
+            "timezone": { "type": "String", "default": "Indian/Mauritius" },
+            "allowLocationPriceOverride": { "type": "Boolean", "default": false, "description": "Allow locations to override product prices" },
+            "allowLocationTaxOverride": { "type": "Boolean", "default": false, "description": "Allow locations to override tax rates" }
+          }
+        },
+        "created_at": { "type": "Timestamp", "required": true }
+      },
+      "computed": {
+        "capabilities": {
+          "description": "Derived from subscriptionTier via deriveCapabilities()",
+          "fields": ["canChooseLocationMode", "canHaveIndependentLocations", "canCreateOrders", "canCreateInvoices", "maxLocations", "maxStaff"]
+        }
+      }
+    },
+    "location": {
+      "tableName": "Location",
+      "description": "Physical location of a business with operating mode",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "business_id": { "type": "UUID", "foreignKey": "Business", "required": true },
+        "name": { "type": "String", "required": true },
+        "address": { "type": "String" },
+        "phone": { "type": "String" },
+        "email": { "type": "String" },
+        "latitude": { "type": "Decimal" },
+        "longitude": { "type": "Decimal" },
+        "operatingMode": { 
+          "type": "Enum", 
+          "values": ["DEPENDENT", "INDEPENDENT"], 
+          "default": "DEPENDENT",
+          "description": "INDEPENDENT only allowed with BUSINESS tier"
+        },
+        "isPublic": { 
+          "type": "Boolean", 
+          "default": false, 
+          "description": "Has public storefront (only for INDEPENDENT)" 
+        },
+        "created_at": { "type": "Timestamp", "required": true },
+        "updated_at": { "type": "Timestamp" }
+      }
+    },
+    "businessMember": {
+      "tableName": "BusinessMember",
+      "description": "Links users to businesses with roles",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "business_id": { "type": "UUID", "foreignKey": "Business", "required": true },
+        "user_id": { "type": "UUID", "foreignKey": "User", "required": true },
+        "role": { "type": "Enum", "values": ["staff", "admin", "super_admin"], "required": true },
+        "status": { "type": "Enum", "values": ["pending", "accepted", "rejected", "locked"], "default": "pending" },
+        "created_at": { "type": "Timestamp", "required": true }
+      }
+    },
+    "locationMember": {
+      "tableName": "LocationMember",
+      "description": "Links users to specific locations with role and permissions",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "location_id": { "type": "UUID", "foreignKey": "Location", "required": true },
+        "business_id": { "type": "UUID", "foreignKey": "Business", "required": true },
+        "user_id": { "type": "UUID", "foreignKey": "User", "required": true },
+        "role": { "type": "Enum", "values": ["staff", "admin", "super_admin"], "required": true },
+        "permissions": { "type": "Array", "items": "String", "description": "['orders', 'stock', 'deliveries', 'invoices']" },
+        "status": { "type": "Enum", "values": ["pending", "accepted", "rejected", "locked"], "default": "pending" },
+        "created_at": { "type": "Timestamp", "required": true }
+      }
+    },
+    "locationProduct": {
+      "tableName": "LocationProduct",
+      "description": "Location-specific price/tax overrides for products",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "business_id": { "type": "UUID", "foreignKey": "Business", "required": true },
+        "location_id": { "type": "UUID", "foreignKey": "Location", "required": true },
+        "product_id": { "type": "UUID", "foreignKey": "Product", "required": true },
+        "priceOverride": { "type": "Decimal", "description": "Location-specific price, null uses business default" },
+        "taxOverride": { "type": "Decimal", "description": "Location-specific tax rate, null uses business default" },
+        "isActive": { "type": "Boolean", "default": true },
+        "created_at": { "type": "Timestamp", "required": true }
+      }
+    },
+    "stock": {
+      "tableName": "Stock",
+      "description": "Location-level inventory quantities",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "business_id": { "type": "UUID", "foreignKey": "Business", "required": true },
+        "location_id": { "type": "UUID", "foreignKey": "Location", "required": true },
+        "product_id": { "type": "UUID", "foreignKey": "Product", "required": true },
+        "qtyOnHand": { "type": "Integer", "required": true, "description": "Current quantity at this location" }
+      }
+    },
+    "brand": {
+      "tableName": "Brand",
+      "description": "Product brands owned by a business",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "business_id": { "type": "UUID", "foreignKey": "Business", "required": true },
+        "name": { "type": "String", "required": true },
+        "logo_url": { "type": "String" },
+        "description": { "type": "Text" },
+        "created_at": { "type": "Timestamp", "required": true },
+        "updated_at": { "type": "Timestamp" }
+      }
+    },
+    "product": {
+      "tableName": "Product",
+      "description": "Products in a business catalog",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "business_id": { "type": "UUID", "foreignKey": "Business", "required": true },
+        "brand_id": { "type": "UUID", "foreignKey": "Brand" },
+        "name": { "type": "String", "required": true },
+        "unit": { "type": "String", "description": "500ml, 1.5L, 20cm, etc." },
+        "price": { "type": "Decimal", "required": true },
+        "description": { "type": "Text" },
+        "status": { 
+          "type": "Enum", 
+          "values": ["available", "out_of_stock", "discontinued", "in_production", "inactive", "low_stock"],
+          "default": "available"
+        },
+        "is_published": { "type": "Boolean", "default": false, "description": "Shown on public profile if true" },
+        "created_at": { "type": "Timestamp", "required": true },
+        "updated_at": { "type": "Timestamp" }
+      }
+    },
+    "stockEntry": {
+      "tableName": "StockEntry",
+      "description": "Stock adjustment records",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "product_id": { "type": "UUID", "foreignKey": "Product", "required": true },
+        "quantity": { "type": "Integer", "description": "Positive or negative" },
+        "action_type": { "type": "Enum", "values": ["add", "remove", "correction"], "required": true },
+        "created_by": { "type": "UUID", "foreignKey": "User", "required": true },
+        "created_at": { "type": "Timestamp", "required": true }
+      }
+    },
+    "order": {
+      "tableName": "Order",
+      "description": "B2B orders with scope (PARENT or LOCATION) and fulfillment assignment",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "business_id": { "type": "UUID", "foreignKey": "Business", "required": true, "description": "Business that owns this order" },
+        "soldByScope": { 
+          "type": "Enum", 
+          "values": ["PARENT", "LOCATION"], 
+          "required": true,
+          "description": "PARENT = created at business level, LOCATION = created by independent location"
+        },
+        "soldByLocationId": { 
+          "type": "UUID", 
+          "foreignKey": "Location", 
+          "description": "Location that created order (only for LOCATION scope)" 
+        },
+        "fulfillmentLocationId": { 
+          "type": "UUID", 
+          "foreignKey": "Location", 
+          "description": "Location assigned to fulfill this order" 
+        },
+        "customer_id": { "type": "UUID", "description": "Customer business or user ID" },
+        "customerName": { "type": "String", "required": true },
+        "customerAddress": { "type": "String" },
+        "customerPhone": { "type": "String" },
+        "items": { "type": "Array", "items": "OrderItem", "required": true },
+        "totalAmount": { "type": "Decimal", "required": true },
+        "status": { 
+          "type": "Enum", 
+          "values": ["NEW", "ASSIGNED", "PACKED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"], 
+          "default": "NEW" 
+        },
+        "paymentStatus": { "type": "String", "default": "Unpaid" },
+        "notes": { "type": "Text" },
+        "created_by": { "type": "UUID", "foreignKey": "User", "description": "User who created the order" },
+        "created_at": { "type": "Timestamp", "required": true },
+        "updated_at": { "type": "Timestamp" }
+      }
+    },
+    "orderItem": {
+      "tableName": "OrderItem",
+      "description": "Line items in an order",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "order_id": { "type": "UUID", "foreignKey": "Order", "required": true },
+        "product_id": { "type": "UUID", "foreignKey": "Product", "required": true },
+        "name": { "type": "String", "required": true, "description": "Product name snapshot" },
+        "quantity": { "type": "Integer", "required": true },
+        "unitPrice": { "type": "Decimal", "description": "Price at time of ordering" },
+        "subtotal": { "type": "Decimal", "computed": "quantity × unitPrice" }
+      }
+    },
+    "delivery": {
+      "tableName": "Delivery",
+      "description": "Delivery assignments for orders",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "order_id": { "type": "UUID", "foreignKey": "Order", "required": true },
+        "assigned_to": { "type": "UUID", "foreignKey": "User", "description": "Delivery staff" },
+        "status": { "type": "Enum", "values": ["pending", "on_the_way", "done"], "default": "pending" },
+        "created_at": { "type": "Timestamp", "required": true }
+      }
+    },
+    "invoiceDocument": {
+      "tableName": "InvoiceDocument",
+      "description": "Invoices and estimates with scope (PARENT or LOCATION)",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "type": { "type": "Enum", "values": ["invoice", "estimate"], "required": true },
+        "business_id": { "type": "UUID", "foreignKey": "Business", "required": true, "description": "Business that owns this invoice" },
+        "issuedByScope": { 
+          "type": "Enum", 
+          "values": ["PARENT", "LOCATION"], 
+          "required": true,
+          "description": "PARENT = issued at business level, LOCATION = issued by independent location"
+        },
+        "issuedByLocationId": { 
+          "type": "UUID", 
+          "foreignKey": "Location", 
+          "description": "Location that issued invoice (only for LOCATION scope)" 
+        },
+        "orderId": { "type": "UUID", "foreignKey": "Order", "description": "Related order if any" },
+        "invoiceNumber": { "type": "String", "required": true, "description": "Unique invoice number" },
+        "clientName": { "type": "String", "required": true },
+        "clientEmail": { "type": "String" },
+        "amount": { "type": "Decimal", "description": "Subtotal before tax" },
+        "taxAmount": { "type": "Decimal", "description": "Tax amount" },
+        "totalAmount": { "type": "Decimal", "required": true, "description": "Total including tax" },
+        "items": { "type": "Array", "items": "InvoiceItem", "required": true },
+        "issue_date": { "type": "Date", "required": true },
+        "due_date": { "type": "Date", "description": "For invoices" },
+        "status": { "type": "Enum", "values": ["draft", "sent", "paid", "cancelled", "expired"], "default": "draft" },
+        "notes": { "type": "Text" },
+        "created_by": { "type": "UUID", "foreignKey": "User" },
+        "created_at": { "type": "Timestamp", "required": true },
+        "updated_at": { "type": "Timestamp" }
+      }
+    },
+    "invoiceItem": {
+      "tableName": "InvoiceItem",
+      "description": "Line items in an invoice",
+      "fields": {
+        "id": { "type": "UUID", "required": true },
+        "invoice_id": { "type": "UUID", "foreignKey": "InvoiceDocument", "required": true },
+        "product_id": { "type": "UUID", "foreignKey": "Product" },
+        "description": { "type": "String" },
+        "quantity": { "type": "Integer", "required": true },
+        "unit_price": { "type": "Decimal", "required": true },
+        "subtotal": { "type": "Decimal", "computed": "quantity × unit_price" }
+      }
+    }
+  },
+
+  "statusEnums": {
+    "productStatus": {
+      "values": ["available", "out_of_stock", "discontinued", "in_production", "inactive", "low_stock"],
+      "colors": {
+        "available": "#22C55E",
+        "out_of_stock": "#EF4444",
+        "in_production": "#0EA5E9",
+        "discontinued": "#F59E42",
+        "inactive": "#6B7280",
+        "low_stock": "#F59E0B"
+      }
+    },
+    "orderStatus": {
+      "values": ["NEW", "ASSIGNED", "PACKED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"],
+      "colors": {
+        "NEW": "#F59E0B",
+        "ASSIGNED": "#0EA5E9",
+        "PACKED": "#8B5CF6",
+        "OUT_FOR_DELIVERY": "#F97316",
+        "DELIVERED": "#22C55E",
+        "CANCELLED": "#6B7280"
+      },
+      "descriptions": {
+        "NEW": "Just created, not yet assigned",
+        "ASSIGNED": "Assigned to a location for fulfillment",
+        "PACKED": "Items prepared for delivery",
+        "OUT_FOR_DELIVERY": "In transit to customer",
+        "DELIVERED": "Successfully delivered",
+        "CANCELLED": "Order cancelled"
+      }
+    },
+    "orderScope": {
+      "values": ["PARENT", "LOCATION"],
+      "descriptions": {
+        "PARENT": "Created at business (parent) level",
+        "LOCATION": "Created by an INDEPENDENT location"
+      }
+    },
+    "invoiceScope": {
+      "values": ["PARENT", "LOCATION"],
+      "descriptions": {
+        "PARENT": "Issued at business (parent) level",
+        "LOCATION": "Issued by an INDEPENDENT location"
+      }
+    },
+    "locationMode": {
+      "values": ["DEPENDENT", "INDEPENDENT"],
+      "colors": {
+        "DEPENDENT": "#6B7280",
+        "INDEPENDENT": "#22C55E"
+      },
+      "descriptions": {
+        "DEPENDENT": "Fulfills parent orders only, no own orders/invoices",
+        "INDEPENDENT": "Own orders, invoices, and public storefront (BUSINESS tier only)"
+      }
+    },
+    "subscriptionTier": {
+      "values": ["FREE", "PRO", "BUSINESS"],
+      "colors": {
+        "FREE": "#6B7280",
+        "PRO": "#0EA5E9",
+        "BUSINESS": "#8B5CF6"
+      }
+    },
+    "deliveryStatus": {
+      "values": ["pending", "on_the_way", "done"],
+      "colors": {
+        "pending": "#F59E0B",
+        "on_the_way": "#0EA5E9",
+        "done": "#22C55E"
+      }
+    },
+    "invoiceStatus": {
+      "values": ["draft", "sent", "paid", "cancelled", "expired"],
+      "colors": {
+        "draft": "#6B7280",
+        "sent": "#FF3B30",
+        "paid": "#22C55E",
+        "cancelled": "#6B7280",
+        "expired": "#EF4444"
+      }
+    },
+    "staffStatus": {
+      "values": ["pending", "accepted", "rejected", "locked"],
+      "colors": {
+        "pending": "#F59E0B",
+        "accepted": "#22C55E",
+        "rejected": "#EF4444",
+        "locked": "#6B7280"
+      }
+    },
+    "subscriptionStatus": {
+      "values": ["active", "grace", "expired"],
+      "colors": {
+        "active": "#22C55E",
+        "grace": "#F59E0B",
+        "expired": "#EF4444"
+      }
+    }
+  },
+
+  "localization": {
+    "currency": {
+      "code": "MUR",
+      "symbol": "Rs",
+      "name": "Mauritian Rupee"
+    },
+    "tax": {
+      "vat": {
+        "rate": 15,
+        "description": "Standard VAT rate in Mauritius"
+      }
+    },
+    "languages": {
+      "supported": ["EN", "FR"],
+      "default": "EN",
+      "notes": "English is default business language, French widely spoken"
+    },
+    "localWorkflows": [
+      "Delivery rounds",
+      "Cash/credit customers",
+      "WhatsApp ordering (common pattern)",
+      "Offline-first mobile behaviour",
+      "Local receipt & invoice formatting"
+    ]
+  },
+
+  "mvpScope": {
+    "included": {
+      "identity": [
+        "Auth (phone/email)",
+        "Personal profile (default)",
+        "Business profile creation",
+        "Profile switcher",
+        "Staff accounts"
+      ],
+      "businessOperations": [
+        "Products (CRUD)",
+        "Stock (manual adjustments)",
+        "Selling orders (paid)",
+        "Delivery flow (paid)"
+      ],
+      "retailerTools": [
+        "Explore businesses/products",
+        "Order placement",
+        "Chat with businesses",
+        "Order tracking"
+      ],
+      "chatFeatures": {
+        "description": "V1 Light chat functionality",
+        "included": [
+          "Text messages with link detection",
+          "PDF messages (invoice-generated only)",
+          "Order message cards (clickable → Order Details)",
+          "Invoice message cards",
+          "Deleted message placeholder",
+          "Event/System messages (conversation start, user removed, name change)",
+          "WhatsApp-style date separators",
+          "Message timestamps (time only)",
+          "Message status indicators (sent/delivered/read)",
+          "Long press to delete messages",
+          "Profile navigation from chat header"
+        ],
+        "excluded": [
+          "Image messages",
+          "Voice messages/recording",
+          "Location sharing",
+          "Contact sharing",
+          "Attachment menu (+)",
+          "Camera capture",
+          "Gallery picker",
+          "Document picker",
+          "Swipe-to-reply"
+        ]
+      }
+    },
+    "postMvp": [
+      "Invoices / Estimates",
+      "Customer CRM",
+      "Basic sales dashboard",
+      "Payment tracking (mark paid/unpaid)",
+      "Multi-location for paid plans"
+    ],
+    "excluded": [
+      "Advanced analytics",
+      "Payment gateway (Juice integration later)",
+      "Multi-language (EN only at launch)",
+      "Multi-location (Free plan)",
+      "Product privacy rules",
+      "Accounting system",
+      "Recommendation engine",
+      "Full web admin"
+    ]
+  },
+
+  "nonFunctionalRequirements": [
+    "Stability",
+    "Correct stock & order logic",
+    "Fast UI",
+    "Simple UX",
+    "Rapid release → feedback → iteration"
+  ],
+
+  "successMetrics": {
+    "month2": {
+      "distributors": 50,
+      "orders": 2000,
+      "retention30Day": "60%"
+    },
+    "year1": {
+      "distributors": 1000,
+      "retailers": 8000,
+      "totalUsers": 20000
+    }
+  },
+
+  "developmentGuidelines": {
+    "keyPrinciples": [
+      "Personal Profile = individual user, NO business tools",
+      "Business Profile = professional entity with full operational tools",
+      "Profile switching = identity change, not logout",
+      "Users always logs in as Personal first, then switches to Business",
+      "Free plan = internal management only, no public features",
+      "Paid plans = unlock selling, deliveries, invoices, public page"
+    ],
+    "uiConsistency": [
+      "Use design.json for all UI tokens (colors, typography, spacing)",
+      "Use theme/index.ts for runtime theme values",
+      "Follow established component patterns (Cards, Pills, Buttons)",
+      "Maintain consistent navigation based on active profile type",
+      "Use settingsListItem pattern for all settings/option list screens",
+      "Use modalListItem pattern for all modal/bottom sheet lists"
+    ],
+    "listStylingGuidelines": {
+      "description": "Standard list item styling for consistency across the app",
+      "settingsLists": {
+        "pattern": "settingsListItem from design.json",
+        "structure": "TouchableOpacity with icon + title + chevron/switch",
+        "styling": {
+          "height": 60,
+          "paddingHorizontal": 8,
+          "marginHorizontal": 12,
+          "borderBottomWidth": 0.5,
+          "iconSize": 24,
+          "iconColor": "appTheme.colors.iconColor",
+          "titleFontFamily": "theme.fonts.primary.semiBold",
+          "titleFontSize": "theme.fontSize.base",
+          "titleMarginLeft": "theme.spacing.md",
+          "chevronSize": 20,
+          "chevronColor": "appTheme.colors.iconMuted"
+        },
+        "destructiveItems": {
+          "iconColor": "#DC2626",
+          "titleColor": "#DC2626"
+        },
+        "appliesTo": ["PersonalSettingsScreen", "CompanySettingsScreen", "SecuritySettingsScreen", "ModalList", "DropdownModal"]
+      },
+      "modalLists": {
+        "pattern": "modalListItem from design.json",
+        "structure": "TouchableOpacity with avatar/icon + title/subtitle + checkbox/checkmark",
+        "styling": {
+          "height": 60,
+          "paddingHorizontal": 8,
+          "marginHorizontal": 12,
+          "borderBottomWidth": 0.5,
+          "avatarSize": 48,
+          "titleFontFamily": "theme.fonts.primary.semiBold",
+          "subtitleFontFamily": "theme.fonts.primary.regular"
+        }
+      },
+      "principles": [
+        "Border lines should NOT touch screen edges - use marginHorizontal: 12",
+        "Use 0.5 border width for subtle separators",
+        "Icon size 24 for list items, chevron size 20",
+        "Consistent height of 60 for touch targets",
+        "SemiBold font for titles in list items"
+      ]
+    },
+    "stateManagement": [
+      "Track active profile type (personal vs business)",
+      "Track current business ID when in business mode",
+      "Track user role/permissions for current business",
+      "Track subscription plan for paywall logic"
+    ],
+    "confirmationDialogs": {
+      "description": "Use ConfirmationDialog component instead of Alert.alert for all confirmation and success feedback",
+      "variants": {
+        "delete": {
+          "when": "Destructive actions that cannot be undone",
+          "examples": ["Delete product?", "Remove staff member?", "Discard changes?", "Cancel order?"],
+          "hasIcon": false,
+          "background": "Dark red (#160000 at 90%)"
+        },
+        "confirm": {
+          "when": "Asking user to confirm BEFORE performing an action",
+          "examples": ["Save changes?", "Confirm order?", "Proceed?", "Apply settings?"],
+          "hasIcon": false,
+          "background": "Dark green (#001004 at 90%)"
+        },
+        "success": {
+          "when": "Providing feedback AFTER an action completed successfully",
+          "examples": ["Changes saved!", "Password changed!", "Profile created!", "Request sent!", "Order confirmed!"],
+          "hasIcon": true,
+          "iconType": "checkmark in circle border",
+          "background": "Dark green (#001004 at 90%)"
+        }
+      },
+      "rules": [
+        "NEVER use native Alert.alert for success messages - use ConfirmationDialog with 'success' variant",
+        "NEVER show checkmark icon when ASKING for confirmation - only when showing SUCCESS",
+        "Use 'delete' variant for any destructive action confirmation",
+        "Use 'confirm' variant when asking 'Would you like to...?' questions",
+        "Use 'success' variant when showing 'Successfully completed!' messages"
+      ]
+    }
+  },
+
+  "projectArchitecture": {
+    "description": "Production-grade feature-based architecture for NouPro React Native app",
+    "version": "2.0.0",
+    "lastUpdated": "2024-12-24",
+
+    "folderStructure": {
+      "description": "Three-layer architecture: modes, features, and shared modules",
+      "root": "src/",
+      "layers": {
+        "modes": {
+          "path": "src/modes/",
+          "description": "Mode-specific screens and configuration (Personal vs Business)",
+          "principle": "Modes are NOT features - they define navigation context and access patterns",
+          "contents": {
+            "personal": {
+              "screens": [
+                "HomeScreen",
+                "ExploreScreen", 
+                "DashboardScreen",
+                "ActivityScreen",
+                "PersonalProfileScreen",
+                "PersonalProfileScreenNew",
+                "EditPersonalProfileScreen",
+                "PersonalDeliveryDetailScreen",
+                "PersonalSettingsScreen"
+              ],
+              "config": "Tab configuration, access rules, home screen definition"
+            },
+            "business": {
+              "screens": ["BusinessProfileOwnScreen", "BusinessHomeScreen"],
+              "components": ["HomeHeaderPro", "ProKpiChipsRow", "ProQuickActions", "ProPriorityQueue", "ProActivityTimeline"],
+              "config": "Tab configuration, access rules, feature gating"
+            }
+          }
+        },
+        "features": {
+          "path": "src/features/",
+          "description": "Domain features - pure business logic modules",
+          "principle": "Each feature is self-contained with its own screens and components",
+          "modules": [
+            {
+              "name": "auth",
+              "description": "Authentication flows",
+              "screens": ["LoginScreen", "RegisterScreen"]
+            },
+            {
+              "name": "inbox",
+              "description": "Messaging and chat functionality (V1 Light: text messages and PDFs from invoices only, no attachments/voice)",
+              "screens": ["InboxScreen", "ChatScreen", "InboxOverlayScreen"],
+              "components": ["MessageCard", "NewChatModal", "NewChatModalList"],
+              "chatScreen": {
+                "description": "Full chat interface with message bubbles, input, and special message types",
+                
+                "messageTypes": {
+                  "v1Supported": {
+                    "text": {
+                      "description": "Regular text message with link detection",
+                      "linkDetection": true,
+                      "linkHighlighting": "blue for incoming (#2563EB), light blue for outgoing (#93C5FD)",
+                      "deleteOnLongPress": true
+                    },
+                    "pdf": {
+                      "description": "PDF/Document attachment (invoices only in V1)",
+                      "tapAction": "Opens document preview with download/share options",
+                      "deleteOnLongPress": true
+                    },
+                    "deleted": {
+                      "description": "Placeholder for deleted messages",
+                      "text": "This message was deleted",
+                      "deleteOnLongPress": false
+                    },
+                    "event": {
+                      "description": "System event messages (centered, light gray background, italic). NO date/timestamp shown - Date Separator is rendered separately above.",
+                      "showsDate": false,
+                      "showsTimestamp": false,
+                      "deleteOnLongPress": false,
+                      "allowedEvents": ["conversation_started", "user_removed_from_group", "user_name_changed"],
+                      "relationship": "Date Separator always appears ABOVE Event/System messages visually"
+                    },
+                    "order": {
+                      "description": "Order card with status, payment info, and action buttons",
+                      "tapAction": "Navigate to OrderDetailScreen",
+                      "deleteOnLongPress": true,
+                      "statuses": ["New", "Ongoing", "Pending", "Done", "Cancel"],
+                      "borderColorByStatus": true,
+                      "statusTextColorByStatus": true
+                    },
+                    "invoice": {
+                      "description": "Invoice card with ID and tap-to-view",
+                      "tapAction": "Opens invoice details",
+                      "deleteOnLongPress": true
+                    }
+                  },
+                  "v1NotSupported": ["image", "voice", "location", "contact"],
+                  "v1NotSupportedPlaceholder": "Shows grayed out placeholder with 'Not available in this version'"
+                },
+                
+                "dateSeparators": {
+                  "description": "WhatsApp-style date headers between messages from different days. ALWAYS appears ABOVE Event/System messages on the same date. Separate from Event/System messages.",
+                  "formatting": {
+                    "today": "Today",
+                    "yesterday": "Yesterday",
+                    "underOneWeek": "Day name (e.g., Wednesday)",
+                    "overOneWeek": "Short day + full date (e.g., Mon, 23 Jan 2025)"
+                  },
+                  "style": {
+                    "position": "centered",
+                    "backgroundColor": "#e5e7eb",
+                    "borderRadius": 8,
+                    "paddingVertical": 4,
+                    "paddingHorizontal": 12,
+                    "fontSize": 12,
+                    "fontWeight": "600",
+                    "color": "#4b5563",
+                    "marginVertical": 12
+                  },
+                  "orderWithEvents": "Date Separator always renders BEFORE Event/System messages visually (above in inverted list)"
+                },
+                
+                "bubbleStyles": {
+                  "borderRadius": 12,
+                  "paddingVertical": 4,
+                  "paddingHorizontal": 8,
+                  "incoming": {
+                    "backgroundColor": "#FFFFFF",
+                    "textColor": "theme.colors.text",
+                    "position": "left"
+                  },
+                  "outgoing": {
+                    "backgroundColor": "theme.colors.primary",
+                    "textColor": "#FFFFFF",
+                    "position": "right"
+                  }
+                },
+                
+                "timestamps": {
+                  "description": "Message timestamps show time only (HH:MM), no date",
+                  "format": "24-hour (HH:MM)",
+                  "fontSize": 12,
+                  "position": "bottom-right of bubble"
+                },
+                
+                "messageStatus": {
+                  "description": "Status indicators for outgoing messages only",
+                  "iconSize": 12,
+                  "statuses": {
+                    "sent": {
+                      "icon": "checkmark",
+                      "color": "theme.colors.textMuted",
+                      "description": "Single gray checkmark"
+                    },
+                    "delivered": {
+                      "icon": "checkmark-done",
+                      "color": "theme.colors.textMuted",
+                      "description": "Double gray checkmarks"
+                    },
+                    "read": {
+                      "icon": "checkmark-done",
+                      "color": "theme.colors.accent",
+                      "description": "Double accent colour checkmarks"
+                    }
+                  }
+                },
+                
+                "orderCardDesign": {
+                  "description": "Special bubble design for order messages",
+                  "borderWidth": 0.5,
+                  "borderColorByStatus": {
+                    "New": "#6E0000",
+                    "Ongoing": "#0075FF",
+                    "Pending": "#FFB600",
+                    "Done": "#2ACF01",
+                    "Cancel": "#FF6B6B"
+                  },
+                  "statusTextColors": {
+                    "New": "#6E0000",
+                    "Ongoing": "#0075FF",
+                    "Pending": "#FFB600",
+                    "Done": "#2ACF01",
+                    "Cancel": "#FF6B6B"
+                  },
+                  "paymentStatusColors": {
+                    "Paid": "#2ACF01",
+                    "Unpaid": "#FF2400",
+                    "Payment Pending Confirmation": "#FFB600"
+                  },
+                  "importExportBadge": {
+                    "import": "#2ACF01",
+                    "export": "#FF7A00"
+                  },
+                  "actionButtons": {
+                    "shown": ["Mark Payment Done", "Confirm Payment", "Mark Delivery Done", "Confirm Delivery", "See Invoice"],
+                    "conditional": true
+                  }
+                },
+                
+                "eventBubbleDesign": {
+                  "description": "Centered system event messages. NO timestamp/date - Date Separator is handled separately and always appears ABOVE event messages.",
+                  "backgroundColor": "#f3f4f6",
+                  "borderRadius": 16,
+                  "paddingVertical": 6,
+                  "paddingHorizontal": 14,
+                  "marginVertical": 4,
+                  "showsTimestamp": false,
+                  "eventText": {
+                    "fontSize": 13,
+                    "fontStyle": "italic",
+                    "color": "#6b7280",
+                    "textAlign": "center"
+                  },
+                  "separationFromDateSeparator": "Event/System messages are visually distinct from Date Separators - different background color, border radius, font style"
+                },
+                
+                "deleteMessage": {
+                  "description": "Long press to delete message functionality",
+                  "trigger": "500ms long press",
+                  "confirmation": "Alert with Cancel and Delete Message options",
+                  "excludedTypes": ["deleted", "event"],
+                  "result": "Message converted to 'deleted' type"
+                },
+                
+                "inputArea": {
+                  "description": "V1 simplified input (text only, no attachments)",
+                  "components": ["TextInput", "Send Button"],
+                  "removed": ["Attachment menu (+)", "Voice recording button", "Camera", "Gallery", "Document picker", "Location", "Contact"],
+                  "sendButton": {
+                    "activeColor": "theme.colors.primary",
+                    "inactiveColor": "theme.colors.textMuted",
+                    "icon": "send"
+                  }
+                },
+                
+                "header": {
+                  "title": "Contact/Chat name",
+                  "leftIcon": "chevron-back (go back)",
+                  "rightIcon": {
+                    "business": "storefront-outline",
+                    "user": "person-outline"
+                  },
+                  "rightIconAction": "Navigate to partner's profile"
+                }
+              },
+              "v1Limitations": {
+                "description": "V1 Light version has simplified chat functionality",
+                "features": {
+                  "textMessages": true,
+                  "imageMessages": false,
+                  "pdfMessages": "invoices only (auto-generated from invoice creation)",
+                  "orderMessages": "clickable, navigates to Order Details",
+                  "invoiceMessages": true,
+                  "locationMessages": false,
+                  "contactMessages": false,
+                  "voiceMessages": false,
+                  "attachmentMenu": false,
+                  "voiceRecording": false,
+                  "cameraCapture": false,
+                  "documentPicker": false
+                },
+                "eventBubbles": {
+                  "shown": ["conversation_started", "user_removed_from_group", "user_name_changed"],
+                  "hidden": ["order_status_update", "delivery_status_update"]
+                }
+              }
+            },
+            {
+              "name": "deliveries",
+              "description": "Delivery management and tracking",
+              "screens": ["DeliveryScreen", "DeliveryDetailScreen", "CreateDeliveryScreen"],
+              "components": ["DeliveryActionsModal", "DeliveryCard", "DeliveryCreateModal"]
+            },
+            {
+              "name": "products",
+              "description": "Product catalog management",
+              "screens": ["ProductsScreen", "ProductDetailOwnScreen", "ProductDetailPublicScreen", "ProductsSearchScreen", "CreateProductScreen"],
+              "components": ["ProductActionsModal", "ProductCard", "ProductCardOtherCompany", "ProductCreateModal", "ProductSearchResultsList"]
+            },
+            {
+              "name": "invoices",
+              "description": "Invoice and estimate management",
+              "screens": ["InvoicesScreen", "InvoiceDetailsScreen", "CreateInvoiceScreen"],
+              "components": ["InvoiceActionsModal", "InvoiceCard"]
+            },
+            {
+              "name": "orders",
+              "description": "Order processing and tracking",
+              "screens": ["OrderDetailScreen"],
+              "components": ["OrderCard", "OrderOptionCard", "OrderOptionsList"]
+            },
+            {
+              "name": "profile",
+              "description": "User and business profile viewing",
+              "screens": ["BusinessProfileScreen", "UserProfileScreen"],
+              "components": ["BusinessCard", "BusinessFeedCard", "BusinessListCard", "EditBusinessModal", "ProfileActionButtons", "ProfileSwitcher"]
+            },
+            {
+              "name": "notifications",
+              "description": "Notification system",
+              "screens": ["NotificationScreen", "NotificationsOverlayScreen"],
+              "components": ["NotificationBell"]
+            },
+            {
+              "name": "company",
+              "description": "Company/business entity management",
+              "screens": ["CompanySearchScreen", "CompanyEditScreen", "CompanySettingsScreen"],
+              "components": ["CompanyDropdown", "LocationDropdown", "ManageLocationsModal"]
+            },
+            {
+              "name": "brands",
+              "description": "Brand management within businesses",
+              "screens": ["BrandSelectionScreen", "CreateBrandScreen"],
+              "components": ["BrandCard"]
+            },
+            {
+              "name": "cart",
+              "description": "Shopping cart for B2B ordering",
+              "components": ["CartBottomSection", "CartItemCard", "CartPopup"]
+            },
+            {
+              "name": "connections",
+              "description": "Social connections and following",
+              "screens": ["ConnectionsScreen", "FollowingScreen"]
+            },
+            {
+              "name": "team",
+              "description": "Staff and team management",
+              "screens": ["TeamManagementScreen"],
+              "components": ["AssignStaffModal", "InviteTeamModal"]
+            },
+            {
+              "name": "settings",
+              "description": "User settings and security",
+              "screens": ["ChangePasswordScreen", "SecuritySettingsScreen"]
+            },
+            {
+              "name": "search",
+              "description": "Search functionality",
+              "screens": ["UserSearchScreen"],
+              "components": ["FilterBar", "SearchResultsList"]
+            },
+            {
+              "name": "subscription",
+              "description": "Subscription and paywall",
+              "components": ["PaywallModal"]
+            },
+            {
+              "name": "tasks",
+              "description": "Task management for staff",
+              "components": ["TaskCard"]
+            }
+          ]
+        },
+        "shared": {
+          "path": "src/shared/",
+          "description": "Shared modules used across features and modes",
+          "modules": {
+            "components": {
+              "ui": {
+                "description": "UI primitives ONLY - reusable atomic components with no domain knowledge",
+                "note": "Headers and search composites moved to layout/ and features/search/",
+                "components": [
+                  "AccordionSection",
+                  "ActionBottomSheet",
+                  "ActionButton",
+                  "AppButton",
+                  "AppSearchBar",
+                  "AppTextField",
+                  "Avatar",
+                  "ColorPicker",
+                  "DropdownModal",
+                  "IconButton",
+                  "ImagePlaceholder",
+                  "ImageViewerModal",
+                  "ModalList",
+                  "Pill",
+                  "SplashScreen",
+                  "Typography"
+                ]
+              },
+              "layout": {
+                "description": "Layout components - headers, shells, screen wrappers",
+                "headers": {
+                  "path": "src/shared/components/layout/headers/",
+                  "components": ["AppHeader", "HeaderConfig", "NewHeader", "SimpleHeader", "types"]
+                }
+              }
+            },
+            "theme": {
+              "description": "Design tokens and theming",
+              "files": ["index.ts", "ThemeProvider.tsx", "typography.ts"]
+            },
+            "services": {
+              "description": "API and external service integrations",
+              "files": ["api.ts", "apiService.ts", "authService.ts", "chat.ts", "imageService.ts", "orders.ts", "products.ts", "userAvatarService.ts"]
+            },
+            "store": {
+              "description": "Zustand state management",
+              "files": ["index.ts", "businessStore.ts", "companyStore.ts", "orderStore.ts", "profileStore.ts"]
+            },
+            "types": {
+              "description": "TypeScript type definitions",
+              "files": ["index.ts", "business.ts", "invoice.ts", "navigation.ts", "order.ts", "product.ts", "profile.ts", "roles.ts", "store.ts", "subscription.ts", "user.ts"]
+            },
+            "utils": {
+              "description": "Utility functions",
+              "files": ["avatarUtils.ts", "permissions.ts"]
+            },
+            "context": {
+              "description": "React contexts",
+              "files": ["NotificationContext.tsx"]
+            },
+            "hooks": {
+              "description": "Custom React hooks",
+              "files": ["useProfileViewType.ts"]
+            },
+            "data": {
+              "description": "Mock data for development",
+              "files": ["businessProfile.ts", "mockDeliveries.ts", "mockInvoices.ts", "mockOrders.ts", "mockProducts.ts", "userProfile.ts"]
+            }
+          }
+        },
+        "navigation": {
+          "path": "src/navigation/",
+          "description": "React Navigation tab navigators",
+          "files": {
+            "PersonalTabNavigator.tsx": "Bottom tabs for Personal mode (Home, Explore, Inbox, Activity, Profile)",
+            "BusinessTabNavigator.tsx": "Bottom tabs for Business mode (Inbox, Deliveries, Products, Invoices, Business)"
+          }
+        },
+        "dev": {
+          "path": "src/dev/",
+          "description": "Development and testing screens",
+          "screens": ["HeroiconTestScreen", "ModalListExampleScreen"]
+        }
+      }
+    },
+
+    "importConventions": {
+      "description": "Standardized import paths using TypeScript path aliases",
+      "aliasConfig": {
+        "tsconfig": { "@/*": ["src/*"] },
+        "babel": { "@": "./src" }
+      },
+      "patterns": {
+        "modes": "@/modes/personal/screens/HomeScreen",
+        "features": "@/features/inbox/screens/InboxScreen",
+        "uiPrimitives": "@/shared/components/ui/AppButton",
+        "layoutHeaders": "@/shared/components/layout/headers/NewHeader",
+        "searchComponents": "@/features/search/components/FilterBar",
+        "sharedTheme": "@/shared/theme",
+        "sharedStore": "@/shared/store/profileStore",
+        "sharedTypes": "@/shared/types/navigation",
+        "navigation": "@/navigation/PersonalTabNavigator"
+      },
+      "rules": [
+        "Always use @/ alias instead of relative paths",
+        "Import from feature index when importing multiple items from same feature",
+        "UI primitives come from @/shared/components/ui/",
+        "Layout components (headers) come from @/shared/components/layout/headers/",
+        "Search composites come from @/features/search/components/",
+        "Feature-specific components come from @/features/{feature}/components/"
+      ]
+    },
+
+    "architecturalPrinciples": {
+      "modesVsFeatures": {
+        "description": "Critical distinction between modes and features",
+        "modes": {
+          "definition": "Navigation contexts that define what tabs/screens a user sees",
+          "examples": ["personal", "business"],
+          "contains": "Mode-specific screens, tab configs, access rules",
+          "notContains": "Domain business logic, shared components"
+        },
+        "features": {
+          "definition": "Self-contained domain modules with business logic",
+          "examples": ["inbox", "deliveries", "products", "invoices"],
+          "contains": "Domain screens, domain components, feature-specific logic",
+          "principle": "Features are reusable across modes"
+        }
+      },
+      "componentOrganization": {
+        "uiPrimitives": {
+          "location": "src/shared/components/ui/",
+          "criteria": ["Stateless or minimal state", "No domain knowledge", "Highly reusable", "Design system atoms"],
+          "examples": ["AppButton", "AppTextField", "Avatar", "Pill", "ModalList", "Typography"]
+        },
+        "layoutComponents": {
+          "location": "src/shared/components/layout/",
+          "criteria": ["Layout/structure components", "Used across features", "Not atomic primitives"],
+          "examples": ["NewHeader", "SimpleHeader", "AppHeader"]
+        },
+        "featureComponents": {
+          "location": "src/features/{feature}/components/",
+          "criteria": ["Domain-specific", "Used within the feature or closely related features", "May have feature-specific state"],
+          "examples": ["DeliveryCard", "ProductCard", "InvoiceCard", "FilterBar", "SearchResultsList"]
+        }
+      },
+      "screenOrganization": {
+        "modeScreens": {
+          "location": "src/modes/{mode}/screens/",
+          "criteria": ["Mode-specific entry points", "Tab screens for that mode"],
+          "examples": ["HomeScreen (personal)", "BusinessProfileOwnScreen (business)"]
+        },
+        "featureScreens": {
+          "location": "src/features/{feature}/screens/",
+          "criteria": ["Domain-specific screens", "Stack screens pushed from tabs"],
+          "examples": ["ChatScreen", "DeliveryDetailScreen", "CreateInvoiceScreen"]
+        }
+      }
+    },
+
+    "navigationArchitecture": {
+      "description": "Dual-mode navigation based on active profile type. Inbox and Notifications are overlays, not tabs.",
+      "entryPoint": "App.tsx",
+      "structure": {
+        "rootStack": "createNativeStackNavigator containing all screens",
+        "tabNavigators": {
+          "PersonalTabNavigator": {
+            "tabs": ["Home", "Explore", "Dashboard", "Activity", "PersonalProfile"],
+            "screenSource": "@/modes/personal/screens/",
+            "note": "Inbox removed from tabs, now an overlay from Home"
+          },
+          "BusinessTabNavigator": {
+            "tabs": ["BusinessHome", "Deliveries", "Products", "Invoices", "BusinessProfile"],
+            "screenSource": "Mixed: domain features + @/modes/business/screens/",
+            "note": "Home added as first tab, Inbox removed (now an overlay)"
+          }
+        },
+        "overlays": {
+          "description": "Screens that slide from right and hide the tab bar",
+          "screens": ["InboxOverlay", "NotificationsOverlay"],
+          "animation": "slide_from_right",
+          "accessedVia": "Home header icons or swipe left gesture"
+        },
+        "modeSwitching": {
+          "mechanism": "ProfileStore.activeMode determines which TabNavigator renders",
+          "uiChange": "Tabs, permissions, and available screens change instantly"
+        }
+      }
+    },
+
+    "fileNamingConventions": {
+      "screens": "{Name}Screen.tsx",
+      "components": "{Name}.tsx (PascalCase)",
+      "stores": "{name}Store.ts (camelCase)",
+      "services": "{name}Service.ts or {name}.ts",
+      "types": "{name}.ts (camelCase)",
+      "indexes": "index.ts (barrel exports)"
+    },
+
+    "buildConfiguration": {
+      "typescript": {
+        "strict": true,
+        "pathAliases": { "@/*": ["src/*"] }
+      },
+      "babel": {
+        "presets": ["babel-preset-expo"],
+        "plugins": ["module-resolver (for @/ alias)", "react-native-reanimated/plugin (must be last)"]
+      },
+      "metro": {
+        "config": "metro.config.js"
+      }
+    }
+  }
+}

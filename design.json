@@ -1,0 +1,2955 @@
+{
+  "$schema": "https://noupro.app/design-system/v1",
+  "version": "1.0.0",
+  "name": "NouPro Design System",
+  "description": "Design guidelines for the NouPro B2B distribution management app. This file serves as the single source of truth for all UI/UX decisions.",
+  
+  "designPrinciples": {
+    "philosophy": "Clean, professional, and efficient design focused on B2B workflows. Prioritize clarity over decoration.",
+    "core": [
+      {
+        "name": "Clarity First",
+        "description": "Every element should have a clear purpose. Use whitespace generously to separate content areas."
+      },
+      {
+        "name": "Consistent Patterns",
+        "description": "Reuse established patterns across screens. Cards, headers, modals, and buttons should behave predictably."
+      },
+      {
+        "name": "Hierarchical Information",
+        "description": "Use typography weight and size to establish visual hierarchy. Primary info is bold/larger, secondary is lighter/smaller."
+      },
+      {
+        "name": "Actionable Feedback",
+        "description": "Every interaction should provide immediate visual feedback. Loading states, success/error indicators, and transitions."
+      },
+      {
+        "name": "Mobile-First Density",
+        "description": "Balance information density with touch-friendly tap targets (minimum 44px). Lists should show enough context without scrolling."
+      }
+    ]
+  },
+
+  "brandIdentity": {
+    "appName": "NouPro",
+    "tagline": "Take the control",
+    "tone": "Professional, trustworthy, efficient",
+    "visualStyle": "Modern minimalist with warm neutral undertones"
+  },
+
+  "colors": {
+    "semantic": {
+      "primary": {
+        "value": "#000000",
+        "usage": "Primary actions, headers, important text, main buttons"
+      },
+      "secondary": {
+        "value": "#33363A",
+        "usage": "Secondary text, supporting information"
+      },
+      "accent": {
+        "value": "#D23030",
+        "usage": "Notifications, badges, attention-grabbing elements, accent indicators"
+      },
+      "background": {
+        "value": "#FFFFFF",
+        "usage": "Main screen backgrounds, card backgrounds"
+      },
+      "surface": {
+        "value": "#F6F7F9",
+        "usage": "Elevated surfaces, input backgrounds, secondary backgrounds"
+      },
+      "confirmDialogDarkRed": {
+        "value": "#160000",
+        "usage": "Background color for delete/destructive confirmation dialogs (used at 90% opacity)"
+      },
+      "confirmDialogDarkGreen": {
+        "value": "#001004",
+        "usage": "Background color for success/positive confirmation dialogs (used at 90% opacity). Also used as text color for confirm button."
+      }
+    },
+    "text": {
+      "primary": {
+        "value": "#000000",
+        "usage": "Headings, primary content, important labels"
+      },
+      "secondary": {
+        "value": "#575B66",
+        "usage": "Descriptions, captions, helper text, timestamps"
+      },
+      "muted": {
+        "value": "#A4AAB8",
+        "usage": "Placeholders, inactive states, disabled text, muted icons"
+      },
+      "inverse": {
+        "value": "#FFFFFF",
+        "usage": "Text on dark backgrounds, primary button text"
+      }
+    },
+    "status": {
+      "success": {
+        "value": "#2ACF01",
+        "usage": "Completed orders, paid invoices, available products, positive states"
+      },
+      "error": {
+        "value": "#FF2400",
+        "usage": "Failed actions, overdue payments, out of stock, validation errors"
+      },
+      "warning": {
+        "value": "#FFB600",
+        "usage": "Pending items, attention needed, expiring items"
+      },
+      "info": {
+        "value": "#0075FF",
+        "usage": "In-progress states, informational messages, ongoing deliveries, links"
+      },
+      "neutral": {
+        "value": "#A4AAB8",
+        "usage": "Draft states, inactive items, cancelled orders"
+      }
+    },
+    "statusSpecific": {
+      "newOrder": {
+        "value": "#6E0000",
+        "usage": "New order status, discontinued products"
+      },
+      "discontinued": {
+        "value": "#6E0000",
+        "usage": "Discontinued products (alias for newOrder)"
+      },
+      "ongoing": {
+        "value": "#0075FF",
+        "usage": "Ongoing deliveries, in-progress tasks"
+      },
+      "done": {
+        "value": "#2ACF01",
+        "usage": "Completed deliveries, done status"
+      },
+      "paid": {
+        "value": "#2ACF01",
+        "usage": "Paid invoices (alias for done)"
+      },
+      "import": {
+        "value": "#2ACF01",
+        "usage": "Import deliveries (alias for done)"
+      },
+      "inReview": {
+        "value": "#A76AF0",
+        "usage": "Items pending review, under evaluation"
+      },
+      "pending": {
+        "value": "#FFB600",
+        "usage": "Pending orders, awaiting action"
+      },
+      "inProduction": {
+        "value": "#FFB600",
+        "usage": "Products in production (alias for pending)"
+      },
+      "lowStock": {
+        "value": "#FF7A00",
+        "usage": "Low stock warning, inventory alerts"
+      },
+      "export": {
+        "value": "#FF7A00",
+        "usage": "Export deliveries (alias for lowStock)"
+      },
+      "canceled": {
+        "value": "#FF6B6B",
+        "usage": "Canceled orders, canceled deliveries"
+      },
+      "unpaid": {
+        "value": "#FF2400",
+        "usage": "Unpaid invoices, overdue payments"
+      },
+      "outOfStock": {
+        "value": "#FF2400",
+        "usage": "Out of stock products (alias for unpaid)"
+      },
+      "inactive": {
+        "value": "#7BA9C1",
+        "usage": "Inactive products, disabled items"
+      }
+    },
+    "ui": {
+      "border": {
+        "value": "#E1E4EA",
+        "usage": "Card borders, dividers, input borders, list separators"
+      },
+      "inputBackground": {
+        "value": "#FFFFFF",
+        "usage": "Input field backgrounds (default state)"
+      },
+      "inputBackgroundFocused": {
+        "value": "#F6F7F9",
+        "usage": "Input field backgrounds (focused state)"
+      },
+      "cardBackground": {
+        "value": "#FFFFFF",
+        "usage": "Card surfaces, modal backgrounds"
+      },
+      "overlay": {
+        "value": "rgba(0, 0, 0, 0.5)",
+        "usage": "Modal overlays, bottom sheet backdrops"
+      },
+      "highlightedRow": {
+        "value": "#F6F7F9",
+        "usage": "Unread messages, new items, highlighted states"
+      },
+      "iconColor": {
+        "value": "#393E47",
+        "usage": "Primary icons, active icons"
+      },
+      "iconMuted": {
+        "value": "#A4AAB8",
+        "usage": "Muted icons, inactive icons, disabled icons"
+      }
+    },
+    "avatarColors": {
+      "description": "Colors for random avatar background assignment",
+      "values": [
+        "#FF6B6B",
+        "#4ECDC4",
+        "#45B7D1",
+        "#96CEB4",
+        "#FFEAA7",
+        "#DDA0DD",
+        "#98D8C8",
+        "#F7DC6F",
+        "#BB8FCE",
+        "#85C1E9",
+        "#F8B500",
+        "#00CED1",
+        "#FF7F50",
+        "#6B5B95",
+        "#88B04B"
+      ]
+    },
+    "gradients": {
+      "headerOverlay": "linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0) 100%)"
+    }
+  },
+
+  "typography": {
+    "fontFamily": {
+      "primary": {
+        "regular": "Inter-Regular",
+        "medium": "Inter-Medium",
+        "semiBold": "Inter-SemiBold",
+        "bold": "Inter-Bold",
+        "extraBold": "Inter-ExtraBold"
+      },
+      "fallback": {
+        "ios": "System",
+        "android": "sans-serif"
+      }
+    },
+    "fontWeights": {
+      "regular": "400",
+      "medium": "500",
+      "semiBold": "600",
+      "bold": "700",
+      "extraBold": "800"
+    },
+    "scale": {
+      "xs": {
+        "size": 12,
+        "lineHeight": 16,
+        "usage": "Badges, small labels, timestamps"
+      },
+      "sm": {
+        "size": 14,
+        "lineHeight": 20,
+        "usage": "Captions, secondary text, filter labels"
+      },
+      "base": {
+        "size": 16,
+        "lineHeight": 24,
+        "usage": "Body text, button text, input text"
+      },
+      "md": {
+        "size": 18,
+        "lineHeight": 28,
+        "usage": "Subheadings, card titles, section headers"
+      },
+      "lg": {
+        "size": 20,
+        "lineHeight": 32,
+        "usage": "Medium headings, modal titles"
+      },
+      "xl": {
+        "size": 24,
+        "lineHeight": 36,
+        "usage": "Page titles, large headings"
+      },
+      "xxl": {
+        "size": 32,
+        "lineHeight": 40,
+        "usage": "Hero headings, screen titles"
+      },
+      "xxxl": {
+        "size": 56,
+        "lineHeight": 64,
+        "usage": "Logo, splash screen"
+      }
+    },
+    "presets": {
+      "h1": {
+        "fontFamily": "Inter-Bold",
+        "fontSize": 32,
+        "lineHeight": 40,
+        "usage": "Main screen titles"
+      },
+      "h2": {
+        "fontFamily": "Inter-Bold",
+        "fontSize": 24,
+        "lineHeight": 36,
+        "usage": "Section headings"
+      },
+      "h3": {
+        "fontFamily": "Inter-Bold",
+        "fontSize": 20,
+        "lineHeight": 32,
+        "usage": "Card titles, modal headers"
+      },
+      "h4": {
+        "fontFamily": "Inter-Medium",
+        "fontSize": 18,
+        "lineHeight": 28,
+        "usage": "Subsection titles"
+      },
+      "body": {
+        "fontFamily": "Inter-Regular",
+        "fontSize": 16,
+        "lineHeight": 24,
+        "usage": "Main content text"
+      },
+      "bodyBold": {
+        "fontFamily": "Inter-Bold",
+        "fontSize": 16,
+        "lineHeight": 24,
+        "usage": "Emphasized body text, names, important labels"
+      },
+      "bodyMedium": {
+        "fontFamily": "Inter-Medium",
+        "fontSize": 16,
+        "lineHeight": 24,
+        "usage": "Semi-emphasized text"
+      },
+      "caption": {
+        "fontFamily": "Inter-Regular",
+        "fontSize": 14,
+        "lineHeight": 20,
+        "usage": "Secondary information, descriptions"
+      },
+      "label": {
+        "fontFamily": "Inter-Medium",
+        "fontSize": 14,
+        "lineHeight": 20,
+        "usage": "Form labels, small headings"
+      },
+      "button": {
+        "fontFamily": "Inter-SemiBold",
+        "fontSize": 16,
+        "lineHeight": 24,
+        "usage": "Button text"
+      },
+      "buttonSmall": {
+        "fontFamily": "Inter-SemiBold",
+        "fontSize": 14,
+        "lineHeight": 20,
+        "usage": "Small button text"
+      }
+    }
+  },
+
+  "spacing": {
+    "scale": {
+      "xs": 4,
+      "sm": 8,
+      "md": 16,
+      "lg": 24,
+      "xl": 32,
+      "xxl": 48
+    },
+    "guidelines": {
+      "screenPadding": {
+        "horizontal": 16,
+        "vertical": 16,
+        "description": "Consistent padding around screen edges"
+      },
+      "cardPadding": {
+        "horizontal": 16,
+        "vertical": 12,
+        "description": "Internal padding for card components"
+      },
+      "listItemPadding": {
+        "horizontal": 16,
+        "vertical": 12,
+        "description": "Padding for list items"
+      },
+      "sectionSpacing": {
+        "value": 24,
+        "description": "Vertical spacing between major sections"
+      },
+      "elementSpacing": {
+        "value": 8,
+        "description": "Spacing between related elements"
+      },
+      "inputFieldSpacing": {
+        "value": 16,
+        "description": "Vertical spacing between form fields"
+      }
+    }
+  },
+
+  "borderRadius": {
+    "scale": {
+      "sm": 4,
+      "md": 8,
+      "lg": 16,
+      "xl": 24,
+      "round": 9999
+    },
+    "usage": {
+      "buttons": 8,
+      "cards": 8,
+      "inputs": 8,
+      "avatars": 8,
+      "pills": 4,
+      "modals": 16,
+      "bottomSheets": 20,
+      "images": 8,
+      "badges": 10
+    }
+  },
+
+  "shadows": {
+    "none": {
+      "shadowColor": "transparent",
+      "shadowOffset": { "width": 0, "height": 0 },
+      "shadowOpacity": 0,
+      "shadowRadius": 0,
+      "elevation": 0
+    },
+    "sm": {
+      "shadowColor": "#000",
+      "shadowOffset": { "width": 0, "height": 1 },
+      "shadowOpacity": 0.05,
+      "shadowRadius": 2,
+      "elevation": 2,
+      "usage": "Cards, subtle elevation"
+    },
+    "md": {
+      "shadowColor": "#000",
+      "shadowOffset": { "width": 0, "height": 2 },
+      "shadowOpacity": 0.1,
+      "shadowRadius": 4,
+      "elevation": 4,
+      "usage": "Modals, popovers"
+    },
+    "lg": {
+      "shadowColor": "#000",
+      "shadowOffset": { "width": 0, "height": 4 },
+      "shadowOpacity": 0.15,
+      "shadowRadius": 8,
+      "elevation": 8,
+      "usage": "Bottom sheets, action menus"
+    }
+  },
+
+  "components": {
+    "buttons": {
+      "description": "Primary button component - AppButton",
+      "typography": {
+        "fontFamily": "Inter-SemiBold",
+        "fontSize": 16,
+        "lineHeight": 24
+      },
+      "variants": {
+        "primary": {
+          "backgroundColor": "#000000",
+          "textColor": "#FFFFFF",
+          "borderWidth": 0,
+          "usage": "Main CTAs, primary actions"
+        },
+        "secondary": {
+          "backgroundColor": "#FFFFFF",
+          "textColor": "#000000",
+          "borderWidth": 0,
+          "usage": "Secondary actions"
+        },
+        "outline": {
+          "backgroundColor": "transparent",
+          "textColor": "#000000",
+          "borderWidth": 1,
+          "borderColor": "#000000",
+          "usage": "Tertiary actions, cancel buttons"
+        },
+        "disabled": {
+          "backgroundColor": "#F6F7F9",
+          "textColor": "#A4AAB8",
+          "borderWidth": 0,
+          "usage": "Disabled state for all buttons"
+        },
+        "alert": {
+          "backgroundColor": "#FF2400",
+          "textColor": "#FFFFFF",
+          "borderWidth": 0,
+          "usage": "Destructive actions, delete, cancel orders"
+        },
+        "confirm": {
+          "backgroundColor": "#2ACF01",
+          "textColor": "#FFFFFF",
+          "borderWidth": 0,
+          "usage": "Confirmation actions, success states"
+        }
+      },
+      "sizes": {
+        "default": {
+          "height": 56,
+          "paddingHorizontal": 24,
+          "borderRadius": 8,
+          "fontSize": 16,
+          "iconSize": 24
+        },
+        "small": {
+          "height": 40,
+          "paddingHorizontal": 24,
+          "borderRadius": 8,
+          "fontSize": 16,
+          "iconSize": 24
+        }
+      },
+      "states": {
+        "pressed": { "opacity": 0.7 },
+        "loading": { "showSpinner": true, "spinnerSize": "small" }
+      }
+    },
+    "iconButtons": {
+      "description": "Icon-only button component - IconButton",
+      "variants": "Same as buttons (primary, secondary, outline, disabled, alert, confirm)",
+      "sizes": {
+        "default": {
+          "width": 40,
+          "height": 40,
+          "iconSize": 24,
+          "borderRadius": 8
+        },
+        "small": {
+          "width": 32,
+          "height": 32,
+          "iconSize": 20,
+          "borderRadius": 8
+        }
+      }
+    },
+    "actionButtons": {
+      "description": "Action buttons for add/remove operations",
+      "sizes": {
+        "default": {
+          "width": 32,
+          "height": 32,
+          "iconSize": 20,
+          "borderRadius": 8
+        },
+        "small": {
+          "width": 24,
+          "height": 24,
+          "iconSize": 16,
+          "borderRadius": 6
+        }
+      },
+      "variants": {
+        "add": {
+          "backgroundColor": "#000000",
+          "iconColor": "#FFFFFF",
+          "borderWidth": 0,
+          "icon": "add",
+          "usage": "Add items, increment quantity"
+        },
+        "remove": {
+          "backgroundColor": "#FFFFFF",
+          "iconColor": "#000000",
+          "borderWidth": 0,
+          "icon": "remove",
+          "usage": "Remove items, decrement quantity"
+        }
+      }
+    },
+    "checkbox": {
+      "description": "Unified checkbox component for selection states throughout the app. Use this for all checkbox implementations.",
+      "sizes": {
+        "default": {
+          "width": 32,
+          "height": 32,
+          "iconSize": 24,
+          "borderRadius": 8
+        },
+        "small": {
+          "width": 24,
+          "height": 24,
+          "iconSize": 20,
+          "borderRadius": 6
+        }
+      },
+      "states": {
+        "unchecked": {
+          "backgroundColor": "#FFFFFF",
+          "borderWidth": 2,
+          "borderColor": "#A4AAB8",
+          "iconColor": "transparent"
+        },
+        "checked": {
+          "backgroundColor": "#000000",
+          "borderWidth": 0,
+          "borderColor": "transparent",
+          "iconColor": "#FFFFFF",
+          "icon": "checkmark"
+        },
+        "disabled": {
+          "backgroundColor": "#F6F7F9",
+          "borderWidth": 2,
+          "borderColor": "#E1E4EA",
+          "iconColor": "#A4AAB8",
+          "opacity": 0.5
+        }
+      },
+      "touchTarget": {
+        "description": "Touch area should be at least 44px for accessibility",
+        "minWidth": 44,
+        "minHeight": 44
+      },
+      "usage": [
+        "Staff selection in modals",
+        "Product loaded status in delivery tables",
+        "Multi-select lists",
+        "Settings toggles (when not using Switch)",
+        "Form checkboxes"
+      ],
+      "implementation": {
+        "containerStyle": {
+          "width": 32,
+          "height": 32,
+          "alignItems": "center",
+          "justifyContent": "center"
+        },
+        "uncheckedStyle": {
+          "width": 32,
+          "height": 32,
+          "borderWidth": 1,
+          "borderColor": "#A4AAB8",
+          "backgroundColor": "#FFFFFF",
+          "borderRadius": 8
+        },
+        "checkedStyle": {
+          "width": 32,
+          "height": 32,
+          "backgroundColor": "#000000",
+          "borderRadius": 8,
+          "alignItems": "center",
+          "justifyContent": "center"
+        }
+      }
+    },
+    "inputs": {
+      "textField": {
+        "description": "Unified text field design - applies to AppTextField, Password, Numeric, Phone, Email, and Selection/Dropdown fields",
+        "appliesTo": ["text", "password", "numeric", "phone", "email", "dropdown", "selection"],
+        
+        "field": {
+          "height": 40,
+          "borderWidth": 1,
+          "borderRadius": 8,
+          "paddingHorizontal": 16,
+          "backgroundColor": "#FFFFFF"
+        },
+        
+        "label": {
+          "description": "Label positioned ABOVE the field, not inside",
+          "fontFamily": "Inter-Medium",
+          "fontSize": 14,
+          "color": "#777777",
+          "position": "above",
+          "marginBottom": 8,
+          "marginLeft": 8
+        },
+        
+        "caret": {
+          "width": 2,
+          "height": 24,
+          "color": "#000000"
+        },
+        
+        "states": {
+          "inactive": {
+            "description": "Empty field, not focused",
+            "borderColor": "#DAD3D1",
+            "placeholder": {
+              "fontFamily": "Inter-Regular",
+              "fontSize": 16,
+              "color": "#777777",
+              "verticalAlign": "center"
+            }
+          },
+          "selected": {
+            "description": "Field is focused/active, before typing",
+            "borderColor": "#000000",
+            "placeholder": {
+              "fontFamily": "Inter-Regular",
+              "fontSize": 16,
+              "color": "#989190",
+              "verticalAlign": "center"
+            }
+          },
+          "typing": {
+            "description": "User is actively typing",
+            "borderColor": "#000000",
+            "placeholder": "hidden",
+            "inputText": {
+              "fontFamily": "Inter-SemiBold",
+              "fontSize": 16,
+              "color": "#000000",
+              "verticalAlign": "center"
+            }
+          },
+          "filled": {
+            "description": "Field has value, not focused (deactivated after typing)",
+            "borderColor": "#DAD3D1",
+            "inputText": {
+              "fontFamily": "Inter-SemiBold",
+              "fontSize": 16,
+              "color": "#000000",
+              "verticalAlign": "center"
+            }
+          },
+          "error": {
+            "borderColor": "#EF4444",
+            "label": {
+              "color": "#EF4444"
+            }
+          }
+        },
+        
+        "variants": {
+          "password": {
+            "description": "Password input with secureTextEntry and optional show/hide toggle",
+            "secureTextEntry": true,
+            "toggleIcon": {
+              "show": "eye-outline",
+              "hide": "eye-off-outline",
+              "size": 20,
+              "color": "#777777"
+            }
+          },
+          
+          "numeric": {
+            "description": "Numeric keyboard input",
+            "keyboardType": "numeric"
+          },
+          
+          "phone": {
+            "description": "Phone number input",
+            "keyboardType": "phone-pad"
+          },
+          
+          "email": {
+            "description": "Email address input",
+            "keyboardType": "email-address",
+            "autoCapitalize": "none"
+          },
+          
+          "dropdown": {
+            "description": "Selection/dropdown field that opens a modal",
+            "rightIcon": "chevron-down",
+            "rightIconSize": 20,
+            "rightIconColor": "#777777",
+            "behavior": "Tappable to open selection modal"
+          },
+          
+          "multiSelect": {
+            "description": "When field represents multiple selected items, display count",
+            "displayFormat": "{count} {label}",
+            "examples": ["1000 items", "4 staffs", "12 products"],
+            "rightIcon": "chevron-forward",
+            "rightIconSize": 20,
+            "rightIconColor": "#777777"
+          },
+          
+          "multiline": {
+            "description": "Text area mode for longer text input",
+            "minHeight": 100,
+            "paddingVertical": 12,
+            "lineHeight": 20,
+            "numberOfLines": 4,
+            "textAlignVertical": "top",
+            "usage": ["Notes", "Description", "Terms and conditions", "Bio"]
+          }
+        },
+        
+        "withIcon": {
+          "description": "When field has a left icon",
+          "iconContainerWidth": 48,
+          "textPaddingLeft": 48,
+          "iconSize": 20,
+          "iconColor": "#777777",
+          "iconPosition": "centered between left edge and text"
+        }
+      },
+      "searchInput": {
+        "height": 48,
+        "paddingHorizontal": 16,
+        "backgroundColor": "#FFFFFF",
+        "borderRadius": 8,
+        "borderWidth": 1,
+        "iconSize": 20,
+        "fontSize": 16,
+        "caret": {
+          "width": 2,
+          "verticalPadding": 2
+        },
+        "states": {
+          "inactive": {
+            "description": "Not selected/focused state",
+            "borderColor": "#575B66",
+            "iconColor": "#575B66",
+            "textColor": "#575B66",
+            "placeholderColor": "#575B66",
+            "fontWeight": "medium",
+            "caretColor": "#000000"
+          },
+          "active": {
+            "description": "Selected/focused but not typing",
+            "borderColor": "#000000",
+            "iconColor": "#A4AAB8",
+            "textColor": "#A4AAB8",
+            "placeholderColor": "#A4AAB8",
+            "fontWeight": "medium",
+            "caretColor": "#000000"
+          },
+          "typing": {
+            "description": "Focused and has text input",
+            "borderColor": "#000000",
+            "iconColor": "#000000",
+            "textColor": "#000000",
+            "placeholderColor": "#A4AAB8",
+            "fontWeight": "semiBold",
+            "caretColor": "#000000"
+          }
+        }
+      }
+    },
+    "cards": {
+      "listCard": {
+        "backgroundColor": "#FFFFFF",
+        "paddingVertical": 12,
+        "paddingHorizontal": 16,
+        "borderBottomWidth": 1,
+        "borderColor": "#E1E4EA",
+        "description": "Standard card for list items (products, invoices, deliveries)"
+      },
+      "elevatedCard": {
+        "backgroundColor": "#FFFFFF",
+        "padding": 16,
+        "borderRadius": 12,
+        "shadow": "sm",
+        "description": "Cards with slight elevation for standalone content"
+      },
+      "structure": {
+        "imageSize": { "width": 64, "height": 64, "borderRadius": 8 },
+        "logoSize": { "width": 48, "height": 48, "borderRadius": 8 },
+        "imageMarginRight": 12,
+        "contentGap": 4
+      }
+    },
+    "checklistTable": {
+      "description": "Table layout for product checklists with image, info, quantity, loaded status, and actions. Used in DeliveryDetailScreen for loaded items checklist.",
+      "container": {
+        "marginTop": 8
+      },
+      "header": {
+        "flexDirection": "row",
+        "alignItems": "center",
+        "paddingVertical": 8,
+        "paddingHorizontal": 4,
+        "borderBottomWidth": 1,
+        "borderColor": "#E1E4EA"
+      },
+      "headerCell": {
+        "fontFamily": "Inter-Medium",
+        "fontSize": 12,
+        "color": "#575B66",
+        "textTransform": "uppercase"
+      },
+      "columns": {
+        "index": {
+          "width": 32,
+          "textAlign": "center",
+          "description": "Row number (#)"
+        },
+        "product": {
+          "flex": 1,
+          "textAlign": "left",
+          "description": "Product image, name, and unit"
+        },
+        "quantity": {
+          "width": 140,
+          "paddingHorizontal": 8,
+          "textAlign": "center",
+          "description": "Quantity ordered with optional stock warning"
+        },
+        "loaded": {
+          "width": 60,
+          "textAlign": "center",
+          "description": "Checkbox for loaded status"
+        },
+        "actions": {
+          "width": 20,
+          "marginRight": 12,
+          "description": "3-dot menu for item actions"
+        }
+      },
+      "row": {
+        "flexDirection": "row",
+        "alignItems": "center",
+        "paddingVertical": 12,
+        "paddingLeft": 4,
+        "borderBottomWidth": 1,
+        "borderColor": "#E1E4EA"
+      },
+      "productInfo": {
+        "image": {
+          "width": 48,
+          "height": 48,
+          "borderRadius": 8,
+          "marginRight": 8
+        },
+        "name": {
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 14,
+          "color": "#000000"
+        },
+        "unit": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 12,
+          "color": "#575B66",
+          "marginTop": 2
+        }
+      },
+      "quantityText": {
+        "fontFamily": "Inter-SemiBold",
+        "fontSize": 18,
+        "color": "#000000",
+        "textAlign": "center",
+        "responsiveFontSize": {
+          "description": "Reduce font size when quantity has more than 5 digits",
+          "threshold": 5,
+          "reducedSize": 14
+        }
+      },
+      "stockWarning": {
+        "fontFamily": "Inter-Medium",
+        "fontSize": 12,
+        "color": "#FF2400",
+        "marginTop": 4,
+        "textAlign": "center",
+        "format": {
+          "zeroStock": "0 left",
+          "lowStock": "Only {count} left"
+        }
+      },
+      "checkbox": {
+        "size": "small",
+        "reference": "components.checkbox.sizes.small"
+      },
+      "actionsButton": {
+        "icon": "ellipsis-vertical",
+        "iconSize": 20,
+        "iconColor": "#6B7280"
+      }
+    },
+    "pills": {
+      "height": 28,
+      "paddingHorizontal": 16,
+      "borderRadius": 4,
+      "fontSize": 14,
+      "fontFamily": "Inter-Medium",
+      "textColor": "#FFFFFF",
+      "statusColors": {
+        "available": "#2ACF01",
+        "outOfStock": "#FF2400",
+        "inProduction": "#0075FF",
+        "inactive": "#A4AAB8",
+        "discontinued": "#FFB600",
+        "paid": "#2ACF01",
+        "sent": "#FF2400",
+        "unpaid": "#FFB600",
+        "overdue": "#FF2400",
+        "draft": "#A4AAB8",
+        "cancelled": "#A4AAB8",
+        "newOrder": "#FF2400",
+        "pending": "#FFB600",
+        "ongoing": "#0075FF",
+        "delivered": "#2ACF01"
+      }
+    },
+    "avatars": {
+      "sizes": {
+        "xs": 32,
+        "sm": 40,
+        "md": 52,
+        "lg": 64,
+        "xl": 72
+      },
+      "borderRadius": 8,
+      "placeholderBackgroundColor": "#F6F7F9",
+      "initialsTextColor": "#575B66",
+      "initialsFontSize": "40% of avatar size"
+    },
+    "badges": {
+      "notification": {
+        "backgroundColor": "#D23030",
+        "textColor": "#FFFFFF",
+        "minWidth": 20,
+        "height": 20,
+        "borderRadius": 10,
+        "fontSize": 11,
+        "fontWeight": "bold"
+      }
+    },
+    "headers": {
+      "description": "Unified header system with three specialized components",
+      "common": {
+        "height": 56,
+        "backgroundColor": "#FFFFFF",
+        "hitSlop": { "top": 10, "bottom": 10, "left": 10, "right": 10 }
+      },
+      "primaryHeader": {
+        "description": "Main header for primary navigating screens (Home, Deliveries, Products, Invoices, etc.). Left-aligned title with optional dropdown and right action icons.",
+        "component": "PrimaryHeader.tsx",
+        "usage": ["BusinessHomeScreen", "DeliveriesScreen", "ProductsScreen", "InvoicesScreen", "ExploreScreen", "DashboardScreen", "ActivityScreen"],
+        "container": {
+          "height": 56,
+          "paddingLeft": 20,
+          "paddingRight": 12,
+          "flexDirection": "row",
+          "alignItems": "center",
+          "justifyContent": "space-between"
+        },
+        "title": {
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 32,
+          "fontWeight": "600",
+          "lineHeight": 38,
+          "alignment": "left",
+          "numberOfLines": 1
+        },
+        "subtitle": {
+          "fontFamily": "Inter-Medium",
+          "fontSize": 13,
+          "fontWeight": "500",
+          "lineHeight": 16,
+          "marginTop": 2,
+          "color": "textLight"
+        },
+        "chevron": {
+          "description": "Shown when onTitlePress is provided (dropdown functionality)",
+          "icon": "chevron-down",
+          "size": 24,
+          "marginLeft": 4
+        },
+        "iconButton": {
+          "width": 40,
+          "height": 40,
+          "marginLeft": 4,
+          "iconSize": 24,
+          "strokeWidth": 2
+        },
+        "badge": {
+          "description": "Optional badge for notification counts on action icons",
+          "position": "absolute",
+          "top": 4,
+          "right": 4,
+          "minWidth": 18,
+          "height": 18,
+          "borderRadius": 9,
+          "backgroundColor": "#FF3B30",
+          "paddingHorizontal": 4,
+          "fontSize": 10,
+          "fontWeight": "700",
+          "textColor": "#FFFFFF",
+          "maxDisplay": "99+"
+        },
+        "props": {
+          "title": "string (required)",
+          "subtitle": "string (optional)",
+          "onTitlePress": "function (optional, enables dropdown chevron)",
+          "actions": "HeaderAction[] (optional, right side icons with optional badges)",
+          "transparent": "boolean (optional, default false)",
+          "style": "ViewStyle (optional)",
+          "titleStyle": "TextStyle (optional)",
+          "subtitleStyle": "TextStyle (optional)"
+        }
+      },
+      "secondaryHeader": {
+        "description": "Header for secondary/detail screens (detail views, create forms, settings, overlays). Center-aligned title with optional back button and right actions.",
+        "component": "SecondaryHeader.tsx",
+        "usage": ["DeliveryDetailScreen", "InvoiceDetailsScreen", "SettingsScreen", "EditScreens", "OverlayScreens"],
+        "container": {
+          "height": 56,
+          "paddingRight": 8,
+          "flexDirection": "row",
+          "alignItems": "center",
+          "justifyContent": "space-between"
+        },
+        "title": {
+          "fontFamily": "Inter-Medium",
+          "fontSize": 24,
+          "fontWeight": "500",
+          "lineHeight": 32,
+          "alignment": "center",
+          "numberOfLines": 1
+        },
+        "side": {
+          "width": 80,
+          "flexDirection": "row",
+          "alignItems": "center"
+        },
+        "iconButton": {
+          "width": 56,
+          "height": 56,
+          "iconSize": {
+            "default": 28,
+            "chevronIcons": 32,
+            "note": "Chevron icons (chevron-left, chevron-right, etc.) use 32px for visual balance with solid icons at 28px"
+          },
+          "strokeWidth": 2
+        },
+        "variants": {
+          "solid": {
+            "description": "Default solid background",
+            "backgroundColor": "theme.colors.background"
+          },
+          "transparent": {
+            "description": "Transparent background with optional overlay tint for readability on images",
+            "backgroundColor": "transparent",
+            "overlayOpacity": "0.0 to 1.0 (rgba(0,0,0,opacity))"
+          }
+        },
+        "props": {
+          "title": "string (required)",
+          "variant": "'solid' | 'transparent' (optional, default 'solid')",
+          "transparentOverlayOpacity": "number 0-1 (optional, only for transparent variant)",
+          "leftAction": "HeaderAction (optional, typically back button)",
+          "rightActions": "HeaderAction[] (optional, max 2 recommended)",
+          "onTitlePress": "function (optional, makes title tappable)",
+          "style": "ViewStyle (optional)",
+          "titleStyle": "TextStyle (optional)"
+        }
+      },
+      "chatHeader": {
+        "description": "Specialized header for chat/conversation screens. Based on SecondaryHeader but simplified without transparency logic.",
+        "component": "ChatHeader.tsx",
+        "usage": ["ChatScreen"],
+        "container": {
+          "height": 56,
+          "paddingRight": 8,
+          "flexDirection": "row",
+          "alignItems": "center",
+          "justifyContent": "space-between"
+        },
+        "title": {
+          "fontFamily": "Inter-Medium",
+          "fontSize": 20,
+          "fontWeight": "500",
+          "lineHeight": 32,
+          "alignment": "center",
+          "numberOfLines": 1
+        },
+        "side": {
+          "width": 80,
+          "flexDirection": "row",
+          "alignItems": "center"
+        },
+        "iconButton": {
+          "width": 56,
+          "height": 56,
+          "iconSize": {
+            "default": 28,
+            "chevronIcons": 32,
+            "note": "Chevron icons use 32px for visual balance with solid icons at 28px"
+          },
+          "strokeWidth": 2
+        },
+        "props": {
+          "title": "string (required)",
+          "leftAction": "HeaderAction (optional, typically back button)",
+          "rightAction": "HeaderAction (optional, single action e.g. profile icon)",
+          "onTitlePress": "function (optional, navigate to profile)",
+          "style": "ViewStyle (optional)",
+          "titleStyle": "TextStyle (optional)"
+        }
+      },
+      "HeaderAction": {
+        "description": "Type definition for header action buttons",
+        "type": {
+          "icon": "string (icon name from lucide-react-native)",
+          "onPress": "function (callback)",
+          "accessibilityLabel": "string (optional)",
+          "badge": "number (optional, only for PrimaryHeader)"
+        }
+      },
+      "deprecated": {
+        "NewHeader": {
+          "description": "Backward-compatible wrapper around SecondaryHeader. Use SecondaryHeader directly for new code.",
+          "component": "NewHeader.tsx",
+          "status": "deprecated",
+          "migrateToComponent": "SecondaryHeader"
+        },
+        "AppHeader": {
+          "description": "Old header with leftTitleHeader and middleTitleHeader variants. Use PrimaryHeader or SecondaryHeader instead.",
+          "component": "AppHeader.tsx",
+          "status": "deprecated",
+          "migrateToComponent": "PrimaryHeader or SecondaryHeader"
+        },
+        "SimpleHeader": {
+          "description": "Complex scrollable header. Use PrimaryHeader + separate scroll logic if needed.",
+          "component": "SimpleHeader.tsx",
+          "status": "deprecated",
+          "migrateToComponent": "PrimaryHeader"
+        }
+      }
+    },
+    "bottomTabBar": {
+      "description": "Bottom tab navigation bar for Personal and Business modes",
+      "backgroundColor": "#FFFFFF",
+      "borderTopColor": "#E1E4EA",
+      "label": {
+        "fontSize": 12,
+        "selected": {
+          "fontFamily": "Inter-ExtraBold",
+          "color": "#000000",
+          "description": "Primary color, extraBold weight for selected tab"
+        },
+        "unselected": {
+          "fontFamily": "Inter-Medium",
+          "color": "#575B66",
+          "description": "textSecondary color, medium weight for unselected tabs"
+        }
+      },
+      "icon": {
+        "size": 24,
+        "selectedStyle": "filled",
+        "unselectedStyle": "outline"
+      },
+      "profileIcon": {
+        "description": "Profile tab uses user/business avatar instead of icon",
+        "width": 28,
+        "height": 28,
+        "borderRadius": 4,
+        "borderWidth": 1,
+        "focusedBorderWidth": 1.5,
+        "focusedBorderColor": "#000000",
+        "placeholderBackgroundColor": "#000000",
+        "initialsFontSize": 14,
+        "initialsFontFamily": "Inter-Bold",
+        "initialsColor": "#FFFFFF"
+      }
+    },
+    "filterBar": {
+      "description": "Default filter bar design used across all screens (Inbox, Activity, etc.)",
+      "height": 40,
+      "backgroundColor": "#FFFFFF",
+      "borderBottomWidth": 1,
+      "borderColor": "#E5E7EB",
+      "tabFontSize": 14,
+      "tabFontFamily": "Inter-Medium",
+      "selectedIndicatorHeight": 2.5,
+      "selectedIndicatorColor": "#D23030",
+      "selectedTextColor": "#000000",
+      "unselectedTextColor": "#777777",
+      "tabPaddingVertical": 6,
+      "containerFlexGrow": 1,
+      "contentJustify": "center",
+      "usage": "Apply consistently across all list screens with filters. Use containerStyle={{ flexGrow: 0 }} if needed."
+    },
+    "modals": {
+      "bottomSheet": {
+        "borderTopLeftRadius": 20,
+        "borderTopRightRadius": 20,
+        "backgroundColor": "#FFFFFF",
+        "paddingTop": 16,
+        "paddingHorizontal": 16,
+        "overlayColor": "rgba(0, 0, 0, 0.5)",
+        "handleIndicator": {
+          "width": 36,
+          "height": 4,
+          "borderRadius": 2,
+          "backgroundColor": "#E5E7EB"
+        }
+      },
+      "centerModal": {
+        "borderRadius": 16,
+        "backgroundColor": "#FFFFFF",
+        "padding": 20,
+        "maxWidth": "80%",
+        "maxHeight": "80%"
+      },
+      "header": {
+        "paddingBottom": 16,
+        "borderBottomWidth": 1,
+        "borderColor": "#E5E7EB",
+        "titleFontSize": 18,
+        "titleFontWeight": "600",
+        "closeIconSize": 24,
+        "closeIconColor": "#6B7280"
+      },
+      "confirmationDialog": {
+        "description": "Centered confirmation dialogs with three variants: 'delete' for destructive actions, 'confirm' for asking confirmation BEFORE an action, 'success' for feedback AFTER an action completes",
+        "common": {
+          "overlay": {
+            "backgroundColor": "rgba(0, 0, 0, 0.5)"
+          },
+          "container": {
+            "width": "100%",
+            "maxWidth": 360,
+            "borderRadius": 16,
+            "paddingTop": 32,
+            "paddingBottom": 12,
+            "paddingHorizontal": 12,
+            "alignItems": "center",
+            "shadow": {
+              "shadowColor": "#000000",
+              "shadowOffset": { "width": 0, "height": 12 },
+              "shadowOpacity": 0.25,
+              "shadowRadius": 24,
+              "elevation": 12
+            }
+          },
+          "title": {
+            "fontFamily": "Inter-SemiBold",
+            "fontSize": 24,
+            "fontWeight": "600",
+            "letterSpacing": -0.3,
+            "marginBottom": 8,
+            "textAlign": "center"
+          },
+          "message": {
+            "fontFamily": "Inter-Regular",
+            "fontSize": 16,
+            "lineHeight": 24,
+            "marginBottom": 24,
+            "textAlign": "center"
+          },
+          "primaryAction": {
+            "width": "100%",
+            "marginBottom": 16
+          },
+          "secondaryAction": {
+            "fontFamily": "Inter-SemiBold",
+            "fontSize": 16,
+            "paddingVertical": 8,
+            "paddingHorizontal": 8
+          }
+        },
+        "variants": {
+          "delete": {
+            "description": "Dark red variant for destructive actions (delete, remove, discard)",
+            "container": {
+              "backgroundColor": "rgba(22, 0, 0, 0.9)",
+              "backgroundColorHex": "#160000",
+              "backgroundOpacity": 0.9
+            },
+            "iconContainer": null,
+            "title": {
+              "color": "#FFFFFF"
+            },
+            "message": {
+              "color": "#FFFFFF"
+            },
+            "primaryAction": {
+              "variant": "alert",
+              "backgroundColor": "#FF2400",
+              "textColor": "#FFFFFF"
+            },
+            "secondaryAction": {
+              "color": "#FFFFFF"
+            }
+          },
+          "confirm": {
+            "description": "Dark green variant for asking confirmation BEFORE an action (save changes?, proceed?, confirm order?). NO icon - used when waiting for user decision.",
+            "useCases": ["Save changes?", "Confirm order?", "Proceed with action?", "Apply changes?"],
+            "container": {
+              "backgroundColor": "rgba(0, 16, 4, 0.9)",
+              "backgroundColorHex": "#001004",
+              "backgroundOpacity": 0.9
+            },
+            "iconContainer": null,
+            "title": {
+              "color": "#FFFFFF"
+            },
+            "message": {
+              "color": "#FFFFFF"
+            },
+            "primaryAction": {
+              "variant": "confirm",
+              "backgroundColor": "#2ACF01",
+              "textColor": "#001004"
+            },
+            "secondaryAction": {
+              "color": "#FFFFFF"
+            }
+          },
+          "success": {
+            "description": "Dark green variant for success feedback AFTER an action completes. Shows checkmark icon to indicate completion.",
+            "useCases": ["Changes saved successfully!", "Password changed!", "Profile created!", "Request sent!", "Order confirmed!", "Product updated!"],
+            "container": {
+              "backgroundColor": "rgba(0, 16, 4, 0.9)",
+              "backgroundColorHex": "#001004",
+              "backgroundOpacity": 0.9
+            },
+            "iconContainer": {
+              "width": 64,
+              "height": 64,
+              "borderRadius": 32,
+              "borderWidth": 1,
+              "borderColor": "#2ACF01",
+              "backgroundColor": "transparent",
+              "marginBottom": 24,
+              "icon": "checkmark",
+              "iconSize": 32,
+              "iconColor": "#FFFFFF"
+            },
+            "title": {
+              "color": "#FFFFFF"
+            },
+            "message": {
+              "color": "#FFFFFF"
+            },
+            "primaryAction": {
+              "variant": "confirm",
+              "backgroundColor": "#2ACF01",
+              "textColor": "#001004"
+            },
+            "secondaryAction": {
+              "color": "#FFFFFF"
+            }
+          }
+        }
+      }
+    },
+    "listItems": {
+      "settingsListItem": {
+        "description": "Standard settings/options list item design. Used for navigation lists, settings screens, and option menus.",
+        "height": 60,
+        "paddingHorizontal": 8,
+        "marginHorizontal": 12,
+        "borderBottomWidth": 0.5,
+        "borderColor": "ui.border",
+        "icon": {
+          "size": 24,
+          "color": "ui.iconColor",
+          "destructiveColor": "#DC2626"
+        },
+        "chevron": {
+          "size": 20,
+          "color": "ui.iconMuted"
+        },
+        "title": {
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 16,
+          "marginLeft": 16,
+          "color": "text.primary",
+          "destructiveColor": "#DC2626"
+        },
+        "switch": {
+          "trackColorOff": "#E9E9EA",
+          "trackColorOn": "#2ACF01",
+          "thumbColor": "#FFFFFF"
+        },
+        "usage": "Settings screens, option menus, navigation lists with icon + title + chevron pattern"
+      },
+      "messageCard": {
+        "paddingVertical": 12,
+        "paddingHorizontal": 12,
+        "avatarSize": 52,
+        "avatarMarginRight": 16,
+        "borderBottomWidth": 1,
+        "unreadBackgroundColor": "#F7F7F7"
+      },
+      "productCard": {
+        "paddingVertical": 12,
+        "paddingHorizontal": 16,
+        "imageSize": 64,
+        "borderBottomWidth": 1
+      },
+      "deliveryCard": {
+        "paddingVertical": 16,
+        "paddingHorizontal": 16,
+        "logoSize": 48,
+        "borderBottomWidth": 1
+      },
+      "communityButton": {
+        "description": "Help the Community grow button - promotional/feedback CTA used in settings screens",
+        "height": 80,
+        "paddingHorizontal": 16,
+        "borderRadius": 8,
+        "backgroundColor": "#DBEAFE",
+        "icon": {
+          "name": "heart-outline",
+          "size": 24,
+          "color": "#3B82F6"
+        },
+        "title": {
+          "text": "Help the Community grow",
+          "fontFamily": "Inter-Bold",
+          "fontSize": 16,
+          "color": "#3B82F6",
+          "marginBottom": 4
+        },
+        "subtitle": {
+          "text": "Propose features, report bugs, and share your feedback",
+          "fontFamily": "Inter-Medium",
+          "fontSize": 14,
+          "color": "text.secondary"
+        },
+        "usage": "Settings screens footer - links to community feedback page"
+      },
+      "modalListItem": {
+        "description": "List item design for modal/bottom sheet lists. Inherits from settingsListItem pattern.",
+        "height": 60,
+        "paddingHorizontal": 8,
+        "marginHorizontal": 12,
+        "borderBottomWidth": 0.5,
+        "borderColor": "ui.border",
+        "icon": {
+          "size": 24,
+          "containerSize": 48,
+          "containerBorderRadius": 24,
+          "containerBackgroundColor": "surface",
+          "color": "ui.iconColor"
+        },
+        "avatar": {
+          "size": 48,
+          "borderRadius": 24
+        },
+        "title": {
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 16,
+          "marginLeft": 12,
+          "color": "text.primary"
+        },
+        "subtitle": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 14,
+          "color": "text.secondary"
+        },
+        "checkbox": {
+          "size": 24,
+          "borderRadius": 12,
+          "checkedBackgroundColor": "primary",
+          "uncheckedBorderWidth": 2
+        },
+        "usage": "Modal lists, bottom sheet selection lists, dropdown menus"
+      }
+    },
+    "chatBubbles": {
+      "description": "Chat message bubbles design for ChatScreen (V1 Light: simplified, no attachments/voice)",
+      "common": {
+        "borderRadius": 12,
+        "paddingVertical": 4,
+        "paddingHorizontal": 8,
+        "maxWidth": "80%"
+      },
+      "incoming": {
+        "backgroundColor": "#FFFFFF",
+        "textColor": "#000000",
+        "borderWidth": 0,
+        "alignment": "flex-start"
+      },
+      "outgoing": {
+        "backgroundColor": "#000000",
+        "textColor": "#FFFFFF",
+        "borderWidth": 0,
+        "alignment": "flex-end"
+      },
+      "timestamp": {
+        "fontSize": 11,
+        "color": {
+          "incoming": "#575B66",
+          "outgoing": "rgba(255,255,255,0.7)"
+        },
+        "format": {
+          "today": "HH:MM",
+          "yesterday": "Yesterday, HH:MM",
+          "underOneWeek": "DayName, HH:MM",
+          "overOneWeek": "Day, DD Mon",
+          "overOneYear": "DD Mon YYYY"
+        }
+      },
+      "specialMessages": {
+        "order": {
+          "description": "Order message bubble - clickable to navigate to Order Details",
+          "minWidth": 220,
+          "paddingVertical": 10,
+          "paddingHorizontal": 12,
+          "header": {
+            "icon": "cube-outline",
+            "iconSize": 18,
+            "marginBottom": 8
+          },
+          "typeBadge": {
+            "paddingHorizontal": 8,
+            "paddingVertical": 4,
+            "borderRadius": 4,
+            "fontSize": 12,
+            "fontWeight": "600",
+            "colors": {
+              "import": "#2ACF01",
+              "export": "#FF7A00"
+            }
+          },
+          "orderId": {
+            "fontSize": 14,
+            "fontWeight": "600",
+            "marginBottom": 4
+          },
+          "details": {
+            "labelFontSize": 14,
+            "valueFontSize": 14,
+            "valueFontWeight": "600",
+            "rowPaddingVertical": 2,
+            "marginBottom": 4
+          },
+          "statusColors": {
+            "Done": "#2ACF01",
+            "New": "#6E0000",
+            "Ongoing": "#0075FF",
+            "Pending": "#FFB600",
+            "Cancel": "#FF6B6B"
+          },
+          "paymentStatusColors": {
+            "Paid": "#2ACF01",
+            "Unpaid": "#FF2400",
+            "Payment Pending Confirmation": "#FFB600"
+          },
+          "actionButton": {
+            "height": 40,
+            "paddingHorizontal": 24,
+            "borderRadius": 8,
+            "fontSize": 14,
+            "fontWeight": "600",
+            "marginTop": 4,
+            "backgroundColor": {
+              "incoming": "#000000",
+              "outgoing": "#FFFFFF"
+            },
+            "textColor": {
+              "incoming": "#FFFFFF",
+              "outgoing": "#000000"
+            }
+          }
+        },
+        "invoice": {
+          "description": "Invoice message bubble",
+          "icon": "receipt-outline",
+          "iconSize": 18,
+          "titleFontSize": 15,
+          "titleFontWeight": "600",
+          "subtextFontSize": 13
+        },
+        "location": {
+          "description": "Location message bubble",
+          "icon": "location",
+          "iconSize": 18,
+          "nameFontSize": 15,
+          "nameFontWeight": "600",
+          "addressFontSize": 13
+        },
+        "contact": {
+          "description": "Contact message bubble",
+          "icon": "person-circle",
+          "iconSize": 24,
+          "nameFontSize": 15,
+          "nameFontWeight": "600",
+          "phoneFontSize": 13
+        },
+        "pdf": {
+          "description": "PDF/Document message bubble (invoices only in V1)",
+          "icon": "file-text",
+          "iconSize": 18,
+          "fileNameFontSize": 15,
+          "hintFontSize": 11
+        },
+        "voice": {
+          "description": "Voice message bubble (receive only in V1)",
+          "icon": "mic",
+          "iconSize": 18
+        },
+        "image": {
+          "description": "Image message bubble",
+          "borderRadius": 12,
+          "aspectRatio": 1
+        },
+        "event": {
+          "description": "Event/System message bubble - no timestamp, displays only event text. Date Separator is separate and always appears above event messages.",
+          "backgroundColor": "#f3f4f6",
+          "borderRadius": 16,
+          "paddingVertical": 6,
+          "paddingHorizontal": 14,
+          "textColor": "#6b7280",
+          "fontSize": 13,
+          "fontStyle": "italic",
+          "alignment": "center",
+          "marginVertical": 4,
+          "showsTimestamp": false,
+          "allowedEvents": ["conversation_started", "user_removed_from_group", "user_name_changed"]
+        },
+        "dateSeparator": {
+          "description": "WhatsApp-style date headers shown between messages from different days. Always appears ABOVE Event/System messages on the same date.",
+          "backgroundColor": "#e5e7eb",
+          "borderRadius": 8,
+          "paddingVertical": 4,
+          "paddingHorizontal": 12,
+          "textColor": "#4b5563",
+          "fontSize": 12,
+          "fontWeight": "600",
+          "marginVertical": 12,
+          "alignment": "center",
+          "formatting": {
+            "today": "Today",
+            "yesterday": "Yesterday",
+            "underOneWeek": "Day name (e.g., Wednesday)",
+            "overOneWeek": "Short day + date (e.g., Mon, 23 Jan 2025)"
+          }
+        }
+      },
+      "statusIndicator": {
+        "iconSize": 14,
+        "colors": {
+          "sent": "#A4AAB8",
+          "delivered": "#A4AAB8",
+          "read": "#2ACF01"
+        }
+      },
+      "linkDetection": {
+        "incoming": {
+          "color": "#0075FF",
+          "textDecorationLine": "underline"
+        },
+        "outgoing": {
+          "color": "#93C5FD",
+          "textDecorationLine": "underline"
+        }
+      },
+      "v1Limitations": {
+        "description": "V1 Light version limitations",
+        "attachmentMenu": false,
+        "voiceRecording": false,
+        "swipeToReply": false,
+        "messageSelection": false
+      }
+    },
+    "accordion": {
+      "paddingVertical": 16,
+      "paddingHorizontal": 16,
+      "borderBottomWidth": 1,
+      "borderColor": "#E5E7EB",
+      "titleFontSize": 18,
+      "titleFontWeight": "600",
+      "iconSize": 24,
+      "contentMarginTop": 16
+    },
+    "staffCard": {
+      "description": "Staff member card design for team management screens",
+      "paddingVertical": 12,
+      "paddingHorizontal": 16,
+      "borderBottomWidth": 1,
+      "borderColor": "#E5E7EB",
+      "avatarSize": 52,
+      "avatarBorderRadius": 8,
+      "spacing": 12,
+      "roleBadge": {
+        "paddingHorizontal": 16,
+        "paddingVertical": 8,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "fontWeight": "500",
+        "variants": {
+          "super_admin": {
+            "backgroundColor": "#160D0D",
+            "textColor": "#FFFFFF"
+          },
+          "admin": {
+            "backgroundColor": "#160D0D",
+            "textColor": "#FFFFFF"
+          },
+          "staff": {
+            "backgroundColor": "#F5F5F5",
+            "textColor": "#160D0D",
+            "borderWidth": 1,
+            "borderColor": "#E5E7EB"
+          },
+          "pending_request": {
+            "backgroundColor": "#F5F5F5",
+            "textColor": "#777777"
+          }
+        }
+      },
+      "actionButtons": {
+        "accept": {
+          "backgroundColor": "#160D0D",
+          "textColor": "#FFFFFF",
+          "paddingHorizontal": 24,
+          "paddingVertical": 10,
+          "borderRadius": 8,
+          "fontSize": 14
+        },
+        "decline": {
+          "backgroundColor": "#FFFFFF",
+          "textColor": "#160D0D",
+          "borderWidth": 1,
+          "borderColor": "#160D0D",
+          "paddingHorizontal": 24,
+          "paddingVertical": 10,
+          "borderRadius": 8,
+          "fontSize": 14
+        }
+      }
+    },
+    "businessProfileCover": {
+      "description": "Cover image design for business profile screens",
+      "aspectRatio": "3:4",
+      "aspectRatioValue": 1.333,
+      "calculation": "SCREEN_WIDTH * (4 / 3)",
+      "settingsButton": {
+        "position": "absolute",
+        "top": 80,
+        "right": 12,
+        "width": 40,
+        "height": 40,
+        "borderRadius": 20,
+        "backgroundColor": "rgba(255, 255, 255, 0.8)",
+        "shadowColor": "#000",
+        "shadowOffset": { "width": 0, "height": 2 },
+        "shadowOpacity": 0.1,
+        "shadowRadius": 4,
+        "elevation": 3
+      }
+    },
+    "businessProfileAbout": {
+      "description": "About Us section design for business profile screens",
+      "mapContainer": {
+        "height": 280,
+        "borderRadius": 0,
+        "marginBottom": 0
+      },
+      "infoSection": {
+        "paddingHorizontal": 16,
+        "paddingVertical": 20
+      },
+      "infoItem": {
+        "marginBottom": 24
+      },
+      "infoLabel": {
+        "fontSize": 18,
+        "fontFamily": "Inter-Bold",
+        "color": "#000000",
+        "marginBottom": 8
+      },
+      "infoValue": {
+        "fontSize": 16,
+        "fontFamily": "Inter-Regular",
+        "color": "#333333"
+      },
+      "infoLink": {
+        "fontSize": 16,
+        "fontFamily": "Inter-Regular",
+        "color": "#0066FF"
+      },
+      "businessHours": {
+        "sectionTitle": {
+          "fontSize": 18,
+          "fontFamily": "Inter-Bold",
+          "color": "#000000",
+          "marginBottom": 16
+        },
+        "row": {
+          "flexDirection": "row",
+          "justifyContent": "space-between",
+          "paddingVertical": 8
+        },
+        "dayText": {
+          "fontSize": 16,
+          "fontFamily": "Inter-Medium",
+          "color": "#000000"
+        },
+        "timeText": {
+          "fontSize": 16,
+          "fontFamily": "Inter-Regular",
+          "color": "#333333"
+        },
+        "closedText": {
+          "fontSize": 16,
+          "fontFamily": "Inter-Regular",
+          "color": "#777777"
+        }
+      }
+    },
+    "switch": {
+      "description": "Toggle/Switch component for boolean settings",
+      "trackColorOff": "#E9E9EA",
+      "trackColorOn": "#2ACF01",
+      "thumbColor": "#FFFFFF",
+      "ios_backgroundColor": "#E9E9EA",
+      "usage": "Privacy toggles, settings switches, feature toggles",
+      "implementation": {
+        "trackColor": "{ false: '#E9E9EA', true: '#2ACF01' }",
+        "thumbColor": "#FFFFFF",
+        "ios_backgroundColor": "#E9E9EA"
+      }
+    },
+    "userProfile": {
+      "description": "Personal user profile design for SELF_PROFILE and OTHER_USER views",
+      "header": {
+        "avatarSize": 100,
+        "avatarBorderRadius": 50,
+        "nameTypography": {
+          "fontFamily": "Inter-Bold",
+          "fontSize": 24,
+          "color": "#000000"
+        },
+        "jobTitleTypography": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 16,
+          "color": "#575B66"
+        }
+      },
+      "aboutSection": {
+        "description": "Bio/description text displayed in secondary color",
+        "typography": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 14,
+          "lineHeight": 20,
+          "color": "#575B66"
+        },
+        "marginTop": 12,
+        "marginBottom": 16
+      },
+      "socialStats": {
+        "description": "Connections and following counts in a horizontal row",
+        "layout": "row",
+        "gap": 24,
+        "marginBottom": 24,
+        "item": {
+          "countTypography": {
+            "fontFamily": "Inter-Bold",
+            "fontSize": 18,
+            "color": "#000000"
+          },
+          "labelTypography": {
+            "fontFamily": "Inter-Regular",
+            "fontSize": 14,
+            "color": "#575B66"
+          },
+          "touchable": true,
+          "pressedOpacity": 0.7
+        }
+      },
+      "experiencesSection": {
+        "title": {
+          "fontFamily": "Inter-Bold",
+          "fontSize": 18,
+          "color": "#000000",
+          "marginBottom": 16
+        },
+        "card": {
+          "paddingVertical": 12,
+          "borderBottomWidth": 1,
+          "borderColor": "#E1E4EA",
+          "logoSize": 48,
+          "logoRadius": 8,
+          "companyName": {
+            "fontFamily": "Inter-Medium",
+            "fontSize": 16,
+            "color": "#000000"
+          },
+          "role": {
+            "fontFamily": "Inter-Regular",
+            "fontSize": 14,
+            "color": "#575B66"
+          },
+          "dateRange": {
+            "fontFamily": "Inter-Regular",
+            "fontSize": 12,
+            "color": "#A4AAB8"
+          }
+        }
+      },
+      "contactSection": {
+        "description": "About section with phone, email, address - visibility controlled by privacy",
+        "title": {
+          "fontFamily": "Inter-Bold",
+          "fontSize": 18,
+          "color": "#000000",
+          "marginBottom": 16
+        },
+        "item": {
+          "paddingVertical": 12,
+          "iconSize": 20,
+          "iconColor": "#575B66",
+          "labelTypography": {
+            "fontFamily": "Inter-Medium",
+            "fontSize": 14,
+            "color": "#A4AAB8"
+          },
+          "valueTypography": {
+            "fontFamily": "Inter-Regular",
+            "fontSize": 16,
+            "color": "#000000"
+          },
+          "linkTypography": {
+            "fontFamily": "Inter-Regular",
+            "fontSize": 16,
+            "color": "#0075FF"
+          }
+        },
+        "privacyNote": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 12,
+          "color": "#A4AAB8",
+          "fontStyle": "italic"
+        }
+      }
+    },
+    "connectionsScreen": {
+      "description": "Design for connections list screen",
+      "header": {
+        "title": "Connections",
+        "height": 48
+      },
+      "searchBar": {
+        "placeholder": "Search connections",
+        "marginHorizontal": 16,
+        "marginVertical": 12
+      },
+      "listItem": {
+        "paddingVertical": 12,
+        "paddingHorizontal": 16,
+        "borderBottomWidth": 1,
+        "borderColor": "#E1E4EA",
+        "avatarSize": 48,
+        "avatarRadius": 24,
+        "contentGap": 12,
+        "nameTypography": {
+          "fontFamily": "Inter-Medium",
+          "fontSize": 16,
+          "color": "#000000"
+        },
+        "subtitleTypography": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 14,
+          "color": "#575B66"
+        }
+      },
+      "emptyState": {
+        "iconSize": 60,
+        "iconColor": "#A4AAB8",
+        "title": {
+          "fontFamily": "Inter-Medium",
+          "fontSize": 16,
+          "color": "#000000"
+        },
+        "subtitle": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 14,
+          "color": "#575B66"
+        }
+      }
+    },
+    "followingScreen": {
+      "description": "Design for following list screen (businesses user follows)",
+      "header": {
+        "title": "Following",
+        "height": 48
+      },
+      "searchBar": {
+        "placeholder": "Search businesses",
+        "marginHorizontal": 16,
+        "marginVertical": 12
+      },
+      "listItem": {
+        "paddingVertical": 12,
+        "paddingHorizontal": 16,
+        "borderBottomWidth": 1,
+        "borderColor": "#E1E4EA",
+        "logoSize": 48,
+        "logoRadius": 8,
+        "contentGap": 12,
+        "nameTypography": {
+          "fontFamily": "Inter-Medium",
+          "fontSize": 16,
+          "color": "#000000"
+        },
+        "industryTypography": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 14,
+          "color": "#575B66"
+        },
+        "descriptionTypography": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 13,
+          "color": "#A4AAB8",
+          "numberOfLines": 1
+        }
+      },
+      "emptyState": {
+        "iconSize": 60,
+        "iconColor": "#A4AAB8",
+        "title": {
+          "fontFamily": "Inter-Medium",
+          "fontSize": 16,
+          "color": "#000000"
+        },
+        "subtitle": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 14,
+          "color": "#575B66"
+        }
+      }
+    },
+    "feedPosts": {
+      "description": "Feed post components design (brand_presentation, company_presentation, new_products)",
+      "common": {
+        "header": {
+          "avatarSize": 56,
+          "avatarBorderRadius": 8,
+          "name": {
+            "fontFamily": "Inter-SemiBold",
+            "fontSize": 20,
+            "color": "#000000"
+          },
+          "subtitle": {
+            "fontFamily": "Inter-Medium",
+            "fontSize": 14,
+            "color": "#575B66"
+          }
+        },
+        "borderBottomWidth": 0.5,
+        "paddingBottom": 16
+      },
+      "productCard": {
+        "description": "Product cards used in brand_presentation and new_products posts",
+        "width": 160,
+        "image": {
+          "width": 160,
+          "height": 160,
+          "borderRadius": 8
+        },
+        "name": {
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 16,
+          "color": "#000000",
+          "numberOfLines": 2
+        },
+        "unit": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 14,
+          "color": "#575B66",
+          "examples": ["1L", "10cmx10cm", "12Kg", "500g", "6 pack"]
+        },
+        "price": {
+          "fontFamily": "Inter-Medium",
+          "fontSize": 16,
+          "color": "#000000"
+        },
+        "orderButton": {
+          "paddingVertical": 10,
+          "paddingHorizontal": 16,
+          "borderRadius": 8,
+          "backgroundColor": "#000000",
+          "textColor": "#FFFFFF",
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 14
+        },
+        "newBadge": {
+          "position": "absolute",
+          "top": 8,
+          "left": 8,
+          "paddingVertical": 3,
+          "paddingHorizontal": 8,
+          "borderRadius": 4,
+          "backgroundColor": "#2ACF01",
+          "textColor": "#FFFFFF",
+          "fontFamily": "Inter-Bold",
+          "fontSize": 10
+        }
+      },
+      "brandCard": {
+        "description": "Brand cards used in company_presentation posts",
+        "width": 120,
+        "logo": {
+          "width": 120,
+          "height": 120,
+          "borderRadius": 8
+        },
+        "name": {
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 16,
+          "color": "#000000",
+          "textAlign": "center",
+          "numberOfLines": 2
+        },
+        "productsCount": {
+          "fontFamily": "Inter-Medium",
+          "fontSize": 14,
+          "color": "#575B66",
+          "textAlign": "center"
+        },
+        "backgroundColor": "transparent",
+        "note": "No grey background - brand cards are now transparent"
+      },
+      "brandPresentation": {
+        "description": "Post type: brand_presentation - showcases a brand with products",
+        "header": {
+          "brandName": {
+            "fontFamily": "Inter-SemiBold",
+            "fontSize": 20,
+            "color": "#000000"
+          },
+          "distributorName": {
+            "fontFamily": "Inter-Medium",
+            "fontSize": 14,
+            "color": "#575B66",
+            "prefix": "by "
+          }
+        },
+        "productsCarousel": {
+          "snapToInterval": 168,
+          "paddingHorizontal": 16,
+          "gap": 8
+        },
+        "timestamp": {
+          "hidden": true,
+          "note": "Timestamp removed from brand presentation"
+        }
+      },
+      "companyPresentation": {
+        "description": "Post type: company_presentation - presents a company with their brands",
+        "header": {
+          "avatarSize": 64,
+          "companyName": {
+            "fontFamily": "Inter-SemiBold",
+            "fontSize": 20,
+            "color": "#000000"
+          },
+          "location": {
+            "fontFamily": "Inter-Medium",
+            "fontSize": 14,
+            "color": "#575B66"
+          }
+        },
+        "connectButton": {
+          "alignment": "vertically centered with company name and location",
+          "default": {
+            "backgroundColor": "#000000",
+            "textColor": "#FFFFFF",
+            "icon": "person-add-outline",
+            "iconSize": 16,
+            "text": "Connect"
+          },
+          "connected": {
+            "description": "Secondary button style when already connected",
+            "backgroundColor": "#FFFFFF",
+            "textColor": "#000000",
+            "borderWidth": 0,
+            "icon": "checkmark",
+            "iconSize": 16,
+            "text": "Connected"
+          },
+          "paddingVertical": 10,
+          "paddingHorizontal": 16,
+          "borderRadius": 8,
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 14
+        },
+        "sectionTitle": {
+          "text": "Brands in Store",
+          "fontFamily": "Inter-Bold",
+          "fontSize": 16,
+          "color": "#000000"
+        },
+        "brandsCarousel": {
+          "snapToInterval": 136,
+          "paddingHorizontal": 16,
+          "gap": 16
+        },
+        "timestamp": {
+          "hidden": true,
+          "note": "Timestamp removed from company presentation"
+        }
+      },
+      "newProducts": {
+        "description": "Post type: new_products - shows newly added or received products",
+        "header": {
+          "businessName": {
+            "fontFamily": "Inter-SemiBold",
+            "fontSize": 20,
+            "color": "#000000"
+          },
+          "action": {
+            "fontFamily": "Inter-Medium",
+            "fontSize": 14,
+            "color": "#575B66"
+          }
+        },
+        "actionIcons": {
+          "distributor_added": {
+            "icon": "add",
+            "description": "Plus icon without circle for 'added new products'",
+            "color": "#2ACF01",
+            "size": 14
+          },
+          "business_received": {
+            "icon": "arrow-down",
+            "description": "Down arrow for 'received new products'",
+            "color": "#2ACF01",
+            "size": 14
+          }
+        },
+        "productsCountBadge": {
+          "paddingVertical": 6,
+          "paddingHorizontal": 12,
+          "borderRadius": 4,
+          "backgroundColor": "#F6F7F9",
+          "fontFamily": "Inter-Medium",
+          "fontSize": 14,
+          "color": "#000000"
+        },
+        "timestamp": {
+          "hidden": true,
+          "note": "Timestamp removed from new products post"
+        }
+      }
+    },
+    "proHome": {
+      "description": "Pro Mode Home dashboard design (Business Mode)",
+      "header": {
+        "component": "PrimaryHeader",
+        "description": "Use PrimaryHeader with notification and inbox icons with badges",
+        "note": "See headers.primaryHeader for exact specifications (height: 56, title fontSize: 32/600, iconSize: 24, badge specifications)",
+        "actions": [
+          { "icon": "bell", "badge": "unreadNotificationsCount" },
+          { "icon": "mail", "badge": "unreadMessagesCount" }
+        ],
+        "companySelector": {
+          "description": "Use onTitlePress prop with subtitle for company name when user has multiple companies",
+          "visible": "when multipleCompanies === true",
+          "implementation": "PrimaryHeader with title='Home', subtitle=companyName, onTitlePress=openCompanySelector"
+        }
+      },
+      "kpiChipsRow": {
+        "description": "Horizontal scrollable KPI chips",
+        "container": {
+          "marginVertical": 8,
+          "paddingHorizontal": 16,
+          "gap": 10
+        },
+        "chip": {
+          "paddingHorizontal": 14,
+          "paddingVertical": 12,
+          "borderRadius": 12,
+          "borderWidth": 1,
+          "borderColor": "#E1E4EA",
+          "backgroundColor": "#F6F7F9",
+          "minWidth": 100,
+          "gap": 6
+        },
+        "iconContainer": {
+          "width": 32,
+          "height": 32,
+          "borderRadius": 8,
+          "backgroundOpacity": 0.15
+        },
+        "label": {
+          "fontFamily": "Inter-Medium",
+          "fontSize": 12,
+          "color": "#575B66"
+        },
+        "value": {
+          "fontFamily": "Inter-Bold",
+          "fontSize": 20,
+          "color": "#000000"
+        }
+      },
+      "quickActions": {
+        "description": "2x2 grid of quick action buttons (DEPRECATED - removed from Pro Home)",
+        "status": "deprecated",
+        "container": {
+          "paddingHorizontal": 16,
+          "marginVertical": 8,
+          "gap": 12
+        },
+        "actionButton": {
+          "flex": 1,
+          "minWidth": "45%",
+          "maxWidth": "48%",
+          "paddingVertical": 16,
+          "paddingHorizontal": 14,
+          "borderRadius": 14,
+          "borderWidth": 1,
+          "borderColor": "#E1E4EA",
+          "backgroundColor": "#F6F7F9",
+          "gap": 10
+        },
+        "iconWrapper": {
+          "width": 48,
+          "height": 48,
+          "borderRadius": 12,
+          "backgroundOpacity": 0.15
+        },
+        "label": {
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 14,
+          "color": "#000000",
+          "textAlign": "center"
+        }
+      },
+      "priorityQueue": {
+        "description": "Priority items needing attention (DEPRECATED - removed from Pro Home)",
+        "status": "deprecated",
+        "sectionTitle": {
+          "fontFamily": "Inter-Bold",
+          "fontSize": 18,
+          "color": "#000000"
+        },
+        "countBadge": {
+          "paddingHorizontal": 8,
+          "paddingVertical": 2,
+          "borderRadius": 10,
+          "backgroundColor": "#D23030",
+          "fontSize": 12,
+          "fontFamily": "Inter-Bold",
+          "textColor": "#FFFFFF"
+        },
+        "itemContainer": {
+          "paddingVertical": 12,
+          "paddingRight": 12,
+          "borderRadius": 12,
+          "borderWidth": 1,
+          "borderColor": "#E1E4EA",
+          "backgroundColor": "#F6F7F9",
+          "gap": 10
+        },
+        "urgencyBar": {
+          "width": 4,
+          "borderTopLeftRadius": 12,
+          "borderBottomLeftRadius": 12,
+          "colors": {
+            "high": "#FF2400",
+            "medium": "#FFB600",
+            "low": "#0075FF"
+          }
+        },
+        "iconContainer": {
+          "width": 40,
+          "height": 40,
+          "borderRadius": 10,
+          "backgroundOpacity": 0.15
+        },
+        "itemTitle": {
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 15,
+          "color": "#000000"
+        },
+        "typePill": {
+          "paddingHorizontal": 8,
+          "paddingVertical": 2,
+          "borderRadius": 6,
+          "fontSize": 11,
+          "fontFamily": "Inter-Medium"
+        },
+        "itemSubtitle": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 13,
+          "color": "#575B66"
+        },
+        "timestamp": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 11,
+          "color": "#A4AAB8"
+        },
+        "actionButton": {
+          "paddingHorizontal": 12,
+          "paddingVertical": 6,
+          "borderRadius": 6,
+          "backgroundColor": "#000000",
+          "fontSize": 12,
+          "fontFamily": "Inter-SemiBold",
+          "textColor": "#FFFFFF"
+        },
+        "seeAllButton": {
+          "paddingVertical": 12,
+          "borderRadius": 10,
+          "borderWidth": 1,
+          "borderColor": "#E1E4EA",
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 14
+        }
+      },
+      "activityTimeline": {
+        "description": "Recent activity feed",
+        "sectionTitle": {
+          "fontFamily": "Inter-Bold",
+          "fontSize": 18,
+          "color": "#000000"
+        },
+        "container": {
+          "borderRadius": 12,
+          "backgroundColor": "#F6F7F9",
+          "paddingVertical": 8
+        },
+        "itemContainer": {
+          "paddingVertical": 10,
+          "paddingHorizontal": 12
+        },
+        "dot": {
+          "width": 24,
+          "height": 24,
+          "borderRadius": 12,
+          "iconSize": 12,
+          "iconColor": "#FFFFFF"
+        },
+        "line": {
+          "width": 2,
+          "backgroundColor": "#E1E4EA",
+          "marginTop": 4
+        },
+        "itemTitle": {
+          "fontFamily": "Inter-Medium",
+          "fontSize": 14,
+          "lineHeight": 18,
+          "color": "#000000"
+        },
+        "itemDescription": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 13,
+          "color": "#575B66"
+        },
+        "timestamp": {
+          "fontFamily": "Inter-Regular",
+          "fontSize": 11,
+          "color": "#A4AAB8",
+          "marginTop": 2
+        }
+      },
+      "postsSection": {
+        "description": "Feed posts section with white background",
+        "container": {
+          "backgroundColor": "#FFFFFF",
+          "borderTopLeftRadius": 20,
+          "borderTopRightRadius": 20,
+          "paddingTop": 16,
+          "marginTop": 24,
+          "minHeight": 400
+        },
+        "sectionTitle": {
+          "fontFamily": "Inter-Bold",
+          "fontSize": 18,
+          "color": "#000000",
+          "paddingHorizontal": 16,
+          "marginBottom": 8
+        },
+        "note": "Uses same feed post components as Personal mode (BrandPresentationPost, CompanyPresentationPost, NewProductPost)"
+      },
+      "typeColors": {
+        "order": "#0075FF",
+        "delivery": "#2ACF01",
+        "invoice": "#A76AF0",
+        "stock": "#FF7A00",
+        "payment": "#2ACF01",
+        "message": "#0075FF",
+        "system": "#6B7280"
+      }
+    },
+    "overlayScreens": {
+      "description": "Design for overlay screens (Inbox, Notifications) that slide from right",
+      "common": {
+        "animation": "slide_from_right",
+        "tabBarHidden": true,
+        "safeAreaEdges": ["top", "bottom"]
+      },
+      "header": {
+        "component": "SecondaryHeader",
+        "description": "Use SecondaryHeader with solid variant for overlay screens",
+        "note": "See headers.secondaryHeader for exact specifications (height: 56, iconSize: 28, title fontSize: 24)"
+      },
+      "inboxOverlay": {
+        "description": "Inbox accessed via Home header or swipe left",
+        "searchBar": {
+          "marginHorizontal": 8,
+          "marginTop": 8
+        },
+        "filterBar": {
+          "filters": ["all", "unread", "direct", "group"]
+        }
+      },
+      "notificationsOverlay": {
+        "description": "Notifications accessed via Home header",
+        "markAllReadButton": {
+          "paddingHorizontal": 12,
+          "paddingVertical": 8,
+          "fontFamily": "Inter-Medium",
+          "fontSize": 14
+        },
+        "notificationItem": {
+          "paddingVertical": 14,
+          "paddingHorizontal": 16,
+          "borderBottomWidth": 1,
+          "borderColor": "#E1E4EA",
+          "gap": 12,
+          "unreadDot": {
+            "width": 8,
+            "height": 8,
+            "borderRadius": 4,
+            "backgroundColor": "#D23030"
+          },
+          "iconContainer": {
+            "width": 40,
+            "height": 40,
+            "borderRadius": 10,
+            "backgroundOpacity": 0.15
+          },
+          "title": {
+            "fontFamily": "Inter-Medium",
+            "fontSize": 15,
+            "lineHeight": 20
+          },
+          "titleUnread": {
+            "fontFamily": "Inter-Bold"
+          },
+          "body": {
+            "fontFamily": "Inter-Regular",
+            "fontSize": 13,
+            "lineHeight": 18,
+            "color": "#575B66",
+            "numberOfLines": 2
+          },
+          "timestamp": {
+            "fontFamily": "Inter-Regular",
+            "fontSize": 11,
+            "color": "#A4AAB8",
+            "marginTop": 4
+          }
+        }
+      }
+    },
+    "personalDashboard": {
+      "description": "Personal Mode Dashboard (replaces Inbox tab)",
+      "header": {
+        "component": "PrimaryHeader",
+        "description": "Use PrimaryHeader with title 'Dashboard'",
+        "note": "See headers.primaryHeader for exact specifications (height: 56, title fontSize: 32/600)"
+      },
+      "statsGrid": {
+        "paddingHorizontal": 16,
+        "gap": 12,
+        "marginTop": 16
+      },
+      "statCard": {
+        "flex": 1,
+        "minWidth": "45%",
+        "maxWidth": "48%",
+        "padding": 16,
+        "borderRadius": 12,
+        "backgroundColor": "#F6F7F9",
+        "gap": 8
+      },
+      "statIcon": {
+        "width": 36,
+        "height": 36,
+        "borderRadius": 10,
+        "backgroundOpacity": 0.15
+      },
+      "statValue": {
+        "fontFamily": "Inter-Bold",
+        "fontSize": 24,
+        "color": "#000000"
+      },
+      "statLabel": {
+        "fontFamily": "Inter-Medium",
+        "fontSize": 13,
+        "color": "#575B66"
+      },
+      "activitySection": {
+        "marginTop": 24,
+        "paddingHorizontal": 16
+      },
+      "sectionTitle": {
+        "fontFamily": "Inter-Bold",
+        "fontSize": 18,
+        "color": "#000000"
+      },
+      "activityItem": {
+        "padding": 14,
+        "borderRadius": 12,
+        "borderWidth": 1,
+        "borderColor": "#E1E4EA",
+        "backgroundColor": "#F6F7F9",
+        "gap": 12
+      },
+      "activityIcon": {
+        "width": 40,
+        "height": 40,
+        "borderRadius": 10,
+        "backgroundOpacity": 0.15
+      },
+      "activityTitle": {
+        "fontFamily": "Inter-SemiBold",
+        "fontSize": 15,
+        "color": "#000000"
+      },
+      "statusBadge": {
+        "paddingHorizontal": 8,
+        "paddingVertical": 2,
+        "borderRadius": 6,
+        "fontSize": 11,
+        "fontFamily": "Inter-Medium"
+      },
+      "activitySubtitle": {
+        "fontFamily": "Inter-Regular",
+        "fontSize": 13,
+        "color": "#575B66"
+      },
+      "activityTime": {
+        "fontFamily": "Inter-Regular",
+        "fontSize": 11,
+        "color": "#A4AAB8",
+        "marginTop": 2
+      }
+    }
+  },
+
+  "patterns": {
+    "screenLayout": {
+      "description": "Standard screen structure",
+      "structure": [
+        "SafeAreaView with edges=['top']",
+        "Header component (fixed or scrollable)",
+        "Optional search bar",
+        "Optional filter bar (sticky)",
+        "Content area (FlatList/ScrollView)",
+        "Optional floating action button"
+      ],
+      "safeAreaBackgroundColor": "Match theme background"
+    },
+    "overlayScreen": {
+      "description": "Overlay screens that slide from right and hide tab bar",
+      "structure": [
+        "SafeAreaView with edges=['top', 'bottom']",
+        "Header with back button, centered title, optional action",
+        "Content area",
+        "No tab bar visible"
+      ],
+      "animation": "slide_from_right",
+      "accessPatterns": ["Header icon tap", "Swipe left gesture (for Inbox)"]
+    },
+    "homeScreenWithOverlays": {
+      "description": "Home screens (Personal or Pro) with header icons for overlays",
+      "headerIcons": ["Notifications (with unread badge)", "Inbox (with unread badge)"],
+      "gestures": {
+        "swipeLeft": "Opens Inbox overlay",
+        "swipeVelocityThreshold": 500,
+        "swipeDistanceThreshold": "25% of screen width"
+      },
+      "badges": {
+        "position": "absolute top-right of icon",
+        "backgroundColor": "#D23030"
+      }
+    },
+    "listScreen": {
+      "description": "Screens with scrollable lists",
+      "components": [
+        "Screen title (H1, 32px, bold)",
+        "Search bar (optional)",
+        "Filter tabs (optional)",
+        "List of cards",
+        "Empty state with icon and message",
+        "Add/Create FAB (optional)"
+      ]
+    },
+    "detailScreen": {
+      "description": "Individual item detail views",
+      "components": [
+        "Navigation header with back button",
+        "Hero image/cover (optional)",
+        "Content sections with clear hierarchy",
+        "Action buttons at bottom"
+      ]
+    },
+    "formScreen": {
+      "description": "Data entry screens",
+      "components": [
+        "Navigation header with title",
+        "Form fields with labels",
+        "Validation messages",
+        "Submit button (fixed at bottom)"
+      ]
+    },
+    "emptyStates": {
+      "iconSize": 60,
+      "iconColor": "#777777",
+      "titleFontSize": 16,
+      "subtitleFontSize": 14,
+      "actionButtonMarginTop": 20
+    },
+    "loadingStates": {
+      "spinnerColor": "#160D0D",
+      "spinnerSize": "small",
+      "overlayBackgroundColor": "rgba(255, 255, 255, 0.8)"
+    }
+  },
+
+  "animations": {
+    "durations": {
+      "fast": 150,
+      "normal": 200,
+      "slow": 300
+    },
+    "bottomSheetSlide": {
+      "duration": 300,
+      "overlayFade": 200
+    },
+    "accordionExpand": {
+      "duration": 200,
+      "easing": "linear"
+    },
+    "pressedOpacity": 0.7
+  },
+
+  "icons": {
+    "library": "Ionicons (@expo/vector-icons)",
+    "sizes": {
+      "xs": 16,
+      "sm": 20,
+      "md": 24,
+      "lg": 28,
+      "xl": 32
+    },
+    "commonIcons": {
+      "back": "chevron-back",
+      "close": "close",
+      "add": "add",
+      "edit": "create-outline",
+      "delete": "trash-outline",
+      "search": "search",
+      "filter": "filter",
+      "notifications": "notifications-outline",
+      "settings": "settings-outline",
+      "profile": "person",
+      "business": "business-outline",
+      "product": "cube-outline",
+      "invoice": "document-text-outline",
+      "delivery": "car-outline",
+      "message": "chatbubbles-outline",
+      "phone": "call-outline",
+      "email": "mail-outline",
+      "location": "location-outline",
+      "calendar": "calendar-outline",
+      "time": "time-outline",
+      "camera": "camera-outline",
+      "image": "image-outline",
+      "checkmark": "checkmark",
+      "checkmarkDone": "checkmark-done",
+      "chevronForward": "chevron-forward",
+      "chevronDown": "chevron-down",
+      "ellipsis": "ellipsis-vertical",
+      "cash": "cash-outline",
+      "receipt": "receipt-outline",
+      "qrCode": "qr-code-outline"
+    }
+  },
+
+  "accessibility": {
+    "minimumTouchTarget": 44,
+    "contrastRatios": {
+      "normal": "4.5:1",
+      "large": "3:1"
+    },
+    "guidelines": [
+      "All interactive elements must have minimum 44x44px touch targets",
+      "Use semantic labels for screen readers",
+      "Ensure sufficient color contrast",
+      "Provide loading and error state feedback",
+      "Support dynamic type scaling"
+    ]
+  },
+
+  "consistencyGuidelines": {
+    "dos": [
+      "Always use theme tokens instead of hardcoded values",
+      "Use the Typography component for all text",
+      "Apply consistent padding using spacing scale",
+      "Use Pill component for all status indicators",
+      "Follow the established card patterns for list items",
+      "Use useTheme() hook to access theme values",
+      "Apply border-bottom pattern for list separators",
+      "Use consistent icon sizes from the scale"
+    ],
+    "donts": [
+      "Don't use inline color values - reference theme colors",
+      "Don't mix px/dp values - use spacing scale",
+      "Don't create new button styles - use existing variants",
+      "Don't use different fonts - stick to Inter family",
+      "Don't hardcode status colors - use the semantic mappings",
+      "Don't create custom shadows - use shadow scale",
+      "Don't use different border radius values - use scale"
+    ],
+    "codePatterns": {
+      "themeAccess": "const { theme: appTheme } = useTheme();",
+      "colorReference": "appTheme.colors.primary",
+      "spacingReference": "theme.spacing.md",
+      "fontReference": "theme.fonts.primary.medium"
+    }
+  },
+
+  "resolvedInconsistencies": {
+    "description": "Previously identified inconsistencies that have been addressed",
+    "resolved": [
+      {
+        "issue": "Mixed color references",
+        "status": "RESOLVED",
+        "solution": "Extended theme with comprehensive color palette (textMuted, textSubtle, highlightedRow, badgeBackground, etc.) and updated key components to use appTheme.colors"
+      },
+      {
+        "issue": "Inconsistent spacing in styles",
+        "status": "RESOLVED",
+        "solution": "Updated key components (ActionBottomSheet, InvoiceCard, DeliveryCard, MessageCard, etc.) to use theme.spacing values"
+      },
+      {
+        "issue": "Font weight strings",
+        "status": "RESOLVED",
+        "solution": "Replaced fontWeight: '600' with fontFamily: theme.fonts.primary.medium in updated components"
+      },
+      {
+        "issue": "Avatar sizes vary",
+        "status": "RESOLVED",
+        "solution": "Added avatarSizes scale to theme (xs: 32, sm: 40, md: 52, lg: 64, xl: 72) and updated Avatar component defaults"
+      }
+    ],
+    "remainingWork": {
+      "description": "Some components still have hardcoded values and should be updated gradually",
+      "components": [
+        "CartPopup",
+        "CartBottomSection",
+        "ProductCardOtherCompany",
+        "AssignStaffModal",
+        "ColorPicker",
+        "ImageViewerModal",
+        "SplashScreen",
+        "Various screen files"
+      ],
+      "pattern": "Follow the same pattern used in updated components: import theme, use appTheme.colors for runtime colors, theme.spacing for static spacing"
+    }
+  }
+}
+
