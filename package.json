@@ -67,6 +67,7 @@
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "babel-plugin-module-resolver": "^5.0.2",
+    "dotenv": "^17.2.3",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-config-universe": "^12.0.0",
@@ -74,6 +75,7 @@
     "jest-expo": "~53.0.9",
     "metro-config": "^0.82.2",
     "prettier": "^3.1.0",
+    "prisma": "^7.2.0",
     "react-native-asset": "^2.1.1",
     "typescript": "~5.8.3"
   },
