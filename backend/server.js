@@ -269,13 +269,19 @@ function verifyOrderOwnership(order, businessId) {
 
 // Verify order is accessible from location (assigned or created by)
 function verifyOrderLocationAccess(order, locationId, location) {
-  if (!order) return false;
-  
-  // Order must belong to same business as location
-  if (order.businessId !== location.companyId) return false;
-  
+  if (!order || !location) return false;
+
+  // Support both memory shape (companyId) and prisma shape (businessId)
+  const locationBusinessId = location.businessId || location.companyId;
+
+  // Order must belong to same business as the location
+  if (order.businessId !== locationBusinessId) return false;
+
   // Order must be either created by or assigned to this location
-  return order.soldByLocationId === locationId || order.fulfillmentLocationId === locationId;
+  return (
+    order.soldByLocationId === locationId ||
+    order.fulfillmentLocationId === locationId
+  );
 }
 
 // ============================================================================
@@ -1559,64 +1565,82 @@ app.delete('/api/companies/:companyId/locations/:locationId', async (req, res) =
 });
 
 // Product Routes
-app.get('/api/companies/:companyId/products', (req, res) => {
-  let companyProducts = products.filter(p => p.companyId === req.params.companyId);
-  
-  // Apply filters
-  const { locationId, category, search, status, viewType } = req.query;
-  
-  if (category) {
-    companyProducts = companyProducts.filter(p => 
-      p.category?.toLowerCase().includes(category.toLowerCase())
-    );
-  }
-  
-  if (status && status !== 'All') {
-    companyProducts = companyProducts.filter(p => p.status === status);
-  }
-  
-  if (viewType) {
-    switch (viewType) {
-      case 'My Products':
-        companyProducts = companyProducts.filter(p => p.isCreatedByUser);
-        break;
-      case 'Imported':
-        companyProducts = companyProducts.filter(p => p.isImported);
-        break;
-      case 'Display':
-        companyProducts = companyProducts.filter(p => p.isDisplayable);
-        break;
-      // 'All Products' shows everything
+app.get('/api/companies/:companyId/products', async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { locationId, category, search, status, viewType } = req.query;
+
+    // Repo returns products for this businessId (companyId maps to businessId)
+    let companyProducts = await repos.productRepo.getByBusinessId(companyId);
+
+    // Apply filters
+    if (category) {
+      companyProducts = companyProducts.filter(p => 
+        p.category?.toLowerCase().includes(category.toLowerCase())
+      );
     }
+    
+    if (status && status !== 'All') {
+      companyProducts = companyProducts.filter(p => p.status === status);
+    }
+    
+    if (viewType) {
+      switch (viewType) {
+        case 'My Products':
+          companyProducts = companyProducts.filter(p => p.isCreatedByUser);
+          break;
+        case 'Imported':
+          companyProducts = companyProducts.filter(p => p.isImported);
+          break;
+        case 'Display':
+          companyProducts = companyProducts.filter(p => p.isDisplayable);
+          break;
+        // 'All Products' shows everything
+      }
+    }
+    
+    if (search) {
+      const searchLower = search.toLowerCase();
+      companyProducts = companyProducts.filter(p => 
+        (p.name || '').toLowerCase().includes(searchLower) ||
+        (p.brand || '').toLowerCase().includes(searchLower) ||
+        (p.category || '').toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Sort by brand name, then product name
+    companyProducts.sort((a, b) => {
+      const brandCompare = (a.brand || '').localeCompare(b.brand || '');
+      if (brandCompare !== 0) return brandCompare;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+    
+    res.json(successResponse(companyProducts));
+  } catch (e) {
+    console.error('Error fetching products:', e);
+    res.status(500).json(errorResponse('Failed to load products'));
   }
-  
-  if (search) {
-    const searchLower = search.toLowerCase();
-    companyProducts = companyProducts.filter(p => 
-      p.name.toLowerCase().includes(searchLower) ||
-      p.brand?.toLowerCase().includes(searchLower) ||
-      p.category?.toLowerCase().includes(searchLower)
-    );
-  }
-  
-  // Sort by brand name, then product name
-  companyProducts.sort((a, b) => {
-    const brandCompare = (a.brand || '').localeCompare(b.brand || '');
-    if (brandCompare !== 0) return brandCompare;
-    return a.name.localeCompare(b.name);
-  });
-  
-  res.json(successResponse(companyProducts));
 });
 
-app.get('/api/companies/:companyId/products/:productId', (req, res) => {
-  const product = products.find(p => 
-    p.id === req.params.productId && p.companyId === req.params.companyId
-  );
-  if (product) {
+app.get('/api/companies/:companyId/products/:productId', async (req, res) => {
+  try {
+    const { companyId, productId } = req.params;
+
+    const product = await repos.productRepo.getById(productId);
+    if (!product) {
+      return res.status(404).json(errorResponse('Product not found'));
+    }
+
+    // Safety check: ensure product belongs to the business (support both companyId and businessId)
+    const productBusinessId = product.businessId || product.companyId;
+    if (productBusinessId !== companyId) {
+      return res.status(404).json(errorResponse('Product not found'));
+    }
+
     res.json(successResponse(product));
-  } else {
-    res.status(404).json(errorResponse('Product not found'));
+  } catch (e) {
+    console.error('Error fetching product:', e);
+    res.status(500).json(errorResponse('Failed to load product'));
   }
 });
 
@@ -1625,144 +1649,157 @@ app.get('/api/companies/:companyId/products/:productId', (req, res) => {
 // ============================================================================
 
 // Get all orders for a business (Parent view)
-app.get('/api/businesses/:businessId/orders', (req, res) => {
+app.get('/api/businesses/:businessId/orders', async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
-  
-  let businessOrders = orders.filter(o => o.businessId === req.params.businessId);
-  
-  const { status, fulfillmentLocationId, soldByScope, search } = req.query;
-  
-  if (status) {
-    businessOrders = businessOrders.filter(o => o.status === status);
+
+  try {
+    let businessOrders = await repos.orderRepo.getByBusinessId(req.params.businessId);
+
+    // Optional filters
+    const { status, scope, soldByLocationId, fulfillmentLocationId, soldByScope, search } = req.query;
+
+    if (status) businessOrders = businessOrders.filter(o => o.status === status);
+    if (scope || soldByScope) businessOrders = businessOrders.filter(o => o.soldByScope === (scope || soldByScope));
+    if (soldByLocationId) businessOrders = businessOrders.filter(o => o.soldByLocationId === soldByLocationId);
+    if (fulfillmentLocationId) businessOrders = businessOrders.filter(o => o.fulfillmentLocationId === fulfillmentLocationId);
+
+    if (search) {
+      const searchLower = search.toLowerCase();
+      businessOrders = businessOrders.filter(o => 
+        (o.customerName || '').toLowerCase().includes(searchLower) ||
+        (o.id || '').toLowerCase().includes(searchLower)
+      );
+    }
+
+    businessOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json(successResponse(businessOrders, 'Orders retrieved successfully'));
+  } catch (err) {
+    console.error('Error fetching business orders:', err);
+    res.status(500).json(errorResponse('Failed to retrieve orders', 'FETCH_ERROR'));
   }
-  
-  if (fulfillmentLocationId) {
-    businessOrders = businessOrders.filter(o => o.fulfillmentLocationId === fulfillmentLocationId);
-  }
-  
-  if (soldByScope) {
-    businessOrders = businessOrders.filter(o => o.soldByScope === soldByScope);
-  }
-  
-  if (search) {
-    const searchLower = search.toLowerCase();
-    businessOrders = businessOrders.filter(o => 
-      o.customerName?.toLowerCase().includes(searchLower) ||
-      o.id.toLowerCase().includes(searchLower)
-    );
-  }
-  
-  // Sort by createdAt (newest first)
-  businessOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  
-  res.json(successResponse(businessOrders));
 });
 
 // Create order at Parent level (always allowed for paid plans)
-app.post('/api/businesses/:businessId/orders', (req, res) => {
+app.post('/api/businesses/:businessId/orders', async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
-  
-  const business = companies.find(c => c.id === req.params.businessId);
-  if (!business) {
-    return res.status(404).json(errorResponse('Business not found'));
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.businessId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    }
+
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canCreateOrders) {
+      return res.status(403).json(errorResponse(
+        'Creating orders requires a paid subscription.',
+        'CAPABILITY_REQUIRED'
+      ));
+    }
+
+    const { customerName, customerAddress, customerPhone, items, totalAmount, notes, fulfillmentLocationId } = req.body;
+
+    const newOrder = {
+      id: 'ORD-' + uuidv4().slice(0, 8).toUpperCase(),
+      businessId: req.params.businessId,
+      soldByScope: ORDER_SCOPE_FROM_STORE.PARENT,
+      soldByLocationId: null,
+      fulfillmentLocationId: fulfillmentLocationId || null,
+      status: fulfillmentLocationId ? ORDER_STATUS_FROM_STORE.ASSIGNED : ORDER_STATUS_FROM_STORE.NEW,
+      paymentStatus: 'Unpaid',
+      customerId: null,
+      customerName,
+      customerAddress,
+      customerPhone,
+      items: items || [],
+      totalAmount,
+      notes: notes || null,
+    };
+
+    const created = await repos.orderRepo.create(newOrder);
+
+    res.status(201).json(successResponse(created, 'Order created successfully'));
+  } catch (err) {
+    console.error('Error creating business order:', err);
+    res.status(500).json(errorResponse('Failed to create order', 'CREATE_ERROR'));
   }
-  
-  const capabilities = deriveCapabilities(business);
-  if (!capabilities.canCreateOrders) {
-    return res.status(403).json(errorResponse(
-      'Creating orders requires a paid subscription.',
-      'CAPABILITY_REQUIRED'
-    ));
-  }
-  
-  const newOrder = {
-    id: 'ORD-' + uuidv4().slice(0, 8).toUpperCase(),
-    businessId: req.params.businessId,
-    soldByScope: ORDER_SCOPE.PARENT,
-    soldByLocationId: null,
-    fulfillmentLocationId: req.body.fulfillmentLocationId || null,
-    status: req.body.fulfillmentLocationId ? ORDER_STATUS.ASSIGNED : ORDER_STATUS.NEW,
-    paymentStatus: 'Unpaid',
-    ...req.body,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-  
-  orders.push(newOrder);
-  res.json(successResponse(newOrder));
 });
 
 // Assign order to a location for fulfillment
-app.post('/api/businesses/:businessId/orders/:orderId/assign', (req, res) => {
+app.post('/api/businesses/:businessId/orders/:orderId/assign', async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
-  
-  const orderIndex = orders.findIndex(o => 
-    o.id === req.params.orderId && o.businessId === req.params.businessId
-  );
-  
-  if (orderIndex === -1) {
-    return res.status(404).json(errorResponse('Order not found'));
+
+  try {
+    const order = await repos.orderRepo.getById(req.params.orderId);
+    if (!verifyOrderOwnership(order, req.params.businessId)) {
+      return res.status(404).json(errorResponse('Order not found', 'NOT_FOUND'));
+    }
+
+    const { fulfillmentLocationId, assignedStaffId, assignedTo } = req.body;
+    if (!fulfillmentLocationId) {
+      return res.status(400).json(errorResponse('fulfillmentLocationId is required'));
+    }
+
+    // Verify location belongs to business
+    const location = await repos.locationRepo.getById(fulfillmentLocationId);
+    const locationBusinessId = location?.businessId || location?.companyId;
+    if (!location || locationBusinessId !== req.params.businessId) {
+      return res.status(404).json(errorResponse('Location not found'));
+    }
+
+    const updated = await repos.orderRepo.update(req.params.orderId, {
+      fulfillmentLocationId: fulfillmentLocationId || null,
+      assignedStaffId: assignedStaffId || null,
+      assignedTo: assignedTo || null,
+      status: ORDER_STATUS_FROM_STORE.ASSIGNED,
+    });
+
+    res.json(successResponse(updated, 'Order assigned successfully'));
+  } catch (err) {
+    console.error('Error assigning order:', err);
+    res.status(500).json(errorResponse('Failed to assign order', 'ASSIGN_ERROR'));
   }
-  
-  const { fulfillmentLocationId } = req.body;
-  if (!fulfillmentLocationId) {
-    return res.status(400).json(errorResponse('fulfillmentLocationId is required'));
-  }
-  
-  const location = locations.find(l => l.id === fulfillmentLocationId && l.companyId === req.params.businessId);
-  if (!location) {
-    return res.status(404).json(errorResponse('Location not found'));
-  }
-  
-  orders[orderIndex] = {
-    ...orders[orderIndex],
-    fulfillmentLocationId,
-    status: ORDER_STATUS.ASSIGNED,
-    updatedAt: new Date().toISOString()
-  };
-  
-  res.json(successResponse(orders[orderIndex]));
 });
 
 // Get single order
-app.get('/api/businesses/:businessId/orders/:orderId', (req, res) => {
+app.get('/api/businesses/:businessId/orders/:orderId', async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
-  
-  const order = orders.find(o => 
-    o.id === req.params.orderId && o.businessId === req.params.businessId
-  );
-  
-  if (!order) {
-    return res.status(404).json(errorResponse('Order not found'));
+
+  try {
+    const order = await repos.orderRepo.getById(req.params.orderId);
+    if (!verifyOrderOwnership(order, req.params.businessId)) {
+      return res.status(404).json(errorResponse('Order not found', 'NOT_FOUND'));
+    }
+
+    res.json(successResponse(order, 'Order retrieved successfully'));
+  } catch (err) {
+    console.error('Error fetching order:', err);
+    res.status(500).json(errorResponse('Failed to retrieve order', 'FETCH_ERROR'));
   }
-  
-  res.json(successResponse(order));
 });
 
 // Update order status
-app.patch('/api/businesses/:businessId/orders/:orderId', (req, res) => {
+app.patch('/api/businesses/:businessId/orders/:orderId', async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
-  
-  const orderIndex = orders.findIndex(o => 
-    o.id === req.params.orderId && o.businessId === req.params.businessId
-  );
-  
-  if (orderIndex === -1) {
-    return res.status(404).json(errorResponse('Order not found'));
+
+  try {
+    const order = await repos.orderRepo.getById(req.params.orderId);
+    if (!verifyOrderOwnership(order, req.params.businessId)) {
+      return res.status(404).json(errorResponse('Order not found', 'NOT_FOUND'));
+    }
+
+    const updated = await repos.orderRepo.update(req.params.orderId, req.body);
+    res.json(successResponse(updated, 'Order updated successfully'));
+  } catch (err) {
+    console.error('Error updating order:', err);
+    res.status(500).json(errorResponse('Failed to update order', 'UPDATE_ERROR'));
   }
-  
-  orders[orderIndex] = {
-    ...orders[orderIndex],
-    ...req.body,
-    updatedAt: new Date().toISOString()
-  };
-  
-  res.json(successResponse(orders[orderIndex]));
 });
 
 // ============================================================================
@@ -1770,156 +1807,194 @@ app.patch('/api/businesses/:businessId/orders/:orderId', (req, res) => {
 // ============================================================================
 
 // Get orders for a location (for location staff view)
-app.get('/api/locations/:locationId/orders', (req, res) => {
+app.get('/api/locations/:locationId/orders', async (req, res) => {
   // PERMISSION: Require location membership
   if (!requireLocationMembership(req, res, req.params.locationId)) return;
-  
-  const location = locations.find(l => l.id === req.params.locationId);
-  if (!location) {
-    return res.status(404).json(errorResponse('Location not found'));
+
+  try {
+    const location = await repos.locationRepo.getById(req.params.locationId);
+    if (!location) {
+      return res.status(404).json(errorResponse('Location not found', 'NOT_FOUND'));
+    }
+
+    const businessId = location.businessId || location.companyId;
+
+    let locationOrders = await repos.orderRepo.getByBusinessId(businessId);
+
+    // Location can only see orders that are sold-by or fulfilled-by this location
+    locationOrders = locationOrders.filter(o => verifyOrderLocationAccess(o, req.params.locationId, location));
+
+    const { status, search } = req.query;
+    if (status) locationOrders = locationOrders.filter(o => o.status === status);
+
+    if (search) {
+      const searchLower = search.toLowerCase();
+      locationOrders = locationOrders.filter(o => 
+        (o.customerName || '').toLowerCase().includes(searchLower) ||
+        (o.id || '').toLowerCase().includes(searchLower)
+      );
+    }
+
+    locationOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json(successResponse(locationOrders, 'Location orders retrieved successfully'));
+  } catch (err) {
+    console.error('Error fetching location orders:', err);
+    res.status(500).json(errorResponse('Failed to retrieve orders', 'FETCH_ERROR'));
   }
-  
-  // Get orders where this location is either the seller (INDEPENDENT) or fulfiller
-  let locationOrders = orders.filter(o => 
-    (o.soldByLocationId === req.params.locationId) || 
-    (o.fulfillmentLocationId === req.params.locationId)
-  );
-  
-  const { status, search } = req.query;
-  
-  if (status) {
-    locationOrders = locationOrders.filter(o => o.status === status);
-  }
-  
-  if (search) {
-    const searchLower = search.toLowerCase();
-    locationOrders = locationOrders.filter(o => 
-      o.customerName?.toLowerCase().includes(searchLower) ||
-      o.id.toLowerCase().includes(searchLower)
-    );
-  }
-  
-  locationOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  
-  res.json(successResponse(locationOrders));
 });
 
 // Create order at Location level (INDEPENDENT locations only) - INTERNAL USE
 // For customer-facing orders, use /api/public/locations/:locationId/orders
-app.post('/api/locations/:locationId/orders', (req, res) => {
+app.post('/api/locations/:locationId/orders', async (req, res) => {
   // PERMISSION: Require location membership (internal staff creating order)
   if (!requireLocationMembership(req, res, req.params.locationId)) return;
-  
-  const location = locations.find(l => l.id === req.params.locationId);
-  if (!location) {
-    return res.status(404).json(errorResponse('Location not found'));
+
+  try {
+    const location = await repos.locationRepo.getById(req.params.locationId);
+    if (!location) {
+      return res.status(404).json(errorResponse('Location not found', 'NOT_FOUND'));
+    }
+
+    const businessId = location.businessId || location.companyId;
+
+    const business = await repos.businessRepo.getById(businessId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    }
+
+    const capabilities = deriveCapabilities(business);
+
+    // ENFORCE: Only INDEPENDENT locations can create their own orders
+    if (location.operatingMode !== LOCATION_MODES.INDEPENDENT) {
+      return res.status(403).json(errorResponse(
+        'Only independent locations can create their own orders. This location operates in DEPENDENT mode.',
+        'LOCATION_MODE_REQUIRED'
+      ));
+    }
+
+    // ENFORCE: Business must have Enterprise capability for location-scoped orders
+    if (!capabilities.canHaveIndependentLocations) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'PLAN_REQUIRED',
+          message: 'Creating orders from independent locations requires an Enterprise subscription.'
+        }
+      });
+    }
+
+    if (!capabilities.canCreateOrders) {
+      return res.status(403).json(errorResponse(
+        'Creating orders requires a paid subscription.',
+        'CAPABILITY_REQUIRED'
+      ));
+    }
+
+    const { customerName, customerAddress, customerPhone, items, totalAmount, notes } = req.body;
+
+    const newOrder = {
+      id: 'ORD-' + uuidv4().slice(0, 8).toUpperCase(),
+      businessId,
+      soldByScope: ORDER_SCOPE_FROM_STORE.LOCATION,
+      soldByLocationId: req.params.locationId,
+      fulfillmentLocationId: req.params.locationId,
+      customerId: null,
+      customerName,
+      customerAddress,
+      customerPhone,
+      items: items || [],
+      totalAmount,
+      status: ORDER_STATUS_FROM_STORE.NEW,
+      paymentStatus: 'Unpaid',
+      notes: notes || null,
+    };
+
+    const created = await repos.orderRepo.create(newOrder);
+
+    res.status(201).json(successResponse(created, 'Order created successfully'));
+  } catch (err) {
+    console.error('Error creating location order:', err);
+    res.status(500).json(errorResponse('Failed to create order', 'CREATE_ERROR'));
   }
-  
-  const business = companies.find(c => c.id === location.companyId);
-  const capabilities = business ? deriveCapabilities(business) : {};
-  
-  // ENFORCE: Only INDEPENDENT locations can create their own orders
-  if (location.operatingMode !== LOCATION_MODES.INDEPENDENT) {
-    return res.status(403).json(errorResponse(
-      'Only independent locations can create their own orders. This location operates in DEPENDENT mode.',
-      'LOCATION_MODE_REQUIRED'
-    ));
-  }
-  
-  // ENFORCE: Business must have Enterprise capability for location-scoped orders
-  // (Grandfathered independent locations can still exist, but direct ordering requires Enterprise)
-  if (!capabilities.canHaveIndependentLocations) {
-    return res.status(403).json({
-      success: false,
-      error: {
-        code: 'PLAN_REQUIRED',
-        message: 'Creating orders from independent locations requires an Enterprise subscription.'
-      }
-    });
-  }
-  
-  if (!capabilities.canCreateOrders) {
-    return res.status(403).json(errorResponse(
-      'Creating orders requires a paid subscription.',
-      'CAPABILITY_REQUIRED'
-    ));
-  }
-  
-  const newOrder = {
-    id: 'ORD-' + uuidv4().slice(0, 8).toUpperCase(),
-    businessId: location.companyId,
-    soldByScope: ORDER_SCOPE.LOCATION,
-    soldByLocationId: location.id,
-    fulfillmentLocationId: location.id, // Same location fulfills
-    status: ORDER_STATUS.NEW,
-    paymentStatus: 'Unpaid',
-    ...req.body,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-  
-  orders.push(newOrder);
-  res.json(successResponse(newOrder));
 });
 
 // Update order at location level
-app.patch('/api/locations/:locationId/orders/:orderId', (req, res) => {
+app.patch('/api/locations/:locationId/orders/:orderId', async (req, res) => {
   // PERMISSION: Require location membership
   if (!requireLocationMembership(req, res, req.params.locationId)) return;
-  
-  const location = locations.find(l => l.id === req.params.locationId);
-  if (!location) {
-    return res.status(404).json(errorResponse('Location not found'));
+
+  try {
+    const location = await repos.locationRepo.getById(req.params.locationId);
+    if (!location) {
+      return res.status(404).json(errorResponse('Location not found', 'NOT_FOUND'));
+    }
+
+    const order = await repos.orderRepo.getById(req.params.orderId);
+
+    // OWNERSHIP CHECK: Ensure order belongs to same business as location
+    const locationBusinessId = location.businessId || location.companyId;
+    if (!order || order.businessId !== locationBusinessId) {
+      return res.status(404).json(errorResponse('Order not found'));
+    }
+
+    // ACCESS CHECK: Ensure order is accessible from this location
+    if (!verifyOrderLocationAccess(order, req.params.locationId, location)) {
+      return res.status(403).json(errorResponse(
+        'This order is not accessible from this location',
+        'ACCESS_DENIED'
+      ));
+    }
+
+    // Dependent locations can only update limited fields (status workflow)
+    const allowedFieldsDependent = ['status', 'paymentStatus', 'notes'];
+    // Independent locations can update more fields but not change ownership
+    const protectedFields = ['id', 'businessId', 'soldByScope', 'soldByLocationId', 'createdAt'];
+
+    let updates = {};
+
+    if (location.operatingMode === LOCATION_MODES.DEPENDENT) {
+      allowedFieldsDependent.forEach(field => {
+        if (req.body[field] !== undefined) {
+          updates[field] = req.body[field];
+        }
+      });
+    } else {
+      // INDEPENDENT locations can update more fields, but protected fields are stripped
+      updates = { ...req.body };
+      protectedFields.forEach(field => delete updates[field]);
+    }
+
+    const updated = await repos.orderRepo.update(req.params.orderId, updates);
+
+    res.json(successResponse(updated, 'Order updated successfully'));
+  } catch (err) {
+    console.error('Error updating location order:', err);
+    res.status(500).json(errorResponse('Failed to update order', 'UPDATE_ERROR'));
   }
-  
-  const order = orders.find(o => o.id === req.params.orderId);
-  
-  // OWNERSHIP CHECK: Ensure order belongs to same business as location
-  if (!order || order.businessId !== location.companyId) {
-    return res.status(404).json(errorResponse('Order not found'));
+});
+
+// Get single order for location
+app.get('/api/locations/:locationId/orders/:orderId', async (req, res) => {
+  // PERMISSION: Require location membership
+  if (!requireLocationMembership(req, res, req.params.locationId)) return;
+
+  try {
+    const location = await repos.locationRepo.getById(req.params.locationId);
+    if (!location) {
+      return res.status(404).json(errorResponse('Location not found', 'NOT_FOUND'));
+    }
+
+    const order = await repos.orderRepo.getById(req.params.orderId);
+    if (!verifyOrderLocationAccess(order, req.params.locationId, location)) {
+      return res.status(404).json(errorResponse('Order not found', 'NOT_FOUND'));
+    }
+
+    res.json(successResponse(order, 'Order retrieved successfully'));
+  } catch (err) {
+    console.error('Error fetching location order:', err);
+    res.status(500).json(errorResponse('Failed to retrieve order', 'FETCH_ERROR'));
   }
-  
-  // ACCESS CHECK: Ensure order is accessible from this location
-  if (!verifyOrderLocationAccess(order, req.params.locationId, location)) {
-    return res.status(403).json(errorResponse(
-      'This order is not accessible from this location',
-      'ACCESS_DENIED'
-    ));
-  }
-  
-  const orderIndex = orders.findIndex(o => o.id === req.params.orderId);
-  
-  // Dependent locations can only update limited fields (status workflow)
-  const allowedFieldsDependent = ['status', 'paymentStatus', 'notes'];
-  // Independent locations can update more fields but not change ownership
-  const protectedFields = ['id', 'businessId', 'soldByScope', 'soldByLocationId', 'createdAt'];
-  
-  if (location.operatingMode === LOCATION_MODES.DEPENDENT) {
-    const updates = {};
-    allowedFieldsDependent.forEach(field => {
-      if (req.body[field] !== undefined) {
-        updates[field] = req.body[field];
-      }
-    });
-    
-    orders[orderIndex] = {
-      ...orders[orderIndex],
-      ...updates,
-      updatedAt: new Date().toISOString()
-    };
-  } else {
-    // INDEPENDENT locations can update more fields, but protected fields are stripped
-    const safeUpdates = { ...req.body };
-    protectedFields.forEach(field => delete safeUpdates[field]);
-    
-    orders[orderIndex] = {
-      ...orders[orderIndex],
-      ...safeUpdates,
-      updatedAt: new Date().toISOString()
-    };
-  }
-  
-  res.json(successResponse(orders[orderIndex]));
 });
 
 // ============================================================================
@@ -1927,130 +2002,143 @@ app.patch('/api/locations/:locationId/orders/:orderId', (req, res) => {
 // ============================================================================
 
 // Get stock for a location
-app.get('/api/locations/:locationId/stock', (req, res) => {
-  // PERMISSION: Require location membership
-  if (!requireLocationMembership(req, res, req.params.locationId)) return;
-  
-  const locationStock = stocks.filter(s => s.locationId === req.params.locationId);
-  
-  // Enrich with product data
-  const enrichedStock = locationStock.map(s => {
-    const product = products.find(p => p.id === s.productId);
-    return {
+app.get('/api/locations/:locationId/stock', async (req, res) => {
+  try {
+    // PERMISSION: Require location membership
+    if (!requireLocationMembership(req, res, req.params.locationId)) return;
+
+    const locationId = req.params.locationId;
+
+    const locationStock = await repos.stockRepo.getByLocationId(locationId);
+
+    // Enrich with product data
+    const productIds = [...new Set(locationStock.map(s => s.productId))];
+    const products = await Promise.all(productIds.map(id => repos.productRepo.getById(id)));
+    const productMap = new Map(products.filter(Boolean).map(p => [p.id, p]));
+
+    const enriched = locationStock.map(s => ({
       ...s,
-      product: product || null
-    };
-  });
-  
-  res.json(successResponse(enrichedStock));
+      product: productMap.get(s.productId) || null,
+    }));
+
+    res.json(successResponse(enriched));
+  } catch (e) {
+    console.error('Error fetching location stock:', e);
+    res.status(500).json(errorResponse('Failed to load stock'));
+  }
 });
 
 // Update stock at location
-app.patch('/api/locations/:locationId/stock/:productId', (req, res) => {
-  // PERMISSION: Require location membership
-  if (!requireLocationMembership(req, res, req.params.locationId)) return;
-  
-  const stockIndex = stocks.findIndex(s => 
-    s.locationId === req.params.locationId && s.productId === req.params.productId
-  );
-  
-  if (stockIndex === -1) {
-    // Create new stock entry
-    const location = locations.find(l => l.id === req.params.locationId);
+app.patch('/api/locations/:locationId/stock/:productId', async (req, res) => {
+  try {
+    // PERMISSION: Require location membership
+    if (!requireLocationMembership(req, res, req.params.locationId)) return;
+
+    const locationId = req.params.locationId;
+    const productId = req.params.productId;
+    const qtyOnHand = Number(req.body.qtyOnHand ?? 0);
+
+    const location = await repos.locationRepo.getById(locationId);
     if (!location) {
       return res.status(404).json(errorResponse('Location not found'));
     }
-    
-    const newStock = {
-      id: 'stk-' + uuidv4().slice(0, 8),
-      businessId: location.companyId,
-      locationId: req.params.locationId,
-      productId: req.params.productId,
-      qtyOnHand: req.body.qtyOnHand || 0
-    };
-    stocks.push(newStock);
-    return res.json(successResponse(newStock));
+
+    const locationBusinessId = location.businessId || location.companyId;
+
+    const updated = await repos.stockRepo.upsert(
+      locationId,
+      productId,
+      qtyOnHand,
+      locationBusinessId
+    );
+
+    res.json(successResponse(updated));
+  } catch (e) {
+    console.error('Error updating stock:', e);
+    res.status(500).json(errorResponse('Failed to update stock'));
   }
-  
-  stocks[stockIndex] = {
-    ...stocks[stockIndex],
-    qtyOnHand: req.body.qtyOnHand ?? stocks[stockIndex].qtyOnHand
-  };
-  
-  res.json(successResponse(stocks[stockIndex]));
 });
 
 // Get stock for a business (all locations)
-app.get('/api/businesses/:businessId/stock', (req, res) => {
-  const businessStock = stocks.filter(s => s.businessId === req.params.businessId);
-  
-  const enrichedStock = businessStock.map(s => {
-    const product = products.find(p => p.id === s.productId);
-    const location = locations.find(l => l.id === s.locationId);
-    return {
+app.get('/api/businesses/:businessId/stock', async (req, res) => {
+  try {
+    const { businessId } = req.params;
+
+    const businessStock = await repos.stockRepo.getByBusinessId(businessId);
+
+    // Enrich with product + location
+    const productIds = [...new Set(businessStock.map(s => s.productId))];
+    const locationIds = [...new Set(businessStock.map(s => s.locationId))];
+
+    const [productsResult, locationsResult] = await Promise.all([
+      Promise.all(productIds.map(id => repos.productRepo.getById(id))),
+      Promise.all(locationIds.map(id => repos.locationRepo.getById(id))),
+    ]);
+
+    const productMap = new Map(productsResult.filter(Boolean).map(p => [p.id, p]));
+    const locationMap = new Map(locationsResult.filter(Boolean).map(l => [l.id, l]));
+
+    const enriched = businessStock.map(s => ({
       ...s,
-      product: product || null,
-      location: location ? { id: location.id, name: location.name } : null
-    };
-  });
-  
-  res.json(successResponse(enrichedStock));
+      product: productMap.get(s.productId) || null,
+      location: locationMap.get(s.locationId) ? { id: s.locationId, name: locationMap.get(s.locationId).name } : null
+    }));
+
+    res.json(successResponse(enriched));
+  } catch (e) {
+    console.error('Error fetching business stock:', e);
+    res.status(500).json(errorResponse('Failed to load business stock'));
+  }
 });
 
 // Delivery Routes
-app.get('/api/companies/:companyId/deliveries', (req, res) => {
-  let companyDeliveries = deliveries.filter(d => d.companyId === req.params.companyId);
-  
-  // Apply filters
-  const { locationId, status, assignedTo, direction, type, search } = req.query;
-  
-  if (locationId) {
-    companyDeliveries = companyDeliveries.filter(d => d.locationId === locationId);
+app.get('/api/companies/:companyId/deliveries', async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { locationId, status, assignedTo, direction, type, search } = req.query;
+
+    let items = await repos.deliveryRepo.getByBusinessId(companyId);
+
+    if (locationId) items = items.filter(d => d.locationId === locationId);
+    if (status && status !== 'all') items = items.filter(d => d.deliveryStatus === status);
+    if (direction) items = items.filter(d => d.direction === direction);
+    if (type) items = items.filter(d => d.type === type);
+    if (assignedTo) items = items.filter(d => (d.assignedTo || '').toLowerCase().includes(String(assignedTo).toLowerCase()));
+
+    if (search) {
+      const q = String(search).toLowerCase();
+      items = items.filter(d =>
+        (d.clientCompanyName || '').toLowerCase().includes(q) ||
+        (d.id || '').toLowerCase().includes(q) ||
+        (d.clientAddress || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Sort by orderTime (newest first)
+    items.sort((a, b) => new Date(b.orderTime) - new Date(a.orderTime));
+
+    res.json(successResponse(items));
+  } catch (e) {
+    console.error('Error fetching deliveries:', e);
+    res.status(500).json(errorResponse('Failed to load deliveries'));
   }
-  
-  if (status && status !== 'all') {
-    companyDeliveries = companyDeliveries.filter(d => d.deliveryStatus === status);
-  }
-  
-  if (direction) {
-    companyDeliveries = companyDeliveries.filter(d => d.direction === direction);
-  }
-  
-  if (type) {
-    companyDeliveries = companyDeliveries.filter(d => d.type === type);
-  }
-  
-  if (assignedTo) {
-    companyDeliveries = companyDeliveries.filter(d => 
-      d.assignedTo?.toLowerCase().includes(assignedTo.toLowerCase())
-    );
-  }
-  
-  if (search) {
-    const searchLower = search.toLowerCase();
-    companyDeliveries = companyDeliveries.filter(d => 
-      d.clientCompanyName.toLowerCase().includes(searchLower) ||
-      d.id.toLowerCase().includes(searchLower) ||
-      d.clientAddress?.toLowerCase().includes(searchLower)
-    );
-  }
-  
-  // Sort by orderTime (newest first)
-  companyDeliveries.sort((a, b) => new Date(b.orderTime) - new Date(a.orderTime));
-  
-  res.json(successResponse(companyDeliveries));
 });
 
-app.post('/api/companies/:companyId/deliveries', (req, res) => {
-  const newDelivery = {
-    id: uuidv4(),
-    companyId: req.params.companyId,
-    ...req.body,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-  deliveries.push(newDelivery);
-  res.json(successResponse(newDelivery));
+app.post('/api/companies/:companyId/deliveries', async (req, res) => {
+  try {
+    const { companyId } = req.params;
+
+    const created = await repos.deliveryRepo.create({
+      id: uuidv4(),
+      businessId: companyId,
+      ...req.body,
+    });
+
+    res.json(successResponse(created));
+  } catch (e) {
+    console.error('Error creating delivery:', e);
+    res.status(500).json(errorResponse('Failed to create delivery'));
+  }
 });
 
 // ============================================================================
@@ -2058,358 +2146,392 @@ app.post('/api/companies/:companyId/deliveries', (req, res) => {
 // ============================================================================
 
 // Get all invoices for a business (Parent view)
-app.get('/api/businesses/:businessId/invoices', (req, res) => {
+app.get('/api/businesses/:businessId/invoices', async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
-  
-  let businessInvoices = invoices.filter(i => i.businessId === req.params.businessId);
-  
-  const { status, issuedByScope, issuedByLocationId, search } = req.query;
-  
-  if (status) {
-    businessInvoices = businessInvoices.filter(i => i.status === status);
+
+  try {
+    let businessInvoices = await repos.invoiceRepo.getByBusinessId(req.params.businessId);
+
+    const { status, issuedByScope, issuedByLocationId, search } = req.query;
+
+    if (status) {
+      businessInvoices = businessInvoices.filter(i => i.status === status);
+    }
+
+    if (issuedByScope) {
+      businessInvoices = businessInvoices.filter(i => i.issuedByScope === issuedByScope);
+    }
+
+    if (issuedByLocationId) {
+      businessInvoices = businessInvoices.filter(i => i.issuedByLocationId === issuedByLocationId);
+    }
+
+    if (search) {
+      const searchLower = search.toLowerCase();
+      businessInvoices = businessInvoices.filter(i => 
+        (i.clientName || '').toLowerCase().includes(searchLower) ||
+        (i.invoiceNumber || '').toLowerCase().includes(searchLower)
+      );
+    }
+
+    businessInvoices.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json(successResponse(businessInvoices, 'Invoices retrieved successfully'));
+  } catch (err) {
+    console.error('Error fetching business invoices:', err);
+    res.status(500).json(errorResponse('Failed to retrieve invoices', 'FETCH_ERROR'));
   }
-  
-  if (issuedByScope) {
-    businessInvoices = businessInvoices.filter(i => i.issuedByScope === issuedByScope);
-  }
-  
-  if (issuedByLocationId) {
-    businessInvoices = businessInvoices.filter(i => i.issuedByLocationId === issuedByLocationId);
-  }
-  
-  if (search) {
-    const searchLower = search.toLowerCase();
-    businessInvoices = businessInvoices.filter(i => 
-      i.clientName?.toLowerCase().includes(searchLower) ||
-      i.invoiceNumber?.toLowerCase().includes(searchLower)
-    );
-  }
-  
-  businessInvoices.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  
-  res.json(successResponse(businessInvoices));
 });
 
 // Create invoice at Parent level
-app.post('/api/businesses/:businessId/invoices', (req, res) => {
+app.post('/api/businesses/:businessId/invoices', async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
-  
-  const business = companies.find(c => c.id === req.params.businessId);
-  if (!business) {
-    return res.status(404).json(errorResponse('Business not found'));
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.businessId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    }
+
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canCreateInvoices) {
+      return res.status(403).json(errorResponse(
+        'Creating invoices requires a paid subscription.',
+        'CAPABILITY_REQUIRED'
+      ));
+    }
+
+    // Get existing invoice count for numbering
+    const existingInvoices = await repos.invoiceRepo.getByBusinessId(req.params.businessId);
+    const invoiceCount = existingInvoices.length;
+    const invoiceNumber = `${business.settings?.invoicePrefix || 'INV'}-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(3, '0')}`;
+
+    const newInvoice = {
+      id: 'inv-' + uuidv4().slice(0, 8),
+      businessId: req.params.businessId,
+      issuedByScope: INVOICE_SCOPE_FROM_STORE.PARENT,
+      issuedByLocationId: null,
+      invoiceNumber,
+      status: 'draft',
+      type: 'invoice',
+      ...req.body,
+    };
+
+    const created = await repos.invoiceRepo.create(newInvoice);
+
+    res.status(201).json(successResponse(created, 'Invoice created successfully'));
+  } catch (err) {
+    console.error('Error creating business invoice:', err);
+    res.status(500).json(errorResponse('Failed to create invoice', 'CREATE_ERROR'));
   }
-  
-  const capabilities = deriveCapabilities(business);
-  if (!capabilities.canCreateInvoices) {
-    return res.status(403).json(errorResponse(
-      'Creating invoices requires a paid subscription.',
-      'CAPABILITY_REQUIRED'
-    ));
-  }
-  
-  const invoiceCount = invoices.filter(i => i.businessId === req.params.businessId).length;
-  const invoiceNumber = `${business.settings?.invoicePrefix || 'INV'}-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(3, '0')}`;
-  
-  const newInvoice = {
-    id: 'inv-' + uuidv4().slice(0, 8),
-    businessId: req.params.businessId,
-    issuedByScope: INVOICE_SCOPE.PARENT,
-    issuedByLocationId: null,
-    invoiceNumber,
-    status: 'draft',
-    type: 'invoice',
-    ...req.body,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-  
-  invoices.push(newInvoice);
-  res.json(successResponse(newInvoice));
 });
 
 // Get invoices for a location
-app.get('/api/locations/:locationId/invoices', (req, res) => {
+app.get('/api/locations/:locationId/invoices', async (req, res) => {
   // PERMISSION: Require location membership
   if (!requireLocationMembership(req, res, req.params.locationId)) return;
-  
-  const location = locations.find(l => l.id === req.params.locationId);
-  if (!location) {
-    return res.status(404).json(errorResponse('Location not found'));
+
+  try {
+    const location = await repos.locationRepo.getById(req.params.locationId);
+    if (!location) {
+      return res.status(404).json(errorResponse('Location not found', 'NOT_FOUND'));
+    }
+
+    // Get invoices issued by this location (for INDEPENDENT) or linked orders
+    let locationInvoices = await repos.invoiceRepo.getByLocationId(req.params.locationId);
+
+    const { status, search } = req.query;
+
+    if (status) {
+      locationInvoices = locationInvoices.filter(i => i.status === status);
+    }
+
+    if (search) {
+      const searchLower = search.toLowerCase();
+      locationInvoices = locationInvoices.filter(i => 
+        (i.clientName || '').toLowerCase().includes(searchLower) ||
+        (i.invoiceNumber || '').toLowerCase().includes(searchLower)
+      );
+    }
+
+    locationInvoices.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json(successResponse(locationInvoices, 'Location invoices retrieved successfully'));
+  } catch (err) {
+    console.error('Error fetching location invoices:', err);
+    res.status(500).json(errorResponse('Failed to retrieve invoices', 'FETCH_ERROR'));
   }
-  
-  // Get invoices issued by this location (for INDEPENDENT) or linked orders
-  let locationInvoices = invoices.filter(i => i.issuedByLocationId === req.params.locationId);
-  
-  const { status, search } = req.query;
-  
-  if (status) {
-    locationInvoices = locationInvoices.filter(i => i.status === status);
-  }
-  
-  if (search) {
-    const searchLower = search.toLowerCase();
-    locationInvoices = locationInvoices.filter(i => 
-      i.clientName?.toLowerCase().includes(searchLower) ||
-      i.invoiceNumber?.toLowerCase().includes(searchLower)
-    );
-  }
-  
-  locationInvoices.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  
-  res.json(successResponse(locationInvoices));
 });
 
 // Create invoice at Location level (INDEPENDENT only) - INTERNAL USE
-app.post('/api/locations/:locationId/invoices', (req, res) => {
+app.post('/api/locations/:locationId/invoices', async (req, res) => {
   // PERMISSION: Require location membership
   if (!requireLocationMembership(req, res, req.params.locationId)) return;
-  
-  const location = locations.find(l => l.id === req.params.locationId);
-  if (!location) {
-    return res.status(404).json(errorResponse('Location not found'));
+
+  try {
+    const location = await repos.locationRepo.getById(req.params.locationId);
+    if (!location) {
+      return res.status(404).json(errorResponse('Location not found', 'NOT_FOUND'));
+    }
+
+    const businessId = location.businessId || location.companyId;
+    const business = await repos.businessRepo.getById(businessId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    }
+
+    const capabilities = deriveCapabilities(business);
+
+    // ENFORCE: Only INDEPENDENT locations can create their own invoices
+    if (location.operatingMode !== LOCATION_MODES.INDEPENDENT) {
+      return res.status(403).json(errorResponse(
+        'Only independent locations can create their own invoices. This location operates in DEPENDENT mode.',
+        'LOCATION_MODE_REQUIRED'
+      ));
+    }
+
+    // ENFORCE: Business must have Enterprise capability for location-scoped invoices
+    if (!capabilities.canHaveIndependentLocations) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'PLAN_REQUIRED',
+          message: 'Creating invoices from independent locations requires an Enterprise subscription.'
+        }
+      });
+    }
+
+    if (!capabilities.canCreateInvoices) {
+      return res.status(403).json(errorResponse(
+        'Creating invoices requires a paid subscription.',
+        'CAPABILITY_REQUIRED'
+      ));
+    }
+
+    // Generate location-specific invoice number
+    const locationInvoices = await repos.invoiceRepo.getByLocationId(location.id);
+    const prefix = (location.name || 'LOC').substring(0, 3).toUpperCase();
+    const invoiceNumber = `${prefix}-${new Date().getFullYear()}-${String(locationInvoices.length + 1).padStart(3, '0')}`;
+
+    const newInvoice = {
+      id: 'inv-' + uuidv4().slice(0, 8),
+      businessId,
+      issuedByScope: INVOICE_SCOPE_FROM_STORE.LOCATION,
+      issuedByLocationId: location.id,
+      invoiceNumber,
+      status: 'draft',
+      type: 'invoice',
+      ...req.body,
+    };
+
+    const created = await repos.invoiceRepo.create(newInvoice);
+
+    res.status(201).json(successResponse(created, 'Invoice created successfully'));
+  } catch (err) {
+    console.error('Error creating location invoice:', err);
+    res.status(500).json(errorResponse('Failed to create invoice', 'CREATE_ERROR'));
   }
-  
-  const business = companies.find(c => c.id === location.companyId);
-  const capabilities = business ? deriveCapabilities(business) : {};
-  
-  // ENFORCE: Only INDEPENDENT locations can create their own invoices
-  if (location.operatingMode !== LOCATION_MODES.INDEPENDENT) {
-    return res.status(403).json(errorResponse(
-      'Only independent locations can create their own invoices. This location operates in DEPENDENT mode.',
-      'LOCATION_MODE_REQUIRED'
-    ));
-  }
-  
-  // ENFORCE: Business must have Enterprise capability for location-scoped invoices
-  if (!capabilities.canHaveIndependentLocations) {
-    return res.status(403).json({
-      success: false,
-      error: {
-        code: 'PLAN_REQUIRED',
-        message: 'Creating invoices from independent locations requires an Enterprise subscription.'
-      }
-    });
-  }
-  
-  if (!capabilities.canCreateInvoices) {
-    return res.status(403).json(errorResponse(
-      'Creating invoices requires a paid subscription.',
-      'CAPABILITY_REQUIRED'
-    ));
-  }
-  
-  // Generate location-specific invoice number
-  const locationInvoices = invoices.filter(i => i.issuedByLocationId === location.id);
-  const prefix = location.name.substring(0, 3).toUpperCase();
-  const invoiceNumber = `${prefix}-${new Date().getFullYear()}-${String(locationInvoices.length + 1).padStart(3, '0')}`;
-  
-  const newInvoice = {
-    id: 'inv-' + uuidv4().slice(0, 8),
-    businessId: location.companyId,
-    issuedByScope: INVOICE_SCOPE.LOCATION,
-    issuedByLocationId: location.id,
-    invoiceNumber,
-    status: 'draft',
-    type: 'invoice',
-    ...req.body,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-  
-  invoices.push(newInvoice);
-  res.json(successResponse(newInvoice));
 });
 
 // Update invoice
-app.patch('/api/invoices/:invoiceId', (req, res) => {
-  const invoiceIndex = invoices.findIndex(i => i.id === req.params.invoiceId);
-  if (invoiceIndex === -1) {
-    return res.status(404).json(errorResponse('Invoice not found'));
+app.patch('/api/invoices/:invoiceId', async (req, res) => {
+  try {
+    const invoice = await repos.invoiceRepo.getById(req.params.invoiceId);
+    if (!invoice) {
+      return res.status(404).json(errorResponse('Invoice not found', 'NOT_FOUND'));
+    }
+
+    const updated = await repos.invoiceRepo.update(req.params.invoiceId, req.body);
+
+    res.json(successResponse(updated, 'Invoice updated successfully'));
+  } catch (err) {
+    console.error('Error updating invoice:', err);
+    res.status(500).json(errorResponse('Failed to update invoice', 'UPDATE_ERROR'));
   }
-  
-  invoices[invoiceIndex] = {
-    ...invoices[invoiceIndex],
-    ...req.body,
-    updatedAt: new Date().toISOString()
-  };
-  
-  res.json(successResponse(invoices[invoiceIndex]));
 });
 
 // Legacy Invoice Routes (for backwards compatibility)
-app.get('/api/companies/:companyId/invoices', (req, res) => {
-  let companyInvoices = invoices.filter(i => i.businessId === req.params.companyId);
-  
-  const { locationId, status, type } = req.query;
-  
-  if (locationId) {
-    companyInvoices = companyInvoices.filter(i => i.issuedByLocationId === locationId);
+app.get('/api/companies/:companyId/invoices', async (req, res) => {
+  try {
+    let companyInvoices = await repos.invoiceRepo.getByBusinessId(req.params.companyId);
+
+    const { locationId, status, type } = req.query;
+
+    if (locationId) {
+      companyInvoices = companyInvoices.filter(i => i.issuedByLocationId === locationId);
+    }
+
+    if (status) {
+      companyInvoices = companyInvoices.filter(i => i.status === status);
+    }
+
+    if (type) {
+      companyInvoices = companyInvoices.filter(i => i.type === type);
+    }
+
+    res.json(successResponse(companyInvoices));
+  } catch (err) {
+    console.error('Error fetching company invoices:', err);
+    res.status(500).json(errorResponse('Failed to retrieve invoices', 'FETCH_ERROR'));
   }
-  
-  if (status) {
-    companyInvoices = companyInvoices.filter(i => i.status === status);
-  }
-  
-  if (type) {
-    companyInvoices = companyInvoices.filter(i => i.type === type);
-  }
-  
-  res.json(successResponse(companyInvoices));
 });
 
 // Chat Routes
-app.get('/api/companies/:companyId/chats', (req, res) => {
-  let companyChats = chats.filter(c => c.companyId === req.params.companyId);
-  
-  // Apply filters
-  const { locationId, type, search } = req.query;
-  
-  if (locationId) {
-    companyChats = companyChats.filter(c => c.locationId === locationId || c.locationId === null);
+app.get('/api/companies/:companyId/chats', async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    let companyChats = await repos.chatRepo.getByBusinessId(companyId);
+
+    // Apply filters
+    const { locationId, type, search } = req.query;
+
+    if (locationId) {
+      companyChats = companyChats.filter(c => c.locationId === locationId || c.locationId === null);
+    }
+
+    if (type) {
+      companyChats = companyChats.filter(c => c.type === type);
+    }
+
+    if (search) {
+      const searchLower = search.toLowerCase();
+      companyChats = companyChats.filter(c => 
+        (c.name || '').toLowerCase().includes(searchLower) ||
+        (c.lastMessage && (c.lastMessage.content || '').toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Sort by updatedAt (most recent first)
+    companyChats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    res.json(successResponse(companyChats));
+  } catch (e) {
+    console.error('Error fetching chats:', e);
+    res.status(500).json(errorResponse('Failed to load chats'));
   }
-  
-  if (type) {
-    companyChats = companyChats.filter(c => c.type === type);
-  }
-  
-  if (search) {
-    const searchLower = search.toLowerCase();
-    companyChats = companyChats.filter(c => 
-      c.name.toLowerCase().includes(searchLower) ||
-      (c.lastMessage && c.lastMessage.content.toLowerCase().includes(searchLower))
-    );
-  }
-  
-  // Sort by updatedAt (most recent first)
-  companyChats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-  
-  res.json(successResponse(companyChats));
 });
 
 // Get messages for a specific chat
-app.get('/api/companies/:companyId/chats/:chatId/messages', (req, res) => {
-  const { chatId } = req.params;
-  const limit = Math.min(parseInt(req.query.limit || '50', 10), 100);
-  const cursor = req.query.cursor;
-  
-  // Check chat exists and belongs to company
-  const chat = chats.find(c => c.id === chatId && c.companyId === req.params.companyId);
-  if (!chat) {
-    return res.status(404).json({ success: false, message: 'Chat not found' });
+app.get('/api/companies/:companyId/chats/:chatId/messages', async (req, res) => {
+  try {
+    const { companyId, chatId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit || '50', 10), 100);
+    const cursor = req.query.cursor;
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat || (chat.businessId !== companyId && chat.companyId !== companyId)) {
+      return res.status(404).json({ success: false, message: 'Chat not found' });
+    }
+
+    let chatMessages = await repos.chatRepo.getMessages(chatId);
+
+    // Sort by timestamp (newest first for inverted list)
+    chatMessages = [...chatMessages].sort((a, b) => 
+      new Date(b.timestamp) - new Date(a.timestamp)
+    );
+
+    // Apply cursor-based pagination
+    let startIndex = 0;
+    if (cursor) {
+      const idx = chatMessages.findIndex(m => m.id === cursor);
+      startIndex = idx >= 0 ? idx + 1 : 0;
+    }
+
+    const page = chatMessages.slice(startIndex, startIndex + limit);
+    const nextCursor = page.length ? page[page.length - 1].id : null;
+    const hasMore = (startIndex + limit) < chatMessages.length;
+
+    res.json({
+      success: true,
+      data: page,
+      nextCursor: hasMore ? nextCursor : null,
+      message: 'Success'
+    });
+  } catch (e) {
+    console.error('Error fetching messages:', e);
+    res.status(500).json(errorResponse('Failed to load messages'));
   }
-  
-  // Get messages for this chat (or empty array if none)
-  let chatMessages = messages[chatId] || [];
-  
-  // Sort by timestamp (newest first for inverted list)
-  chatMessages = [...chatMessages].sort((a, b) => 
-    new Date(b.timestamp) - new Date(a.timestamp)
-  );
-  
-  // Apply cursor-based pagination
-  let startIndex = 0;
-  if (cursor) {
-    const idx = chatMessages.findIndex(m => m.id === cursor);
-    startIndex = idx >= 0 ? idx + 1 : 0;
-  }
-  
-  const page = chatMessages.slice(startIndex, startIndex + limit);
-  const nextCursor = page.length ? page[page.length - 1].id : null;
-  const hasMore = (startIndex + limit) < chatMessages.length;
-  
-  res.json({
-    success: true,
-    data: page,
-    nextCursor: hasMore ? nextCursor : null,
-    message: 'Success'
-  });
 });
 
 // Mark chat as read
-app.post('/api/companies/:companyId/chats/:chatId/read', (req, res) => {
-  const { chatId } = req.params;
-  
-  const chatIndex = chats.findIndex(c => c.id === chatId && c.companyId === req.params.companyId);
-  if (chatIndex === -1) {
-    return res.status(404).json({ success: false, message: 'Chat not found' });
+app.post('/api/companies/:companyId/chats/:chatId/read', async (req, res) => {
+  try {
+    const { companyId, chatId } = req.params;
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat || (chat.businessId !== companyId && chat.companyId !== companyId)) {
+      return res.status(404).json({ success: false, message: 'Chat not found' });
+    }
+
+    const updatedChat = await repos.chatRepo.update(chatId, {
+      unreadCount: 0,
+      lastMessage: chat.lastMessage ? { ...chat.lastMessage, isRead: true } : null
+    });
+
+    res.json(successResponse(updatedChat));
+  } catch (e) {
+    console.error('Error marking chat as read:', e);
+    res.status(500).json(errorResponse('Failed to mark chat as read'));
   }
-  
-  chats[chatIndex].unreadCount = 0;
-  if (chats[chatIndex].lastMessage) {
-    chats[chatIndex].lastMessage.isRead = true;
-  }
-  
-  res.json(successResponse(chats[chatIndex]));
 });
 
 // Send message to chat
-app.post('/api/companies/:companyId/chats/:chatId/messages', (req, res) => {
-  const { chatId, companyId } = req.params;
-  const { type, content, replyToId, attachmentUrl, metadata } = req.body;
-  
-  const chatIndex = chats.findIndex(c => c.id === chatId && c.companyId === companyId);
-  if (chatIndex === -1) {
-    return res.status(404).json({ success: false, message: 'Chat not found' });
-  }
-  
-  // Create message based on type
-  const newMessage = {
-    id: `msg-${Date.now()}`,
-    chatId,
-    type: type || 'text',
-    isOutgoing: true,
-    sender: { id: 'user-1', name: 'You', avatar: '', role: 'business' },
-    timestamp: new Date().toISOString(),
-    status: 'sent'
-  };
-  
-  // Add type-specific fields
-  if (type === 'text') {
-    newMessage.text = content;
-  } else if (type === 'pdf') {
-    newMessage.fileName = content;
-    newMessage.fileUrl = attachmentUrl;
-  } else if (type === 'image') {
-    newMessage.imageUrl = attachmentUrl || content;
-  }
-  
-  // Add reply context if replying
-  if (replyToId) {
-    const chatMsgs = messages[chatId] || [];
-    const replyTo = chatMsgs.find(m => m.id === replyToId);
-    if (replyTo) {
-      newMessage.replyingTo = {
-        senderName: replyTo.sender.name,
-        messageSnippet: replyTo.text || replyTo.fileName || replyTo.event || '[Media]',
-        messageId: replyTo.id
-      };
+app.post('/api/companies/:companyId/chats/:chatId/messages', async (req, res) => {
+  try {
+    const { chatId, companyId } = req.params;
+    const { type, content, replyToId, attachmentUrl, metadata } = req.body;
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat || (chat.businessId !== companyId && chat.companyId !== companyId)) {
+      return res.status(404).json({ success: false, message: 'Chat not found' });
     }
+
+    // Create message based on type
+    const newMessage = {
+      id: `msg-${Date.now()}`,
+      chatId,
+      type: type || 'text',
+      isOutgoing: true,
+      sender: { id: 'user-1', name: 'You', avatar: '', role: 'business' },
+      timestamp: new Date().toISOString(),
+      status: 'sent'
+    };
+
+    // Add type-specific fields
+    if (type === 'text') {
+      newMessage.text = content;
+    } else if (type === 'pdf') {
+      newMessage.fileName = content;
+      newMessage.fileUrl = attachmentUrl;
+    } else if (type === 'image') {
+      newMessage.imageUrl = attachmentUrl || content;
+    }
+
+    // Add reply context if replying (for Prisma mode, we'd need to fetch from repo)
+    if (replyToId) {
+      const chatMsgs = await repos.chatRepo.getMessages(chatId);
+      const replyTo = chatMsgs.find(m => m.id === replyToId);
+      if (replyTo) {
+        newMessage.replyingTo = {
+          senderName: replyTo.sender?.name || replyTo.senderName,
+          messageSnippet: replyTo.text || replyTo.content || replyTo.fileName || replyTo.event || '[Media]',
+          messageId: replyTo.id
+        };
+      }
+    }
+
+    const created = await repos.chatRepo.addMessage(chatId, newMessage);
+
+    // Update chat's last message is handled by chatRepo.addMessage
+    res.json(successResponse(created));
+  } catch (e) {
+    console.error('Error sending message:', e);
+    res.status(500).json(errorResponse('Failed to send message'));
   }
-  
-  // Add to messages
-  if (!messages[chatId]) {
-    messages[chatId] = [];
-  }
-  messages[chatId].push(newMessage);
-  
-  // Update chat's last message
-  chats[chatIndex].lastMessage = {
-    id: newMessage.id,
-    content: content,
-    type: type || 'text',
-    senderId: 'user-1',
-    senderName: 'You',
-    timestamp: newMessage.timestamp,
-    isRead: false,
-    isOutgoing: true,
-    status: 'sent'
-  };
-  chats[chatIndex].updatedAt = newMessage.timestamp;
-  
-  res.json(successResponse(newMessage));
 });
+
 
 // ============================================================================
 // MEMBERSHIP ROUTES
