@@ -679,7 +679,17 @@
           "profileSwitcher": {
             "description": "Allows user to switch between User Profile and Business Profiles",
             "location": "Top of screen, tappable area showing current profile",
-            "behavior": "Opens profile selection modal/dropdown with all available profiles"
+            "behavior": "Opens profile selection modal/dropdown with all available profiles",
+            "sections": {
+              "personal": {
+                "description": "Always visible - shows Personal Profile option"
+              },
+              "businesses": {
+                "description": "Only shown when user has at least one business in their list",
+                "visibility": "hidden when userBusinesses.length === 0",
+                "showCondition": "Shown after user creates or joins their first business"
+              }
+            }
           }
         },
         "sections": [
@@ -965,7 +975,17 @@
         "profileSwitcher": {
           "description": "Allows user to switch between User Profile and Business Profiles",
           "location": "Top of screen, tappable area showing current business profile",
-          "behavior": "Opens profile selection modal/dropdown with all available profiles"
+          "behavior": "Opens profile selection modal/dropdown with all available profiles",
+          "sections": {
+            "personal": {
+              "description": "Always visible - shows Personal Profile option"
+            },
+            "businesses": {
+              "description": "Only shown when user has at least one business in their list",
+              "visibility": "hidden when userBusinesses.length === 0",
+              "showCondition": "Shown after user creates or joins their first business"
+            }
+          }
         }
       },
       "buttons": {

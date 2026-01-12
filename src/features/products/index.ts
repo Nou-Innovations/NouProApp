@@ -11,9 +11,7 @@ export * from './screens';
 export * from './components';
 
 // Hooks
-export { useProducts, type DisplayBrand } from './hooks/useProducts';
-
-// Service
+export { useProducts, type DisplayBrand } from './hooks/useProducts';// Service
 export { 
   default as productsService,
   getProducts,

@@ -122,6 +122,21 @@ export default function BusinessProfileOwnScreen() {
   const [expandedBrandName, setExpandedBrandName] = useState<string | null>(null);
   const [isProfileSwitcherVisible, setIsProfileSwitcherVisible] = useState(false);
   const [isAddBusinessOptionsVisible, setIsAddBusinessOptionsVisible] = useState(false);
+  const [expandedBusinessId, setExpandedBusinessId] = useState<string | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+
+  // Mock locations data - in real app this would come from the store/API
+  const mockBusinessLocations: Record<string, Array<{ id: string; name: string; address: string; is_primary: boolean }>> = {
+    'comp-1': [
+      { id: 'loc-1', name: 'Main Warehouse', address: 'Port Louis', is_primary: true },
+      { id: 'loc-2', name: 'Rose Hill Branch', address: 'Rose Hill', is_primary: false },
+      { id: 'loc-3', name: 'Curepipe Store', address: 'Curepipe', is_primary: false },
+    ],
+    'comp-2': [
+      { id: 'loc-4', name: 'Head Office', address: 'Ebene', is_primary: true },
+      { id: 'loc-5', name: 'Quatre Bornes', address: 'Quatre Bornes', is_primary: false },
+    ],
+  };
 
   // Animation for modal
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
@@ -224,6 +239,30 @@ export default function BusinessProfileOwnScreen() {
       closeProfileSwitcher();
     } catch (error) {
       console.error('Error switching business:', error);
+    }
+  };
+
+  const handleBusinessPress = (businessId: string) => {
+    const locations = mockBusinessLocations[businessId];
+    if (locations && locations.length > 1) {
+      // Toggle expansion if business has multiple locations
+      setExpandedBusinessId(expandedBusinessId === businessId ? null : businessId);
+    } else {
+      // Switch directly if single location or no locations
+      handleBusinessSelect(businessId);
+    }
+  };
+
+  const handleLocationSelect = async (businessId: string, locationId: string) => {
+    try {
+      // Set selected location and switch business
+      setSelectedLocationId(locationId);
+      await switchToBusiness(businessId);
+      closeProfileSwitcher();
+      // TODO: Set active location in store
+      console.log(`Selected location ${locationId} for business ${businessId}`);
+    } catch (error) {
+      console.error('Error switching to location:', error);
     }
   };
 
@@ -608,49 +647,140 @@ export default function BusinessProfileOwnScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* Business Profiles Section */}
-            <View style={styles.sectionTitleRow}>
-              <Text style={[styles.modalSectionTitle, { color: appTheme.colors.primary }]}>
-                Businesses
-              </Text>
-              <TouchableOpacity
-                style={styles.addBusinessButton}
-                onPress={() => {
-                  closeProfileSwitcher();
-                  setTimeout(openAddBusinessOptions, 300);
-                }}
-              >
-                <Icon name="add" size={20} color={appTheme.colors.primary} />
-              </TouchableOpacity>
-            </View>
-            {userBusinesses.map((ub) => (
-              <TouchableOpacity
-                key={ub.business.id}
-                style={[
-                  styles.profileRow,
-                  activeBusiness?.id === ub.business.id && styles.profileRowActive,
-                ]}
-                onPress={() => handleBusinessSelect(ub.business.id)}
-              >
-                <Avatar
-                  userId={ub.business.id}
-                  userName={ub.business.name}
-                  imageUri={ub.business.logo_url}
-                  size={48}
-                />
-                <View style={styles.profileRowInfo}>
-                  <Text style={[styles.profileRowName, { color: appTheme.colors.primary }]}>
-                    {ub.business.name}
-                  </Text>
-                  <Text style={[styles.profileRowSubtitle, { color: appTheme.colors.textSecondary }]}>
-                    {getRoleDisplayName(ub.role)}
-                  </Text>
+            {/* Business Profiles Section - only shown when user has businesses */}
+            {userBusinesses.length > 0 && (
+              <View style={styles.sectionTitleRow}>
+                <Text style={[styles.modalSectionTitle, { color: appTheme.colors.primary }]}>
+                  Businesses
+                </Text>
+                <TouchableOpacity
+                  style={styles.addBusinessButton}
+                  onPress={() => {
+                    closeProfileSwitcher();
+                    setTimeout(openAddBusinessOptions, 300);
+                  }}
+                >
+                  <Icon name="add" size={24} color={appTheme.colors.primary} />
+                </TouchableOpacity>
+              </View>
+            )}
+            {userBusinesses.map((ub) => {
+              const isActive = activeBusiness?.id === ub.business.id;
+              const locations = mockBusinessLocations[ub.business.id];
+              const hasLocations = locations && locations.length > 0;
+              const isExpanded = expandedBusinessId === ub.business.id;
+              // Find if this business has a selected location
+              const selectedLocation = hasLocations ? locations.find(loc => loc.id === selectedLocationId) : null;
+              // Business is "active" only if it's selected AND no location is selected
+              const showBusinessAsActive = isActive && !selectedLocation;
+              // Show all locations if expanded, or just the selected one if collapsed
+              const showAllLocations = hasLocations && isExpanded;
+              const showSelectedLocationOnly = !isExpanded && selectedLocation && isActive;
+              
+              return (
+                <View key={ub.business.id}>
+                  <TouchableOpacity
+                    style={[
+                      styles.profileRow,
+                      showBusinessAsActive && styles.profileRowActive,
+                    ]}
+                    onPress={() => handleBusinessPress(ub.business.id)}
+                  >
+                    <Avatar
+                      userId={ub.business.id}
+                      userName={ub.business.name}
+                      imageUri={ub.business.logo_url}
+                      size={48}
+                    />
+                    <View style={styles.profileRowInfo}>
+                      <Text style={[styles.profileRowName, { color: showBusinessAsActive ? '#FFFFFF' : appTheme.colors.primary }]}>
+                        {ub.business.name}
+                      </Text>
+                      <Text style={[styles.profileRowSubtitle, { color: showBusinessAsActive ? 'rgba(255,255,255,0.7)' : appTheme.colors.textSecondary }]}>
+                        {getRoleDisplayName(ub.role)}
+                        {hasLocations && ` • ${locations.length} location${locations.length > 1 ? 's' : ''}`}
+                      </Text>
+                    </View>
+                    {hasLocations && (
+                      <Icon 
+                        name={isExpanded ? "chevron-up" : "chevron-down"} 
+                        size={20} 
+                        color={showBusinessAsActive ? '#FFFFFF' : appTheme.colors.textLight} 
+                      />
+                    )}
+                  </TouchableOpacity>
+                  
+                  {/* Selected location only - shown when collapsed but has selection */}
+                  {showSelectedLocationOnly && (
+                    <TouchableOpacity
+                      style={[styles.locationRow, styles.locationRowActive]}
+                      onPress={() => setExpandedBusinessId(ub.business.id)}
+                    >
+                      <View style={[styles.locationIconContainer, styles.locationIconContainerActive]}>
+                        <Icon name="location-outline" size={20} color="#FFFFFF" />
+                      </View>
+                      <View style={styles.locationInfo}>
+                        <Text style={[styles.locationName, { color: '#FFFFFF' }]}>
+                          {selectedLocation.name}
+                        </Text>
+                        <Text style={[styles.locationAddress, { color: 'rgba(255,255,255,0.7)' }]}>
+                          {selectedLocation.address}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {/* All location options - shown when expanded */}
+                  {showAllLocations && (
+                    <View style={styles.locationsContainer}>
+                      {locations.map((location) => {
+                        const isLocationSelected = selectedLocationId === location.id;
+                        return (
+                          <TouchableOpacity
+                            key={location.id}
+                            style={[
+                              styles.locationRow,
+                              isLocationSelected && styles.locationRowActive,
+                            ]}
+                            onPress={() => handleLocationSelect(ub.business.id, location.id)}
+                          >
+                            <View style={[
+                              styles.locationIconContainer,
+                              isLocationSelected && styles.locationIconContainerActive,
+                            ]}>
+                              <Icon 
+                                name="location-outline" 
+                                size={20} 
+                                color={isLocationSelected ? '#FFFFFF' : appTheme.colors.textSecondary} 
+                              />
+                            </View>
+                            <View style={styles.locationInfo}>
+                              <Text style={[
+                                styles.locationName, 
+                                { color: isLocationSelected ? '#FFFFFF' : appTheme.colors.primary }
+                              ]}>
+                                {location.name}
+                              </Text>
+                              <Text style={[
+                                styles.locationAddress, 
+                                { color: isLocationSelected ? 'rgba(255,255,255,0.7)' : appTheme.colors.textSecondary }
+                              ]}>
+                                {location.address}
+                              </Text>
+                            </View>
+                            {location.is_primary && !isLocationSelected && (
+                              <View style={styles.primaryBadge}>
+                                <Text style={styles.primaryBadgeText}>Primary</Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
                 </View>
-                {activeBusiness?.id === ub.business.id && (
-                  <Icon name="checkmark-circle" size={24} color="#22C55E" />
-                )}
-              </TouchableOpacity>
-            ))}
+              );
+            })}
 
             {/* Add New Business Button */}
             <TouchableOpacity
@@ -1024,45 +1154,46 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   modalScrollView: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     marginTop: 8,
   },
   modalSectionTitle: {
     fontSize: 18,
     fontFamily: theme.fonts.primary.bold,
-    marginTop: 16,
+    marginTop: 8,
     marginBottom: 8,
   },
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 8,
     marginBottom: 8,
   },
   addBusinessButton: {
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
+    
   },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 60,
-    paddingHorizontal: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
     marginHorizontal: 0,
     borderBottomWidth: 0.5,
     borderBottomColor: '#E1E4EA',
   },
   profileRowActive: {
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    borderRadius: 12,
-    borderBottomWidth: 1,
+    backgroundColor: '#000000',
+    borderRadius: 0,
+    borderBottomWidth: 0,
+    marginHorizontal: -12,
+    paddingHorizontal: 12,
   },
   profileRowAvatar: {
     width: 48,
@@ -1085,13 +1216,66 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.semiBold,
     marginTop: 2,
   },
+  // Location styles
+  locationsContainer: {
+    // No left line, just a container for locations
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#E1E4EA',
+  },
+  locationRowActive: {
+    backgroundColor: '#000000',
+    borderBottomWidth: 0,
+    marginHorizontal: -12,
+    paddingHorizontal: 12,
+  },
+  locationIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F6F7F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  locationIconContainerActive: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  locationInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  locationName: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.semiBold,
+  },
+  locationAddress: {
+    fontSize: 12,
+    fontFamily: theme.fonts.primary.regular,
+    marginTop: 2,
+  },
+  primaryBadge: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  primaryBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.fonts.primary.semiBold,
+    color: '#2E7D32',
+  },
   addNewBusinessButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#000000',
     borderRadius: 8,
-    height: 48,
+    height: 56,
     marginTop: 24,
     marginBottom: 16,
   },
