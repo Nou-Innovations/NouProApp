@@ -1,32 +1,50 @@
-import React, { useRef, useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
-  View, Text, Image, TouchableOpacity, Dimensions, StyleSheet, Linking, StatusBar, ScrollView, FlatList, Alert, Share,
+  View, Text, Image, TouchableOpacity, Dimensions, StyleSheet, Linking, StatusBar, ScrollView, Alert, Share,
 } from 'react-native';
 import { mockBusiness, mockBrands, mockBusinessAbout, getBusinessById, getBrandsByBusinessId, feedCompanies } from '@/shared/data/businessProfile';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import BrandCard from '@/features/brands/components/BrandCard';
-import ProductCard from '@/features/products/components/ProductCard';
 import ProductCardOtherCompany from '@/features/products/components/ProductCardOtherCompany';
 import CartPopup from '@/features/cart/components/CartPopup';
 import CartItemCard from '@/features/cart/components/CartItemCard';
 import CartBottomSection from '@/features/cart/components/CartBottomSection';
 import ProfileActionButtons from '@/features/profile/components/ProfileActionButtons';
+import Avatar from '@/shared/components/ui/Avatar';
 import { useAppStore } from '@/shared/store';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useOrderStore } from '@/shared/store/orderStore';
 import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
-import { ProfileViewType, getProfileAdditionalOptions } from '@/shared/types/profile';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+import theme from '@/shared/theme';
+import MapView, { Marker } from 'react-native-maps';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
-const COVER_HEIGHT = SCREEN_HEIGHT * (2 / 3); // 2/3 of screen height
+const COVER_HEIGHT = SCREEN_WIDTH * (4 / 3); // 3:4 aspect ratio - matching BusinessProfileOwnScreen
 const TAB_BAR_HEIGHT = 50;
+
+// Mock business hours data - matching BusinessProfileOwnScreen
+const mockBusinessHours = [
+  { day: 'Monday', open: '09:00 AM', close: '06:00 PM' },
+  { day: 'Tuesday', open: '09:00 AM', close: '06:00 PM' },
+  { day: 'Wednesday', open: '09:00 AM', close: '06:00 PM' },
+  { day: 'Thursday', open: '09:00 AM', close: '06:00 PM' },
+  { day: 'Friday', open: '09:00 AM', close: '06:00 PM' },
+  { day: 'Saturday', open: 'Closed', close: '' },
+  { day: 'Sunday', open: 'Closed', close: '' },
+];
+
+// Mock map location
+const mockMapLocation = {
+  latitude: -20.232,
+  longitude: 57.498,
+};
 
 // Base tabs without Cart (Cart only shown in Business Mode)
 const BASE_TABS = [
   { key: 'products', label: 'Products', icon: 'cube-outline' },
-  { key: 'about', label: 'About Us', icon: 'information-circle-outline' },
+  { key: 'about', label: 'About Us', icon: 'person-outline' },
 ];
 
 const CART_TAB = { key: 'cart', label: 'Cart', icon: 'cart-outline' };
@@ -220,18 +238,6 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     ]);
   };
 
-  const handleMoreOptions = () => {
-    const options = getProfileAdditionalOptions(viewType);
-    Alert.alert('Options', 'Select an action', [
-      ...options.map((option) => ({
-        text: option,
-        onPress: () => console.log(`${option} pressed for business ${businessId}`),
-        style: option === 'Block' ? 'destructive' as const : 'default' as const,
-      })),
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
   const handleShareProfile = async () => {
     try {
       await Share.share({
@@ -320,29 +326,96 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     return item.type === 'brand' ? `brand-${item.data.name}` : `product-${item.data.id}`;
   };
 
-  const AboutUsTab = () => (
-    <View style={styles.tabContentContainer}>
-      <View style={styles.detailsContainer}>
-        <DetailItem icon="location-outline" text={business.locations?.[0]?.address || 'Address not available'} />
-        <DetailItem icon="globe-outline" text={aboutInfo.website || 'website.com'} onPress={() => aboutInfo.website && Linking.openURL(`https://${aboutInfo.website}`)} isLink />
-        <DetailItem icon="mail-outline" text={business.locations?.[0]?.email || 'contact@company.com'} onPress={() => Linking.openURL(`mailto:${business.locations?.[0]?.email || 'contact@company.com'}`)} isLink />
-        <DetailItem icon="call-outline" text={aboutInfo.phone || 'Phone not available'} onPress={() => aboutInfo.phone && Linking.openURL(`tel:${aboutInfo.phone}`)} isLink />
-      </View>
-      
-      <View style={styles.hoursContainer}>
-        <Text style={styles.sectionTitle}>Business Hours</Text>
-        {aboutInfo.businessHours.map((h, index) => (
-          <View 
-            key={h.day} 
-            style={[styles.hourRow, index === aboutInfo.businessHours.length - 1 && styles.hourRowLast]}
+  // Handle website press
+  const handleWebsitePress = () => {
+    const website = aboutInfo.website || 'shop.com';
+    Linking.openURL(`https://${website}`);
+  };
+
+  // Handle phone press
+  const handlePhonePress = () => {
+    const phone = aboutInfo.phone || '412 3456';
+    Linking.openURL(`tel:${phone}`);
+  };
+
+  const AboutUsTab = () => {
+    const address = business.locations?.[0]?.address || 'ShopName, XYZ Road, Beau Bassin, Mauritius';
+    const website = aboutInfo.website || 'shop.com';
+    const phone = aboutInfo.phone || '412 3456';
+
+    return (
+      <View style={styles.aboutContainer}>
+        {/* Map Section */}
+        <View style={styles.mapContainer}>
+          <MapView
+            style={styles.map}
+            initialRegion={{
+              latitude: mockMapLocation.latitude,
+              longitude: mockMapLocation.longitude,
+              latitudeDelta: 0.02,
+              longitudeDelta: 0.02,
+            }}
+            scrollEnabled={false}
+            zoomEnabled={false}
+            pitchEnabled={false}
+            rotateEnabled={false}
           >
-            <Text style={styles.hourDay}>{h.day}</Text>
-            <Text style={styles.hourTime}>{h.open}{h.close && h.open !== 'Closed' ? ` - ${h.close}` : ''}</Text>
+            <Marker
+              coordinate={{
+                latitude: mockMapLocation.latitude,
+                longitude: mockMapLocation.longitude,
+              }}
+            />
+          </MapView>
+        </View>
+
+        {/* Info Section */}
+        <View style={styles.infoSection}>
+          {/* Address */}
+          <View style={styles.infoItem}>
+            <Text style={[styles.infoLabel, { color: appTheme.colors.text }]}>Address</Text>
+            <Text style={[styles.infoValue, { color: appTheme.colors.secondary }]}>
+              {address}
+            </Text>
           </View>
-        ))}
+
+          {/* Website */}
+          <View style={styles.infoItem}>
+            <Text style={[styles.infoLabel, { color: appTheme.colors.text }]}>Website</Text>
+            <TouchableOpacity onPress={handleWebsitePress}>
+              <Text style={styles.infoLink}>{website}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Phone number */}
+          <View style={styles.infoItem}>
+            <Text style={[styles.infoLabel, { color: appTheme.colors.text }]}>Phone number</Text>
+            <TouchableOpacity onPress={handlePhonePress}>
+              <Text style={styles.infoLink}>{phone}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Business Hours */}
+          <View style={styles.businessHoursSection}>
+            <Text style={[styles.infoLabel, { color: appTheme.colors.text }]}>Business Hours</Text>
+            {mockBusinessHours.map((hours) => (
+              <View key={hours.day} style={styles.hoursRow}>
+                <Text style={[styles.hoursDay, { color: appTheme.colors.text }]}>
+                  {hours.day}
+                </Text>
+                <Text style={[
+                  styles.hoursTime, 
+                  { color: hours.open === 'Closed' ? appTheme.colors.textLight : appTheme.colors.secondary }
+                ]}>
+                  {hours.open === 'Closed' ? 'Closed' : `${hours.open} - ${hours.close}`}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const ProductsTab = () => {
     // Backend logic: Show products if available, otherwise show "No product yet"
@@ -357,7 +430,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     // Display products using ScrollView with BrandCard and ProductCard components (exactly like ProductScreen)
     return (
       <View style={[styles.tabContentContainer, styles.fixedHeightContainer]}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {listData.map((item) => {
             if (item.type === 'brand') {
               return (
@@ -445,6 +518,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
         <ScrollView 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 180 }} // Space for bottom section
+          keyboardShouldPersistTaps="handled"
         >
           {cartItems.map((item) => (
             <CartItemCard
@@ -457,22 +531,8 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     );
   };
 
-  interface DetailItemProps {
-    icon: keyof typeof Icon.glyphMap;
-    text: string;
-    onPress?: () => void;
-    isLink?: boolean;
-  }
-
-  const DetailItem = ({ icon, text, onPress, isLink = false }: DetailItemProps) => (
-    <TouchableOpacity disabled={!onPress} onPress={onPress} style={styles.detailItem}>
-      <Icon name={icon} size={20} color={appTheme.colors.iconMuted} style={styles.detailIcon} />
-      <Text style={[styles.detailText, isLink && styles.linkText]} numberOfLines={2}>{text}</Text>
-    </TouchableOpacity>
-  );
-
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       <ScrollView
@@ -481,56 +541,111 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
           paddingBottom: insets.bottom + (isCartPopupVisible && cartItems.length > 0 ? 120 : 0)
         }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        {/* Cover Image */}
-        <View style={styles.coverImageContainer}>
-        <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1596178065887-1198b6148b2b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80' }}
-          style={styles.coverPhoto}
-          resizeMode="cover"
-        />
+        {/* Cover Image - matching BusinessProfileOwnScreen */}
+        <View style={styles.coverContainer}>
+          <Image
+            source={{ 
+              uri: 'https://images.unsplash.com/photo-1596178065887-1198b6148b2b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80' 
+            }}
+            style={styles.coverImage}
+            resizeMode="cover"
+          />
+          {/* Floating Back Button */}
+          <TouchableOpacity
+            style={[styles.floatingBackButton, { top: insets.top + 10 }]}
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="chevron-back" size={24} color={appTheme.colors.text} />
+          </TouchableOpacity>
         </View>
 
-        {/* Profile Card - Product Detail Style */}
-        <View style={styles.profileCard}>
-          <View style={styles.profileCardColumn}>
-              <View style={styles.logoContainerTopLeft}>
-                <Image
-                  source={{ uri: business.logo }}
-                  style={styles.profileLogoTopLeft}
-                />
-              </View>
-              <View style={styles.profileInfoLeft}>
-                <View style={styles.profileTextBlockLeft}>
-                  <Text style={styles.businessNameLeft}>{business.name}</Text>
-                  <Text style={styles.businessTypeLeft}>Distributor</Text>
-                  <Text style={styles.businessDescriptionLeft} numberOfLines={2}>
-                    {aboutInfo.description}
-                  </Text>
-                </View>
-                {/* Profile Action Buttons - Based on ProfileViewType (OTHER_BUSINESS) */}
-                <ProfileActionButtons
-                  viewType={viewType}
-                  onPrimaryPress={handlePrimaryAction}
-                  onSecondaryPress={handleSecondaryAction}
-                  onMoreOptionsPress={showAdditionalOptions ? handleMoreOptions : undefined}
-                />
-              </View>
-            </View>
+        {/* Profile Section - Matching BusinessProfileOwnScreen UI */}
+        <View style={styles.profileSection}>
+          {/* Business Logo - 80x80 */}
+          <View style={styles.avatarContainer}>
+            <Avatar
+              userId={business.id || ''}
+              userName={business.name || 'Business'}
+              imageUri={business.logo}
+              size={80}
+            />
+          </View>
+
+          {/* Business Name - 24px bold */}
+          <Text style={[styles.businessName, { color: appTheme.colors.text }]}>
+            {business.name}
+          </Text>
+
+          {/* Industry/Type - 16px medium, secondary color */}
+          <Text style={[styles.industryText, { color: appTheme.colors.secondary }]}>
+            Distributor
+          </Text>
+
+          {/* Description - 14px medium, secondary color */}
+          {aboutInfo.description ? (
+            <Text style={[styles.description, { color: appTheme.colors.secondary }]} numberOfLines={3}>
+              {aboutInfo.description}
+            </Text>
+          ) : (
+            <Text style={[styles.descriptionPlaceholder, { color: appTheme.colors.textLight }]}>
+              No description available
+            </Text>
+          )}
+
+          {/* Social Stats - Connections count */}
+          <View style={styles.socialStats}>
+            <TouchableOpacity style={styles.socialStatItem}>
+              <Text style={[styles.socialStatCount, { color: appTheme.colors.text }]}>
+                {(business as any).connections_count ?? 128}
+              </Text>
+              <Text style={[styles.socialStatLabel, { color: appTheme.colors.secondary }]}>
+                Connections
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Profile Action Buttons - Based on ProfileViewType (OTHER_BUSINESS) */}
+          <ProfileActionButtons
+            viewType={viewType}
+            onPrimaryPress={handlePrimaryAction}
+            onSecondaryPress={handleSecondaryAction}
+            style={styles.actionButtons}
+          />
         </View>
  
-        {/* Tab Bar */}
-        <View style={styles.tabsContainer}>
-            {TABS.map((tab) => (
+        {/* Tab Bar - matching BusinessProfileOwnScreen */}
+        <View style={[styles.tabBar, { borderBottomColor: appTheme.colors.borderColor }]}>
+          {TABS.map((tab) => {
+            const isSelected = activeTab === tab.key;
+            return (
               <TouchableOpacity
                 key={tab.key}
-                style={[styles.tabButton, activeTab === tab.key && styles.activeTabButton]}
+                style={styles.tabItem}
                 onPress={() => handleTabPress(tab.key)}
+                activeOpacity={0.7}
               >
-                <Icon name={tab.icon as keyof typeof Icon.glyphMap} size={20} color={activeTab === tab.key ? appTheme.colors.text : appTheme.colors.iconMuted} />
-                <Text style={[styles.tabLabel, activeTab === tab.key && styles.activeTabLabel]}>{tab.label}</Text>
+                <Icon 
+                  name={tab.icon as any} 
+                  size={20} 
+                  color={isSelected ? appTheme.colors.text : appTheme.colors.textLight} 
+                />
+                <Text
+                  style={[
+                    styles.tabText,
+                    { color: isSelected ? appTheme.colors.text : appTheme.colors.textLight },
+                    isSelected && styles.tabTextActive,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+                {isSelected && (
+                  <View style={[styles.tabIndicator, { backgroundColor: appTheme.colors.text }]} />
+                )}
               </TouchableOpacity>
-            ))}
+            );
+          })}
         </View>
  
         {/* Tab Content */}
@@ -540,31 +655,6 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
           {activeTab === 'cart' && <CartTab />}
         </View>
       </ScrollView>
-
-      {/* Fixed Header - Moved to bottom so it overlays everything */}
-      <View style={[styles.fixedHeader, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity 
-          style={styles.navButton} 
-          onPress={() => navigation.goBack()}
-        >
-          <Icon name="chevron-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navButton}
-          onPress={() => navigation.navigate('Chat', { 
-            id: 'biz-1', 
-            name: business.name, 
-            avatar: business.logo,
-            isGroup: false,
-            partnerId: business.id,
-            partnerType: 'business',
-            unreadCount: 0,
-          })}
-        >
-          <Icon name="paper-plane-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
 
       {/* Cart Popup - Fixed across all tabs */}
       <CartPopup
@@ -585,154 +675,120 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  fixedHeader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    zIndex: 1000,
-    backgroundColor: 'transparent',
   },
   scrollView: {
     flex: 1,
   },
-  coverImageContainer: {
+  // Cover image styles - matching BusinessProfileOwnScreen
+  coverContainer: {
     height: COVER_HEIGHT,
     width: '100%',
+    backgroundColor: '#F5F5F5',
     position: 'relative',
   },
-  coverPhoto: {
+  coverImage: {
     width: '100%',
     height: '100%',
   },
-  navButton: {
+  floatingBackButton: {
+    position: 'absolute',
+    left: 12,
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  profileCard: {
-    backgroundColor: '#fff',
-    // Removed border radius and shadow for product detail style
+  // Profile Section - Matching BusinessProfileOwnScreen
+  profileSection: {
+    paddingHorizontal: 12,
+    paddingTop: 16, // 16px gap between cover and profile
+    paddingBottom: theme.spacing.md,
   },
-  profileCardColumn: {
-    flexDirection: 'column',
-    alignItems: 'flex-start', 
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 15,
+  avatarContainer: {
+    marginBottom: theme.spacing.md,
   },
-  logoContainerTopLeft: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
-    backgroundColor: '#fff',
-    marginBottom: 8,
-    alignSelf: 'flex-start',
+  businessName: {
+    fontSize: 24,
+    fontFamily: theme.fonts.primary.bold,
+    marginTop: theme.spacing.xs,
   },
-  profileLogoTopLeft: {
-    width: 72,
-    height: 72,
-    borderRadius: 12,
-    backgroundColor: '#ff3b30',
+  industryText: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.medium,
+    marginTop: theme.spacing.xs,
   },
-  profileInfoLeft: {
-    width: '100%',
-    alignItems: 'flex-start',
-  },
-  profileTextBlockLeft: {
-    marginBottom: 10,
-    width: '100%',
-  },
-  businessNameLeft: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 8,
-  },
-  businessTypeLeft: {
+  description: {
     fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 16,
+    fontFamily: theme.fonts.primary.medium,
+    lineHeight: 20,
+    marginTop: 16,
   },
-  businessDescriptionLeft: {
-    fontSize: 13,
-    color: '#6b7280',
-    lineHeight: 17,
+  descriptionPlaceholder: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.regular,
+    fontStyle: 'italic',
+    marginTop: 8,
   },
-  actionButtonsFill: {
+  socialStats: {
     flexDirection: 'row',
-    width: '100%',
-    marginTop: 15,
+    marginTop: 16,
+    marginBottom: 8,
+    gap: 24,
+  },
+  socialStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  socialStatCount: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.bold,
+  },
+  socialStatLabel: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.regular,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    marginTop: theme.spacing.md,
     gap: 10,
   },
-  messageButtonFill: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderRadius: 8,
-    height: 40,
-    paddingHorizontal: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonText: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-  },
-  connectButtonFill: {
-    flex: 1,
-    borderRadius: 8,
-    height: 40,
-    paddingHorizontal: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonTextWhite: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-  },
-  moreButtonAction: {
-    height: 40,
-    width: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabsContainer: {
+  // Tab bar styles - matching BusinessProfileOwnScreen
+  tabBar: {
     flexDirection: 'row',
-    height: TAB_BAR_HEIGHT,
-    width: '100%',
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderColor: '#e5e7eb',
+    marginTop: 0,
   },
-  tabButton: {
+  tabItem: {
     flex: 1,
+    flexDirection: 'row',
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-    flexDirection: 'row',
+    position: 'relative',
+    gap: 6,
   },
-  activeTabButton: {
-    borderBottomColor: '#1f2937',
+  tabText: {
+    fontSize: theme.fontSize.sm,
+    fontFamily: theme.fonts.primary.medium,
   },
-  tabLabel: {
-    marginLeft: 6,
-    fontSize: 14,
-    color: '#6b7280',
+  tabTextActive: {
+    fontFamily: theme.fonts.primary.bold,
   },
-  activeTabLabel: {
-    color: '#1f2937',
-    fontWeight: '600',
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: '15%',
+    right: '15%',
+    height: 3,
+    borderRadius: 1.5,
   },
   tabContentOuterContainer: {
     flex: 1,
@@ -749,67 +805,54 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     marginTop: 80,
   },
-  detailsContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+  // About tab styles - matching BusinessProfileOwnScreen
+  aboutContainer: {
+    flex: 1,
   },
-  sectionTitle: {
+  mapContainer: {
+    height: 280,
+    width: '100%',
+    backgroundColor: '#F5F5F5',
+  },
+  map: {
+    flex: 1,
+  },
+  infoSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+  },
+  infoItem: {
+    marginBottom: 24,
+  },
+  infoLabel: {
+    fontSize: 18,
+    fontFamily: theme.fonts.primary.bold,
+    marginBottom: 8,
+  },
+  infoValue: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 12,
+    fontFamily: theme.fonts.primary.regular,
   },
-  hourRow: {
+  infoLink: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.regular,
+    color: '#0066FF',
+  },
+  businessHoursSection: {
+    marginTop: 8,
+  },
+  hoursRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  hourRowLast: {
-    borderBottomWidth: 0,
-  },
-  hourDay: {
-    fontSize: 14,
-    color: '#374151',
-  },
-  hourTime: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 8,
   },
-  detailIcon: {
-    marginRight: 12,
+  hoursDay: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.medium,
   },
-  detailText: {
-    flex: 1,
-    color: '#374151',
-    fontSize: 15,
-  },
-  linkText: {
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-  hoursContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+  hoursTime: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.regular,
   },
   emptyCartText: {
     color: '#9ca3af',

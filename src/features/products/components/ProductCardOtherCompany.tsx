@@ -1,23 +1,16 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
   Image,
   TouchableOpacity,
   TextInput,
-  LayoutAnimation,
-  UIManager,
-  Platform,
+  Keyboard,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import theme from '@/shared/theme';
 import { Text, BodyBold, Caption, Label } from '@/shared/components/ui/Typography';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android') {
-  UIManager.setLayoutAnimationEnabledExperimental?.(true);
-}
 
 interface ProductCardOtherCompanyProps {
   product: any;
@@ -42,20 +35,49 @@ const ProductCardOtherCompany: React.FC<ProductCardOtherCompanyProps> = ({
 }) => {
   const { theme: appTheme } = useTheme();
   const inputRef = useRef<TextInput>(null);
+  
+  // Use local state for the input to avoid parent re-renders during typing
+  const [localQuantity, setLocalQuantity] = useState<string>(quantity.toString());
+  const [isFocused, setIsFocused] = useState(false);
   const firstFocusRef = useRef(true);
+  const hasAutoFocusedRef = useRef(false);
+  const prevIsAddingRef = useRef(isAdding);
 
+  // Sync local state when isAdding changes (entering add mode)
   useEffect(() => {
-    // Animate height/position changes smoothly
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-
-    // When entering "adding" mode, focus the input
-    if (isAdding) {
+    // Only auto-focus when transitioning from false to true (just opened)
+    const justOpened = isAdding && !prevIsAddingRef.current;
+    prevIsAddingRef.current = isAdding;
+    
+    if (justOpened) {
+      // Reset state when entering add mode - show "1" initially
       firstFocusRef.current = true;
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
+      hasAutoFocusedRef.current = false;
+      setLocalQuantity(quantity.toString());
+      // Focus the input after a short delay to allow layout to settle
+      const timer = setTimeout(() => {
+        if (!hasAutoFocusedRef.current) {
+          hasAutoFocusedRef.current = true;
+          inputRef.current?.focus();
+        }
+      }, 150);
+      return () => clearTimeout(timer);
     }
-  }, [isAdding]);
+    
+    // Reset refs when closing
+    if (!isAdding) {
+      hasAutoFocusedRef.current = false;
+      firstFocusRef.current = true;
+    }
+  }, [isAdding, quantity]);
+
+  // Sync local state when parent quantity changes (but not during typing)
+  useEffect(() => {
+    // Only sync if not currently focused (not typing)
+    if (!isFocused) {
+      setLocalQuantity(quantity === 0 ? '' : quantity.toString());
+    }
+  }, [quantity, isFocused]);
 
   const formatNumber = (num: number, type: 'currency' | 'stock'): string => {
     if (type === 'currency') {
@@ -65,20 +87,62 @@ const ProductCardOtherCompany: React.FC<ProductCardOtherCompanyProps> = ({
     }
   };
 
-  const handleQuantityChange = (text: string) => {
-    const num = parseInt(text, 10);
-    onChangeQuantity(isNaN(num) ? 0 : num);
-  };
+  const handleQuantityChange = useCallback((text: string) => {
+    // Only allow numeric characters
+    const cleanText = text.replace(/[^0-9]/g, '');
+    setLocalQuantity(cleanText);
+  }, []);
 
-  const handleQuantityFocus = () => {
-    // Clear the default "1" only on the very first focus
-    if (firstFocusRef.current && quantity === 1) {
-      onChangeQuantity(0);
+  const handleQuantityFocus = useCallback(() => {
+    setIsFocused(true);
+    // Clear the default "1" only on the very first focus for easy typing
+    if (firstFocusRef.current && localQuantity === '1') {
+      setLocalQuantity('');
       firstFocusRef.current = false;
     }
-  };
+  }, [localQuantity]);
 
-  const totalAmount = product.price * quantity;
+  const handleQuantityBlur = useCallback(() => {
+    setIsFocused(false);
+    // Sync with parent on blur
+    const num = parseInt(localQuantity, 10);
+    const finalQuantity = isNaN(num) || num <= 0 ? 1 : num;
+    setLocalQuantity(finalQuantity.toString());
+    onChangeQuantity(finalQuantity);
+  }, [localQuantity, onChangeQuantity]);
+
+  const handleSubmitEditing = useCallback(() => {
+    // Blur the input and dismiss keyboard
+    inputRef.current?.blur();
+    Keyboard.dismiss();
+    setIsFocused(false);
+    // Sync quantity
+    const num = parseInt(localQuantity, 10);
+    const finalQuantity = isNaN(num) || num <= 0 ? 1 : num;
+    setLocalQuantity(finalQuantity.toString());
+    onChangeQuantity(finalQuantity);
+  }, [localQuantity, onChangeQuantity]);
+
+  const handleConfirmAdd = useCallback(() => {
+    // Blur input and dismiss keyboard first
+    inputRef.current?.blur();
+    Keyboard.dismiss();
+    // Sync quantity before confirming
+    const num = parseInt(localQuantity, 10);
+    const finalQuantity = isNaN(num) || num <= 0 ? 1 : num;
+    onChangeQuantity(finalQuantity);
+    onConfirmAdd();
+  }, [localQuantity, onChangeQuantity, onConfirmAdd]);
+
+  const handleCancelAdding = useCallback(() => {
+    inputRef.current?.blur();
+    Keyboard.dismiss();
+    onCancelAdding();
+  }, [onCancelAdding]);
+
+  // Calculate total based on local quantity for immediate feedback
+  const displayQuantity = parseInt(localQuantity, 10) || 0;
+  const totalAmount = product.price * displayQuantity;
 
   return (
     <View style={[
@@ -149,30 +213,27 @@ const ProductCardOtherCompany: React.FC<ProductCardOtherCompanyProps> = ({
                 ref={inputRef}
                 style={[styles.quantityInput, { 
                   color: appTheme.colors.text, 
-                  borderColor: appTheme.colors.borderColor, 
+                  borderColor: isFocused ? appTheme.colors.primary : appTheme.colors.borderColor, 
                   backgroundColor: appTheme.colors.inputBackground 
                 }]}
-                value={quantity === 0 ? '' : quantity.toString()}
+                value={localQuantity}
                 onChangeText={handleQuantityChange}
                 onFocus={handleQuantityFocus}
+                onBlur={handleQuantityBlur}
                 keyboardType="number-pad"
                 placeholder="1"
                 placeholderTextColor="#D0CAC8"
                 selectionColor={appTheme.colors.primary}
-                selectTextOnFocus={false}
-                autoFocus={false}
+                returnKeyType="done"
+                onSubmitEditing={handleSubmitEditing}
                 blurOnSubmit={false}
-                caretHidden={false}
-                textContentType="none"
-                autoCorrect={false}
-                spellCheck={false}
               />
             </View>
             <View style={styles.totalContainer}>
               <Label style={[styles.totalLabel, { color: appTheme.colors.textLight }]}>
                 Total
               </Label>
-              <Text style={[styles.totalAmount, { color: appTheme.colors.text }]}>
+              <Text style={[styles.totalAmount, { color: appTheme.colors.primary }]}>
                 {formatNumber(totalAmount, 'currency')}
               </Text>
             </View>
@@ -182,14 +243,14 @@ const ProductCardOtherCompany: React.FC<ProductCardOtherCompanyProps> = ({
           <View style={styles.actionButtons}>
             <TouchableOpacity 
               style={[styles.confirmButton, { backgroundColor: appTheme.colors.primary }]}
-              onPress={onConfirmAdd}
+              onPress={handleConfirmAdd}
             >
               <Text style={styles.confirmButtonText}>Add to Cart</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.cancelButton}
-              onPress={onCancelAdding}
+              onPress={handleCancelAdding}
             >
               <Icon name="close" size={20} color="#D0CAC8" />
             </TouchableOpacity>
@@ -310,7 +371,7 @@ const styles = StyleSheet.create({
   },
   totalAmount: {
     fontSize: 16,
-    fontFamily: theme.fonts.primary.medium,
+    fontFamily: theme.fonts.primary.semiBold,
   },
   actionButtons: {
     flexDirection: 'row',

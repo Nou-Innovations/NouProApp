@@ -27,6 +27,7 @@ export type Business = {
     currency: string;
     invoicePrefix: string;
   };
+  connections_count?: number;
 };
 
 export type Message = {

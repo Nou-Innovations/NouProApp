@@ -94,6 +94,11 @@ import SecuritySettingsScreen from '@/features/settings/screens/SecuritySettings
 
 // Screens - Business/Team
 import TeamManagementScreen from '@/features/team/screens/TeamManagementScreen';
+import InviteStaffScreen from '@/features/team/screens/InviteStaffScreen';
+
+// Screens - Locations & Transports
+import LocationsScreen from '@/features/locations/screens/LocationsScreen';
+import TransportsScreen from '@/features/transports/screens/TransportsScreen';
 
 // Screens - Orders
 import OrderDetailScreen from '@/features/orders/screens/OrderDetailScreen';
@@ -268,6 +273,11 @@ function AppNavigator() {
         
         {/* Team Management */}
         <RootStack.Screen name="TeamManagement" component={TeamManagementScreen} />
+        <RootStack.Screen name="InviteStaff" component={InviteStaffScreen} />
+        
+        {/* Locations & Transports */}
+        <RootStack.Screen name="Locations" component={LocationsScreen} />
+        <RootStack.Screen name="Transports" component={TransportsScreen} />
         
         {/* Social Screens */}
         <RootStack.Screen name="Connections" component={ConnectionsScreen} />

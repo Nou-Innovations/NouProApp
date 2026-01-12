@@ -28,9 +28,12 @@ export const businessModeConfig = {
     'CreateDelivery',
     'OrderDetail',
     'TeamManagement',
+    'InviteStaff',
     'CompanySettings',
     'EditBusiness',
     'Notifications',
+    'Locations',
+    'Transports',
   ],
 } as const;
 

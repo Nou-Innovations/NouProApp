@@ -2,74 +2,25 @@
 CREATE SCHEMA IF NOT EXISTS "public";
 
 -- CreateEnum
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'SubscriptionTier') THEN
-    CREATE TYPE "SubscriptionTier" AS ENUM ('FREE','PRO','BUSINESS','ENTERPRISE');
-  END IF;
-END $$;
-
+CREATE TYPE "SubscriptionTier" AS ENUM ('FREE', 'PRO', 'BUSINESS', 'ENTERPRISE');
 
 -- CreateEnum
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'LocationMode') THEN
-    CREATE TYPE "LocationMode" AS ENUM ('DEPENDENT','INDEPENDENT');
-  END IF;
-END $$;
-
+CREATE TYPE "LocationMode" AS ENUM ('DEPENDENT', 'INDEPENDENT');
 
 -- CreateEnum
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MemberRole') THEN
-    CREATE TYPE "MemberRole" AS ENUM ('super_admin','admin','staff');
-  END IF;
-END $$;
-
+CREATE TYPE "MemberRole" AS ENUM ('super_admin', 'admin', 'staff');
 
 -- CreateEnum
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MemberStatus') THEN
-    CREATE TYPE "MemberStatus" AS ENUM ('pending','accepted','rejected','locked');
-  END IF;
-END $$;
-
+CREATE TYPE "MemberStatus" AS ENUM ('pending', 'accepted', 'rejected', 'locked');
 
 -- CreateEnum
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'OrderStatus') THEN
-    CREATE TYPE "OrderStatus" AS ENUM (
-      'NEW',
-      'ASSIGNED',
-      'PACKED',
-      'OUT_FOR_DELIVERY',
-      'DELIVERED',
-      'CANCELLED'
-    );
-  END IF;
-END $$;
-
+CREATE TYPE "OrderStatus" AS ENUM ('NEW', 'ASSIGNED', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED');
 
 -- CreateEnum
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'OrderScope') THEN
-    CREATE TYPE "OrderScope" AS ENUM ('PARENT','LOCATION');
-  END IF;
-END $$;
-
+CREATE TYPE "OrderScope" AS ENUM ('PARENT', 'LOCATION');
 
 -- CreateEnum
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'InvoiceScope') THEN
-    CREATE TYPE "InvoiceScope" AS ENUM ('PARENT','LOCATION');
-  END IF;
-END $$;
-
+CREATE TYPE "InvoiceScope" AS ENUM ('PARENT', 'LOCATION');
 
 -- CreateTable
 CREATE TABLE "User" (

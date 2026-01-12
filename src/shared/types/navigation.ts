@@ -120,6 +120,10 @@ export type RootStackParamList = {
   TeamManagement: undefined;
   InviteStaff: undefined;
   
+  // Locations & Transports
+  Locations: undefined;
+  Transports: undefined;
+  
   // Subscription
   Subscription: undefined;
   

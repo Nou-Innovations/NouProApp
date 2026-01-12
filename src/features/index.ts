@@ -20,6 +20,8 @@ export * from './settings';
 export * from './search';
 export * from './subscription';
 export * from './tasks';
+export * from './locations';
+export * from './transports';
 
 // Note: personal and business modes are now in @/modes/
 

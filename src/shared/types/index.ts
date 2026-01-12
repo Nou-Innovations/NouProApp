@@ -42,6 +42,9 @@ export * from './inbox';
 // Delivery types (UI-specific, extends order.ts)
 export * from './delivery';
 
+// Transport/Vehicle types
+export * from './transport';
+
 
 
 

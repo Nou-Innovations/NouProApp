@@ -1,13 +1,17 @@
-import React, { useEffect, useMemo } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Linking, Alert, Share } from 'react-native';
+/**
+ * UserProfileScreen - Viewing OTHER users' personal profiles
+ * UI/UX matches PersonalProfileScreen design
+ */
+
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Alert, Share } from 'react-native';
 import { mockUser, mockUserCompany, mockUserProfileDetails } from '@/shared/data/userProfile';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { userAvatarService } from '@/shared/services/userAvatarService';
 import Avatar from '@/shared/components/ui/Avatar';
-import BusinessCard from '@/features/profile/components/BusinessCard';
-import ProfileActionButtons from '@/features/profile/components/ProfileActionButtons';
+import ActionBottomSheet, { ActionItem } from '@/shared/components/ui/ActionBottomSheet';
 import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
 import { ProfileViewType, getProfileAdditionalOptions } from '@/shared/types/profile';
 import theme from '@/shared/theme';
@@ -21,15 +25,15 @@ interface UserProfileScreenProps {
   };
 }
 
-// Accept navigation prop and route for navigating to business profile
 export default function UserProfileScreen({ navigation, route }: UserProfileScreenProps) {
-  const insets = useSafeAreaInsets();
   const { theme: appTheme } = useTheme();
-  // TODO: Use userId to fetch real user data
   const userId = route.params?.userId || '1';
 
+  // Local state
+  const [isMoreOptionsVisible, setIsMoreOptionsVisible] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+
   // Determine profile view type using the hook
-  // Since this screen is for viewing OTHER users, we pass the userId
   const { viewType, isOwnProfile, canEdit, showAdditionalOptions } = useProfileViewType({
     profileId: userId,
     profileType: 'user',
@@ -48,7 +52,6 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
   }, []);
 
   const handleCompanyPress = () => {
-    // Navigate to Business Profile, passing the business ID
     if (navigation && mockUserCompany?.id) {
       navigation.push('ViewBusinessProfile', { businessId: mockUserCompany.id });
     }
@@ -60,10 +63,9 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     }
   };
 
-  // Profile action handlers based on ProfileViewType
+  // Profile action handlers
   const handlePrimaryAction = () => {
     if (viewType === ProfileViewType.SELF_PROFILE) {
-      // Edit profile
       navigation.navigate('EditPersonalProfile');
     } else {
       // Message user
@@ -81,7 +83,6 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
 
   const handleSecondaryAction = async () => {
     if (viewType === ProfileViewType.SELF_PROFILE) {
-      // Share profile
       try {
         await Share.share({
           message: `Check out ${mockUser.name}'s profile on NouPro!`,
@@ -99,92 +100,259 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     }
   };
 
-  const handleMoreOptions = () => {
-    const options = getProfileAdditionalOptions(viewType);
-    Alert.alert('Options', 'Select an action', [
-      ...options.map((option) => ({
-        text: option,
-        onPress: () => console.log(`${option} pressed for user ${userId}`),
-        style: option === 'Block' ? 'destructive' as const : 'default' as const,
-      })),
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  // Action menu items for bottom sheet
+  const moreOptionsItems: ActionItem[] = getProfileAdditionalOptions(viewType).map((option) => ({
+    id: option.toLowerCase().replace(/\s/g, '-'),
+    title: option,
+    variant: option === 'Block' ? 'destructive' as const : 'default' as const,
+  }));
+
+  const handleMoreOptionAction = (item: ActionItem) => {
+    console.log(`${item.title} pressed for user ${userId}`);
+    if (item.title === 'Block') {
+      Alert.alert('Block User', `Are you sure you want to block ${mockUser.name}?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block', style: 'destructive', onPress: () => console.log('Blocked') },
+      ]);
+    } else if (item.title === 'Report') {
+      Alert.alert('Report', `Report ${mockUser.name} for inappropriate content?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Report', onPress: () => console.log('Reported') },
+      ]);
+    } else if (item.title === 'Share') {
+      handleShareProfile();
+    }
   };
 
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: appTheme.colors.background }]} edges={['top', 'bottom']}>
-      {/* Fixed Header */}
-      <View style={[styles.header, { backgroundColor: appTheme.colors.background }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="chevron-back" size={24} color={appTheme.colors.text} />
-        </TouchableOpacity>
-      </View>
-      
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Profile Section */}
-        <View style={styles.profileSection}>
-          <View style={styles.avatarContainer}>
-            <Avatar
-              userId={userId}
-              userName={mockUser.name}
-              imageUri={mockUser.avatar}
-              size={110}
-              style={{ borderColor: appTheme.colors.cardBackground, borderWidth: 4, borderRadius: 55 }}
-            />
-          </View>
-          <Text style={[styles.userName, { color: appTheme.colors.text }]}>{mockUser.name}</Text>
-          <Text style={[styles.userRole, { color: appTheme.colors.textLight }]}>{mockUserProfileDetails.position || mockUser.role}</Text>
-          
-          {/* Profile Action Buttons - Based on ProfileViewType */}
-          <ProfileActionButtons
-            viewType={viewType}
-            onPrimaryPress={handlePrimaryAction}
-            onSecondaryPress={handleSecondaryAction}
-            onMoreOptionsPress={showAdditionalOptions ? handleMoreOptions : undefined}
-            style={styles.actionButtons}
+  const handleShareProfile = async () => {
+    try {
+      await Share.share({
+        message: `Check out ${mockUser.name}'s profile on NouPro!`,
+        title: 'Share Profile',
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
+  // Render header with back button and 3-dots menu
+  const renderHeader = () => (
+    <View style={[styles.header, { backgroundColor: appTheme.colors.background }]}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Icon name="chevron-back" size={24} color={appTheme.colors.text} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.menuButton}
+        onPress={() => setIsMoreOptionsVisible(true)}
+      >
+        <Icon name="ellipsis-vertical" size={24} color={appTheme.colors.text} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Render profile section - matching PersonalProfileScreen design
+  const renderProfileSection = () => (
+    <View style={styles.profileSection}>
+      {/* Avatar on the left - 80x80 */}
+      <View style={styles.profileTopRow}>
+        <View style={styles.avatarContainer}>
+          <Avatar
+            userId={userId}
+            userName={mockUser.name}
+            imageUri={mockUser.avatar}
+            size={80}
           />
         </View>
+      </View>
 
-        {/* About Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>About</Text>
-          <Text style={[styles.aboutText, { color: appTheme.colors.textLight }]}>{mockUserProfileDetails.about}</Text>
-        </View>
+      {/* Name - 24px bold, left aligned */}
+      <Text style={[styles.userName, { color: appTheme.colors.text }]}>
+        {mockUser.name}
+      </Text>
 
-        {/* Business Card */}
-        <BusinessCard
-          businessName={mockUserCompany.name}
-          businessLogo={mockUserCompany.logo}
-          businessLocation={mockUserCompany.locations[0]?.address || 'No location available'}
+      {/* Job title - 16px medium, secondary color */}
+      <Text style={[styles.jobStatus, { color: appTheme.colors.secondary }]}>
+        {mockUserProfileDetails.position || mockUser.role}
+      </Text>
+
+      {/* Description - expandable */}
+      {mockUserProfileDetails.about ? (
+        <TouchableOpacity 
+          onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+          activeOpacity={0.7}
+        >
+          <Text 
+            style={[styles.description, { color: appTheme.colors.secondary }]}
+            numberOfLines={isDescriptionExpanded ? undefined : 2}
+          >
+            {mockUserProfileDetails.about}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {/* Connections Stats */}
+      <View style={styles.socialStats}>
+        <TouchableOpacity 
+          style={styles.socialStatItem}
+          onPress={() => {
+            navigation.navigate('Connections', { userId });
+          }}
+        >
+          <Text style={[styles.socialStatCount, { color: appTheme.colors.text }]}>
+            {(mockUser as any).connections_count ?? 128}
+          </Text>
+          <Text style={[styles.socialStatLabel, { color: appTheme.colors.secondary }]}>
+            Connections
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Action Buttons - Message and Connect */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={styles.messageButton}
+          onPress={handlePrimaryAction}
+        >
+          <Text style={styles.messageButtonText}>Message</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.connectButton}
+          onPress={handleSecondaryAction}
+        >
+          <Text style={styles.connectButtonText}>Connect</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // Format date for experience
+  const formatExperienceDate = (dateString?: string) => {
+    if (!dateString) return 'Present';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  };
+
+  // Render Experience section
+  const renderExperienceSection = () => {
+    if (!mockUserCompany) return null;
+
+    // Mock date range for the user's experience
+    const startDate = mockUserProfileDetails.joined || '2022-01-15';
+
+    return (
+      <View style={[styles.section, { backgroundColor: appTheme.colors.cardBackground }]}>
+        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+          Experience
+        </Text>
+
+        <TouchableOpacity
+          style={styles.experienceCard}
           onPress={handleCompanyPress}
-        />
+        >
+          <Avatar
+            userId={mockUserCompany.id}
+            userName={mockUserCompany.name}
+            imageUri={mockUserCompany.logo}
+            size={48}
+          />
+          <View style={styles.experienceInfo}>
+            <Text style={[styles.experienceName, { color: appTheme.colors.text }]}>
+              {mockUserCompany.name}
+            </Text>
+            <Text style={[styles.experienceRole, { color: appTheme.colors.textLight }]}>
+              {mockUserProfileDetails.position || mockUser.role}
+            </Text>
+            <Text style={[styles.experienceDate, { color: appTheme.colors.textMuted }]}>
+              {formatExperienceDate(startDate)} - Present
+            </Text>
+          </View>
+          <Icon name="chevron-forward" size={20} color={appTheme.colors.textLight} />
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
-        {/* Contact Information Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Contact Information</Text>
-          <View style={styles.contactItem}>
-            <Icon name="mail-outline" size={20} color={appTheme.colors.textLight} style={styles.contactIcon} />
-            <Text style={[styles.contactText, { color: appTheme.colors.textLight }]}>{mockUser.email}</Text>
+  // Render About section - Contact Information
+  const renderAboutSection = () => {
+    const hasContactInfo = mockUser.email || mockUserProfileDetails.phone || mockUserProfileDetails.address;
+    if (!hasContactInfo) return null;
+
+    return (
+      <View style={[styles.section, { backgroundColor: appTheme.colors.cardBackground }]}>
+        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+          About
+        </Text>
+
+        {mockUser.email && (
+          <View style={styles.aboutItem}>
+            <Icon name="mail-outline" size={20} color={appTheme.colors.textSecondary} />
+            <View style={styles.aboutItemContent}>
+              <Text style={[styles.aboutLabel, { color: appTheme.colors.textSecondary }]}>Email</Text>
+              <Text style={[styles.aboutValue, { color: appTheme.colors.text }]}>{mockUser.email}</Text>
+            </View>
           </View>
-          <TouchableOpacity style={styles.contactItem} onPress={handlePhonePress}>
-            <Icon name="call-outline" size={20} color={appTheme.colors.textLight} style={styles.contactIcon} />
-            <Text style={[styles.contactLinkText, { color: appTheme.colors.accent }]}>{mockUserProfileDetails.phone}</Text>
+        )}
+
+        {mockUserProfileDetails.phone && (
+          <TouchableOpacity style={styles.aboutItem} onPress={handlePhonePress}>
+            <Icon name="call-outline" size={20} color={appTheme.colors.textSecondary} />
+            <View style={styles.aboutItemContent}>
+              <Text style={[styles.aboutLabel, { color: appTheme.colors.textSecondary }]}>Phone</Text>
+              <Text style={[styles.aboutValue, { color: appTheme.colors.info }]}>{mockUserProfileDetails.phone}</Text>
+            </View>
           </TouchableOpacity>
-          <View style={styles.contactItem}>
-            <Icon name="location-outline" size={20} color={appTheme.colors.textLight} style={styles.contactIcon} />
-            <Text style={[styles.contactText, { color: appTheme.colors.textLight }]}>{mockUserProfileDetails.address}</Text>
+        )}
+
+        {mockUserProfileDetails.address && (
+          <View style={styles.aboutItem}>
+            <Icon name="location-outline" size={20} color={appTheme.colors.textSecondary} />
+            <View style={styles.aboutItemContent}>
+              <Text style={[styles.aboutLabel, { color: appTheme.colors.textSecondary }]}>Address</Text>
+              <Text style={[styles.aboutValue, { color: appTheme.colors.text }]}>{mockUserProfileDetails.address}</Text>
+            </View>
           </View>
+        )}
+      </View>
+    );
+  };
+
+  // Render Other Details section
+  const renderOtherDetailsSection = () => (
+    <View style={[styles.section, { backgroundColor: appTheme.colors.cardBackground }]}>
+      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+        Other Details
+      </Text>
+      <View style={styles.aboutItem}>
+        <Icon name="calendar-outline" size={20} color={appTheme.colors.textSecondary} />
+        <View style={styles.aboutItemContent}>
+          <Text style={[styles.aboutLabel, { color: appTheme.colors.textSecondary }]}>Joined</Text>
+          <Text style={[styles.aboutValue, { color: appTheme.colors.text }]}>{mockUserProfileDetails.joined}</Text>
         </View>
+      </View>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
+      {renderHeader()}
+      
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {renderProfileSection()}
+        {renderExperienceSection()}
+        {renderAboutSection()}
+        {renderOtherDetailsSection()}
         
-        {/* Other Details Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Other Details</Text>
-          <View style={styles.contactItem}>
-            <Icon name="calendar-outline" size={20} color={appTheme.colors.textLight} style={styles.contactIcon} />
-            <Text style={[styles.contactText, { color: appTheme.colors.textLight }]}>Joined: {mockUserProfileDetails.joined}</Text>
-          </View>
-        </View>
+        <View style={{ height: theme.spacing.xl }} />
       </ScrollView>
+
+      {/* More Options Bottom Sheet */}
+      <ActionBottomSheet
+        visible={isMoreOptionsVisible}
+        onClose={() => setIsMoreOptionsVisible(false)}
+        title="Options"
+        actionItems={moreOptionsItems}
+        onActionPress={handleMoreOptionAction}
+      />
     </SafeAreaView>
   );
 }
@@ -193,17 +361,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  // Header styles - matching PersonalProfileScreen
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    height: 56,
-    paddingHorizontal: 8,
-    justifyContent: 'flex-start',
-    backgroundColor: 'red',
+    paddingHorizontal: 12,
+    paddingVertical: theme.spacing.sm,
   },
   backButton: {
     width: 40,
     height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -211,61 +387,146 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingBottom: theme.spacing.xl,
   },
+  // Profile Section - matching PersonalProfileScreen
   profileSection: {
-    alignItems: 'center',
-    paddingTop: 20,
-    paddingBottom: 30,
+    paddingHorizontal: 12,
+    paddingTop: 0,
+    paddingBottom: theme.spacing.md,
+  },
+  profileTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   avatarContainer: {
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    marginBottom: 8,
+    position: 'relative',
+    marginBottom: theme.spacing.md,
   },
   userName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontSize: 24,
+    fontFamily: theme.fonts.primary.bold,
+    marginTop: theme.spacing.xs,
   },
-  userRole: {
+  jobStatus: {
     fontSize: 16,
-    textTransform: 'capitalize',
+    fontFamily: theme.fonts.primary.medium,
+    marginTop: theme.spacing.xs,
   },
-  actionButtons: {
-    width: '100%',
+  description: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+    lineHeight: 20,
     marginTop: 16,
-    paddingHorizontal: 16,
   },
-  section: {
-    marginBottom: 36,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  // Social Stats - matching PersonalProfileScreen
+  socialStats: {
+    flexDirection: 'row',
+    marginTop: 16,
     marginBottom: 8,
+    gap: 24,
   },
-  aboutText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  contactItem: {
+  socialStatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    gap: 6,
   },
-  contactIcon: {
-    marginRight: 12,
+  socialStatCount: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.bold,
   },
-  contactText: {
+  socialStatLabel: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.regular,
+  },
+  // Action Buttons
+  actionButtons: {
+    flexDirection: 'row',
+    marginTop: theme.spacing.md,
+    gap: 10,
+  },
+  messageButton: {
     flex: 1,
-    fontSize: 15,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: 8,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  contactLinkText: {
+  messageButtonText: {
+    color: '#000000',
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.bold,
+  },
+  connectButton: {
     flex: 1,
-    fontSize: 15,
-    textDecorationLine: 'underline',
+    backgroundColor: '#000000',
+    borderRadius: 8,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-}); 
+  connectButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.bold,
+  },
+  // Section styles - matching PersonalProfileScreen
+  section: {
+    marginHorizontal: 12,
+    marginBottom: 0,
+    paddingVertical: theme.spacing.md,
+    borderRadius: 12,
+  },
+  sectionTitle: {
+    fontSize: theme.fontSize.md,
+    fontFamily: theme.fonts.primary.bold,
+    marginBottom: theme.spacing.sm,
+  },
+  // Experience section - matching PersonalProfileScreen
+  experienceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.sm,
+  },
+  experienceInfo: {
+    flex: 1,
+    marginLeft: theme.spacing.sm,
+    marginRight: theme.spacing.sm,
+  },
+  experienceName: {
+    fontSize: theme.fontSize.base,
+    fontFamily: theme.fonts.primary.bold,
+  },
+  experienceRole: {
+    fontSize: theme.fontSize.sm,
+    fontFamily: theme.fonts.primary.semiBold,
+    marginTop: 2,
+  },
+  experienceDate: {
+    fontSize: theme.fontSize.sm,
+    fontFamily: theme.fonts.primary.medium,
+    marginTop: 2,
+  },
+  // About section styles
+  aboutItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 12, // 12px gap between icon and content
+  },
+  aboutItemContent: {
+    flex: 1,
+  },
+  aboutLabel: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.semiBold,
+    marginBottom: 2,
+  },
+  aboutValue: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.semiBold,
+  },
+});

@@ -2310,8 +2310,8 @@
             },
             {
               "name": "connections",
-              "description": "Social connections and following",
-              "screens": ["ConnectionsScreen", "FollowingScreen"]
+              "description": "Social connections",
+              "screens": ["ConnectionsScreen"]
             },
             {
               "name": "team",

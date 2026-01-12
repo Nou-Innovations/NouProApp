@@ -26,6 +26,7 @@ export interface SelectionItem {
 export interface ActionItem {
   id: string;
   title: string;
+  variant?: 'default' | 'selected' | 'destructive';
 }
 
 interface ActionBottomSheetProps {
@@ -38,10 +39,19 @@ interface ActionBottomSheetProps {
   onSelectItem?: (item: SelectionItem) => void;
   // For action-style buttons (like Invoices)
   actionItems?: ActionItem[];
+  selectedActionId?: string;
   onActionPress?: (item: ActionItem) => void;
   // Optional styling
   containerStyle?: ViewStyle;
 }
+
+// Keywords that indicate a destructive action
+const DESTRUCTIVE_KEYWORDS = ['remove', 'delete', 'cancel', 'decline', 'reject', 'report'];
+
+const isDestructiveAction = (title: string): boolean => {
+  const lowerTitle = title.toLowerCase();
+  return DESTRUCTIVE_KEYWORDS.some(keyword => lowerTitle.includes(keyword));
+};
 
 export default function ActionBottomSheet({
   visible,
@@ -51,6 +61,7 @@ export default function ActionBottomSheet({
   selectedItemId,
   onSelectItem,
   actionItems,
+  selectedActionId,
   onActionPress,
   containerStyle,
 }: ActionBottomSheetProps) {
@@ -157,14 +168,62 @@ export default function ActionBottomSheet({
   };
 
   const renderActionItem = (item: ActionItem) => {
+    // Determine the variant: explicit > selected > destructive auto-detect > default
+    let variant = item.variant || 'default';
+    
+    // Check if this item is selected
+    if (selectedActionId === item.id && variant === 'default') {
+      variant = 'selected';
+    }
+    
+    // Auto-detect destructive actions if no variant specified
+    if (variant === 'default' && isDestructiveAction(item.title)) {
+      variant = 'destructive';
+    }
+    
+    // Get styles based on variant
+    const getButtonStyle = () => {
+      switch (variant) {
+        case 'selected':
+          return {
+            backgroundColor: appTheme.colors.primary,
+            borderWidth: 0,
+            borderColor: 'transparent',
+          };
+        case 'destructive':
+          return {
+            backgroundColor: 'transparent',
+            borderWidth: 1,
+            borderColor: appTheme.colors.error,
+          };
+        default:
+          return {
+            backgroundColor: 'transparent',
+            borderWidth: 1,
+            borderColor: appTheme.colors.primary,
+          };
+      }
+    };
+    
+    const getTextColor = () => {
+      switch (variant) {
+        case 'selected':
+          return appTheme.colors.textInverse;
+        case 'destructive':
+          return appTheme.colors.error;
+        default:
+          return appTheme.colors.primary;
+      }
+    };
+    
     return (
       <TouchableOpacity
         key={item.id}
-        style={[styles.actionButton, { backgroundColor: appTheme.colors.cardBackground, borderColor: appTheme.colors.borderColor }]}
+        style={[styles.actionButton, getButtonStyle()]}
         onPress={() => handleActionPress(item)}
         activeOpacity={0.7}
       >
-        <Text style={[styles.actionButtonText, { color: appTheme.colors.text }]}>{item.title}</Text>
+        <Text style={[styles.actionButtonText, { color: getTextColor() }]}>{item.title}</Text>
       </TouchableOpacity>
     );
   };
@@ -251,7 +310,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.xs,
   },
   content: {
-    gap: theme.spacing.sm + 4,
+    gap: 4,
     paddingHorizontal: theme.spacing.sm,
   },
   selectionItem: {

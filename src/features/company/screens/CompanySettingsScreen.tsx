@@ -127,11 +127,13 @@ export default function CompanySettingsScreen() {
   };
 
   const handleLocations = () => {
-    Alert.alert('Locations', 'Navigate to locations management screen');
+    // @ts-ignore
+    navigation.navigate('Locations');
   };
 
   const handleTransports = () => {
-    Alert.alert('Transports', 'Navigate to transports management screen');
+    // @ts-ignore
+    navigation.navigate('Transports');
   };
 
   const handleSecurity = () => {

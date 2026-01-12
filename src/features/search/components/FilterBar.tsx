@@ -1,8 +1,12 @@
 import React from 'react';
-import { View, TouchableOpacity, ScrollView, StyleSheet, ViewStyle } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import theme from '@/shared/theme';
 import { Text } from '@/shared/components/ui/Typography';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+
+// Design specs from design.json - filterBar
+const FILTER_BAR_HEIGHT = 40;
+const SELECTED_INDICATOR_HEIGHT = 2.5;
 
 interface FilterBarProps {
   statuses: string[];
@@ -20,9 +24,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   const { theme: appTheme } = useTheme();
   
   return (
-    <ScrollView 
-      horizontal 
-      showsHorizontalScrollIndicator={false} 
+    <View 
       style={[
         styles.filtersContainer, 
         { 
@@ -31,77 +33,59 @@ const FilterBar: React.FC<FilterBarProps> = ({
         },
         containerStyle
       ]}
-      contentContainerStyle={styles.filtersContentContainer}
     >
-      {statuses.map((status) => (
-        <TouchableOpacity
-          key={status}
-          style={styles.filterButton}
-          onPress={() => onSelectStatus(status)}
-        >
-          <View style={styles.filterTextWrapper}>
+      {statuses.map((status) => {
+        const isSelected = selectedStatus === status;
+        return (
+          <TouchableOpacity
+            key={status}
+            style={styles.filterButton}
+            onPress={() => onSelectStatus(status)}
+            activeOpacity={0.7}
+          >
             <Text 
               style={[
                 styles.filterText,
-                selectedStatus === status 
-                  ? [styles.filterTextSelected, { color: appTheme.colors.primary }] 
-                  : [styles.filterTextNotSelected, { color: appTheme.colors.textSecondary }]
+                isSelected 
+                  ? { color: appTheme.colors.primary, fontFamily: theme.fonts.primary.bold }
+                  : { color: appTheme.colors.textMuted }
               ]}
             >
               {status.charAt(0).toUpperCase() + status.slice(1)}
             </Text>
-            {selectedStatus === status && 
+            {isSelected && (
               <View style={[styles.selectedIndicator, { backgroundColor: appTheme.colors.primary }]} />
-            }
-          </View>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   filtersContainer: {
-    height: 40,
-    minHeight: 40,
-    maxHeight: 40,
-    borderBottomWidth: 1,
-    
-  },
-  filtersContentContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flexGrow: 1,
-    justifyContent: 'center',
-    height: 40,
-    minHeight: 40,
+    height: FILTER_BAR_HEIGHT,
+    borderBottomWidth: 1,
   },
   filterButton: {
     flex: 1,
     height: '100%', 
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  filterTextWrapper: { 
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'relative',
   },
   filterText: { 
     fontSize: theme.fontSize.sm,
-    paddingBottom: 6,
     fontFamily: theme.fonts.primary.medium,
   },
-  filterTextSelected: {
-    fontFamily: theme.fonts.primary.bold,
-  },
-  filterTextNotSelected: {
-  },
   selectedIndicator: {
-    height: 3,
-    width: '100%', 
+    height: SELECTED_INDICATOR_HEIGHT,
     position: 'absolute', 
     bottom: 0,
+    left: 0,
+    right: 0,
   },
 });
 

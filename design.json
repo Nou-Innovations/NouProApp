@@ -1256,21 +1256,30 @@
       }
     },
     "filterBar": {
-      "description": "Default filter bar design used across all screens (Inbox, Activity, etc.)",
+      "description": "Default filter bar/tab bar design used across all screens (Inbox, Activity, Profile tabs, etc.). Takes full width with indicator touching screen edges.",
       "height": 40,
       "backgroundColor": "#FFFFFF",
       "borderBottomWidth": 1,
       "borderColor": "#E5E7EB",
-      "tabFontSize": 14,
-      "tabFontFamily": "Inter-Medium",
-      "selectedIndicatorHeight": 2.5,
-      "selectedIndicatorColor": "#D23030",
-      "selectedTextColor": "#000000",
-      "unselectedTextColor": "#777777",
-      "tabPaddingVertical": 6,
-      "containerFlexGrow": 1,
-      "contentJustify": "center",
-      "usage": "Apply consistently across all list screens with filters. Use containerStyle={{ flexGrow: 0 }} if needed."
+      "tab": {
+        "flex": 1,
+        "iconTextGap": 12,
+        "iconSize": 20
+      },
+      "selected": {
+        "indicatorHeight": 2.5,
+        "indicatorColor": "primary",
+        "indicatorPosition": "full-width",
+        "textColor": "primary",
+        "textFontFamily": "Inter-Bold",
+        "iconColor": "primary"
+      },
+      "unselected": {
+        "textColor": "textMuted",
+        "textFontFamily": "Inter-Medium",
+        "iconColor": "iconMuted"
+      },
+      "usage": "Apply consistently across all list screens with filters and profile screen tabs. Indicator spans full tab width allowing it to touch screen edges when first/last tab is selected."
     },
     "modals": {
       "bottomSheet": {
@@ -1286,6 +1295,40 @@
           "borderRadius": 2,
           "backgroundColor": "#E5E7EB"
         }
+      },
+      "actionBottomSheet": {
+        "description": "Bottom sheet modal for options/actions (3-dots menus, role selection, etc.)",
+        "actionButtons": {
+          "gap": 4,
+          "height": 48,
+          "borderRadius": 12,
+          "fontSize": 16,
+          "fontFamily": "Inter-Medium",
+          "variants": {
+            "default": {
+              "description": "Default outline button - primary color for text and border",
+              "backgroundColor": "transparent",
+              "borderWidth": 1,
+              "borderColor": "#000000",
+              "textColor": "#000000"
+            },
+            "selected": {
+              "description": "Selected/active option - filled primary button",
+              "backgroundColor": "#000000",
+              "borderWidth": 0,
+              "textColor": "#FFFFFF"
+            },
+            "destructive": {
+              "description": "Remove/delete/cancel actions - error red for text and border",
+              "backgroundColor": "transparent",
+              "borderWidth": 1,
+              "borderColor": "#FF2400",
+              "textColor": "#FF2400",
+              "keywords": ["remove", "delete", "cancel", "decline", "reject", "report"]
+            }
+          }
+        },
+        "usage": "Use for all 3-dots option menus, role selection sheets, and action lists throughout the app"
       },
       "centerModal": {
         "borderRadius": 16,
@@ -1936,7 +1979,7 @@
         "marginBottom": 16
       },
       "socialStats": {
-        "description": "Connections and following counts in a horizontal row",
+        "description": "Connections count display",
         "layout": "row",
         "gap": 24,
         "marginBottom": 24,
@@ -2049,57 +2092,6 @@
           "fontFamily": "Inter-Regular",
           "fontSize": 14,
           "color": "#575B66"
-        }
-      },
-      "emptyState": {
-        "iconSize": 60,
-        "iconColor": "#A4AAB8",
-        "title": {
-          "fontFamily": "Inter-Medium",
-          "fontSize": 16,
-          "color": "#000000"
-        },
-        "subtitle": {
-          "fontFamily": "Inter-Regular",
-          "fontSize": 14,
-          "color": "#575B66"
-        }
-      }
-    },
-    "followingScreen": {
-      "description": "Design for following list screen (businesses user follows)",
-      "header": {
-        "title": "Following",
-        "height": 48
-      },
-      "searchBar": {
-        "placeholder": "Search businesses",
-        "marginHorizontal": 16,
-        "marginVertical": 12
-      },
-      "listItem": {
-        "paddingVertical": 12,
-        "paddingHorizontal": 16,
-        "borderBottomWidth": 1,
-        "borderColor": "#E1E4EA",
-        "logoSize": 48,
-        "logoRadius": 8,
-        "contentGap": 12,
-        "nameTypography": {
-          "fontFamily": "Inter-Medium",
-          "fontSize": 16,
-          "color": "#000000"
-        },
-        "industryTypography": {
-          "fontFamily": "Inter-Regular",
-          "fontSize": 14,
-          "color": "#575B66"
-        },
-        "descriptionTypography": {
-          "fontFamily": "Inter-Regular",
-          "fontSize": 13,
-          "color": "#A4AAB8",
-          "numberOfLines": 1
         }
       },
       "emptyState": {

@@ -6,19 +6,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  Modal,
-  TextInput,
-  Switch,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import { useCompanyStore } from '@/shared/store/companyStore';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { get, post, del } from '@/shared/services/api';
-import { ConfirmationDialog, AppSearchBar, StaffCard, StaffMember, StaffRole as StaffCardRole, Avatar } from '@/shared/components/ui';
+import { get, del } from '@/shared/services/api';
+import { ConfirmationDialog, AppSearchBar, StaffCard, StaffMember, StaffRole as StaffCardRole, Avatar, ActionBottomSheet } from '@/shared/components/ui';
+import type { ActionItem } from '@/shared/components/ui/ActionBottomSheet';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 
 // User type for team management
@@ -35,261 +32,6 @@ interface User {
   lastLoginAt?: string;
 }
 
-// Staff role types from app-logic.json
-type StaffRoleType = 'delivery' | 'sales' | 'inventory' | 'custom';
-
-interface InviteUserModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onInvite: (data: { email: string; role: string; staffRoleType?: StaffRoleType; locationIds: string[] }) => void;
-}
-
-// Helper function to get icon for staff role type
-const getStaffTypeIcon = (type: StaffRoleType): keyof typeof Icon.glyphMap => {
-  switch (type) {
-    case 'delivery': return 'car-outline';
-    case 'sales': return 'cash-outline';
-    case 'inventory': return 'cube-outline';
-    default: return 'person-outline';
-  }
-};
-
-// Helper function to get description for staff role type
-const getStaffTypeDescription = (type: StaffRoleType): string => {
-  switch (type) {
-    case 'delivery': return 'Can view and update assigned deliveries';
-    case 'sales': return 'Can view products, process orders, use inbox';
-    case 'inventory': return 'Can manage products and stock levels';
-    default: return 'Custom permissions set by admin';
-  }
-};
-
-const InviteUserModal: React.FC<InviteUserModalProps> = ({ visible, onClose, onInvite }) => {
-  const { theme: appTheme } = useTheme();
-  const { locations } = useCompanyStore();
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'admin' | 'staff'>('staff');
-  const [staffRoleType, setStaffRoleType] = useState<StaffRoleType>('custom');
-  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
-
-  const handleInvite = () => {
-    if (!email.trim()) {
-      Alert.alert('Error', 'Please enter an email address');
-      return;
-    }
-
-    if (role === 'staff' && selectedLocationIds.length === 0) {
-      Alert.alert('Error', 'Please select at least one location for staff members');
-      return;
-    }
-
-    onInvite({
-      email: email.trim(),
-      role,
-      staffRoleType: role === 'staff' ? staffRoleType : undefined,
-      locationIds: role === 'admin' ? [] : selectedLocationIds,
-    });
-
-    // Reset form
-    setEmail('');
-    setRole('staff');
-    setStaffRoleType('custom');
-    setSelectedLocationIds([]);
-  };
-
-  const toggleLocation = (locationId: string) => {
-    setSelectedLocationIds(prev => 
-      prev.includes(locationId) 
-        ? prev.filter(id => id !== locationId)
-        : [...prev, locationId]
-    );
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContainer, { backgroundColor: appTheme.colors.background }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: appTheme.colors.text }]}>
-              Invite Team Member
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Icon name="close" size={24} color={appTheme.colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={[styles.label, { color: appTheme.colors.text }]}>Email Address</Text>
-            <TextInput
-              style={[styles.textInput, { 
-                borderColor: appTheme.colors.borderColor,
-                backgroundColor: appTheme.colors.inputBackground,
-                color: appTheme.colors.text
-              }]}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Enter email address"
-              placeholderTextColor={appTheme.colors.textLight}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={[styles.label, { color: appTheme.colors.text }]}>Role</Text>
-            <View style={styles.roleSelector}>
-              <TouchableOpacity
-                style={[
-                  styles.roleOption,
-                  role === 'admin' && styles.roleOptionSelected,
-                  { 
-                    borderColor: role === 'admin' ? appTheme.colors.primary : appTheme.colors.borderColor,
-                    backgroundColor: role === 'admin' ? appTheme.colors.primary + '10' : 'transparent'
-                  }
-                ]}
-                onPress={() => setRole('admin')}
-              >
-                <Text style={[
-                  styles.roleOptionText,
-                  { color: role === 'admin' ? appTheme.colors.primary : appTheme.colors.text }
-                ]}>
-                  Admin
-                </Text>
-                <Text style={[styles.roleDescription, { color: appTheme.colors.textLight }]}>
-                  Full access to company data
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.roleOption,
-                  role === 'staff' && styles.roleOptionSelected,
-                  { 
-                    borderColor: role === 'staff' ? appTheme.colors.primary : appTheme.colors.borderColor,
-                    backgroundColor: role === 'staff' ? appTheme.colors.primary + '10' : 'transparent'
-                  }
-                ]}
-                onPress={() => setRole('staff')}
-              >
-                <Text style={[
-                  styles.roleOptionText,
-                  { color: role === 'staff' ? appTheme.colors.primary : appTheme.colors.text }
-                ]}>
-                  Staff
-                </Text>
-                <Text style={[styles.roleDescription, { color: appTheme.colors.textLight }]}>
-                  Location-specific access
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {role === 'staff' && (
-            <>
-              {/* Staff Role Type Selector */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: appTheme.colors.text }]}>Staff Type</Text>
-                <View style={styles.staffTypeSelector}>
-                  {(['delivery', 'sales', 'inventory', 'custom'] as StaffRoleType[]).map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.staffTypeOption,
-                        staffRoleType === type && styles.staffTypeOptionSelected,
-                        { 
-                          borderColor: staffRoleType === type ? appTheme.colors.primary : appTheme.colors.borderColor,
-                          backgroundColor: staffRoleType === type ? appTheme.colors.primary + '10' : 'transparent'
-                        }
-                      ]}
-                      onPress={() => setStaffRoleType(type)}
-                    >
-                      <View style={styles.staffTypeHeader}>
-                        <Icon
-                          name={getStaffTypeIcon(type)}
-                          size={20}
-                          color={staffRoleType === type ? appTheme.colors.primary : appTheme.colors.text}
-                        />
-                        <Text style={[
-                          styles.staffTypeText,
-                          { color: staffRoleType === type ? appTheme.colors.primary : appTheme.colors.text }
-                        ]}>
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </Text>
-                      </View>
-                      <Text style={[styles.staffTypeDescription, { color: appTheme.colors.textLight }]}>
-                        {getStaffTypeDescription(type)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-              
-              {/* Location Access */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: appTheme.colors.text }]}>
-                  Location Access ({selectedLocationIds.length} selected)
-                </Text>
-                <View style={styles.locationsList}>
-                  {locations.map(location => (
-                    <TouchableOpacity
-                      key={location.id}
-                      style={[styles.locationCheckbox, { borderColor: appTheme.colors.borderColor }]}
-                      onPress={() => toggleLocation(location.id)}
-                    >
-                      <View style={styles.checkboxRow}>
-                        <View style={[
-                          styles.checkbox,
-                          selectedLocationIds.includes(location.id) && styles.checkboxSelected,
-                          { 
-                            borderColor: appTheme.colors.borderColor,
-                            backgroundColor: selectedLocationIds.includes(location.id) 
-                              ? appTheme.colors.primary 
-                              : 'transparent'
-                          }
-                        ]}>
-                          {selectedLocationIds.includes(location.id) && (
-                            <Icon name="checkmark" size={12} color="white" />
-                          )}
-                        </View>
-                        <View style={styles.locationInfo}>
-                          <Text style={[styles.locationName, { color: appTheme.colors.text }]}>
-                            {location.name}
-                          </Text>
-                          <Text style={[styles.locationAddress, { color: appTheme.colors.textLight }]}>
-                            {location.address}
-                          </Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </>
-          )}
-
-          <View style={styles.modalActions}>
-            <TouchableOpacity 
-              style={[styles.modalButton, { borderColor: appTheme.colors.borderColor }]}
-              onPress={onClose}
-            >
-              <Text style={[styles.modalButtonText, { color: appTheme.colors.text }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: appTheme.colors.primary }]}
-              onPress={handleInvite}
-            >
-              <Text style={styles.modalButtonPrimaryText}>Send Invite</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-};
-
 export default function TeamManagementScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
@@ -302,7 +44,6 @@ export default function TeamManagementScreen() {
   
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isInviteModalVisible, setIsInviteModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -367,6 +108,13 @@ export default function TeamManagementScreen() {
     },
   ]);
   
+  // Bottom sheet state for Join Requests
+  const [selectedJoinRequest, setSelectedJoinRequest] = useState<JoinRequest | null>(null);
+  const [showJoinRequestOptions, setShowJoinRequestOptions] = useState(false);
+  
+  // Bottom sheet state for Pending Invites
+  const [selectedPendingInvite, setSelectedPendingInvite] = useState<PendingInvite | null>(null);
+  const [showPendingInviteOptions, setShowPendingInviteOptions] = useState(false);
 
   // Check permissions using profileStore
   const isSuperAdmin = isSuperAdminRole();
@@ -432,28 +180,6 @@ export default function TeamManagementScreen() {
       setUsers(mockUsers);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleInviteUser = async (data: { email: string; role: string; locationIds: string[] }) => {
-    if (!activeBusiness?.id) return;
-
-    try {
-      await post<User>(`/companies/${activeBusiness.id}/users/invite`, data);
-      setIsInviteModalVisible(false);
-      setSuccessMessage('Invitation sent successfully');
-      setShowSuccessDialog(true);
-      fetchUsers(); // Refresh the list
-    } catch (error) {
-      console.error('Error inviting user:', error);
-      
-      // Graceful fallback for demo purposes
-      console.log('API not available, simulating invitation for demo purposes');
-      Alert.alert(
-        'Demo Mode', 
-        `In production, an invitation would be sent to ${data.email} with ${data.role} role. This is a demo with mock data.`
-      );
-      setIsInviteModalVisible(false);
     }
   };
 
@@ -650,7 +376,7 @@ export default function TeamManagementScreen() {
       <SecondaryHeader
         title="Staffs"
         leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
-        rightActions={[{ icon: 'user-plus', onPress: () => setIsInviteModalVisible(true) }]}
+        rightActions={[{ icon: 'user-plus', onPress: () => navigation.navigate('InviteStaff' as never) }]}
       />
 
       {/* Search Bar */}
@@ -688,54 +414,52 @@ export default function TeamManagementScreen() {
                   <View style={styles.sectionContent}>
                     {joinRequests.map((request, index) => (
                       <View key={request.id}>
-                        <View style={styles.userCard}>
-                          <Avatar
-                            userId={request.userId}
-                            userName={request.userName}
-                            imageUri={request.userAvatar}
-                            size={48}
-                            style={styles.userCardAvatar}
-                          />
-                          <View style={styles.userCardContent}>
-                            <Text style={[styles.userCardName, { color: appTheme.colors.text }]} numberOfLines={1}>
-                              {request.userName}
-                            </Text>
-                            <Text style={[styles.userCardUsername, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
-                              @{request.userEmail.split('@')[0]}
-                            </Text>
-                            <View style={styles.userCardButtons}>
-                              <TouchableOpacity 
-                                style={[styles.userCardButtonPrimary, { backgroundColor: appTheme.colors.primary }]}
-                                onPress={() => handleAcceptRequest(request)}
-                                activeOpacity={0.7}
-                              >
-                                <Text style={styles.userCardButtonPrimaryText}>Accept</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity 
-                                style={[styles.userCardButtonOutline, { borderColor: appTheme.colors.primary }]}
-                                onPress={() => handleRejectRequest(request)}
-                                activeOpacity={0.7}
-                              >
-                                <Text style={[styles.userCardButtonOutlineText, { color: appTheme.colors.primary }]}>Decline</Text>
-                              </TouchableOpacity>
+                        <View style={styles.requestCard}>
+                          {/* Top row: Avatar, Name/Username, 3-dots - same as Staff/Pending cards */}
+                          <View style={styles.requestCardTopRow}>
+                            <Avatar
+                              userId={request.userId}
+                              userName={request.userName}
+                              imageUri={request.userAvatar}
+                              size={48}
+                              style={styles.requestCardAvatar}
+                            />
+                            <View style={styles.requestCardInfo}>
+                              <Text style={[styles.requestCardName, { color: appTheme.colors.text }]} numberOfLines={1}>
+                                {request.userName}
+                              </Text>
+                              <Text style={[styles.requestCardUsername, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
+                                @{request.userEmail.split('@')[0]}
+                              </Text>
                             </View>
+                            <TouchableOpacity 
+                              style={styles.requestCardOptionsButton}
+                              onPress={() => {
+                                setSelectedJoinRequest(request);
+                                setShowJoinRequestOptions(true);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Icon name="ellipsis-vertical" size={20} color={appTheme.colors.text} />
+                            </TouchableOpacity>
                           </View>
-                          <TouchableOpacity 
-                            style={styles.userCardOptionsButton}
-                            onPress={() => {
-                              Alert.alert(
-                                'Options',
-                                `Options for ${request.userName}`,
-                                [
-                                  { text: 'Report User', onPress: () => Alert.alert('Report', 'Report functionality coming soon') },
-                                  { text: 'Cancel', style: 'cancel' },
-                                ]
-                              );
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <Icon name="ellipsis-vertical" size={20} color={appTheme.colors.text} />
-                          </TouchableOpacity>
+                          {/* Bottom row: Accept + Decline buttons */}
+                          <View style={styles.requestCardButtons}>
+                            <TouchableOpacity 
+                              style={[styles.requestCardButtonPrimary, { backgroundColor: appTheme.colors.primary }]}
+                              onPress={() => handleAcceptRequest(request)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.requestCardButtonPrimaryText}>Accept</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                              style={[styles.requestCardButtonOutline, { borderColor: appTheme.colors.primary }]}
+                              onPress={() => handleRejectRequest(request)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.requestCardButtonOutlineText, { color: appTheme.colors.primary }]}>Decline</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                         {index < joinRequests.length - 1 && (
                           <View style={[styles.listDivider, { backgroundColor: appTheme.colors.borderColor }]} />
@@ -782,7 +506,10 @@ export default function TeamManagementScreen() {
                           </TouchableOpacity>
                           <TouchableOpacity 
                             style={styles.pendingCardOptionsButton}
-                            onPress={() => handleCancelInvite(invite)}
+                            onPress={() => {
+                              setSelectedPendingInvite(invite);
+                              setShowPendingInviteOptions(true);
+                            }}
                             activeOpacity={0.7}
                           >
                             <Icon name="ellipsis-vertical" size={20} color={appTheme.colors.text} />
@@ -850,13 +577,6 @@ export default function TeamManagementScreen() {
         />
       )}
 
-      {/* Invite User Modal */}
-      <InviteUserModal
-        visible={isInviteModalVisible}
-        onClose={() => setIsInviteModalVisible(false)}
-        onInvite={handleInviteUser}
-      />
-
       {/* Success Dialog */}
       <ConfirmationDialog
         visible={showSuccessDialog}
@@ -866,6 +586,46 @@ export default function TeamManagementScreen() {
         primaryButtonText="OK"
         onPrimaryAction={() => setShowSuccessDialog(false)}
         onClose={() => setShowSuccessDialog(false)}
+      />
+
+      {/* Join Request Options Bottom Sheet */}
+      <ActionBottomSheet
+        visible={showJoinRequestOptions}
+        onClose={() => {
+          setShowJoinRequestOptions(false);
+          setSelectedJoinRequest(null);
+        }}
+        title="Options"
+        actionItems={[
+          { id: 'report', title: 'Report User' },
+        ]}
+        onActionPress={(item: ActionItem) => {
+          if (item.id === 'report' && selectedJoinRequest) {
+            Alert.alert('Report', 'Report functionality coming soon');
+          }
+          setShowJoinRequestOptions(false);
+          setSelectedJoinRequest(null);
+        }}
+      />
+
+      {/* Pending Invite Options Bottom Sheet */}
+      <ActionBottomSheet
+        visible={showPendingInviteOptions}
+        onClose={() => {
+          setShowPendingInviteOptions(false);
+          setSelectedPendingInvite(null);
+        }}
+        title="Options"
+        actionItems={[
+          { id: 'cancel', title: 'Cancel Invite' },
+        ]}
+        onActionPress={(item: ActionItem) => {
+          if (item.id === 'cancel' && selectedPendingInvite) {
+            handleCancelInvite(selectedPendingInvite);
+          }
+          setShowPendingInviteOptions(false);
+          setSelectedPendingInvite(null);
+        }}
       />
     </SafeAreaView>
   );
@@ -916,48 +676,60 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
   },
-  // User Card styles (for Join Requests)
-  userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  // Request Card styles (for Join Requests) - matches Staff/Pending card layout
+  requestCard: {
     paddingVertical: 12,
     paddingLeft: 8,
+    paddingRight: 0,
   },
-  userCardAvatar: {
+  requestCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  requestCardAvatar: {
     marginRight: 12,
   },
-  userCardContent: {
+  requestCardInfo: {
     flex: 1,
     marginRight: 8,
   },
-  userCardName: {
+  requestCardName: {
     fontSize: 16,
     fontFamily: 'Inter-Bold',
   },
-  userCardUsername: {
+  requestCardUsername: {
     fontSize: 14,
     fontFamily: 'Inter-Medium',
     marginTop: 2,
   },
-  userCardButtons: {
+  requestCardOptionsButton: {
+    paddingRight: 4,
+    paddingLeft: 12,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  requestCardButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 8,
+    marginLeft: 60, // Avatar width (48) + marginRight (12)
+    marginRight: 4, // Match optionsButton paddingRight
     gap: 8,
   },
-  userCardButtonPrimary: {
+  requestCardButtonPrimary: {
     flex: 1,
     height: 40,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  userCardButtonPrimaryText: {
+  requestCardButtonPrimaryText: {
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
     color: '#FFFFFF',
   },
-  userCardButtonOutline: {
+  requestCardButtonOutline: {
     flex: 1,
     height: 40,
     borderRadius: 8,
@@ -965,22 +737,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  userCardButtonOutlineText: {
+  requestCardButtonOutlineText: {
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
   },
-  userCardOptionsButton: {
-    paddingLeft: 8,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Pending Card styles (for Pending Invites)
+  // Pending Card styles (for Pending Invites) - matches Staff card layout
   pendingCard: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     paddingLeft: 8,
+    paddingRight: 0,
   },
   pendingCardAvatar: {
     marginRight: 12,
@@ -1010,155 +777,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
   },
   pendingCardOptionsButton: {
-    paddingLeft: 8,
+    paddingRight: 4,
+    paddingLeft: 12,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   listDivider: {
     height: 1,
-  },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: '90%',
-    maxHeight: '80%',
-    borderRadius: 16,
-    padding: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-  },
-  roleSelector: {
-    gap: 12,
-  },
-  roleOption: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-  },
-  roleOptionSelected: {
-    borderWidth: 2,
-  },
-  roleOptionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  roleDescription: {
-    fontSize: 12,
-  },
-  // Staff type selector styles
-  staffTypeSelector: {
-    gap: 8,
-  },
-  staffTypeOption: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-  },
-  staffTypeOptionSelected: {
-    borderWidth: 2,
-  },
-  staffTypeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  staffTypeText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  staffTypeDescription: {
-    fontSize: 12,
-    marginLeft: 28,
-  },
-  locationsList: {
-    maxHeight: 200,
-  },
-  locationCheckbox: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 1,
-    borderRadius: 4,
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxSelected: {
-    borderWidth: 2,
-  },
-  locationInfo: {
-    flex: 1,
-  },
-  locationName: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  locationAddress: {
-    fontSize: 12,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-  },
-  modalButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  modalButtonPrimary: {
-    borderWidth: 0,
-  },
-  modalButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  modalButtonPrimaryText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'white',
   },
   // Loading & Empty States
   loadingContainer: {

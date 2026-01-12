@@ -45,12 +45,12 @@ export interface ProfileActionConfig {
 export const PROFILE_ACTION_CONFIGS: Record<ProfileViewType, ProfileActionConfig> = {
   [ProfileViewType.SELF_PROFILE]: {
     primaryButton: {
-      label: 'Edit profile',
+      label: 'Edit Profile',
       action: 'edit',
       variant: 'outline',
     },
     secondaryButton: {
-      label: 'Share',
+      label: 'Share Profile',
       action: 'share',
       variant: 'primary',
     },
@@ -58,7 +58,7 @@ export const PROFILE_ACTION_CONFIGS: Record<ProfileViewType, ProfileActionConfig
   },
   [ProfileViewType.SELF_BUSINESS]: {
     primaryButton: {
-      label: 'Edit',
+      label: 'Edit Profile',
       action: 'edit',
       variant: 'outline',
     },
