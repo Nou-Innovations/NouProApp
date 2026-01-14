@@ -26,7 +26,6 @@ export const businessModeConfig = {
     'BrandSelection',
     'DeliveryDetail',
     'CreateDelivery',
-    'OrderDetail',
     'TeamManagement',
     'InviteStaff',
     'CompanySettings',

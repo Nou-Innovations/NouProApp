@@ -7,10 +7,16 @@
  * - Business entities (not to be confused with profile mode - see profileStore)
  * - Business locations
  * - Business CRUD operations
+ * 
+ * Persistence:
+ * - currentLocationId is persisted to remember last selected location
+ * - null = "All Locations" view
  */
 
 import { create } from 'zustand';
-import { get, put, post, del } from '@/shared/services/api';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { get as apiGet, put as apiPut, post as apiPost, del as apiDel } from '@/shared/services/api';
 import { Business, BusinessLocation, UpdateBusinessPayload } from '@/shared/types/business';
 
 /**
@@ -58,6 +64,7 @@ interface BusinessStoreState {
   // Locations
   locations: LegacyLocation[];
   currentLocation: LegacyLocation | null;
+  currentLocationId: string | null; // Persisted: null = "All Locations"
   
   // Loading states
   isLoading: boolean;
@@ -85,12 +92,16 @@ interface BusinessStoreState {
 
 /**
  * Business Store
+ * Persists currentLocationId to remember last selected location across sessions
  */
-export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
+export const useBusinessStore = create<BusinessStoreState>()(
+  persist(
+    (set, get) => ({
   businesses: [],
   currentBusiness: null,
   locations: [],
   currentLocation: null,
+  currentLocationId: null, // null = "All Locations"
   isLoading: false,
   error: null,
   
@@ -113,12 +124,15 @@ export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
     get().setBusiness(company);
   },
 
-  setLocation: (location) => set({ currentLocation: location }),
+  setLocation: (location) => set({ 
+    currentLocation: location,
+    currentLocationId: location?.id || null, // null = "All Locations"
+  }),
 
   fetchBusinesses: async () => {
     set({ isLoading: true, error: null });
     try {
-      const businesses = await get<LegacyCompany[]>('/companies');
+      const businesses = await apiGet<LegacyCompany[]>('/companies');
       set({ businesses, companies: businesses, isLoading: false });
       
       const state = get();
@@ -177,7 +191,7 @@ export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
   fetchLocations: async (businessId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const locations = await get<LegacyLocation[]>(`/companies/${businessId}/locations`);
+      const locations = await apiGet<LegacyLocation[]>(`/companies/${businessId}/locations`);
       set({ locations, isLoading: false });
       
       const state = get();
@@ -192,9 +206,16 @@ export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
         });
       }
       
-      if (locations.length > 0 && !get().currentLocation) {
-        set({ currentLocation: locations[0] });
+      // Restore currentLocation from persisted currentLocationId
+      const persistedLocationId = get().currentLocationId;
+      if (persistedLocationId !== null) {
+        // User had a specific location selected - restore it
+        const restoredLocation = locations.find(loc => loc.id === persistedLocationId);
+        if (restoredLocation) {
+          set({ currentLocation: restoredLocation });
+        }
       }
+      // If persistedLocationId is null, user had "All Locations" - don't auto-select
     } catch (error) {
       // Expected when backend is not running - silently fall back to mock data
       if (__DEV__) console.log('Using mock location data (API unavailable)');
@@ -255,16 +276,23 @@ export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
         });
       }
       
-      if (mockLocations.length > 0 && !get().currentLocation) {
-        set({ currentLocation: mockLocations[0] });
+      // Restore currentLocation from persisted currentLocationId
+      const persistedLocationId = get().currentLocationId;
+      if (persistedLocationId !== null) {
+        // User had a specific location selected - restore it
+        const restoredLocation = mockLocations.find(loc => loc.id === persistedLocationId);
+        if (restoredLocation) {
+          set({ currentLocation: restoredLocation });
+        }
       }
+      // If persistedLocationId is null, user had "All Locations" - don't auto-select
     }
   },
 
   updateBusiness: async (businessId: string, data: Partial<LegacyCompany>) => {
     set({ isLoading: true, error: null });
     try {
-      const updatedBusiness = await put<LegacyCompany>(`/companies/${businessId}`, data);
+      const updatedBusiness = await apiPut<LegacyCompany>(`/companies/${businessId}`, data);
 
       const state = get();
       const updatedBusinesses = state.businesses.map(b => 
@@ -302,7 +330,7 @@ export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
   createLocation: async (businessId: string, data: Omit<LegacyLocation, 'id' | 'companyId'>) => {
     set({ isLoading: true, error: null });
     try {
-      const newLocation = await post<LegacyLocation>(`/companies/${businessId}/locations`, data);
+      const newLocation = await apiPost<LegacyLocation>(`/companies/${businessId}/locations`, data);
 
       const state = get();
       const updatedLocations = [...state.locations, newLocation];
@@ -336,7 +364,7 @@ export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
   updateLocation: async (businessId: string, locationId: string, data: Partial<LegacyLocation>) => {
     set({ isLoading: true, error: null });
     try {
-      const updatedLocation = await put<LegacyLocation>(`/companies/${businessId}/locations/${locationId}`, data);
+      const updatedLocation = await apiPut<LegacyLocation>(`/companies/${businessId}/locations/${locationId}`, data);
 
       const state = get();
       const updatedLocations = state.locations.map(location => 
@@ -377,7 +405,7 @@ export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
   deleteLocation: async (businessId: string, locationId: string) => {
     set({ isLoading: true, error: null });
     try {
-      await del(`/companies/${businessId}/locations/${locationId}`);
+      await apiDel(`/companies/${businessId}/locations/${locationId}`);
 
       const state = get();
       const updatedLocations = state.locations.filter(location => location.id !== locationId);
@@ -422,10 +450,21 @@ export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
     currentCompany: null,
     locations: [],
     currentLocation: null,
+    currentLocationId: null,
     isLoading: false,
     error: null,
   }),
-}));
+    }),
+    {
+      name: 'noupro-business-store',
+      storage: createJSONStorage(() => AsyncStorage),
+      // Only persist the location selection preference
+      partialize: (state) => ({
+        currentLocationId: state.currentLocationId,
+      }),
+    }
+  )
+);
 
 // Helper functions
 export const businessStoreHelpers = {

@@ -66,7 +66,7 @@ const ProductsScreen: React.FC = () => {
   const isAdmin = useProfileStore((state) => state.isAdmin);
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
-  const { currentCompany, currentLocation, locations } = useBusinessStore();
+  const { currentCompany, currentLocation, locations, setLocation } = useBusinessStore();
   
   // Profile store for RBAC
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
@@ -99,7 +99,8 @@ const ProductsScreen: React.FC = () => {
   } = useProducts();
 
   // Local UI state
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  // selectedLocationId now comes from store (currentLocation?.id), persisted across sessions
+  const selectedLocationId = currentLocation?.id || null;
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editedProducts, setEditedProducts] = useState<Record<string, Partial<UIProduct>>>({});
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
@@ -255,8 +256,12 @@ const ProductsScreen: React.FC = () => {
   };
 
   const handleLocationSelect = (item: DropdownItem) => {
-    const locationId = item.id === 'all' ? null : item.id;
-    setSelectedLocationId(locationId);
+    if (item.id === 'all') {
+      setLocation(null); // "All Locations"
+    } else {
+      const location = safeLocations.find(loc => loc.id === item.id);
+      setLocation(location || null);
+    }
   };
 
   const handleProductPress = (productId: string) => {
@@ -273,10 +278,10 @@ const ProductsScreen: React.FC = () => {
 
   // Auto-select primary location when there's only one
   useEffect(() => {
-    if (hasSingleLocation && primaryLocation && !selectedLocationId) {
-      setSelectedLocationId(primaryLocation.id);
+    if (hasSingleLocation && primaryLocation && !currentLocation) {
+      setLocation(primaryLocation);
     }
-  }, [hasSingleLocation, primaryLocation?.id]);
+  }, [hasSingleLocation, primaryLocation?.id, currentLocation]);
 
   // Create location dropdown items using business store locations
   const locationItems: DropdownItem[] = useMemo(() => {

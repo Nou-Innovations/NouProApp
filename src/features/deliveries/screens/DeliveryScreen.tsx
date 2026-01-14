@@ -45,7 +45,7 @@ export default function DeliveryScreen() {
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const { theme: appTheme } = useTheme();
   const { setDeliveriesUnreadCount } = useNotifications();
-  const { currentCompany, currentLocation, locations } = useBusinessStore();
+  const { currentCompany, currentLocation, locations, setLocation } = useBusinessStore();
   
   // Profile store for RBAC (single source of truth)
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
@@ -106,10 +106,10 @@ export default function DeliveryScreen() {
 
   // Auto-select primary location when there's only one
   useEffect(() => {
-    if (hasSingleLocation && primaryLocation && !selectedLocationId) {
-      setSelectedLocationId(primaryLocation.id);
+    if (hasSingleLocation && primaryLocation && !currentLocation) {
+      setLocation(primaryLocation);
     }
-  }, [hasSingleLocation, primaryLocation?.id]);
+  }, [hasSingleLocation, primaryLocation?.id, currentLocation]);
 
   // Create location dropdown items using business store locations
   const locationItems = useMemo(() => {

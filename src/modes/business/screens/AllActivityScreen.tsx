@@ -210,8 +210,6 @@ export default function AllActivityScreen() {
     switch (item.type) {
       case 'order_created':
       case 'order_confirmed':
-        navigation.navigate('OrderDetail', { orderId: item.relatedId });
-        break;
       case 'delivery_completed':
       case 'delivery_started':
         navigation.navigate('DeliveryDetail', { deliveryId: item.relatedId });

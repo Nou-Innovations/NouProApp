@@ -47,7 +47,7 @@ export default function InvoicesScreen() {
   const [search, setSearch] = useState('');
   const statuses = ['all', 'draft', 'sent', 'paid', 'overdue'];
   const [filter, setFilter] = useState('all');
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  // selectedLocationId now comes from store (currentLocation?.id), persisted across sessions
   const [activeTab, setActiveTab] = useState<'invoices' | 'estimates'>('invoices');
   const [showViewDropdown, setShowViewDropdown] = useState<boolean>(false);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
@@ -55,7 +55,8 @@ export default function InvoicesScreen() {
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const { theme: appTheme } = useTheme();
   const { setInvoicesUnreadCount } = useNotifications();
-  const { currentCompany, currentLocation, locations } = useBusinessStore();
+  const { currentCompany, currentLocation, locations, setLocation } = useBusinessStore();
+  const selectedLocationId = currentLocation?.id || null;
   
   // Profile store for RBAC (single source of truth)
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
@@ -110,8 +111,12 @@ export default function InvoicesScreen() {
   }, [newInvoicesCount, setInvoicesUnreadCount]);
 
   const handleLocationSelect = (item: DropdownItem) => {
-    const locationId = item.id === 'all' ? null : item.id;
-    setSelectedLocationId(locationId);
+    if (item.id === 'all') {
+      setLocation(null); // "All Locations"
+    } else {
+      const location = safeLocations.find(loc => loc.id === item.id);
+      setLocation(location || null);
+    }
   };
 
   // Check user permissions for global vs location-scoped access
@@ -124,10 +129,10 @@ export default function InvoicesScreen() {
 
   // Auto-select primary location when there's only one
   useEffect(() => {
-    if (hasSingleLocation && primaryLocation && !selectedLocationId) {
-      setSelectedLocationId(primaryLocation.id);
+    if (hasSingleLocation && primaryLocation && !currentLocation) {
+      setLocation(primaryLocation);
     }
-  }, [hasSingleLocation, primaryLocation?.id]);
+  }, [hasSingleLocation, primaryLocation?.id, currentLocation]);
 
   // Create location dropdown items using business store locations
   const locationItems: DropdownItem[] = useMemo(() => {

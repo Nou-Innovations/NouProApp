@@ -16,14 +16,12 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
-  Modal,
   FlatList,
 } from 'react-native';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
@@ -33,8 +31,9 @@ import { RootStackParamList } from '@/shared/types/navigation';
 import { mockStaff, mockTransportModes, Staff, TransportMode } from '@/shared/data/mockDeliveries';
 import { mockBrands } from '@/shared/data/businessProfile';
 import { formatCurrency } from '@/shared/data/mockOrders';
-import { AppModal } from '@/shared/components/ui';
+import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, TimeSelector } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 
 type CreateDeliveryRouteProp = RouteProp<RootStackParamList, 'CreateDelivery'>;
 
@@ -75,6 +74,11 @@ export default function CreateDeliveryScreen() {
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const { locations, currentLocation } = useBusinessStore();
   
+  // Defensive check for locations (with single location logic)
+  const safeLocations = Array.isArray(locations) ? locations : [];
+  const hasSingleLocation = safeLocations.length === 1;
+  const primaryLocation = safeLocations.find(loc => (loc as any).is_primary) || safeLocations[0];
+  
   // Check if user can edit ID (Business or Enterprise plan)
   const canEditId = activeBusiness?.plan === 'business' || activeBusiness?.plan === 'enterprise';
   
@@ -92,12 +96,16 @@ export default function CreateDeliveryScreen() {
   const [showClientModal, setShowClientModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showItemsModal, setShowItemsModal] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [showStaffModal, setShowStaffModal] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [expandedBrand, setExpandedBrand] = useState<string | null>(null);
+  
+  // Search states for modals
+  const [clientSearch, setClientSearch] = useState('');
+  const [itemSearch, setItemSearch] = useState('');
+  const [staffSearch, setStaffSearch] = useState('');
   
   // Get all products from mock data
   const allProducts = useMemo(() => {
@@ -108,6 +116,40 @@ export default function CreateDeliveryScreen() {
       }))
     );
   }, []);
+
+  // Filtered products based on search
+  const filteredProducts = useMemo(() => {
+    if (!itemSearch) return allProducts;
+    const searchLower = itemSearch.toLowerCase();
+    return allProducts.filter(
+      (product) =>
+        product.name.toLowerCase().includes(searchLower) ||
+        product.brandName.toLowerCase().includes(searchLower)
+    );
+  }, [allProducts, itemSearch]);
+
+  // Filtered clients based on search
+  const filteredClients = useMemo(() => {
+    if (!clientSearch) return mockClients;
+    const searchLower = clientSearch.toLowerCase();
+    return mockClients.filter(
+      (client) =>
+        client.name.toLowerCase().includes(searchLower) ||
+        client.address.toLowerCase().includes(searchLower) ||
+        client.type.toLowerCase().includes(searchLower)
+    );
+  }, [clientSearch]);
+
+  // Filtered staff based on search
+  const filteredStaff = useMemo(() => {
+    if (!staffSearch) return mockStaff;
+    const searchLower = staffSearch.toLowerCase();
+    return mockStaff.filter(
+      (staff) =>
+        staff.name.toLowerCase().includes(searchLower) ||
+        staff.role.toLowerCase().includes(searchLower)
+    );
+  }, [staffSearch]);
   
   // Calculate totals
   const orderTotal = useMemo(() => {
@@ -164,14 +206,6 @@ export default function CreateDeliveryScreen() {
   const getItemQuantity = (productId: string): number => {
     const item = selectedItems.find((i) => i.product_id === productId);
     return item?.quantity || 0;
-  };
-
-  // Handle date change
-  const handleDateChange = (event: any, date?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (date) {
-      setScheduledDate(date);
-    }
   };
 
   // Format date for display
@@ -233,68 +267,36 @@ export default function CreateDeliveryScreen() {
     );
   };
 
+  // Get initials from name
+  const getInitials = (name: string): string => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
-  // Render bottom sheet modal
-  const renderModal = (
-    visible: boolean,
-    onClose: () => void,
-    title: string,
-    children: React.ReactNode
-  ) => (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <TouchableOpacity style={styles.modalBackdrop} onPress={onClose} />
-        <View style={[styles.modalContent, { backgroundColor: appTheme.colors.background }]}>
-          {/* Handle */}
-          <View style={styles.modalHandle}>
-            <View style={[styles.handleBar, { backgroundColor: appTheme.colors.borderColor }]} />
-          </View>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.bold }]}>
-              {title}
-            </Text>
-            <TouchableOpacity onPress={onClose} style={styles.modalCloseButton}>
-              <Icon name="close" size={24} color={appTheme.colors.iconColor} />
-            </TouchableOpacity>
-          </View>
-          {children}
-        </View>
-      </View>
-    </Modal>
-  );
+  // Get color for avatar based on name hash
+  const getAvatarColor = (name: string): string => {
+    const colors = ['#4ECDC4', '#6366F1', '#EC4899', '#F59E0B', '#10B981', '#8B5CF6'];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: appTheme.colors.cardBackground, borderBottomColor: appTheme.colors.borderColor }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-          <Icon name="chevron-back" size={24} color={appTheme.colors.iconColor} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.bold }]}>
-          {isTransfer ? 'Create Transfer' : 'Create Delivery'}
-        </Text>
-        <View style={styles.headerButton} />
-      </View>
-
-      {/* Mode Badge */}
-      <View style={styles.modeBadgeContainer}>
-        <View style={[styles.modeBadge, { backgroundColor: isTransfer ? `${appTheme.colors.warning}20` : `${appTheme.colors.info}20` }]}>
-          <Icon
-            name={isTransfer ? 'swap-horizontal' : 'car'}
-            size={18}
-            color={isTransfer ? appTheme.colors.warning : appTheme.colors.info}
-          />
-          <Text style={[styles.modeBadgeText, { color: isTransfer ? appTheme.colors.warning : appTheme.colors.info, fontFamily: theme.fonts.primary.medium }]}>
-            {isTransfer ? 'Internal Transfer' : 'External Delivery'}
-          </Text>
-        </View>
-      </View>
+      <SecondaryHeader
+        title={isTransfer ? 'Create Transfer' : 'Create Delivery'}
+        leftAction={{
+          icon: 'chevron-back',
+          onPress: () => navigation.goBack(),
+        }}
+      />
 
       <KeyboardAvoidingView
         style={styles.content}
@@ -328,12 +330,12 @@ export default function CreateDeliveryScreen() {
 
           {/* Document ID */}
           <View style={styles.fieldContainer}>
-            <View style={styles.fieldLabelRow}>
-              <Text style={[styles.fieldLabel, { color: appTheme.colors.textFieldLabelDefault, fontFamily: theme.fonts.primary.medium, marginBottom: 8, marginLeft: 8 }]}>
+            <View style={styles.documentIdHeader}>
+              <Text style={[styles.fieldLabel, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.medium }]}>
                 {isTransfer ? 'Transfer ID' : 'Order ID'}
               </Text>
               {!canEditId && (
-                <View style={[styles.lockBadge, { backgroundColor: appTheme.colors.lightGrey }]}>
+                <View style={[styles.lockBadge, { backgroundColor: appTheme.colors.surface }]}>
                   <Icon name="lock-closed" size={12} color={appTheme.colors.textLight} />
                   <Text style={[styles.lockText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
                     Upgrade to edit
@@ -341,15 +343,17 @@ export default function CreateDeliveryScreen() {
                 </View>
               )}
             </View>
-            <AppTextField
-              label=""
-              value={documentId}
-              onChangeText={handleIdChange}
-              placeholder={isTransfer ? 'TRF-XXXXXX' : 'ORD-XXXXXX'}
-              leftIcon="document-text-outline"
-              disabled={!canEditId}
-              autoCapitalize="characters"
-            />
+            <View style={styles.documentIdFieldWrapper}>
+              <AppTextField
+                label=""
+                value={documentId}
+                onChangeText={handleIdChange}
+                placeholder={isTransfer ? 'TRF-XXXXXX' : 'ORD-XXXXXX'}
+                leftIcon="document-text-outline"
+                disabled={!canEditId}
+                autoCapitalize="characters"
+              />
+            </View>
           </View>
 
           {/* Select Items */}
@@ -394,7 +398,7 @@ export default function CreateDeliveryScreen() {
             placeholder="Select date and time"
             leftIcon="calendar-outline"
             isDropdown
-            onPress={() => setShowDatePicker(true)}
+            onPress={() => setShowScheduleModal(true)}
             containerStyle={styles.fieldContainer}
           />
 
@@ -429,7 +433,7 @@ export default function CreateDeliveryScreen() {
             onChangeText={setNotes}
             placeholder="Add notes or special instructions..."
             isMultiline
-            numberOfLines={4}
+            minHeight={48}
             containerStyle={styles.fieldContainer}
           />
 
@@ -443,7 +447,6 @@ export default function CreateDeliveryScreen() {
           style={[styles.createButton, { backgroundColor: appTheme.colors.primary }]}
           onPress={handleCreate}
         >
-          <Icon name="checkmark-circle" size={24} color="#FFFFFF" />
           <Text style={[styles.createButtonText, { fontFamily: theme.fonts.primary.bold }]}>
             {isTransfer ? 'Create Transfer' : 'Create Delivery'}
           </Text>
@@ -451,252 +454,408 @@ export default function CreateDeliveryScreen() {
       </View>
 
       {/* Client Selection Modal */}
-      {renderModal(showClientModal, () => setShowClientModal(false), 'Select Client', (
-        <FlatList
-          data={mockClients}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.listItem, selectedClient?.id === item.id && styles.listItemSelected, { borderBottomColor: appTheme.colors.borderColor }]}
-              onPress={() => {
-                setSelectedClient(item);
-                setShowClientModal(false);
-              }}
-            >
-              <View style={[styles.listItemAvatar, { backgroundColor: '#4ECDC4' }]}>
-                <Text style={styles.listItemAvatarText}>{item.name.charAt(0)}</Text>
-              </View>
-              <View style={styles.listItemContent}>
-                <Text style={[styles.listItemTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.bold }]}>
-                  {item.name}
+      <AppBottomSheet
+        visible={showClientModal}
+        onClose={() => {
+          setShowClientModal(false);
+          setClientSearch('');
+        }}
+        title="Select Client"
+      >
+        <View style={styles.bottomSheetContent}>
+          <AppSearchBar
+            placeholder="Search clients..."
+            value={clientSearch}
+            onChangeText={setClientSearch}
+            onClear={() => setClientSearch('')}
+            containerStyle={styles.searchBarContainer}
+          />
+          <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
+            {filteredClients.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.selectionItem,
+                  { 
+                    borderColor: selectedClient?.id === item.id ? appTheme.colors.primary : appTheme.colors.borderColor,
+                    backgroundColor: selectedClient?.id === item.id ? `${appTheme.colors.primary}08` : appTheme.colors.cardBackground,
+                  }
+                ]}
+                onPress={() => {
+                  setSelectedClient(item);
+                  setShowClientModal(false);
+                  setClientSearch('');
+                }}
+              >
+                <View style={[styles.selectionAvatar, { backgroundColor: getAvatarColor(item.name) }]}>
+                  <Text style={styles.selectionAvatarText}>{getInitials(item.name)}</Text>
+                </View>
+                <View style={styles.selectionContent}>
+                  <Text style={[styles.selectionTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
+                    {item.name}
+                  </Text>
+                  <View style={styles.selectionMeta}>
+                    <View style={[styles.typeBadge, { backgroundColor: appTheme.colors.surface }]}>
+                      <Text style={[styles.typeBadgeText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.medium }]}>
+                        {item.type}
+                      </Text>
+                    </View>
+                    <Text style={[styles.selectionSubtitle, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
+                      {item.address}
+                    </Text>
+                  </View>
+                </View>
+                {selectedClient?.id === item.id && (
+                  <View style={[styles.checkCircle, { backgroundColor: appTheme.colors.primary }]}>
+                    <Icon name="checkmark" size={16} color="#FFFFFF" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+            {filteredClients.length === 0 && (
+              <View style={styles.emptyState}>
+                <Icon name="search-outline" size={40} color={appTheme.colors.textLight} />
+                <Text style={[styles.emptyText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
+                  No clients found
                 </Text>
-                <Text style={[styles.listItemSubtitle, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
-                  {item.address}
-                </Text>
               </View>
-              {selectedClient?.id === item.id && (
-                <Icon name="checkmark-circle" size={24} color={appTheme.colors.success} />
-              )}
-            </TouchableOpacity>
-          )}
-          style={styles.modalList}
-        />
-      ))}
+            )}
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        </View>
+      </AppBottomSheet>
 
       {/* Location Selection Modal */}
-      {renderModal(showLocationModal, () => setShowLocationModal(false), 'Select Destination', (
-        <FlatList
-          data={locations.filter(loc => loc.id !== currentLocation?.id)}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.listItem, selectedLocation?.id === item.id && styles.listItemSelected, { borderBottomColor: appTheme.colors.borderColor }]}
-              onPress={() => {
-                setSelectedLocation(item);
-                setShowLocationModal(false);
-              }}
-            >
-              <View style={[styles.listItemAvatar, { backgroundColor: '#EAB308' }]}>
-                <Icon name="location" size={20} color="#FFFFFF" />
-              </View>
-              <View style={styles.listItemContent}>
-                <Text style={[styles.listItemTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.bold }]}>
-                  {item.name}
+      <AppBottomSheet
+        visible={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+        title="Select Destination"
+      >
+        <View style={styles.bottomSheetContent}>
+          <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
+            {safeLocations.filter(loc => loc.id !== currentLocation?.id).map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.selectionItem,
+                  { 
+                    borderColor: selectedLocation?.id === item.id ? appTheme.colors.primary : appTheme.colors.borderColor,
+                    backgroundColor: selectedLocation?.id === item.id ? `${appTheme.colors.primary}08` : appTheme.colors.cardBackground,
+                  }
+                ]}
+                onPress={() => {
+                  setSelectedLocation(item);
+                  setShowLocationModal(false);
+                }}
+              >
+                <View style={[styles.selectionAvatar, { backgroundColor: '#EAB308' }]}>
+                  <Icon name="location" size={20} color="#FFFFFF" />
+                </View>
+                <View style={styles.selectionContent}>
+                  <Text style={[styles.selectionTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
+                    {item.name}
+                  </Text>
+                  <Text style={[styles.selectionSubtitle, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
+                    {item.address}
+                  </Text>
+                </View>
+                {selectedLocation?.id === item.id && (
+                  <View style={[styles.checkCircle, { backgroundColor: appTheme.colors.primary }]}>
+                    <Icon name="checkmark" size={16} color="#FFFFFF" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+            {safeLocations.filter(loc => loc.id !== currentLocation?.id).length === 0 && (
+              <View style={styles.emptyState}>
+                <Icon name="location-outline" size={48} color={appTheme.colors.textLight} />
+                <Text style={[styles.emptyText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
+                  No other locations available.{'\n'}Add more locations in settings.
                 </Text>
-                <Text style={[styles.listItemSubtitle, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
-                  {item.address}
-                </Text>
               </View>
-              {selectedLocation?.id === item.id && (
-                <Icon name="checkmark-circle" size={24} color={appTheme.colors.success} />
-              )}
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyState}>
-              <Icon name="location-outline" size={48} color={appTheme.colors.textLight} />
-              <Text style={[styles.emptyText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
-                No other locations available.{'\n'}Add more locations in settings.
-              </Text>
-            </View>
-          )}
-          style={styles.modalList}
-        />
-      ))}
+            )}
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        </View>
+      </AppBottomSheet>
 
       {/* Items Selection Modal */}
-      {renderModal(showItemsModal, () => setShowItemsModal(false), 'Select Items', (
-        <View style={styles.itemsModalContent}>
+      <AppBottomSheet
+        visible={showItemsModal}
+        onClose={() => {
+          setShowItemsModal(false);
+          setItemSearch('');
+        }}
+        title="Select Items"
+      >
+        <View style={styles.bottomSheetContent}>
+          {/* Summary Bar */}
           {selectedItems.length > 0 && (
-            <View style={[styles.itemsSummary, { backgroundColor: appTheme.colors.surface }]}>
-              <Text style={[styles.itemsSummaryText, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.medium }]}>
-                {totalItemsCount} items • {formatCurrency(orderTotal)}
-              </Text>
+            <View style={[styles.itemsSummaryBar, { backgroundColor: appTheme.colors.surface }]}>
+              <View style={styles.summaryInfo}>
+                <Text style={[styles.summaryCount, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
+                  {totalItemsCount} items
+                </Text>
+                <Text style={[styles.summaryTotal, { color: appTheme.colors.primary, fontFamily: theme.fonts.primary.bold }]}>
+                  {formatCurrency(orderTotal)}
+                </Text>
+              </View>
               <TouchableOpacity
                 style={[styles.doneButton, { backgroundColor: appTheme.colors.primary }]}
-                onPress={() => setShowItemsModal(false)}
+                onPress={() => {
+                  setShowItemsModal(false);
+                  setItemSearch('');
+                }}
               >
                 <Text style={[styles.doneButtonText, { fontFamily: theme.fonts.primary.bold }]}>Done</Text>
               </TouchableOpacity>
             </View>
           )}
-          <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-            {mockBrands.map((brand) => (
-              <View key={brand.id} style={styles.brandSection}>
-                <TouchableOpacity
-                  style={[styles.brandHeader, { backgroundColor: appTheme.colors.surface }]}
-                  onPress={() => setExpandedBrand(expandedBrand === brand.id ? null : brand.id)}
+          
+          {/* Search Bar */}
+          <AppSearchBar
+            placeholder="Search products..."
+            value={itemSearch}
+            onChangeText={setItemSearch}
+            onClear={() => setItemSearch('')}
+            containerStyle={styles.searchBarContainer}
+          />
+          
+          <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
+            {filteredProducts.map((product) => {
+              const quantity = getItemQuantity(product.id);
+              const isSelected = quantity > 0;
+
+              return (
+                <View
+                  key={product.id}
+                  style={[
+                    styles.productItem,
+                    { 
+                      backgroundColor: appTheme.colors.cardBackground, 
+                      borderColor: isSelected ? appTheme.colors.primary : appTheme.colors.borderColor,
+                    },
+                  ]}
                 >
-                  <Text style={[styles.brandName, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.bold }]}>
-                    {brand.name}
-                  </Text>
-                  <View style={styles.brandRight}>
-                    <Text style={[styles.brandCount, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
-                      {brand.products.length} products
+                  <View style={styles.productInfo}>
+                    <Text style={[styles.productBrand, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.medium }]}>
+                      {product.brandName}
                     </Text>
-                    <Icon
-                      name={expandedBrand === brand.id ? 'chevron-up' : 'chevron-down'}
-                      size={20}
-                      color={appTheme.colors.textLight}
-                    />
+                    <Text style={[styles.productName, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]} numberOfLines={1}>
+                      {product.name}
+                    </Text>
+                    <Text style={[styles.productPrice, { color: appTheme.colors.primary, fontFamily: theme.fonts.primary.bold }]}>
+                      {formatCurrency(product.price)}
+                    </Text>
                   </View>
-                </TouchableOpacity>
 
-                {expandedBrand === brand.id && (
-                  <View style={styles.productsContainer}>
-                    {brand.products.map((product) => {
-                      const quantity = getItemQuantity(product.id);
-                      const isSelected = quantity > 0;
-
-                      return (
-                        <View
-                          key={product.id}
-                          style={[
-                            styles.productCard,
-                            { backgroundColor: appTheme.colors.cardBackground, borderColor: isSelected ? appTheme.colors.success : appTheme.colors.borderColor },
-                            isSelected && styles.productCardSelected,
-                          ]}
-                        >
-                          <View style={styles.productInfo}>
-                            <Text style={[styles.productName, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.medium }]} numberOfLines={1}>
-                              {product.name}
-                            </Text>
-                            <Text style={[styles.productPrice, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
-                              {formatCurrency(product.price)}
-                            </Text>
-                          </View>
-
-                          {isSelected ? (
-                            <View style={styles.quantityControls}>
-                              <TouchableOpacity
-                                style={[styles.quantityButton, { backgroundColor: appTheme.colors.surface }]}
-                                onPress={() => handleQuantityChange(product.id, quantity - 1)}
-                              >
-                                <Icon name="remove" size={18} color={appTheme.colors.primary} />
-                              </TouchableOpacity>
-                              <Text style={[styles.quantityText, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.bold }]}>
-                                {quantity}
-                              </Text>
-                              <TouchableOpacity
-                                style={[styles.quantityButton, { backgroundColor: appTheme.colors.surface }]}
-                                onPress={() => handleQuantityChange(product.id, quantity + 1)}
-                              >
-                                <Icon name="add" size={18} color={appTheme.colors.primary} />
-                              </TouchableOpacity>
-                            </View>
-                          ) : (
-                            <TouchableOpacity
-                              style={[styles.addItemButton, { backgroundColor: appTheme.colors.primary }]}
-                              onPress={() => handleToggleItem(product)}
-                            >
-                              <Icon name="add" size={20} color="#FFFFFF" />
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
+                  {isSelected ? (
+                    <View style={styles.quantityControls}>
+                      <TouchableOpacity
+                        style={[styles.quantityButton, { backgroundColor: appTheme.colors.surface }]}
+                        onPress={() => handleQuantityChange(product.id, quantity - 1)}
+                      >
+                        <Icon name="remove" size={18} color={appTheme.colors.primary} />
+                      </TouchableOpacity>
+                      <Text style={[styles.quantityText, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.bold }]}>
+                        {quantity}
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.quantityButton, { backgroundColor: appTheme.colors.surface }]}
+                        onPress={() => handleQuantityChange(product.id, quantity + 1)}
+                      >
+                        <Icon name="add" size={18} color={appTheme.colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.addItemButton, { backgroundColor: appTheme.colors.primary }]}
+                      onPress={() => handleToggleItem(product)}
+                    >
+                      <Icon name="add" size={20} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+            {filteredProducts.length === 0 && (
+              <View style={styles.emptyState}>
+                <Icon name="cube-outline" size={40} color={appTheme.colors.textLight} />
+                <Text style={[styles.emptyText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
+                  No products found
+                </Text>
               </View>
-            ))}
+            )}
             <View style={{ height: 40 }} />
           </ScrollView>
         </View>
-      ))}
+      </AppBottomSheet>
+
+      {/* Schedule Modal */}
+      <AppBottomSheet
+        visible={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        title="Schedule Delivery"
+      >
+        <View style={styles.scheduleContent}>
+          {/* Time Section */}
+          <View style={styles.scheduleSection}>
+            <Text style={[styles.scheduleSectionTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
+              Time
+            </Text>
+            <View style={[styles.timeSelectorWrapper, { backgroundColor: appTheme.colors.surface }]}>
+              <TimeSelector
+                value={scheduledDate}
+                onChange={setScheduledDate}
+                minuteStep={5}
+              />
+            </View>
+          </View>
+
+          {/* Date Section */}
+          <View style={styles.scheduleSection}>
+            <Text style={[styles.scheduleSectionTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
+              Date
+            </Text>
+            <DateSelector
+              value={scheduledDate}
+              onChange={setScheduledDate}
+              minDate={new Date()}
+              calendarHeight={340}
+            />
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.scheduleActions}>
+            <TouchableOpacity
+              style={[styles.scheduleActionButton, styles.scheduleCancelButton, { borderColor: appTheme.colors.borderColor }]}
+              onPress={() => setShowScheduleModal(false)}
+            >
+              <Text style={[styles.scheduleCancelText, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.medium }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.scheduleActionButton, styles.scheduleConfirmButton, { backgroundColor: appTheme.colors.primary }]}
+              onPress={() => setShowScheduleModal(false)}
+            >
+              <Text style={[styles.scheduleConfirmText, { fontFamily: theme.fonts.primary.bold }]}>
+                Confirm
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </AppBottomSheet>
 
       {/* Transport Selection Modal */}
-      {renderModal(showTransportModal, () => setShowTransportModal(false), 'Select Transport', (
-        <FlatList
-          data={mockTransportModes}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.listItem, selectedTransport?.id === item.id && styles.listItemSelected, { borderBottomColor: appTheme.colors.borderColor }]}
-              onPress={() => {
-                setSelectedTransport(item);
-                setShowTransportModal(false);
-              }}
-            >
-              <View style={[styles.listItemAvatar, { backgroundColor: appTheme.colors.info }]}>
-                <Icon name={item.icon as any} size={20} color="#FFFFFF" />
-              </View>
-              <View style={styles.listItemContent}>
-                <Text style={[styles.listItemTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.bold }]}>
-                  {item.name}
-                </Text>
-              </View>
-              {selectedTransport?.id === item.id && (
-                <Icon name="checkmark-circle" size={24} color={appTheme.colors.success} />
-              )}
-            </TouchableOpacity>
-          )}
-          style={styles.modalList}
-        />
-      ))}
+      <AppBottomSheet
+        visible={showTransportModal}
+        onClose={() => setShowTransportModal(false)}
+        title="Select Transport"
+      >
+        <View style={styles.bottomSheetContent}>
+          <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
+            {mockTransportModes.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.selectionItem,
+                  { 
+                    borderColor: selectedTransport?.id === item.id ? appTheme.colors.primary : appTheme.colors.borderColor,
+                    backgroundColor: selectedTransport?.id === item.id ? `${appTheme.colors.primary}08` : appTheme.colors.cardBackground,
+                  }
+                ]}
+                onPress={() => {
+                  setSelectedTransport(item);
+                  setShowTransportModal(false);
+                }}
+              >
+                <View style={[styles.selectionAvatar, { backgroundColor: appTheme.colors.info }]}>
+                  <Icon name={item.icon as any} size={22} color="#FFFFFF" />
+                </View>
+                <View style={styles.selectionContent}>
+                  <Text style={[styles.selectionTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
+                    {item.name}
+                  </Text>
+                </View>
+                {selectedTransport?.id === item.id && (
+                  <View style={[styles.checkCircle, { backgroundColor: appTheme.colors.primary }]}>
+                    <Icon name="checkmark" size={16} color="#FFFFFF" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        </View>
+      </AppBottomSheet>
 
       {/* Staff Selection Modal */}
-      {renderModal(showStaffModal, () => setShowStaffModal(false), 'Assign Staff', (
-        <FlatList
-          data={mockStaff}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.listItem, selectedStaff?.id === item.id && styles.listItemSelected, { borderBottomColor: appTheme.colors.borderColor }]}
-              onPress={() => {
-                setSelectedStaff(item);
-                setShowStaffModal(false);
-              }}
-            >
-              <View style={[styles.listItemAvatar, { backgroundColor: '#6366F1' }]}>
-                <Text style={styles.listItemAvatarText}>{item.name.charAt(0)}</Text>
-              </View>
-              <View style={styles.listItemContent}>
-                <Text style={[styles.listItemTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.bold }]}>
-                  {item.name}
+      <AppBottomSheet
+        visible={showStaffModal}
+        onClose={() => {
+          setShowStaffModal(false);
+          setStaffSearch('');
+        }}
+        title="Assign Staff"
+      >
+        <View style={styles.bottomSheetContent}>
+          <AppSearchBar
+            placeholder="Search staff..."
+            value={staffSearch}
+            onChangeText={setStaffSearch}
+            onClear={() => setStaffSearch('')}
+            containerStyle={styles.searchBarContainer}
+          />
+          <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
+            {filteredStaff.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.selectionItem,
+                  { 
+                    borderColor: selectedStaff?.id === item.id ? appTheme.colors.primary : appTheme.colors.borderColor,
+                    backgroundColor: selectedStaff?.id === item.id ? `${appTheme.colors.primary}08` : appTheme.colors.cardBackground,
+                  }
+                ]}
+                onPress={() => {
+                  setSelectedStaff(item);
+                  setShowStaffModal(false);
+                  setStaffSearch('');
+                }}
+              >
+                <View style={[styles.selectionAvatar, { backgroundColor: getAvatarColor(item.name) }]}>
+                  <Text style={styles.selectionAvatarText}>{getInitials(item.name)}</Text>
+                </View>
+                <View style={styles.selectionContent}>
+                  <Text style={[styles.selectionTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
+                    {item.name}
+                  </Text>
+                  <View style={[styles.roleBadge, { backgroundColor: appTheme.colors.surface }]}>
+                    <Text style={[styles.roleBadgeText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.medium }]}>
+                      {item.role}
+                    </Text>
+                  </View>
+                </View>
+                {selectedStaff?.id === item.id && (
+                  <View style={[styles.checkCircle, { backgroundColor: appTheme.colors.primary }]}>
+                    <Icon name="checkmark" size={16} color="#FFFFFF" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+            {filteredStaff.length === 0 && (
+              <View style={styles.emptyState}>
+                <Icon name="people-outline" size={40} color={appTheme.colors.textLight} />
+                <Text style={[styles.emptyText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
+                  No staff found
                 </Text>
-                <Text style={[styles.listItemSubtitle, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
-                  {item.role}
-                </Text>
               </View>
-              {selectedStaff?.id === item.id && (
-                <Icon name="checkmark-circle" size={24} color={appTheme.colors.success} />
-              )}
-            </TouchableOpacity>
-          )}
-          style={styles.modalList}
-        />
-      ))}
-
-      {/* Date Picker */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={scheduledDate}
-          mode="datetime"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleDateChange}
-          minimumDate={new Date()}
-        />
-      )}
+            )}
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        </View>
+      </AppBottomSheet>
 
       {/* Success Dialog */}
       <AppModal
@@ -727,57 +886,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 48,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modeBadgeContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  modeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 8,
-  },
-  modeBadgeText: {
-    fontSize: 14,
-  },
   content: {
     flex: 1,
   },
   scrollContent: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    paddingTop: 16,
   },
   fieldContainer: {
     marginBottom: 16,
   },
-  fieldLabelRow: {
+  documentIdHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginLeft: 8,
+    marginRight: 8,
     marginBottom: 8,
+  },
+  documentIdFieldWrapper: {
+    marginTop: -26, // Counteract AppTextField's empty label (Text height ~14 + marginBottom 8)
   },
   fieldLabel: {
     fontSize: 14,
@@ -817,138 +946,126 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 4,
   },
-  notesInput: {
-    height: 100,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 8,
-    fontSize: 15,
-    textAlignVertical: 'top',
-  },
   bottomContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 16,
+    padding: 12,
     paddingBottom: 32,
     borderTopWidth: 1,
   },
   createButton: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     height: 52,
     borderRadius: 8,
-    gap: 10,
   },
   createButtonText: {
     color: '#FFFFFF',
     fontSize: 17,
   },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
+  // Bottom sheet content
+  bottomSheetContent: {
+    maxHeight: 500,
   },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  searchBarContainer: {
+    marginHorizontal: 0,
+    marginBottom: 12,
   },
-  modalContent: {
-    maxHeight: '80%',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 32,
-  },
-  modalHandle: {
-    alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  handleBar: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  modalTitle: {
-    fontSize: 18,
-  },
-  modalCloseButton: {
-    padding: 4,
-  },
-  modalList: {
-    paddingHorizontal: 16,
+  modalScrollList: {
     maxHeight: 400,
   },
-  listItem: {
+  // Selection item styles (used by all selection modals)
+  selectionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginBottom: 10,
   },
-  listItemSelected: {
-    backgroundColor: '#F0FDF4',
-  },
-  listItemAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  selectionAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
-  listItemAvatarText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  selectionAvatarText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
-  listItemContent: {
+  selectionContent: {
     flex: 1,
   },
-  listItemTitle: {
-    fontSize: 15,
-    marginBottom: 2,
+  selectionTitle: {
+    fontSize: 16,
+    marginBottom: 4,
   },
-  listItemSubtitle: {
+  selectionSubtitle: {
     fontSize: 13,
+  },
+  selectionMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  typeBadgeText: {
+    fontSize: 11,
+  },
+  roleBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  roleBadgeText: {
+    fontSize: 12,
+  },
+  checkCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 40,
+    gap: 12,
   },
   emptyText: {
     fontSize: 14,
     textAlign: 'center',
-    marginTop: 12,
   },
   // Items modal specific
-  itemsModalContent: {
-    flex: 1,
-    maxHeight: 500,
-  },
-  itemsSummary: {
+  itemsSummaryBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 8,
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 12,
   },
-  itemsSummaryText: {
+  summaryInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  summaryCount: {
     fontSize: 15,
+  },
+  summaryTotal: {
+    fontSize: 16,
   },
   doneButton: {
     paddingHorizontal: 24,
@@ -961,51 +1078,28 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
   },
-  brandSection: {
-    marginTop: 12,
-  },
-  brandHeader: {
+  productItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     padding: 14,
-    borderRadius: 10,
-  },
-  brandName: {
-    fontSize: 15,
-  },
-  brandRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  brandCount: {
-    fontSize: 13,
-  },
-  productsContainer: {
-    paddingTop: 8,
-  },
-  productCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    marginLeft: 12,
-    borderWidth: 1,
-  },
-  productCardSelected: {
-    borderWidth: 1,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1.5,
   },
   productInfo: {
     flex: 1,
   },
-  productName: {
-    fontSize: 14,
+  productBrand: {
+    fontSize: 11,
     marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  productName: {
+    fontSize: 15,
+    marginBottom: 4,
   },
   productPrice: {
-    fontSize: 13,
+    fontSize: 14,
   },
   quantityControls: {
     flexDirection: 'row',
@@ -1013,24 +1107,62 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   quantityButton: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   quantityText: {
-    fontSize: 15,
+    fontSize: 16,
     minWidth: 24,
     textAlign: 'center',
   },
   addItemButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Schedule modal specific
+  scheduleContent: {
+    paddingBottom: 16,
+  },
+  scheduleSection: {
+    marginBottom: 24,
+  },
+  scheduleSectionTitle: {
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  timeSelectorWrapper: {
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  scheduleActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  scheduleActionButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scheduleCancelButton: {
+    borderWidth: 1,
+  },
+  scheduleCancelText: {
+    fontSize: 15,
+  },
+  scheduleConfirmButton: {
+    
+  },
+  scheduleConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+  },
 });
-
-

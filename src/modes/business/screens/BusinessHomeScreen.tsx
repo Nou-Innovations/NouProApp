@@ -591,7 +591,7 @@ export default function BusinessHomeScreen() {
       title: 'Order #1235 created',
       description: 'Global Distributors - Rs 8,500',
       timestamp: '5 min ago',
-      onPress: () => navigation.navigate('OrderDetail' as never, { orderId: '1235' } as never),
+      onPress: () => navigation.navigate('DeliveryDetail' as never, { deliveryId: 'DEL-001' } as never),
     },
     {
       id: 'act-2',

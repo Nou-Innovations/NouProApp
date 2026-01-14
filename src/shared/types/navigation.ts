@@ -79,11 +79,6 @@ export type RootStackParamList = {
   // Product screens
   CreateProduct: { selectedBrand?: string; product?: import('./product').UIProduct };
   ProductDetail: { productId: string };
-  // Legacy routes (deprecated - use ProductDetail instead)
-  /** @deprecated Use ProductDetail instead */
-  ProductDetailPublic: { productId: string; businessId?: string };
-  /** @deprecated Use ProductDetail instead */
-  ProductDetailOwn: { productId: string };
   
   // Brand screens
   CreateBrand: undefined;
@@ -98,13 +93,9 @@ export type RootStackParamList = {
   CreateDelivery: { orderId?: string; mode?: 'delivery' | 'transfer' };
   PersonalDeliveryDetail: { taskId: string; businessId: string; hasFullAccess: boolean };
   
-  // Order screens
-  OrderDetail: { orderId: string };
-  
   // Search screens
   CompanySearch: { query: string };
   UserSearch: { query: string };
-  ProductSearch: { query?: string; businessId?: string };
   
   // Settings screens
   Settings: undefined;

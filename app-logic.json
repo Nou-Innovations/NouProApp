@@ -1345,46 +1345,106 @@
     },
 
     "locationSelectionUI": {
-      "description": "Location dropdown behavior in main screens (Products, Invoices, Deliveries, Orders)",
-      "version": "1.0.0",
-      "dataSource": "businessStore.locations - only shows locations belonging to the current business",
+      "description": "Location dropdown behavior in main screens - shows only own business locations",
+      "version": "1.2.0",
+      "principle": "Users can only select from locations belonging to their own business",
+      
+      "persistence": {
+        "description": "Selected location is persisted across app sessions",
+        "storage": "AsyncStorage via zustand persist middleware",
+        "key": "noupro-business-store",
+        "persistedField": "currentLocationId (null = 'All Locations')",
+        "behavior": [
+          "When app opens, restores last selected location",
+          "If 'All Locations' was selected (null), shows 'All Locations'",
+          "If specific location was selected, restores that selection",
+          "If persisted location no longer exists, defaults to 'All Locations'"
+        ]
+      },
+      
+      "dataSource": {
+        "store": "useBusinessStore().locations",
+        "currentLocation": "useBusinessStore().currentLocation (persisted)",
+        "setLocation": "useBusinessStore().setLocation(location | null)",
+        "note": "IMPORTANT: Screens must use 'locations' from businessStore, NOT currentCompany.locations",
+        "defensiveCheck": "Always use: const safeLocations = Array.isArray(locations) ? locations : []"
+      },
+
       "behavior": {
         "singleLocation": {
           "description": "Business has only one location (the main/primary location)",
           "rules": [
-            "Auto-selects the primary location on mount",
+            "Auto-selects the primary location on mount via useEffect",
             "Hides 'All Locations' option from dropdown",
-            "Disables the dropdown (no chevron icon)",
+            "Disables the dropdown touch handler",
+            "Hides chevron icon (no dropdown indicator)",
             "Displays only the location name",
-            "User cannot change selection"
+            "User cannot change selection - data is filtered to that location"
           ]
         },
         "multipleLocations": {
           "description": "Business has more than one location",
           "rules": [
-            "Shows 'All Locations' option at the top",
-            "Lists all business locations below",
-            "Dropdown is interactive with chevron icon",
-            "User can switch between locations",
-            "Filters data based on selected location"
+            "Shows 'All Locations' option at the top of dropdown",
+            "Lists all business locations below 'All Locations'",
+            "Dropdown is interactive with chevron icon visible",
+            "User can switch between any location or 'All Locations'",
+            "Data is filtered based on selected location (or shows all if 'All Locations')"
           ]
         }
       },
+
       "implementation": {
         "component": "LocationDropdown (src/features/company/components/LocationDropdown.tsx)",
-        "screens": ["ProductsScreen", "InvoicesScreen", "DeliveryScreen", "OrderDetailScreen"],
-        "store": "useBusinessStore().locations",
-        "autoSelectLogic": "If locations.length === 1, auto-select locations[0] (primary)"
+        "screens": ["ProductsScreen", "InvoicesScreen", "DeliveryScreen"],
+        "storeFile": "src/shared/store/businessStore.ts",
+        "codePattern": {
+          "getLocations": "const { locations } = useBusinessStore();",
+          "safeAccess": "const safeLocations = Array.isArray(locations) ? locations : [];",
+          "singleCheck": "const hasSingleLocation = safeLocations.length === 1;",
+          "primaryLocation": "const primaryLocation = safeLocations.find(loc => loc.is_primary) || safeLocations[0];",
+          "autoSelect": "useEffect with hasSingleLocation && primaryLocation && !selectedLocationId"
+        }
       },
-      "initializationFlow": {
-        "description": "Location data is fetched and initialized in App.tsx CompanyStoreInitializer",
-        "steps": [
-          "1. App mounts, CompanyStoreInitializer runs",
-          "2. fetchCompanies() called on mount",
-          "3. When activeBusiness changes, fetchLocations(businessId) is called",
-          "4. If only one location exists, it is auto-selected as currentLocation",
-          "5. Screens use locations from businessStore, not currentCompany.locations"
+
+      "storeArchitecture": {
+        "description": "businessStore manages locations fetching and state",
+        "importAliasing": {
+          "critical": "API functions MUST be aliased to avoid Zustand getter shadowing",
+          "correct": "import { get as apiGet, put as apiPut, post as apiPost, del as apiDel } from '@/shared/services/api';",
+          "reason": "Zustand's create((set, get) => ...) provides a 'get' function that shadows the API import"
+        },
+        "fetchFlow": [
+          "1. fetchCompanies() called from CompanyStoreInitializer",
+          "2. On success/mock fallback, setBusiness(businesses[0]) is called",
+          "3. setBusiness() internally calls fetchLocations(business.id)",
+          "4. fetchLocations() populates store.locations array",
+          "5. Screens re-render with updated locations"
         ]
+      },
+
+      "initializationFlow": {
+        "description": "Location data initialization in App.tsx",
+        "component": "CompanyStoreInitializer",
+        "steps": [
+          "1. App mounts, CompanyStoreInitializer renders",
+          "2. useEffect calls fetchCompanies() on mount",
+          "3. fetchCompanies() → setBusiness() → fetchLocations(businessId)",
+          "4. businessStore.locations is populated with business locations",
+          "5. If only one location, auto-select it as currentLocation",
+          "6. Screens read from useBusinessStore().locations"
+        ]
+      },
+
+      "mockData": {
+        "description": "When API is unavailable, mock data is used",
+        "locations": [
+          { "id": "loc-1", "name": "Main Warehouse", "address": "Port Louis" },
+          { "id": "loc-2", "name": "City Center Shop", "address": "Curepipe" },
+          { "id": "loc-3", "name": "Beach Resort Outlet", "address": "Grand Baie" },
+          { "id": "loc-4", "name": "South Distribution Center", "address": "Mahebourg" }
+        ],
+        "note": "Mock data should be consistent between businessStore and LocationsScreen"
       }
     },
 

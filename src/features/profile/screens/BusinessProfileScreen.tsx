@@ -488,8 +488,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
         'Order Placed!',
         `Your order #${order.id} has been sent to ${business.name}.`,
         [
-          { text: 'View Order', onPress: () => navigation.navigate('OrderDetail', { orderId: order.id }) },
-          { text: 'Continue', style: 'cancel' },
+          { text: 'OK', style: 'cancel' },
         ]
       );
     } else {

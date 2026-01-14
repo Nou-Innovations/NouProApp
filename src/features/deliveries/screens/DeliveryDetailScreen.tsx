@@ -38,6 +38,8 @@ import mockDeliveries, {
   mockTransportModes 
 } from '@/shared/data/mockDeliveries';
 import { useNotifications } from '@/shared/context/NotificationContext';
+import { useBusinessStore } from '@/shared/store/businessStore';
+import { useProfileStore } from '@/shared/store/profileStore';
 
 // Types for route params
 type DeliveryDetailScreenParams = {
@@ -60,6 +62,10 @@ const DeliveryDetailScreen = () => {
   const route = useRoute<RouteProp<DeliveryDetailScreenParams, 'DeliveryDetail'>>();
   const deliveryId = route.params?.deliveryId;
   const { setDeliveriesUnreadCount, markItemAsViewed } = useNotifications();
+  
+  // Business store for locations
+  const { locations, currentLocation, setLocation } = useBusinessStore();
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
   
   // Find delivery from mock data
   const delivery = mockDeliveries.find(d => d.id === deliveryId) || mockDeliveries[0];
@@ -94,10 +100,22 @@ const DeliveryDetailScreen = () => {
   const [expectedDeliveryTime, setExpectedDeliveryTime] = useState<Date>(new Date(delivery.expectedDeliveryDateTime));
   const [distributorNotes, setDistributorNotes] = useState<string>(delivery.distributorNotes || '');
   const [clientNotes, setClientNotes] = useState<string>(delivery.clientNotes || '');
-  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('Warehouse A');
+  // Location/Warehouse selector using businessStore
+  const safeLocations = Array.isArray(locations) ? locations : [];
+  const hasSingleLocation = safeLocations.length === 1;
+  const primaryLocation = safeLocations.find(loc => (loc as any).is_primary) || safeLocations[0];
+  const selectedWarehouse = currentLocation || (hasSingleLocation ? primaryLocation : null);
+  
   const [showWarehouseModal, setShowWarehouseModal] = useState(false);
   const [warehouseOverlayAnimation] = useState(new Animated.Value(0));
   const [warehouseContentAnimation] = useState(new Animated.Value(0));
+  
+  // Auto-select primary location when there's only one
+  useEffect(() => {
+    if (hasSingleLocation && primaryLocation && !currentLocation) {
+      setLocation(primaryLocation);
+    }
+  }, [hasSingleLocation, primaryLocation?.id]);
   
   // State for modals
   const [showStaffModal, setShowStaffModal] = useState(false);
@@ -1301,21 +1319,16 @@ const DeliveryDetailScreen = () => {
     );
   };
 
-  // Define available warehouses
-  const warehouseOptions = [
-    { id: 'W001', name: 'Warehouse A', icon: 'business-outline' },
-    { id: 'W002', name: 'Warehouse B', icon: 'business-outline' },
-    { id: 'W003', name: 'Warehouse C', icon: 'business-outline' },
-  ];
-  
-  // Filter warehouses based on search
+  // Filter warehouses based on search (using businessStore locations)
   const [searchWarehouse, setSearchWarehouse] = useState('');
-  const filteredWarehouses = warehouseOptions.filter(warehouse => 
-    warehouse.name.toLowerCase().includes(searchWarehouse.toLowerCase())
+  const filteredWarehouses = safeLocations.filter(location => 
+    location.name.toLowerCase().includes(searchWarehouse.toLowerCase()) ||
+    (location.address && location.address.toLowerCase().includes(searchWarehouse.toLowerCase()))
   );
   
   // Show warehouse modal with animation
   const handleShowWarehouseModal = () => {
+    if (hasSingleLocation) return; // Don't show modal if only one location
     setShowWarehouseModal(true);
     animateOverlayIn(warehouseOverlayAnimation);
     animateContentIn(warehouseContentAnimation);
@@ -1327,9 +1340,9 @@ const DeliveryDetailScreen = () => {
     animateContentOut(warehouseContentAnimation, () => setShowWarehouseModal(false));
   };
 
-  // Handle warehouse selection
-  const handleSelectWarehouse = (warehouse: { id: string; name: string }) => {
-    setSelectedWarehouse(warehouse.name);
+  // Handle warehouse selection - update global location in store
+  const handleSelectWarehouse = (location: typeof safeLocations[0]) => {
+    setLocation(location);
     handleHideWarehouseModal();
   };
 
@@ -1385,21 +1398,30 @@ const DeliveryDetailScreen = () => {
           </View>
           
           <ScrollView style={styles.modalScrollView}>
-            {filteredWarehouses.map(warehouse => (
+            {filteredWarehouses.map(location => (
               <TouchableOpacity 
-                key={warehouse.id} 
-                style={styles.modalItem}
+                key={location.id} 
+                style={[
+                  styles.modalItem,
+                  selectedWarehouse?.id === location.id && { backgroundColor: `${theme.colors.primary}10` }
+                ]}
                 onPress={() => {
-                  handleSelectWarehouse(warehouse);
+                  handleSelectWarehouse(location);
                   setSearchWarehouse('');
                 }}
               >
                 <View style={styles.modalItemIconContainer}>
-                  <Icon name={warehouse.icon as any} size={24} color="#6B7280" />
+                  <Icon name="location" size={24} color={theme.colors.primary} />
                 </View>
                 <View style={styles.modalItemInfo}>
-                  <Text style={styles.modalItemName}>{warehouse.name}</Text>
+                  <Text style={styles.modalItemName}>{location.name}</Text>
+                  {location.address && (
+                    <Text style={styles.modalItemDetails}>{location.address}</Text>
+                  )}
                 </View>
+                {selectedWarehouse?.id === location.id && (
+                  <Icon name="checkmark-circle" size={24} color={theme.colors.primary} />
+                )}
               </TouchableOpacity>
             ))}
             
@@ -1416,6 +1438,158 @@ const DeliveryDetailScreen = () => {
 
   const [isOrderDetailsExpanded, setIsOrderDetailsExpanded] = useState(true);
   const orderDetailsHeight = useRef(new Animated.Value(1)).current;
+  
+  // Notes state for collapsible cards
+  const [noteText, setNoteText] = useState('');
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
+  
+  // Mock order notes data
+  const orderNotes = React.useMemo(() => [
+    {
+      id: 'note-1',
+      businessName: delivery.clientCompanyName || 'Client Business',
+      businessAvatar: delivery.clientCompanyName?.charAt(0).toUpperCase() || 'C',
+      message: clientNotes || 'Please deliver before noon. No substitutions please.',
+      timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+    },
+    {
+      id: 'note-2',
+      businessName: activeBusiness?.name || 'Your Business',
+      businessAvatar: activeBusiness?.name?.charAt(0).toUpperCase() || 'Y',
+      message: distributorNotes || 'Repeat customer, VIP treatment.',
+      timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 3600000), // 2 days ago + 1 hour
+    },
+  ], [delivery.clientCompanyName, activeBusiness?.name, clientNotes, distributorNotes]);
+
+  // Toggle note expansion
+  const toggleNoteExpansion = (noteId: string) => {
+    setExpandedNotes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(noteId)) {
+        newSet.delete(noteId);
+      } else {
+        newSet.add(noteId);
+      }
+      return newSet;
+    });
+  };
+
+  // Group notes by date
+  const groupedNotes = React.useMemo(() => {
+    const groups: { [key: string]: typeof orderNotes } = {};
+    orderNotes.forEach(note => {
+      // Format as DD.MM.YY
+      const day = note.timestamp.getDate().toString().padStart(2, '0');
+      const month = (note.timestamp.getMonth() + 1).toString().padStart(2, '0');
+      const year = note.timestamp.getFullYear().toString().slice(-2);
+      const dateKey = `${day}.${month}.${year}`;
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+      }
+      groups[dateKey].push(note);
+    });
+    return Object.entries(groups).sort((a, b) => 
+      new Date(b[1][0].timestamp).getTime() - new Date(a[1][0].timestamp).getTime()
+    );
+  }, [orderNotes]);
+
+  // Handle send note
+  const handleSendNote = () => {
+    if (!noteText.trim()) return;
+    Alert.alert('Note Sent', 'Your note has been sent.');
+    setNoteText('');
+  };
+
+  // Format time for notes (lowercase am/pm)
+  const formatNoteTime = (date: Date) => {
+    const hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const period = hours >= 12 ? 'pm' : 'am';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes}${period}`;
+  };
+
+  // Mock order updates/timeline data - only show completed and current steps
+  const orderUpdates = React.useMemo(() => {
+    const baseUpdates = [
+      {
+        id: 'update-1',
+        status: 'Order Confirmed',
+        timestamp: new Date(delivery.orderTime),
+        completed: true,
+      },
+      {
+        id: 'update-2',
+        status: 'Payment Received',
+        timestamp: paymentStatus === 'Paid' || paymentStatus === 'Pending Confirmation' 
+          ? new Date(new Date(delivery.orderTime).getTime() + 3600000) 
+          : null,
+        completed: paymentStatus === 'Paid',
+      },
+      {
+        id: 'update-3',
+        status: 'Transport Loading',
+        timestamp: deliveryStatus === 'ongoing' || deliveryStatus === 'delivered' 
+          ? new Date(Date.now() - 12 * 60 * 60 * 1000) 
+          : null,
+        completed: deliveryStatus === 'delivered',
+      },
+      {
+        id: 'update-4',
+        status: 'Transport Loading Completed',
+        timestamp: deliveryStatus === 'delivered' 
+          ? new Date(Date.now() - 6 * 60 * 60 * 1000) 
+          : null,
+        completed: deliveryStatus === 'delivered',
+      },
+      {
+        id: 'update-5',
+        status: 'Out for Delivery',
+        timestamp: deliveryStatus === 'delivered' 
+          ? new Date(Date.now() - 3 * 60 * 60 * 1000) 
+          : null,
+        completed: deliveryStatus === 'delivered',
+      },
+      {
+        id: 'update-6',
+        status: 'Awaiting Delivery Confirmation',
+        timestamp: deliveryStatus === 'delivered' 
+          ? new Date(Date.now() - 1 * 60 * 60 * 1000) 
+          : null,
+        completed: deliveryStatus === 'delivered',
+      },
+    ];
+
+    // Find current step
+    let currentStepId: string | null = null;
+    for (const update of baseUpdates) {
+      if (!update.completed && update.timestamp) {
+        currentStepId = update.id;
+        break;
+      }
+    }
+
+    // Only return updates that have timestamps (completed or current)
+    return baseUpdates
+      .filter(update => update.timestamp !== null)
+      .map(update => ({
+        ...update,
+        isCurrent: update.id === currentStepId,
+      }));
+  }, [delivery.orderTime, paymentStatus, deliveryStatus]);
+
+  // Format date and time for order updates (DD.MM.YY HH:MMam/pm)
+  const formatUpdateDateTime = (date: Date | null) => {
+    if (!date) return '';
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear().toString().slice(-2);
+    const hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const period = hours >= 12 ? 'pm' : 'am';
+    const displayHours = hours % 12 || 12;
+    return `${day}.${month}.${year} ${displayHours}:${minutes}${period}`;
+  };
 
   // Enable LayoutAnimation for Android
   useEffect(() => {
@@ -1653,20 +1827,23 @@ const DeliveryDetailScreen = () => {
         <View style={styles.productListContainer}>
           <Text style={[styles.sectionTitle, { paddingHorizontal: 16, marginBottom: 16 }]}>Product List</Text>
 
-          {/* Warehouse Selector - Redesigned to match Transport */}
-          {isUserAdmin && (
+          {/* Warehouse Selector - Using businessStore locations */}
+          {isUserAdmin && safeLocations.length > 0 && (
             <View style={[styles.infoItem, { paddingHorizontal: 16, marginBottom: 16 }]}>
               <Text style={styles.infoLabel}>Warehouse:</Text>
               <View style={styles.customFieldContainer}>
                 <TouchableOpacity 
                   onPress={handleShowWarehouseModal}
                   style={styles.customField}
-                  activeOpacity={0.7}
+                  activeOpacity={hasSingleLocation ? 1 : 0.7}
+                  disabled={hasSingleLocation}
                 >
                   <Text style={styles.customFieldText}>
-                    {selectedWarehouse}
+                    {selectedWarehouse?.name || 'Select warehouse'}
                   </Text>
-                  <Icon name="chevron-down" size={20} color="#6B7280" />
+                  {!hasSingleLocation && (
+                    <Icon name="chevron-down" size={20} color="#6B7280" />
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -1683,7 +1860,8 @@ const DeliveryDetailScreen = () => {
           
           {/* Product Items */}
           {deliveryItems.map((item, index) => {
-            const availableStock = item.warehouseStock?.[selectedWarehouse] || 0;
+            const warehouseName = selectedWarehouse?.name || 'Warehouse A';
+            const availableStock = item.warehouseStock?.[warehouseName] || 0;
             const hasStockWarning = isUserAdmin && item.warehouseStock && availableStock < item.quantityOrdered;
             
             return (
@@ -1785,27 +1963,119 @@ const DeliveryDetailScreen = () => {
           })}
         </View>
         
-        {/* 6. Notes & Special Instructions */}
+        {/* 6. Notes Section - Collapsible Cards */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Notes & Instructions</Text>
+          <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Notes</Text>
           
-          <Text style={styles.notesLabel}>Client Notes (read-only):</Text>
-          <View style={styles.notesBox}>
-            <Text style={styles.notesText}>{clientNotes}</Text>
+          {/* Notes List */}
+          {groupedNotes.map(([dateKey, notes]) => (
+            <View key={dateKey} style={styles.notesDateGroup}>
+              <Text style={styles.notesDateHeader}>{dateKey}</Text>
+              {notes.map((note, noteIndex) => (
+                <TouchableOpacity
+                  key={note.id}
+                  style={[
+                    styles.noteCard,
+                    noteIndex === notes.length - 1 && { borderBottomWidth: 0 }
+                  ]}
+                  onPress={() => toggleNoteExpansion(note.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.noteCardHeader}>
+                    <View style={styles.noteCardHeaderLeft}>
+                      <View style={styles.noteAvatar}>
+                        <Text style={styles.noteAvatarText}>{note.businessAvatar}</Text>
+                      </View>
+                      <Text style={styles.noteBusinessName}>{note.businessName}</Text>
+                    </View>
+                    <View style={styles.noteCardHeaderRight}>
+                      <Text style={styles.noteTime}>{formatNoteTime(note.timestamp)}</Text>
+                      <Icon 
+                        name={expandedNotes.has(note.id) ? 'chevron-up' : 'chevron-down'} 
+                        size={16} 
+                        color="#6B7280" 
+                      />
+                    </View>
+                  </View>
+                  {expandedNotes.has(note.id) && (
+                    <Text style={styles.noteContent}>{note.message}</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))}
+          
+          {/* Note Input */}
+          <View style={styles.noteInputContainer}>
+            <TextInput
+              style={styles.noteInput}
+              placeholder="Leave a note"
+              placeholderTextColor={theme.colors.textSecondary}
+              value={noteText}
+              onChangeText={setNoteText}
+              multiline
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendNoteButton,
+                !noteText.trim() && styles.sendNoteButtonDisabled
+              ]}
+              onPress={handleSendNote}
+              disabled={!noteText.trim()}
+            >
+              <Text style={[
+                styles.sendNoteButtonText,
+                !noteText.trim() && styles.sendNoteButtonTextDisabled
+              ]}>Send note</Text>
+            </TouchableOpacity>
           </View>
-          
-          {isUserAdmin && (
-            <>
-              <Text style={styles.notesLabel}>Distributor Notes (internal):</Text>
-              <TextInput
-                style={styles.notesInput}
-                value={distributorNotes}
-                onChangeText={setDistributorNotes}
-                multiline
-                placeholder="Add internal notes here..."
-              />
-            </>
-          )}
+        </View>
+
+        {/* 7. Order Updates Timeline */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Order Updates</Text>
+          <View style={styles.timelineContainer}>
+            {orderUpdates.map((update, index) => (
+              <View key={update.id} style={styles.timelineItem}>
+                <View style={styles.timelineIconColumn}>
+                  {update.completed ? (
+                    <View style={styles.timelineIconCompleted}>
+                      <Icon name="checkmark" size={14} color="#FFFFFF" />
+                    </View>
+                  ) : update.isCurrent ? (
+                    <View style={styles.timelineIconCurrent}>
+                      <Icon name="more-horizontal" size={14} color="#FFFFFF" />
+                    </View>
+                  ) : (
+                    <View style={styles.timelineIconPending} />
+                  )}
+                  {index < orderUpdates.length - 1 && (
+                    <View 
+                      style={[
+                        styles.timelineLine, 
+                        { backgroundColor: update.completed ? '#22C55E' : '#E5E7EB' }
+                      ]} 
+                    />
+                  )}
+                </View>
+                <View style={styles.timelineContent}>
+                  {update.timestamp && (
+                    <Text style={styles.timelineDate}>
+                      {formatUpdateDateTime(update.timestamp)}
+                    </Text>
+                  )}
+                  <Text 
+                    style={[
+                      styles.timelineStatus, 
+                      { color: update.completed || update.isCurrent ? '#111827' : '#9CA3AF' }
+                    ]}
+                  >
+                    {update.status}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
       </ScrollView>
       
@@ -2887,6 +3157,170 @@ const styles = StyleSheet.create({
     marginTop: 100,
     paddingBottom: 0,
     overflow: 'visible',
+  },
+  // Notes section styles
+  notesDateGroup: {
+    marginBottom: 0,
+  },
+  notesDateHeader: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: theme.colors.textSecondary,
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  noteCard: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    borderColor: '#E5E7EB',
+    borderRadius: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+    marginBottom: 0,
+    backgroundColor: '#FFFFFF',
+  },
+  noteCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  noteCardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  noteAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  noteAvatarText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#FFFFFF',
+  },
+  noteBusinessName: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#111827',
+    flex: 1,
+  },
+  noteCardHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  noteTime: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: theme.colors.textSecondary,
+  },
+  noteContent: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    lineHeight: 20,
+    color: '#111827',
+    marginTop: 12,
+  },
+  noteInputContainer: {
+    marginTop: 16,
+    gap: 12,
+  },
+  noteInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 80,
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#111827',
+    backgroundColor: '#F9FAFB',
+    textAlignVertical: 'top',
+  },
+  sendNoteButton: {
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary,
+  },
+  sendNoteButtonDisabled: {
+    backgroundColor: theme.colors.buttonBackgroundDisabled,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  sendNoteButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: '#FFFFFF',
+  },
+  sendNoteButtonTextDisabled: {
+    color: theme.colors.textSecondary,
+  },
+  // Timeline styles
+  timelineContainer: {
+    paddingLeft: 0,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    minHeight: 56,
+  },
+  timelineIconColumn: {
+    alignItems: 'center',
+    width: 24,
+    marginRight: 12,
+  },
+  timelineIconCompleted: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: '#22C55E',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timelineIconCurrent: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timelineIconPending: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    backgroundColor: 'transparent',
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    marginTop: 0,
+    marginBottom: 0,
+  },
+  timelineContent: {
+    flex: 1,
+    paddingBottom: 16,
+    paddingTop: 2,
+  },
+  timelineDate: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: theme.colors.textSecondary,
+    marginBottom: 2,
+  },
+  timelineStatus: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
   },
 });
 

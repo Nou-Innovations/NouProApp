@@ -71,8 +71,22 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
   // Use canonical source: useProfileStore.activeBusiness for company context
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const companyId = activeBusiness?.id || 'comp-1';
-  // Location data still comes from businessStore (entity data, not context)
-  const { currentLocation } = useBusinessStore();
+  // Location data comes from businessStore - persisted across sessions
+  const { currentLocation, setLocation } = useBusinessStore();
+  
+  // selectedLocationId is derived from store's currentLocation (persisted)
+  const selectedLocationId = currentLocation?.id || null;
+  // Wrapper to update store
+  const setSelectedLocationId = useCallback((locationId: string | null) => {
+    if (locationId === null) {
+      setLocation(null);
+    } else {
+      // We need locations array to find the location object
+      const locations = useBusinessStore.getState().locations;
+      const location = locations?.find(loc => loc.id === locationId);
+      setLocation(location || null);
+    }
+  }, [setLocation]);
   
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,9 +98,6 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
   const [statusFilter, setStatusFilter] = useState<DeliveryStatus | 'all'>('all');
   const [viewType, setViewType] = useState<DeliveryViewType>('all');
   const [search, setSearch] = useState('');
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
-    initialLocationId || currentLocation?.id || null
-  );
   
   // Fetch deliveries
   const fetchDeliveries = useCallback(async (isRefresh = false) => {

@@ -63,9 +63,6 @@ import BrandSelectionScreen from '@/features/brands/screens/BrandSelectionScreen
 // Screens - Products
 import CreateProductScreen from '@/features/products/screens/CreateProductScreen';
 import ProductDetailScreen from '@/features/products/screens/ProductDetailScreen';
-// Legacy screens (kept for backward compatibility, will be removed)
-import ProductDetailPublicScreen from '@/features/products/screens/ProductDetailPublicScreen';
-import ProductDetailOwnScreen from '@/features/products/screens/ProductDetailOwnScreen';
 
 // Screens - Company & Search
 import CompanySearchScreen from '@/features/company/screens/CompanySearchScreen';
@@ -113,9 +110,6 @@ import LocationsScreen from '@/features/locations/screens/LocationsScreen';
 import AddLocationScreen from '@/features/locations/screens/AddLocationScreen';
 import TransportsScreen from '@/features/transports/screens/TransportsScreen';
 import AddTransportScreen from '@/features/transports/screens/AddTransportScreen';
-
-// Screens - Orders
-import OrderDetailScreen from '@/features/orders/screens/OrderDetailScreen';
 
 // Screens - Connections
 import ConnectionsScreen from '@/features/connections/screens/ConnectionsScreen';
@@ -255,8 +249,6 @@ function AppNavigator() {
         <RootStack.Screen name="CreateBrand" component={CreateBrandScreen} />
         <RootStack.Screen name="CreateProduct" component={CreateProductScreen} />
         <RootStack.Screen name="ProductDetail" component={ProductDetailScreen} />
-        <RootStack.Screen name="ProductDetailPublic" component={ProductDetailPublicScreen} />
-        <RootStack.Screen name="ProductDetailOwn" component={ProductDetailOwnScreen} />
         <RootStack.Screen name="BrandSelection" component={BrandSelectionScreen} />
         
         {/* Search Screens */}
@@ -266,10 +258,7 @@ function AppNavigator() {
         {/* Delivery Screens */}
         <RootStack.Screen name="DeliveryDetail" component={DeliveryDetailScreen} />
         <RootStack.Screen name="CreateDelivery" component={CreateDeliveryScreen} />
-        
-        {/* Order Screens */}
-        <RootStack.Screen name="OrderDetail" component={OrderDetailScreen} />
-        
+
         {/* Settings Screens */}
         <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
         <RootStack.Screen name="SecuritySettings" component={SecuritySettingsScreen} />
