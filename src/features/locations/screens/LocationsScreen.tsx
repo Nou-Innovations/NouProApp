@@ -21,8 +21,9 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { AppSearchBar } from '@/shared/components/ui';
+import { AppSearchBar, AppButton } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 
 // Location type based on app-logic.json and Prisma schema
 interface Location {
@@ -49,6 +50,7 @@ interface LocationCardProps {
   onEdit: () => void;
   onDelete: () => void;
   showDivider?: boolean;
+  isPrimaryLocation?: boolean; // true if this is the parent location (doesn't show status)
 }
 
 const LocationCard: React.FC<LocationCardProps> = ({
@@ -57,25 +59,9 @@ const LocationCard: React.FC<LocationCardProps> = ({
   onEdit,
   onDelete,
   showDivider = true,
+  isPrimaryLocation = false,
 }) => {
   const { theme: appTheme } = useTheme();
-  const [showOptions, setShowOptions] = useState(false);
-
-  const handlePhonePress = () => {
-    if (location.phone) {
-      Linking.openURL(`tel:${location.phone.replace(/\s/g, '')}`);
-    }
-  };
-
-  const handleMapPress = () => {
-    if (location.latitude && location.longitude) {
-      const url = `https://maps.google.com/?q=${location.latitude},${location.longitude}`;
-      Linking.openURL(url);
-    } else if (location.address) {
-      const encodedAddress = encodeURIComponent(location.address);
-      Linking.openURL(`https://maps.google.com/?q=${encodedAddress}`);
-    }
-  };
 
   const handleOptionsPress = () => {
     Alert.alert(
@@ -111,9 +97,26 @@ const LocationCard: React.FC<LocationCardProps> = ({
             <Text style={[styles.locationName, { color: appTheme.colors.text }]} numberOfLines={1}>
               {location.name}
             </Text>
-            {location.is_primary && (
-              <View style={[styles.primaryBadge, { backgroundColor: appTheme.colors.primary }]}>
-                <Text style={styles.primaryBadgeText}>Primary</Text>
+            {/* Show status badge aligned right, but not for primary/parent location */}
+            {!isPrimaryLocation && (
+              <View style={[
+                styles.modeBadge,
+                { 
+                  backgroundColor: location.operating_mode === 'INDEPENDENT' 
+                    ? 'rgba(42, 207, 1, 0.1)' 
+                    : 'rgba(0, 117, 255, 0.1)'
+                }
+              ]}>
+                <Text style={[
+                  styles.modeBadgeText,
+                  { 
+                    color: location.operating_mode === 'INDEPENDENT' 
+                      ? appTheme.colors.success 
+                      : appTheme.colors.info
+                  }
+                ]}>
+                  {location.operating_mode === 'INDEPENDENT' ? 'Independent' : 'Dependent'}
+                </Text>
               </View>
             )}
           </View>
@@ -121,65 +124,6 @@ const LocationCard: React.FC<LocationCardProps> = ({
           <Text style={[styles.locationAddress, { color: appTheme.colors.textSecondary }]} numberOfLines={2}>
             {location.address}
           </Text>
-          
-          <View style={styles.metaRow}>
-            {location.phone && (
-              <TouchableOpacity 
-                style={styles.metaItem} 
-                onPress={handlePhonePress}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Icon name="call-outline" size={14} color={appTheme.colors.textMuted} />
-                <Text style={[styles.metaText, { color: appTheme.colors.info }]}>
-                  {location.phone}
-                </Text>
-              </TouchableOpacity>
-            )}
-            
-            {(location.latitude || location.address) && (
-              <TouchableOpacity 
-                style={styles.metaItem} 
-                onPress={handleMapPress}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Icon name="map-outline" size={14} color={appTheme.colors.textMuted} />
-                <Text style={[styles.metaText, { color: appTheme.colors.info }]}>
-                  View Map
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.statusRow}>
-            <View style={[
-              styles.modeBadge,
-              { 
-                backgroundColor: location.operating_mode === 'INDEPENDENT' 
-                  ? 'rgba(42, 207, 1, 0.1)' 
-                  : 'rgba(0, 117, 255, 0.1)'
-              }
-            ]}>
-              <Text style={[
-                styles.modeBadgeText,
-                { 
-                  color: location.operating_mode === 'INDEPENDENT' 
-                    ? appTheme.colors.success 
-                    : appTheme.colors.info
-                }
-              ]}>
-                {location.operating_mode === 'INDEPENDENT' ? 'Independent' : 'Dependent'}
-              </Text>
-            </View>
-            
-            {location.staff_count !== undefined && (
-              <View style={styles.staffCount}>
-                <Icon name="people-outline" size={14} color={appTheme.colors.textMuted} />
-                <Text style={[styles.staffCountText, { color: appTheme.colors.textMuted }]}>
-                  {location.staff_count} staff
-                </Text>
-              </View>
-            )}
-          </View>
         </View>
 
         {/* Right: Options Button */}
@@ -193,7 +137,7 @@ const LocationCard: React.FC<LocationCardProps> = ({
       </TouchableOpacity>
       
       {showDivider && (
-        <View style={[styles.divider, { backgroundColor: appTheme.colors.borderColor }]} />
+        <View style={[styles.divider, { backgroundColor: appTheme.colors.surface }]} />
       )}
     </View>
   );
@@ -212,6 +156,8 @@ export default function LocationsScreen() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [showLocationSheet, setShowLocationSheet] = useState(false);
 
   // Check permissions
   const isSuperAdmin = isSuperAdminRole();
@@ -304,8 +250,19 @@ export default function LocationsScreen() {
   };
 
   const handleLocationPress = (location: Location) => {
-    // TODO: Navigate to location detail screen
-    Alert.alert(location.name, `Address: ${location.address}\nMode: ${location.operating_mode}`);
+    setSelectedLocation(location);
+    setShowLocationSheet(true);
+  };
+
+  const handleCloseSheet = () => {
+    setShowLocationSheet(false);
+    setSelectedLocation(null);
+  };
+
+  const handleSwitchProfile = () => {
+    // TODO: Implement switch profile logic
+    handleCloseSheet();
+    Alert.alert('Switch Profile', `Switching to ${selectedLocation?.name}`);
   };
 
   const handleEditLocation = (location: Location) => {
@@ -350,6 +307,9 @@ export default function LocationsScreen() {
   // Separate primary and other locations
   const primaryLocation = filteredLocations.find(l => l.is_primary);
   const otherLocations = filteredLocations.filter(l => !l.is_primary);
+  
+  // Check if there's only one location (single parent location)
+  const hasSingleLocation = filteredLocations.length === 1;
 
   if (!canManageLocations) {
     return (
@@ -429,47 +389,65 @@ export default function LocationsScreen() {
           keyExtractor={() => 'sections'}
           renderItem={() => (
             <View style={styles.sectionsContainer}>
-              {/* Primary Location Section */}
-              {primaryLocation && (
-                <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
-                      Primary Location
-                    </Text>
-                  </View>
-                  <View style={styles.sectionContent}>
-                    <LocationCard
-                      location={primaryLocation}
-                      onPress={() => handleLocationPress(primaryLocation)}
-                      onEdit={() => handleEditLocation(primaryLocation)}
-                      onDelete={() => handleDeleteLocation(primaryLocation)}
-                      showDivider={false}
-                    />
-                  </View>
+              {/* Single Location - No sections */}
+              {hasSingleLocation && primaryLocation ? (
+                <View style={styles.singleLocationContainer}>
+                  <LocationCard
+                    location={primaryLocation}
+                    onPress={() => handleLocationPress(primaryLocation)}
+                    onEdit={() => handleEditLocation(primaryLocation)}
+                    onDelete={() => handleDeleteLocation(primaryLocation)}
+                    showDivider={false}
+                    isPrimaryLocation={true}
+                  />
                 </View>
-              )}
+              ) : (
+                <>
+                  {/* Primary Location Section */}
+                  {primaryLocation && (
+                    <View style={styles.section}>
+                      <View style={styles.sectionHeader}>
+                        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+                          Primary Location
+                        </Text>
+                      </View>
+                      <View style={styles.sectionContent}>
+                        <LocationCard
+                          location={primaryLocation}
+                          onPress={() => handleLocationPress(primaryLocation)}
+                          onEdit={() => handleEditLocation(primaryLocation)}
+                          onDelete={() => handleDeleteLocation(primaryLocation)}
+                          showDivider={false}
+                          isPrimaryLocation={true}
+                        />
+                      </View>
+                    </View>
+                  )}
 
-              {/* Other Locations Section */}
-              {otherLocations.length > 0 && (
-                <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
-                      Other Locations ({otherLocations.length})
-                    </Text>
-                  </View>
-                  <View style={styles.sectionContent}>
-                    {otherLocations.map((location, index) => (
-                      <LocationCard
-                        key={location.id}
-                        location={location}
-                        onPress={() => handleLocationPress(location)}
-                        onEdit={() => handleEditLocation(location)}
-                        onDelete={() => handleDeleteLocation(location)}
-                        showDivider={index < otherLocations.length - 1}
-                      />
-                    ))}
-                  </View>
-                </View>
+                  {/* Other Locations Section */}
+                  {otherLocations.length > 0 && (
+                    <View style={styles.section}>
+                      <View style={styles.sectionHeader}>
+                        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+                          Other Locations ({otherLocations.length})
+                        </Text>
+                      </View>
+                      <View style={styles.sectionContent}>
+                        {otherLocations.map((location, index) => (
+                          <LocationCard
+                            key={location.id}
+                            location={location}
+                            onPress={() => handleLocationPress(location)}
+                            onEdit={() => handleEditLocation(location)}
+                            onDelete={() => handleDeleteLocation(location)}
+                            showDivider={index < otherLocations.length - 1}
+                            isPrimaryLocation={false}
+                          />
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                </>
               )}
             </View>
           )}
@@ -477,6 +455,88 @@ export default function LocationsScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
+
+      {/* Location Details Bottom Sheet */}
+      <AppBottomSheet
+        visible={showLocationSheet}
+        onClose={handleCloseSheet}
+        title={selectedLocation?.name}
+      >
+        {selectedLocation && (
+          <View style={styles.sheetContent}>
+            {/* Status - Only show for non-primary locations */}
+            {!selectedLocation.is_primary && (
+              <View style={styles.aboutItem}>
+                <Icon name="pulse-outline" size={20} color={appTheme.colors.textSecondary} />
+                <View style={styles.aboutItemContent}>
+                  <Text style={[styles.aboutLabel, { color: appTheme.colors.textSecondary }]}>
+                    Status
+                  </Text>
+                  <View style={[
+                    styles.sheetStatusBadge,
+                    { 
+                      backgroundColor: selectedLocation.operating_mode === 'INDEPENDENT' 
+                        ? 'rgba(42, 207, 1, 0.1)' 
+                        : 'rgba(0, 117, 255, 0.1)'
+                    }
+                  ]}>
+                    <Text style={[
+                      styles.sheetStatusText,
+                      { 
+                        color: selectedLocation.operating_mode === 'INDEPENDENT' 
+                          ? appTheme.colors.success 
+                          : appTheme.colors.info
+                      }
+                    ]}>
+                      {selectedLocation.operating_mode === 'INDEPENDENT' ? 'Independent' : 'Dependent'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Location/Address */}
+            <View style={styles.aboutItem}>
+              <Icon name="location-outline" size={20} color={appTheme.colors.textSecondary} />
+              <View style={styles.aboutItemContent}>
+                <Text style={[styles.aboutLabel, { color: appTheme.colors.textSecondary }]}>
+                  Location
+                </Text>
+                <Text style={[styles.aboutValue, { color: appTheme.colors.text }]}>
+                  {selectedLocation.address}
+                </Text>
+              </View>
+            </View>
+
+            {/* Contact Number */}
+            {selectedLocation.phone && (
+              <TouchableOpacity 
+                style={styles.aboutItem} 
+                onPress={() => Linking.openURL(`tel:${selectedLocation.phone?.replace(/\s/g, '')}`)}
+              >
+                <Icon name="call-outline" size={20} color={appTheme.colors.textSecondary} />
+                <View style={styles.aboutItemContent}>
+                  <Text style={[styles.aboutLabel, { color: appTheme.colors.textSecondary }]}>
+                    Contact
+                  </Text>
+                  <Text style={[styles.aboutValue, { color: appTheme.colors.info }]}>
+                    {selectedLocation.phone}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* Switch Profile Button */}
+            <View style={styles.sheetButton}>
+              <AppButton
+                title="Switch Profile"
+                onPress={handleSwitchProfile}
+                variant="primary"
+              />
+            </View>
+          </View>
+        )}
+      </AppBottomSheet>
     </SafeAreaView>
   );
 }
@@ -491,9 +551,13 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 24,
+    paddingHorizontal: 12,
   },
   sectionsContainer: {
-    paddingHorizontal: 12,
+    // padding handled by listContent
+  },
+  singleLocationContainer: {
+    paddingTop: 12,
   },
   section: {
     marginBottom: 16,
@@ -514,10 +578,8 @@ const styles = StyleSheet.create({
   // Location Card Styles
   cardContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingVertical: 12,
-    paddingLeft: 8,
-    paddingRight: 0,
   },
   iconContainer: {
     width: 48,
@@ -529,55 +591,19 @@ const styles = StyleSheet.create({
   },
   cardInfo: {
     flex: 1,
-    marginRight: 8,
+    justifyContent: 'center',
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
     marginBottom: 4,
   },
   locationName: {
     fontSize: 16,
     fontFamily: theme.fonts.primary.bold,
-    flex: 1,
-  },
-  primaryBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  primaryBadgeText: {
-    fontSize: 10,
-    fontFamily: theme.fonts.primary.semiBold,
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
-  },
-  locationAddress: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.regular,
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-    marginBottom: 8,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 13,
-    fontFamily: theme.fonts.primary.medium,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    flexShrink: 1,
+    marginRight: 8,
   },
   modeBadge: {
     paddingHorizontal: 8,
@@ -588,17 +614,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.fonts.primary.medium,
   },
-  staffCount: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  staffCountText: {
-    fontSize: 12,
-    fontFamily: theme.fonts.primary.regular,
+  locationAddress: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+    lineHeight: 20,
   },
   optionsButton: {
-    paddingRight: 4,
+    paddingRight: 0,
     paddingLeft: 12,
     height: 48,
     justifyContent: 'center',
@@ -606,7 +628,43 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    marginLeft: 68, // iconContainer width + marginRight
+  },
+  // Bottom Sheet Styles - matching About section from UserProfileScreen
+  sheetContent: {
+    gap: 0,
+    paddingBottom: 8,
+  },
+  aboutItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 12,
+  },
+  aboutItemContent: {
+    flex: 1,
+  },
+  aboutLabel: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.semiBold,
+    marginBottom: 2,
+  },
+  aboutValue: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.semiBold,
+  },
+  sheetStatusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 2,
+  },
+  sheetStatusText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.medium,
+  },
+  sheetButton: {
+    marginTop: 16,
   },
   // Loading & Empty States
   loadingContainer: {
