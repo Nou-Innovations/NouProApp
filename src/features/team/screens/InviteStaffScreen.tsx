@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import { useCompanyStore } from '@/shared/store/companyStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { post } from '@/shared/services/api';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -43,7 +43,7 @@ const getStaffTypeDescription = (type: StaffRoleType): string => {
 export default function InviteStaffScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
-  const { locations } = useCompanyStore();
+  const { locations } = useBusinessStore();
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   
   const [email, setEmail] = useState('');

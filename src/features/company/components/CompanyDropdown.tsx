@@ -9,7 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
-import { useCompanyStore } from '@/shared/store/companyStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 
@@ -20,7 +20,7 @@ export default function CompanyDropdown() {
     currentCompany, 
     setCompany, 
     isLoading 
-  } = useCompanyStore();
+  } = useBusinessStore();
   const { theme: appTheme } = useTheme();
 
   const handleCompanySelect = (company: any) => {

@@ -17,12 +17,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNavigation } from '@react-navigation/native';
-import { useCompanyStore } from '@/shared/store/companyStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AppButton from '@/shared/components/ui/AppButton';
-import DropdownModal, { DropdownItem } from '@/shared/components/ui/DropdownModal';
-import { ConfirmationDialog } from '@/shared/components/ui';
+import { AppBottomSheet, AppModal } from '@/shared/components/ui';
+
+// DropdownItem type (kept for selection items)
+interface DropdownItem {
+  id: string;
+  title: string;
+  description?: string;
+  icon?: string;
+}
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import Avatar from '@/shared/components/ui/Avatar';
 import theme from '@/shared/theme';
@@ -85,7 +92,7 @@ const TIME_OPTIONS = generateTimeOptions();
 export default function CompanyEditScreen() {
   const { theme: appTheme } = useTheme();
   const navigation = useNavigation();
-  const { currentCompany } = useCompanyStore();
+  const { currentCompany } = useBusinessStore();
 
   // Initial values
   const initialCoverImage = 'https://images.unsplash.com/photo-1596178065887-1198b6148b2b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80';
@@ -974,49 +981,93 @@ export default function CompanyEditScreen() {
       {renderTimePicker()}
 
       {/* Business Type Modal */}
-      <DropdownModal
+      <AppBottomSheet
         visible={showBusinessTypeModal}
         onClose={() => setShowBusinessTypeModal(false)}
         title="Select Business Type"
-        items={businessTypes}
-        selectedItemId={businessType}
-        onSelectItem={(item) => {
-          setBusinessType(item.id);
-          setShowBusinessTypeModal(false);
-        }}
-      />
+      >
+        <ScrollView style={{ maxHeight: 300 }}>
+          {businessTypes.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={[
+                styles.bottomSheetItem,
+                { borderBottomColor: appTheme.colors.borderColor },
+                businessType === item.id && { backgroundColor: `${appTheme.colors.primary}15` }
+              ]}
+              onPress={() => {
+                setBusinessType(item.id);
+                setShowBusinessTypeModal(false);
+              }}
+            >
+              <Text style={[
+                styles.bottomSheetItemText,
+                { color: businessType === item.id ? appTheme.colors.primary : appTheme.colors.text }
+              ]}>
+                {item.title}
+              </Text>
+              {businessType === item.id && (
+                <Icon name="check" size={20} color={appTheme.colors.primary} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </AppBottomSheet>
 
       {/* Country Code Modal */}
-      <DropdownModal
+      <AppBottomSheet
         visible={showCountryCodeModal}
         onClose={() => setShowCountryCodeModal(false)}
         title="Select Country Code"
-        items={countryCodes.map(cc => ({
-          id: cc.code,
-          title: `${cc.flag} ${cc.country} ${cc.code}`,
-        }))}
-        selectedItemId={countryCode}
-        onSelectItem={(item) => {
-          setCountryCode(item.id);
-          setShowCountryCodeModal(false);
-        }}
-      />
+      >
+        <ScrollView style={{ maxHeight: 400 }}>
+          {countryCodes.map((cc) => (
+            <TouchableOpacity
+              key={cc.code}
+              style={[
+                styles.bottomSheetItem,
+                { borderBottomColor: appTheme.colors.borderColor },
+                countryCode === cc.code && { backgroundColor: `${appTheme.colors.primary}15` }
+              ]}
+              onPress={() => {
+                setCountryCode(cc.code);
+                setShowCountryCodeModal(false);
+              }}
+            >
+              <Text style={[
+                styles.bottomSheetItemText,
+                { color: countryCode === cc.code ? appTheme.colors.primary : appTheme.colors.text }
+              ]}>
+                {`${cc.flag} ${cc.country} ${cc.code}`}
+              </Text>
+              {countryCode === cc.code && (
+                <Icon name="check" size={20} color={appTheme.colors.primary} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </AppBottomSheet>
 
       {/* Success Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showSuccessDialog}
-        variant="success"
-        title="Success"
-        message="Business profile updated successfully!"
-        primaryButtonText="OK"
-        onPrimaryAction={() => {
-          setShowSuccessDialog(false);
-          navigation.goBack();
-        }}
         onClose={() => {
           setShowSuccessDialog(false);
           navigation.goBack();
         }}
+        title="Success"
+        message="Business profile updated successfully!"
+        footer={
+          <AppButton
+            title="OK"
+            onPress={() => {
+              setShowSuccessDialog(false);
+              navigation.goBack();
+            }}
+            variant="confirm"
+            style={{ width: '100%' }}
+          />
+        }
       />
     </SafeAreaView>
   );
@@ -1341,5 +1392,18 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 16,
     fontFamily: theme.fonts.primary.semiBold,
+  },
+  // Bottom sheet item styles
+  bottomSheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 0.5,
+  },
+  bottomSheetItemText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
   },
 });

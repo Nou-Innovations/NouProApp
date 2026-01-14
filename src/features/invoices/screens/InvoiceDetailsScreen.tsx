@@ -28,7 +28,8 @@ import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNotifications } from '@/shared/context/NotificationContext';
-import { ConfirmationDialog } from '@/shared/components/ui';
+import { AppModal } from '@/shared/components/ui';
+import AppButton from '@/shared/components/ui/AppButton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InvoiceDetails'>;
 
@@ -582,14 +583,19 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
       )}
 
       {/* Success Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showSuccessDialog}
-        variant="success"
+        onClose={() => setShowSuccessDialog(false)}
         title="Success"
         message={successMessage}
-        primaryButtonText="OK"
-        onPrimaryAction={() => setShowSuccessDialog(false)}
-        onClose={() => setShowSuccessDialog(false)}
+        footer={
+          <AppButton
+            title="OK"
+            onPress={() => setShowSuccessDialog(false)}
+            variant="confirm"
+            style={{ width: '100%' }}
+          />
+        }
       />
 
       {/* More Options Bottom Sheet */}

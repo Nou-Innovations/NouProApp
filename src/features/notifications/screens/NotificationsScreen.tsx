@@ -27,7 +27,8 @@ import { useNotifications } from '@/shared/context/NotificationContext';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/features/search/components/FilterBar';
-import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
+import { AppModal } from '@/shared/components/ui';
+import AppButton from '@/shared/components/ui/AppButton';
 import theme from '@/shared/theme';
 
 // Types
@@ -624,27 +625,43 @@ export default function NotificationsScreen() {
       </Modal>
 
       {/* Confirmation Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showConfirmDialog}
-        variant="confirm"
+        onClose={handleCancelRoleChange}
         title="Change Role"
         message={`Change role to ${pendingRole}?`}
-        primaryButtonText="Confirm"
-        secondaryButtonText="Cancel"
-        onPrimaryAction={handleConfirmRoleChange}
-        onSecondaryAction={handleCancelRoleChange}
-        onClose={handleCancelRoleChange}
+        footer={
+          <View style={styles.modalFooter}>
+            <AppButton
+              title="Confirm"
+              onPress={handleConfirmRoleChange}
+              variant="confirm"
+              style={{ flex: 1, marginRight: 8 }}
+            />
+            <AppButton
+              title="Cancel"
+              onPress={handleCancelRoleChange}
+              variant="outline"
+              style={{ flex: 1 }}
+            />
+          </View>
+        }
       />
 
       {/* Success Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showSuccessDialog}
-        variant="success"
+        onClose={() => setShowSuccessDialog(false)}
         title="Role Updated"
         message={successMessage}
-        primaryButtonText="OK"
-        onPrimaryAction={() => setShowSuccessDialog(false)}
-        onClose={() => setShowSuccessDialog(false)}
+        footer={
+          <AppButton
+            title="OK"
+            onPress={() => setShowSuccessDialog(false)}
+            variant="confirm"
+            style={{ width: '100%' }}
+          />
+        }
       />
     </SafeAreaView>
   );
@@ -826,5 +843,9 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 16,                   // design spec: actionButtons.fontSize
     fontFamily: theme.fonts.primary.medium, // design spec: actionButtons.fontFamily (Inter-Medium)
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    marginTop: 8,
   },
 });

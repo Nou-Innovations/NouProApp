@@ -39,7 +39,8 @@ import {
 } from '@/shared/types/order';
 import { RootStackParamList } from '@/shared/types/navigation';
 import { formatCurrency, formatRelativeTime } from '@/shared/data/mockOrders';
-import { ConfirmationDialog } from '@/shared/components/ui';
+import { AppModal } from '@/shared/components/ui';
+import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 
 
@@ -421,14 +422,19 @@ const OrderDetailScreen: React.FC = () => {
       {renderActions()}
 
       {/* Success Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showSuccessDialog}
-        variant="success"
+        onClose={() => setShowSuccessDialog(false)}
         title="Success"
         message={successMessage}
-        primaryButtonText="OK"
-        onPrimaryAction={() => setShowSuccessDialog(false)}
-        onClose={() => setShowSuccessDialog(false)}
+        footer={
+          <AppButton
+            title="OK"
+            onPress={() => setShowSuccessDialog(false)}
+            variant="confirm"
+            style={{ width: '100%' }}
+          />
+        }
       />
     </SafeAreaView>
   );

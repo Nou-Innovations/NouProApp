@@ -19,19 +19,27 @@ import FilterBar from '@/features/search/components/FilterBar';
 import BrandCard from '@/features/brands/components/BrandCard';
 import ProductCard from '@/features/products/components/ProductCard';
 import LocationDropdown from '@/features/company/components/LocationDropdown';
-import DropdownModal, { DropdownItem } from '@/shared/components/ui/DropdownModal';
+import { AppBottomSheet } from '@/shared/components/ui';
+
+// DropdownItem type (kept for location items)
+interface DropdownItem {
+  id: string;
+  title: string;
+  description?: string;
+  icon?: string;
+}
 import ProductActionsModal from '@/features/products/components/ProductActionsModal';
 import ProductCreateModal from '@/features/products/components/ProductCreateModal';
 import PaywallModal from '@/features/subscription/components/PaywallModal';
 import { Icon } from '@/shared/utils/icons';
 import AppButton from '@/shared/components/ui/AppButton';
 import IconButton from '@/shared/components/ui/IconButton';
-import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
+import { AppModal } from '@/shared/components/ui';
 import SimpleHeader, { AnimatedFlatList, HEADER_HEIGHT } from '@/shared/components/layout/headers/SimpleHeader';
 import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
-import { useCompanyStore } from '@/shared/store/companyStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import { useProfileStore } from '@/shared/store/profileStore';
 import {
   canViewProducts,
@@ -58,7 +66,7 @@ const ProductsScreen: React.FC = () => {
   const isAdmin = useProfileStore((state) => state.isAdmin);
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
-  const { currentCompany, currentLocation } = useCompanyStore();
+  const { currentCompany, currentLocation } = useBusinessStore();
   
   // Profile store for RBAC
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
@@ -168,6 +176,23 @@ const ProductsScreen: React.FC = () => {
   const handleCancelSaveDialog = () => {
     setShowSaveConfirmation(false);
   };
+
+  // Handle publish toggle with paywall check (must be defined before renderListItem)
+  const handlePublishToggle = useCallback((productId: string, currentPublishState: boolean) => {
+    // Only check paywall when trying to publish (not unpublish)
+    if (!currentPublishState && !canPublish) {
+      // Check paywall
+      const paywallCheck = checkPaywall('publish_product', activeBusiness?.plan || null);
+      if (!paywallCheck.allowed) {
+        setPaywallFeature('publishing products');
+        setShowPaywall(true);
+        return;
+      }
+    }
+    
+    // Toggle publish state
+    handleProductUpdate(productId, 'isDisplayable', !currentPublishState);
+  }, [canPublish, activeBusiness?.plan, handleProductUpdate]);
   
   const renderListItem = useCallback(({ item }: { item: ListItem }) => {
     if (item.type === 'brand') {
@@ -237,23 +262,6 @@ const ProductsScreen: React.FC = () => {
   const handleProductPress = (productId: string) => {
     (navigation as any).navigate('ProductDetail', { productId });
   };
-
-  // Handle publish toggle with paywall check
-  const handlePublishToggle = useCallback((productId: string, currentPublishState: boolean) => {
-    // Only check paywall when trying to publish (not unpublish)
-    if (!currentPublishState && !canPublish) {
-      // Check paywall
-      const paywallCheck = checkPaywall('publish_product', activeBusiness?.plan || null);
-      if (!paywallCheck.allowed) {
-        setPaywallFeature('publishing products');
-        setShowPaywall(true);
-        return;
-      }
-    }
-    
-    // Toggle publish state
-    handleProductUpdate(productId, 'isDisplayable', !currentPublishState);
-  }, [canPublish, activeBusiness?.plan, handleProductUpdate]);
 
   // Check user permissions for global vs location-scoped access
   const canViewAllProducts = isAdmin();
@@ -403,14 +411,43 @@ const ProductsScreen: React.FC = () => {
       />
 
       {/* Location Selection Modal */}
-      <DropdownModal
+      <AppBottomSheet
         visible={showLocationDropdown}
         onClose={() => setShowLocationDropdown(false)}
         title="Locations"
-        items={locationItems}
-        selectedItemId={selectedLocationId || 'all'}
-        onSelectItem={handleLocationSelect}
-      />
+      >
+        <ScrollView style={{ maxHeight: 300 }}>
+          {locationItems.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={[
+                styles.locationItem,
+                { borderBottomColor: appTheme.colors.borderColor },
+                (selectedLocationId || 'all') === item.id && { backgroundColor: `${appTheme.colors.primary}15` }
+              ]}
+              onPress={() => {
+                handleLocationSelect(item);
+                setShowLocationDropdown(false);
+              }}
+            >
+              <Icon 
+                name={item.icon || 'map-pin'} 
+                size={20} 
+                color={(selectedLocationId || 'all') === item.id ? appTheme.colors.primary : appTheme.colors.iconColor} 
+              />
+              <Text style={[
+                styles.locationItemText,
+                { color: (selectedLocationId || 'all') === item.id ? appTheme.colors.primary : appTheme.colors.text }
+              ]}>
+                {item.title}
+              </Text>
+              {(selectedLocationId || 'all') === item.id && (
+                <Icon name="check" size={20} color={appTheme.colors.primary} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </AppBottomSheet>
 
       {/* Create Actions Bottom Sheet Modal (+ button) */}
       <ProductCreateModal
@@ -423,27 +460,43 @@ const ProductsScreen: React.FC = () => {
       />
       
       {/* Save Confirmation Modal */}
-      <ConfirmationDialog
+      <AppModal
         visible={showSaveConfirmation}
-        variant="confirm"
+        onClose={handleCancelSaveDialog}
         title="Unsaved Changes"
         message="Would you like to save your changes?"
-        primaryButtonText="Save Changes"
-        secondaryButtonText="Discard Changes"
-        onPrimaryAction={handleConfirmSave}
-        onSecondaryAction={handleDiscardChanges}
-        onClose={handleCancelSaveDialog}
+        footer={
+          <View style={styles.modalFooter}>
+            <AppButton
+              title="Save Changes"
+              onPress={handleConfirmSave}
+              variant="confirm"
+              style={{ flex: 1, marginRight: 8 }}
+            />
+            <AppButton
+              title="Discard"
+              onPress={handleDiscardChanges}
+              variant="outline"
+              style={{ flex: 1 }}
+            />
+          </View>
+        }
       />
 
       {/* Success Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showSuccessDialog}
-        variant="success"
+        onClose={() => setShowSuccessDialog(false)}
         title="Success"
         message="Changes saved successfully!"
-        primaryButtonText="OK"
-        onPrimaryAction={() => setShowSuccessDialog(false)}
-        onClose={() => setShowSuccessDialog(false)}
+        footer={
+          <AppButton
+            title="OK"
+            onPress={() => setShowSuccessDialog(false)}
+            variant="confirm"
+            style={{ width: '100%' }}
+          />
+        }
       />
 
       {/* Paywall Modal for Free Plan Users */}
@@ -582,6 +635,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 8,
+  },
+  // AppBottomSheet location item styles
+  locationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 0.5,
+    gap: 12,
+  },
+  locationItemText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  // AppModal footer styles
+  modalFooter: {
+    flexDirection: 'row',
+    marginTop: 8,
   },
 }); 
 

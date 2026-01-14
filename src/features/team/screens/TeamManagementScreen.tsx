@@ -14,8 +14,8 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { get, del } from '@/shared/services/api';
-import { ConfirmationDialog, AppSearchBar, StaffCard, StaffMember, StaffRole as StaffCardRole, Avatar, ActionBottomSheet } from '@/shared/components/ui';
-import type { ActionItem } from '@/shared/components/ui/ActionBottomSheet';
+import { AppSearchBar, StaffCard, StaffMember, StaffRole as StaffCardRole, Avatar, AppModal, AppBottomSheet } from '@/shared/components/ui';
+import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 
 // User type for team management
@@ -578,55 +578,68 @@ export default function TeamManagementScreen() {
       )}
 
       {/* Success Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showSuccessDialog}
-        variant="success"
+        onClose={() => setShowSuccessDialog(false)}
         title="Success"
         message={successMessage}
-        primaryButtonText="OK"
-        onPrimaryAction={() => setShowSuccessDialog(false)}
-        onClose={() => setShowSuccessDialog(false)}
+        footer={
+          <AppButton
+            title="OK"
+            onPress={() => setShowSuccessDialog(false)}
+            variant="confirm"
+            style={{ width: '100%' }}
+          />
+        }
       />
 
       {/* Join Request Options Bottom Sheet */}
-      <ActionBottomSheet
+      <AppBottomSheet
         visible={showJoinRequestOptions}
         onClose={() => {
           setShowJoinRequestOptions(false);
           setSelectedJoinRequest(null);
         }}
         title="Options"
-        actionItems={[
-          { id: 'report', title: 'Report User' },
-        ]}
-        onActionPress={(item: ActionItem) => {
-          if (item.id === 'report' && selectedJoinRequest) {
+      >
+        <TouchableOpacity
+          style={[styles.bottomSheetAction, { borderColor: appTheme.colors.error }]}
+          onPress={() => {
             Alert.alert('Report', 'Report functionality coming soon');
-          }
-          setShowJoinRequestOptions(false);
-          setSelectedJoinRequest(null);
-        }}
-      />
+            setShowJoinRequestOptions(false);
+            setSelectedJoinRequest(null);
+          }}
+        >
+          <Text style={[styles.bottomSheetActionText, { color: appTheme.colors.error }]}>
+            Report User
+          </Text>
+        </TouchableOpacity>
+      </AppBottomSheet>
 
       {/* Pending Invite Options Bottom Sheet */}
-      <ActionBottomSheet
+      <AppBottomSheet
         visible={showPendingInviteOptions}
         onClose={() => {
           setShowPendingInviteOptions(false);
           setSelectedPendingInvite(null);
         }}
         title="Options"
-        actionItems={[
-          { id: 'cancel', title: 'Cancel Invite' },
-        ]}
-        onActionPress={(item: ActionItem) => {
-          if (item.id === 'cancel' && selectedPendingInvite) {
-            handleCancelInvite(selectedPendingInvite);
-          }
-          setShowPendingInviteOptions(false);
-          setSelectedPendingInvite(null);
-        }}
-      />
+      >
+        <TouchableOpacity
+          style={[styles.bottomSheetAction, { borderColor: appTheme.colors.error }]}
+          onPress={() => {
+            if (selectedPendingInvite) {
+              handleCancelInvite(selectedPendingInvite);
+            }
+            setShowPendingInviteOptions(false);
+            setSelectedPendingInvite(null);
+          }}
+        >
+          <Text style={[styles.bottomSheetActionText, { color: appTheme.colors.error }]}>
+            Cancel Invite
+          </Text>
+        </TouchableOpacity>
+      </AppBottomSheet>
     </SafeAreaView>
   );
 }
@@ -838,6 +851,18 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Bottom sheet action styles
+  bottomSheetAction: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  bottomSheetActionText: {
     fontSize: 16,
     fontWeight: '600',
   },

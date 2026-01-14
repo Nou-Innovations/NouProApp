@@ -17,7 +17,8 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
 import Avatar from '@/shared/components/ui/Avatar';
-import { ConfirmationDialog } from '@/shared/components/ui';
+import { AppModal } from '@/shared/components/ui';
+import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { imageService } from '@/shared/services/imageService';
 import { authService } from '@/shared/services/authService';
@@ -639,20 +640,25 @@ export default function EditPersonalProfileScreen() {
       </ScrollView>
 
       {/* Success Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showSuccessDialog}
-        variant="success"
-        title="Success"
-        message={successMessage}
-        primaryButtonText="OK"
-        onPrimaryAction={() => {
-          setShowSuccessDialog(false);
-          navigation.goBack();
-        }}
         onClose={() => {
           setShowSuccessDialog(false);
           navigation.goBack();
         }}
+        title="Success"
+        message={successMessage}
+        footer={
+          <AppButton
+            title="OK"
+            onPress={() => {
+              setShowSuccessDialog(false);
+              navigation.goBack();
+            }}
+            variant="confirm"
+            style={{ width: '100%' }}
+          />
+        }
       />
     </SafeAreaView>
   );

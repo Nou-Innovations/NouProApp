@@ -25,9 +25,9 @@ import {
   LucideIcon,
 } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import { useCompanyStore } from '@/shared/store/companyStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { ConfirmationDialog } from '@/shared/components/ui';
+import { AppModal } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import theme from '@/shared/theme';
@@ -82,7 +82,7 @@ const SettingsOption: React.FC<SettingsOptionProps> = ({
 export default function CompanySettingsScreen() {
   const navigation = useNavigation();
   const { theme: appTheme, isDarkMode } = useTheme();
-  const { currentCompany } = useCompanyStore();
+  const { currentCompany } = useBusinessStore();
   
   // Use profileStore for role checks (single source of truth)
   const isSuperAdminRole = useProfileStore((state) => state.isSuperAdmin);
@@ -273,29 +273,51 @@ export default function CompanySettingsScreen() {
       </View>
 
       {/* Delete Confirmation Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showDeleteDialog}
-        variant="delete"
+        onClose={() => setShowDeleteDialog(false)}
         title="Delete Company?"
         message="This action cannot be undone. All company data will be permanently deleted."
-        primaryButtonText="Delete"
-        secondaryButtonText="Cancel"
-        onPrimaryAction={confirmDeleteCompany}
-        onSecondaryAction={() => setShowDeleteDialog(false)}
-        onClose={() => setShowDeleteDialog(false)}
+        footer={
+          <View style={styles.modalFooter}>
+            <AppButton
+              title="Delete"
+              onPress={confirmDeleteCompany}
+              variant="alert"
+              style={{ flex: 1, marginRight: 8 }}
+            />
+            <AppButton
+              title="Cancel"
+              onPress={() => setShowDeleteDialog(false)}
+              variant="outline"
+              style={{ flex: 1 }}
+            />
+          </View>
+        }
       />
 
       {/* Leave Workplace Confirmation Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showLeaveDialog}
-        variant="delete"
+        onClose={() => setShowLeaveDialog(false)}
         title="Leave Workplace?"
         message="Are you sure you want to leave this workplace?"
-        primaryButtonText="Leave"
-        secondaryButtonText="Cancel"
-        onPrimaryAction={confirmLeaveWorkplace}
-        onSecondaryAction={() => setShowLeaveDialog(false)}
-        onClose={() => setShowLeaveDialog(false)}
+        footer={
+          <View style={styles.modalFooter}>
+            <AppButton
+              title="Leave"
+              onPress={confirmLeaveWorkplace}
+              variant="alert"
+              style={{ flex: 1, marginRight: 8 }}
+            />
+            <AppButton
+              title="Cancel"
+              onPress={() => setShowLeaveDialog(false)}
+              variant="outline"
+              style={{ flex: 1 }}
+            />
+          </View>
+        }
       />
     </SafeAreaView>
   );
@@ -411,5 +433,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontFamily: theme.fonts.primary.bold,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    marginTop: 8,
   },
 });

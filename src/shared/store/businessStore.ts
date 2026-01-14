@@ -408,9 +408,6 @@ export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
   }),
 }));
 
-// Re-export with company alias for backward compatibility
-export const useCompanyStore = useBusinessStore;
-
 // Helper functions
 export const businessStoreHelpers = {
   getBusinessById: (businesses: LegacyCompany[], id: string) => {
@@ -433,7 +430,3 @@ export const businessStoreHelpers = {
     return locations.filter(l => l.companyId === businessId);
   },
 };
-
-// Legacy export alias
-export const companyStoreHelpers = businessStoreHelpers;
-

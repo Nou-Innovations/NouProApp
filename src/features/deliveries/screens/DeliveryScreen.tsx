@@ -21,7 +21,7 @@ import DeliveryCreateModal from '@/features/deliveries/components/DeliveryCreate
 import PaywallModal from '@/features/subscription/components/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
-import { useCompanyStore } from '@/shared/store/companyStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { Icon } from '@/shared/utils/icons';
 import {
@@ -45,7 +45,7 @@ export default function DeliveryScreen() {
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const { theme: appTheme } = useTheme();
   const { setDeliveriesUnreadCount } = useNotifications();
-  const { currentCompany, currentLocation } = useCompanyStore();
+  const { currentCompany, currentLocation } = useBusinessStore();
   
   // Profile store for RBAC (single source of truth)
   const currentUserRole = useProfileStore((state) => state.currentUserRole);

@@ -31,7 +31,7 @@ import LaunchScreen from '@/shared/components/ui/LaunchScreen';
 
 // Stores
 import { useProfileStore } from '@/shared/store/profileStore';
-import { useCompanyStore } from '@/shared/store/companyStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 
 // Navigation
 import { PersonalTabNavigator } from '@/navigation/PersonalTabNavigator';
@@ -302,7 +302,7 @@ function AuthNavigatorWithContainer() {
  * Initialize company store
  */
 function CompanyStoreInitializer({ children }: { children: React.ReactNode }) {
-  const fetchCompanies = useCompanyStore((state) => state.fetchCompanies);
+  const fetchCompanies = useBusinessStore((state) => state.fetchCompanies);
 
   useEffect(() => {
     fetchCompanies();

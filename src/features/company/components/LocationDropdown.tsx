@@ -8,7 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
-import { useCompanyStore } from '@/shared/store/companyStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 
 interface LocationDropdownProps {
@@ -29,7 +29,7 @@ export default function LocationDropdown({
     locations, 
     currentLocation,
     setLocation 
-  } = useCompanyStore();
+  } = useBusinessStore();
   const { theme: appTheme } = useTheme();
 
   const selectedLocation = selectedLocationId 

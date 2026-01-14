@@ -7,6 +7,7 @@ import {
   Alert,
   Animated,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -14,14 +15,22 @@ import { Icon } from '@/shared/utils/icons';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/features/search/components/FilterBar';
 import InvoiceCard from '@/features/invoices/components/InvoiceCard';
-import DropdownModal, { DropdownItem } from '@/shared/components/ui/DropdownModal';
+import { AppBottomSheet } from '@/shared/components/ui';
+
+// DropdownItem type (kept for location items)
+interface DropdownItem {
+  id: string;
+  title: string;
+  description?: string;
+  icon?: string;
+}
 import SimpleHeader, { AnimatedFlatList, HEADER_HEIGHT } from '@/shared/components/layout/headers/SimpleHeader';
 import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
 import InvoiceActionsModal from '@/features/invoices/components/InvoiceActionsModal';
 import PaywallModal from '@/features/subscription/components/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
-import { useCompanyStore } from '@/shared/store/companyStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import { useProfileStore } from '@/shared/store/profileStore';
 // ARCHITECTURE: Data comes from hook, not mock array
 import { useInvoices } from '../hooks/useInvoices';
@@ -46,7 +55,7 @@ export default function InvoicesScreen() {
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const { theme: appTheme } = useTheme();
   const { setInvoicesUnreadCount } = useNotifications();
-  const { currentCompany, currentLocation } = useCompanyStore();
+  const { currentCompany, currentLocation } = useBusinessStore();
   
   // Profile store for RBAC (single source of truth)
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
@@ -281,27 +290,27 @@ export default function InvoicesScreen() {
                 /* Empty State */
                 <>
                   <Icon 
-                    name={activeTab === 'invoices' ? 'document-text-outline' : 'clipboard-outline'} 
-                    size={60} 
-                    color={appTheme.colors.textLight} 
-                  />
-                  <Text style={[styles.emptyListText, { color: appTheme.colors.textLight }]}>
-                    No {activeTab} found
+                name={activeTab === 'invoices' ? 'document-text-outline' : 'clipboard-outline'} 
+                size={60} 
+                color={appTheme.colors.textLight} 
+              />
+              <Text style={[styles.emptyListText, { color: appTheme.colors.textLight }]}>
+                No {activeTab} found
+              </Text>
+              {selectedLocationId && (
+                <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textLight }]}>
+                  Try selecting "All Locations" to see more {activeTab}
+                </Text>
+              )}
+              {hasManagePermission && (
+                <TouchableOpacity 
+                  style={[styles.createButtonInline, { backgroundColor: appTheme.colors.primary }]}
+                  onPress={handleCreateNew}
+                >
+                  <Text style={styles.createButtonInlineText}>
+                    Create {activeTab === 'invoices' ? 'Invoice' : 'Estimate'}
                   </Text>
-                  {selectedLocationId && (
-                    <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textLight }]}>
-                      Try selecting "All Locations" to see more {activeTab}
-                    </Text>
-                  )}
-                  {hasManagePermission && (
-                    <TouchableOpacity 
-                      style={[styles.createButtonInline, { backgroundColor: appTheme.colors.primary }]}
-                      onPress={handleCreateNew}
-                    >
-                      <Text style={styles.createButtonInlineText}>
-                        Create {activeTab === 'invoices' ? 'Invoice' : 'Estimate'}
-                      </Text>
-                    </TouchableOpacity>
+                </TouchableOpacity>
                   )}
                 </>
               )}
@@ -315,35 +324,82 @@ export default function InvoicesScreen() {
       </SimpleHeader>
 
       {/* Document Type Selection Modal */}
-      <DropdownModal
+      <AppBottomSheet
         visible={showViewDropdown}
         onClose={() => setShowViewDropdown(false)}
         title="Document Type"
-        items={[
-          {
-            id: 'invoices',
-            title: 'Invoices',
-            icon: 'document-text',
-          },
-          {
-            id: 'estimates',
-            title: 'Estimates',
-            icon: 'clipboard',
-          }
-        ]}
-        selectedItemId={activeTab}
-        onSelectItem={(item) => selectDocumentType(item.id as 'invoices' | 'estimates')}
-      />
+      >
+        {[
+          { id: 'invoices', title: 'Invoices', icon: 'file-text' },
+          { id: 'estimates', title: 'Estimates', icon: 'clipboard' },
+        ].map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={[
+              styles.bottomSheetItem,
+              { borderBottomColor: appTheme.colors.borderColor },
+              activeTab === item.id && { backgroundColor: `${appTheme.colors.primary}15` }
+            ]}
+            onPress={() => {
+              selectDocumentType(item.id as 'invoices' | 'estimates');
+            }}
+          >
+            <Icon 
+              name={item.icon} 
+              size={20} 
+              color={activeTab === item.id ? appTheme.colors.primary : appTheme.colors.iconColor} 
+            />
+            <Text style={[
+              styles.bottomSheetItemText,
+              { color: activeTab === item.id ? appTheme.colors.primary : appTheme.colors.text }
+            ]}>
+              {item.title}
+            </Text>
+            {activeTab === item.id && (
+              <Icon name="check" size={20} color={appTheme.colors.primary} />
+            )}
+          </TouchableOpacity>
+        ))}
+      </AppBottomSheet>
 
       {/* Location Selection Modal */}
-      <DropdownModal
+      <AppBottomSheet
         visible={showLocationDropdown}
         onClose={() => setShowLocationDropdown(false)}
         title="Locations"
-        items={locationItems}
-        selectedItemId={selectedLocationId || 'all'}
-        onSelectItem={handleLocationSelect}
-      />
+      >
+        <ScrollView style={{ maxHeight: 300 }}>
+          {locationItems.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={[
+                styles.bottomSheetItem,
+                { borderBottomColor: appTheme.colors.borderColor },
+                (selectedLocationId || 'all') === item.id && { backgroundColor: `${appTheme.colors.primary}15` }
+              ]}
+              onPress={() => {
+                handleLocationSelect(item);
+                setShowLocationDropdown(false);
+              }}
+            >
+              <Icon 
+                name={item.icon || 'map-pin'} 
+                size={20} 
+                color={(selectedLocationId || 'all') === item.id ? appTheme.colors.primary : appTheme.colors.iconColor} 
+              />
+              <Text style={[
+                styles.bottomSheetItemText,
+                { color: (selectedLocationId || 'all') === item.id ? appTheme.colors.primary : appTheme.colors.text }
+              ]}>
+                {item.title}
+              </Text>
+              {(selectedLocationId || 'all') === item.id && (
+                <Icon name="check" size={20} color={appTheme.colors.primary} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </AppBottomSheet>
 
       {/* Actions Bottom Sheet Modal */}
       <InvoiceActionsModal
@@ -515,6 +571,20 @@ const styles = StyleSheet.create({
   mockDataText: {
     color: '#000',
     fontSize: 12,
+    fontWeight: '500',
+  },
+  // AppBottomSheet item styles
+  bottomSheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 0.5,
+    gap: 12,
+  },
+  bottomSheetItemText: {
+    flex: 1,
+    fontSize: 16,
     fontWeight: '500',
   },
 });

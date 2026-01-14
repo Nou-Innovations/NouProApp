@@ -28,7 +28,6 @@ import NewChatModalList from '@/features/inbox/components/NewChatModalList';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
-import { useCompanyStore } from '@/shared/store/companyStore';
 import { useProfileStore } from '@/shared/store/profileStore';
 import theme from '@/shared/theme';
 
@@ -226,7 +225,6 @@ export default function InboxOverlayScreen() {
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const { theme: appTheme } = useTheme();
   const { setInboxUnreadCount } = useNotifications();
-  const { currentCompany } = useCompanyStore();
   const searchBarRef = useRef<AppSearchBarRef>(null);
   const keyboardHeightAnim = useRef(new Animated.Value(0)).current;
 
@@ -272,8 +270,8 @@ export default function InboxOverlayScreen() {
     let chats: any[] = isPersonalMode ? mockPersonalChats : mockBusinessChats;
 
     // Filter by company only in business mode (personal chats don't have companyId)
-    if (!isPersonalMode && currentCompany) {
-      chats = chats.filter((chat: any) => chat.companyId === currentCompany.id);
+    if (!isPersonalMode && activeBusiness) {
+      chats = chats.filter((chat: any) => chat.companyId === activeBusiness.id);
     }
 
     // Apply type filter - handle differently for personal vs business mode
@@ -302,7 +300,7 @@ export default function InboxOverlayScreen() {
     }
 
     return chats;
-  }, [search, filter, currentCompany, isPersonalMode]);
+  }, [search, filter, activeBusiness, isPersonalMode]);
 
   // Calculate unread chats count
   const unreadChatsCount = filteredChats.filter(chat => chat.unreadCount > 0).length;

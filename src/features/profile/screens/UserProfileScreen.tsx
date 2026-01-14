@@ -11,7 +11,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { userAvatarService } from '@/shared/services/userAvatarService';
 import Avatar from '@/shared/components/ui/Avatar';
-import ActionBottomSheet, { ActionItem } from '@/shared/components/ui/ActionBottomSheet';
+import { AppBottomSheet } from '@/shared/components/ui';
 import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
 import { ProfileViewType, getProfileAdditionalOptions } from '@/shared/types/profile';
 import theme from '@/shared/theme';
@@ -101,25 +101,26 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
   };
 
   // Action menu items for bottom sheet
-  const moreOptionsItems: ActionItem[] = getProfileAdditionalOptions(viewType).map((option) => ({
+  const moreOptionsItems = getProfileAdditionalOptions(viewType).map((option) => ({
     id: option.toLowerCase().replace(/\s/g, '-'),
     title: option,
-    variant: option === 'Block' ? 'destructive' as const : 'default' as const,
+    isDestructive: option === 'Block',
   }));
 
-  const handleMoreOptionAction = (item: ActionItem) => {
-    console.log(`${item.title} pressed for user ${userId}`);
-    if (item.title === 'Block') {
+  const handleMoreOptionAction = (title: string) => {
+    console.log(`${title} pressed for user ${userId}`);
+    setIsMoreOptionsVisible(false);
+    if (title === 'Block') {
       Alert.alert('Block User', `Are you sure you want to block ${mockUser.name}?`, [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Block', style: 'destructive', onPress: () => console.log('Blocked') },
       ]);
-    } else if (item.title === 'Report') {
+    } else if (title === 'Report') {
       Alert.alert('Report', `Report ${mockUser.name} for inappropriate content?`, [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Report', onPress: () => console.log('Reported') },
       ]);
-    } else if (item.title === 'Share') {
+    } else if (title === 'Share') {
       handleShareProfile();
     }
   };
@@ -346,13 +347,29 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
       </ScrollView>
 
       {/* More Options Bottom Sheet */}
-      <ActionBottomSheet
+      <AppBottomSheet
         visible={isMoreOptionsVisible}
         onClose={() => setIsMoreOptionsVisible(false)}
         title="Options"
-        actionItems={moreOptionsItems}
-        onActionPress={handleMoreOptionAction}
-      />
+      >
+        {moreOptionsItems.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={[
+              styles.bottomSheetAction,
+              { borderColor: item.isDestructive ? appTheme.colors.error : appTheme.colors.primary }
+            ]}
+            onPress={() => handleMoreOptionAction(item.title)}
+          >
+            <Text style={[
+              styles.bottomSheetActionText,
+              { color: item.isDestructive ? appTheme.colors.error : appTheme.colors.primary }
+            ]}>
+              {item.title}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </AppBottomSheet>
     </SafeAreaView>
   );
 }
@@ -528,5 +545,17 @@ const styles = StyleSheet.create({
   aboutValue: {
     fontSize: 16,
     fontFamily: theme.fonts.primary.semiBold,
+  },
+  // Bottom sheet action styles
+  bottomSheetAction: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  bottomSheetActionText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -26,7 +26,8 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
 import Avatar from '@/shared/components/ui/Avatar';
-import { ConfirmationDialog } from '@/shared/components/ui';
+import { AppModal } from '@/shared/components/ui';
+import AppButton from '@/shared/components/ui/AppButton';
 import { imageService } from '@/shared/services/imageService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -771,14 +772,19 @@ export default function PersonalProfileScreen() {
       {renderAddBusinessOptionsModal()}
 
       {/* Success Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showSuccessDialog}
-        variant="success"
+        onClose={() => setShowSuccessDialog(false)}
         title="Success"
         message={successMessage}
-        primaryButtonText="OK"
-        onPrimaryAction={() => setShowSuccessDialog(false)}
-        onClose={() => setShowSuccessDialog(false)}
+        footer={
+          <AppButton
+            title="OK"
+            onPress={() => setShowSuccessDialog(false)}
+            variant="confirm"
+            style={{ width: '100%' }}
+          />
+        }
       />
     </SafeAreaView>
   );

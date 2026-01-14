@@ -67,7 +67,7 @@ import {
 
 // Export new stores (RECOMMENDED)
 export { useProfileStore } from './profileStore';
-export { useBusinessStore, useCompanyStore } from './businessStore';
+export { useBusinessStore } from './businessStore';
 export { useOrderStore } from './orderStore';
 
 // Cart types

@@ -14,7 +14,8 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
 import Avatar from '@/shared/components/ui/Avatar';
-import { ConfirmationDialog } from '@/shared/components/ui';
+import { AppModal } from '@/shared/components/ui';
+import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 
 type RouteParams = {
@@ -274,33 +275,49 @@ export default function EditWorkExperienceScreen() {
       </View>
 
       {/* Success Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showSuccessDialog}
-        variant="success"
-        title="Success"
-        message={successMessage}
-        primaryButtonText="OK"
-        onPrimaryAction={() => {
-          setShowSuccessDialog(false);
-          navigation.goBack();
-        }}
         onClose={() => {
           setShowSuccessDialog(false);
           navigation.goBack();
         }}
+        title="Success"
+        message={successMessage}
+        footer={
+          <AppButton
+            title="OK"
+            onPress={() => {
+              setShowSuccessDialog(false);
+              navigation.goBack();
+            }}
+            variant="confirm"
+            style={{ width: '100%' }}
+          />
+        }
       />
 
       {/* Delete Confirmation Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showDeleteDialog}
-        variant="delete"
+        onClose={() => setShowDeleteDialog(false)}
         title="Remove Experience"
         message="Are you sure you want to remove this work experience?"
-        primaryButtonText="Remove"
-        secondaryButtonText="Cancel"
-        onPrimaryAction={confirmDelete}
-        onSecondaryAction={() => setShowDeleteDialog(false)}
-        onClose={() => setShowDeleteDialog(false)}
+        footer={
+          <View style={styles.modalFooter}>
+            <AppButton
+              title="Remove"
+              onPress={confirmDelete}
+              variant="alert"
+              style={{ flex: 1, marginRight: 8 }}
+            />
+            <AppButton
+              title="Cancel"
+              onPress={() => setShowDeleteDialog(false)}
+              variant="outline"
+              style={{ flex: 1 }}
+            />
+          </View>
+        }
       />
     </SafeAreaView>
   );
@@ -430,5 +447,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.medium,
     color: '#EF4444',
     marginLeft: 8,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    marginTop: 8,
   },
 });

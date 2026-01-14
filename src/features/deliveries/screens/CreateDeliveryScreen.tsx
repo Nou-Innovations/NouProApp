@@ -28,12 +28,13 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { useCompanyStore } from '@/shared/store/companyStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import { RootStackParamList } from '@/shared/types/navigation';
 import { mockStaff, mockTransportModes, Staff, TransportMode } from '@/shared/data/mockDeliveries';
 import { mockBrands } from '@/shared/data/businessProfile';
 import { formatCurrency } from '@/shared/data/mockOrders';
-import { ConfirmationDialog } from '@/shared/components/ui';
+import { AppModal } from '@/shared/components/ui';
+import AppButton from '@/shared/components/ui/AppButton';
 
 type CreateDeliveryRouteProp = RouteProp<RootStackParamList, 'CreateDelivery'>;
 
@@ -72,7 +73,7 @@ export default function CreateDeliveryScreen() {
   
   // Store state
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
-  const { locations, currentLocation } = useCompanyStore();
+  const { locations, currentLocation } = useBusinessStore();
   
   // Check if user can edit ID (Business or Enterprise plan)
   const canEditId = activeBusiness?.plan === 'business' || activeBusiness?.plan === 'enterprise';
@@ -698,20 +699,25 @@ export default function CreateDeliveryScreen() {
       )}
 
       {/* Success Dialog */}
-      <ConfirmationDialog
+      <AppModal
         visible={showSuccessDialog}
-        variant="success"
-        title="Success"
-        message={successMessage}
-        primaryButtonText="OK"
-        onPrimaryAction={() => {
-          setShowSuccessDialog(false);
-          navigation.goBack();
-        }}
         onClose={() => {
           setShowSuccessDialog(false);
           navigation.goBack();
         }}
+        title="Success"
+        message={successMessage}
+        footer={
+          <AppButton
+            title="OK"
+            onPress={() => {
+              setShowSuccessDialog(false);
+              navigation.goBack();
+            }}
+            variant="confirm"
+            style={{ width: '100%' }}
+          />
+        }
       />
     </SafeAreaView>
   );
