@@ -41,7 +41,6 @@ export interface Business {
   subscription_status: SubscriptionStatus;
   next_billing_date?: string; // ISO date
   connections_count?: number; // Number of business connections
-  followers_count?: number; // Number of followers
   created_at: string; // ISO timestamp
   updated_at?: string;
 }

@@ -412,7 +412,7 @@ export default function PersonalProfileScreen() {
                 {formatExperienceDate(ub.start_date)} - {formatExperienceDate(ub.end_date)}
               </Text>
             </View>
-            <Icon name="chevron-forward" size={20} color={appTheme.colors.textLight} />
+            <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
           </TouchableOpacity>
         ))}
       </View>
@@ -729,7 +729,7 @@ export default function PersonalProfileScreen() {
                   Start a new business from scratch
                 </Text>
               </View>
-              <Icon name="chevron-forward" size={20} color={appTheme.colors.textLight} />
+              <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -747,7 +747,7 @@ export default function PersonalProfileScreen() {
                   Search and join an existing business
                 </Text>
               </View>
-              <Icon name="chevron-forward" size={20} color={appTheme.colors.textLight} />
+              <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
             </TouchableOpacity>
           </View>
         </Animated.View>

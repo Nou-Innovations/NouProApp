@@ -1,9 +1,10 @@
 /**
- * NotificationsOverlayScreen - Notifications as an Overlay
+ * NotificationsScreen - Notifications Screen
  * Slides in from right, sits above tabs
- * Bottom tab bar is hidden inside this overlay
+ * Bottom tab bar is hidden inside this screen
  * Used for both Personal and Business modes
- * Uses the same notification card design as the main NotificationScreen
+ * 
+ * Design System: components.overlayScreens.notificationsOverlay
  */
 
 import React, { useState, useCallback } from 'react';
@@ -16,12 +17,14 @@ import {
   RefreshControl,
   Alert,
   Modal,
+  Pressable,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/features/search/components/FilterBar';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
@@ -154,6 +157,18 @@ const MOCK_NOTIFICATIONS: Notification[] = [
 
 const notificationFilterStatuses = ['all', 'request', 'deliveries', 'invoices'];
 
+// Type colors from design system - proHome.typeColors
+const TYPE_COLORS = {
+  message: '#0075FF',  // info
+  delivery: '#2ACF01', // success
+  invoice: '#A76AF0',  // inReview
+  system: '#6B7280',   // neutral gray
+  staff_request: '#A76AF0',    // inReview (purple)
+  company_request: '#FF7A00',  // lowStock (orange)
+  connection_accepted: '#2ACF01', // success
+  join_accepted: '#A76AF0',    // inReview
+};
+
 const NotificationCard: React.FC<NotificationCardProps> = ({ 
   notification, 
   onPress, 
@@ -187,27 +202,8 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
     }
   };
 
-  const getIconColor = (type: string) => {
-    switch (type) {
-      case 'message':
-        return '#007AFF';
-      case 'delivery':
-        return '#FF9500';
-      case 'invoice':
-        return '#34C759';
-      case 'system':
-        return '#8E8E93';
-      case 'staff_request':
-        return '#9C27B0';
-      case 'company_request':
-        return '#FF5722';
-      case 'connection_accepted':
-        return '#FF5722';
-      case 'join_accepted':
-        return '#9C27B0';
-      default:
-        return appTheme.colors.primary;
-    }
+  const getIconColor = (type: string): string => {
+    return TYPE_COLORS[type as keyof typeof TYPE_COLORS] || appTheme.colors.primary;
   };
 
   const handleRequestAction = (action: 'accept' | 'decline') => {
@@ -227,6 +223,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
   const canManageRequests = currentUserRole === 'admin' || currentUserRole === 'super_admin';
   const isPending = notification.status === 'pending';
   const isAccepted = notification.status === 'accepted';
+  const iconColor = getIconColor(notification.type);
 
   return (
     <TouchableOpacity
@@ -236,63 +233,79 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
           backgroundColor: appTheme.colors.background,
           borderBottomColor: appTheme.colors.borderColor,
         },
-        !notification.read && { backgroundColor: '#eef9ff' }
+        // Highlighted background for unread items (same as DeliveryCard/InvoiceCard)
+        !notification.read && { backgroundColor: appTheme.colors.highlightedRow },
       ]}
       onPress={() => onPress(notification)}
+      activeOpacity={0.7}
     >
       <View style={styles.notificationContent}>
-        <View style={[styles.iconContainer, { backgroundColor: getIconColor(notification.type) + '20' }]}>
+        {/* Icon Container - design spec: borderRadius 10, backgroundOpacity 0.15 */}
+        <View style={[styles.iconContainer, { backgroundColor: iconColor + '26' }]}>
           <Icon 
             name={getIconName(notification.type)} 
-            size={20} 
-            color={getIconColor(notification.type)} 
+            size={theme.iconSizes.sm} 
+            color={iconColor} 
           />
         </View>
         
         <View style={styles.textContainer}>
-          <View style={styles.headerRow}>
-            <Text style={[styles.title, { color: appTheme.colors.text }]} numberOfLines={1}>
+          {/* Title Row with Timestamp */}
+          <View style={styles.titleRow}>
+            <Text 
+              style={[styles.title, { color: appTheme.colors.primary }]} 
+              numberOfLines={1}
+            >
               {notification.title}
             </Text>
-            <Text style={[styles.time, { color: appTheme.colors.textLight }]}>
+            <Text style={[styles.timestamp, { color: appTheme.colors.textMuted }]}>
               {notification.time}
             </Text>
           </View>
-          <Text style={[styles.description, { color: appTheme.colors.textLight }]} numberOfLines={2}>
+          
+          {/* Subtitle/Description - 14px medium textSecondary */}
+          <Text 
+            style={[styles.subtitle, { color: appTheme.colors.textSecondary }]} 
+            numberOfLines={2}
+          >
             {notification.description}
           </Text>
           
-          {/* Staff Button for Accepted Join Requests */}
+          {/* Staff Button for Accepted Join Requests - Small Outline Button, Full Width */}
           {((notification.type === 'staff_request' && isAccepted) || notification.type === 'join_accepted') && canManageRequests && (
-            <View style={styles.staffButtonContainer}>
-              <TouchableOpacity
-                style={styles.staffButton}
-                onPress={handleStaffButtonPress}
-              >
-                <Text style={styles.staffButtonText}>{currentRole}</Text>
-                <Icon 
-                  name="chevron-down" 
-                  size={16} 
-                  color="#666666" 
-                />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[styles.staffButton, { borderColor: appTheme.colors.primary }]}
+              onPress={handleStaffButtonPress}
+            >
+              <Text style={[styles.staffButtonText, { color: appTheme.colors.primary }]}>
+                {currentRole}
+              </Text>
+              <Icon 
+                name="chevron-down" 
+                size={20} 
+                color={appTheme.colors.primary} 
+              />
+            </TouchableOpacity>
           )}
           
           {/* Action Buttons for Pending Requests */}
           {isRequestType && canManageRequests && isPending && (
             <View style={styles.requestButtons}>
               <TouchableOpacity
-                style={[styles.requestButton, styles.declineButton]}
+                style={[styles.requestButton, styles.declineButton, { borderColor: appTheme.colors.primary }]}
                 onPress={() => handleRequestAction('decline')}
               >
-                <Text style={styles.declineButtonText}>Decline</Text>
+                <Text style={[styles.declineButtonText, { color: appTheme.colors.primary }]}>
+                  Decline
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.requestButton, styles.confirmButton]}
+                style={[styles.requestButton, styles.confirmButton, { backgroundColor: appTheme.colors.primary }]}
                 onPress={() => handleRequestAction('accept')}
               >
-                <Text style={styles.confirmButtonText}>Confirm</Text>
+                <Text style={[styles.confirmButtonText, { color: appTheme.colors.textInverse }]}>
+                  Confirm
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -302,7 +315,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
   );
 };
 
-export default function NotificationsOverlayScreen() {
+export default function NotificationsScreen() {
   const [search, setSearch] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
@@ -317,6 +330,7 @@ export default function NotificationsOverlayScreen() {
   const navigation = useNavigation<any>();
   const { theme: appTheme } = useTheme();
   const { markAllAsRead, setUnreadCount } = useNotifications();
+  const insets = useSafeAreaInsets();
 
   // Mock current user role
   const currentUserRole: 'admin' | 'super_admin' | 'user' = 'admin';
@@ -407,7 +421,6 @@ export default function NotificationsOverlayScreen() {
         [selectedNotificationId]: pendingRole
       }));
       
-      // Show success dialog
       setSuccessMessage(`Role has been changed to ${pendingRole}.`);
       setShowSuccessDialog(true);
     }
@@ -473,11 +486,6 @@ export default function NotificationsOverlayScreen() {
     navigation.goBack();
   };
 
-  const handleMarkAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    markAllAsRead();
-  };
-
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setTimeout(() => {
@@ -492,41 +500,17 @@ export default function NotificationsOverlayScreen() {
     }, [markAllAsRead])
   );
 
+
   return (
     <SafeAreaView 
       style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} 
       edges={['top', 'bottom']}
     >
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: appTheme.colors.background, borderBottomColor: appTheme.colors.borderColor }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={handleBack}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Icon name="chevron-back" size={28} color={appTheme.colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: appTheme.colors.text }]}>
-          Notifications
-        </Text>
-        {unreadCount > 0 ? (
-          <TouchableOpacity
-            style={styles.markReadButton}
-            onPress={handleMarkAllRead}
-          >
-            <Text style={[styles.markReadText, { color: appTheme.colors.primary }]}>
-              Mark all read
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.settingsButton}
-            onPress={() => navigation.navigate('NotificationSettings')}
-          >
-            <Icon name="settings-outline" size={24} color={appTheme.colors.text} />
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Header - Using SecondaryHeader per design spec */}
+      <SecondaryHeader
+        title="Notifications"
+        leftAction={{ icon: 'chevron-left', onPress: handleBack }}
+      />
 
       {/* Search Bar */}
       <AppSearchBar 
@@ -585,52 +569,58 @@ export default function NotificationsOverlayScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Role Selection Modal */}
+      {/* Role Selection Bottom Sheet - design spec: components.modals.actionBottomSheet */}
       <Modal
         visible={showRoleModal}
         transparent={true}
         animationType="slide"
         onRequestClose={() => setShowRoleModal(false)}
       >
-        <TouchableOpacity 
+        <Pressable 
           style={styles.modalOverlay}
-          activeOpacity={1}
           onPress={() => setShowRoleModal(false)}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Role</Text>
-              <TouchableOpacity onPress={() => setShowRoleModal(false)}>
-                <Icon name="close" size={24} color="#666666" />
-              </TouchableOpacity>
-            </View>
+          <Pressable 
+            style={[styles.modalContent, { paddingBottom: insets.bottom + 16 }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Handle Indicator - design spec: components.modals.bottomSheet.handleIndicator */}
+            <View style={styles.handleIndicator} />
             
-            {['Staff', 'Admin', 'Super Admin'].map((role) => {
-              const currentRoleVal = getCurrentRole(selectedNotificationId || '');
-              return (
-                <TouchableOpacity
-                  key={role}
-                  style={[
-                    styles.roleListItem,
-                    currentRoleVal === role && styles.roleListItemSelected
-                  ]}
-                  onPress={() => handleRoleSelection(role)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[
-                    styles.roleListText,
-                    currentRoleVal === role && styles.roleListTextSelected
-                  ]}>
-                    {role}
-                  </Text>
-                  {currentRoleVal === role && (
-                    <Icon name="checkmark" size={20} color="#FFFFFF" />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </TouchableOpacity>
+            {/* Title - design spec: components.modals.header */}
+            <Text style={[styles.modalTitle, { color: appTheme.colors.text }]}>
+              Select Role
+            </Text>
+            
+            {/* Action Buttons - design spec: components.modals.actionBottomSheet.actionButtons */}
+            <View style={styles.actionButtonsContainer}>
+              {['Staff', 'Admin', 'Super Admin'].map((role) => {
+                const currentRoleVal = getCurrentRole(selectedNotificationId || '');
+                const isSelected = currentRoleVal === role;
+                return (
+                  <TouchableOpacity
+                    key={role}
+                    style={[
+                      styles.actionButton,
+                      isSelected 
+                        ? styles.actionButtonSelected
+                        : styles.actionButtonDefault
+                    ]}
+                    onPress={() => handleRoleSelection(role)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[
+                      styles.actionButtonText,
+                      { color: isSelected ? '#FFFFFF' : '#000000' }
+                    ]}>
+                      {role}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* Confirmation Dialog */}
@@ -664,196 +654,177 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    minHeight: 52,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.primary.bold,
-    flex: 1,
-    textAlign: 'center',
-  },
-  markReadButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  markReadText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
-  },
-  settingsButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   listContent: {
     paddingBottom: theme.spacing.lg,
+    flexGrow: 1,
   },
+  // Notification Card - design spec: components.overlayScreens.notificationsOverlay.notificationItem
   notificationCard: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14, // design spec
+    paddingHorizontal: theme.spacing.md, // 16
     borderBottomWidth: 1,
   },
   notificationContent: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: 12, // design spec
   },
+  // Icon Container - design spec: width 40, height 40, borderRadius 10
   iconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 8,
+    borderRadius: 10, // design spec (not 8)
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   textContainer: {
     flex: 1,
   },
-  headerRow: {
+  // Title Row - title and timestamp on same line
+  titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 4,
   },
+  // Title - 16px semiBold primary color
   title: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: theme.fonts.primary.semiBold,
     flex: 1,
-    marginRight: 8,
+    marginRight: theme.spacing.sm,
   },
-  time: {
-    fontSize: 12,
-    fontWeight: '400',
-  },
-  description: {
+  // Subtitle - 14px medium textSecondary
+  subtitle: {
     fontSize: 14,
     lineHeight: 20,
+    fontFamily: theme.fonts.primary.medium,
   },
+  // Timestamp - 14px medium textMuted, same line as title
+  timestamp: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+  },
+  // Request Action Buttons - Small buttons (40px height)
   requestButtons: {
     flexDirection: 'row',
     marginTop: 12,
-    height: 40,
-    gap: 8,
+    gap: theme.spacing.sm,
   },
   requestButton: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    height: theme.heights.buttonSmall, // 40px
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Decline - Small Outline Button
   declineButton: {
-    backgroundColor: 'white',
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
   },
-  confirmButton: {
-    backgroundColor: 'black',
-  },
+  // Confirm - Small Primary Button
+  confirmButton: {},
   declineButtonText: {
-    color: '#666666',
-    fontFamily: 'inter-semibold',
+    fontFamily: theme.fonts.primary.semiBold,
     fontSize: 14,
   },
   confirmButtonText: {
-    color: 'white',
-    fontFamily: 'inter-semibold',
+    fontFamily: theme.fonts.primary.semiBold,
     fontSize: 14,
   },
-  staffButtonContainer: {
-    marginTop: 12,
-  },
+  // Staff Button - Small Outline, Full Width
   staffButton: {
     flexDirection: 'row',
-    width: 180,
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
-    height: 40,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
+    height: theme.heights.buttonSmall, // 40px small button
+    borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    backgroundColor: 'transparent',
+    marginTop: 12,
   },
   staffButtonText: {
     fontSize: 14,
-    color: '#374151',
-    fontFamily: 'inter-semibold',
+    fontFamily: theme.fonts.primary.semiBold,
   },
+  // Empty State - design spec: patterns.emptyStates
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: theme.spacing.xxl,
     paddingHorizontal: theme.spacing.lg,
+    flex: 1,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.primary.bold,
+    fontSize: 16, // design spec: patterns.emptyStates.titleFontSize
+    fontFamily: theme.fonts.primary.medium,
     marginTop: theme.spacing.md,
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 14, // design spec: patterns.emptyStates.subtitleFontSize
     fontFamily: theme.fonts.primary.regular,
     textAlign: 'center',
     marginTop: theme.spacing.xs,
   },
+  // ============================================================
+  // BOTTOM SHEET MODAL - design spec: components.modals.bottomSheet
+  // ============================================================
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // design spec: bottomSheet.overlayColor
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 34,
+    backgroundColor: '#FFFFFF', // design spec: bottomSheet.backgroundColor
+    borderTopLeftRadius: 20,    // design spec: bottomSheet.borderTopLeftRadius
+    borderTopRightRadius: 20,   // design spec: bottomSheet.borderTopRightRadius
+    paddingTop: 16,             // design spec: bottomSheet.paddingTop
+    paddingHorizontal: 16,      // design spec: bottomSheet.paddingHorizontal
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+  // Handle Indicator - design spec: bottomSheet.handleIndicator
+  handleIndicator: {
+    width: 36,                  // design spec: handleIndicator.width
+    height: 4,                  // design spec: handleIndicator.height
+    borderRadius: 2,            // design spec: handleIndicator.borderRadius
+    backgroundColor: '#E5E7EB', // design spec: handleIndicator.backgroundColor
+    alignSelf: 'center',
+    marginBottom: 16,
   },
+  // Modal Title - design spec: components.modals.header
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
+    fontSize: 18,               // design spec: header.titleFontSize
+    fontFamily: theme.fonts.primary.semiBold, // design spec: header.titleFontWeight (600)
+    textAlign: 'center',
+    marginBottom: 16,           // design spec: header.paddingBottom
   },
-  roleListItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  // ============================================================
+  // ACTION BUTTONS - design spec: components.modals.actionBottomSheet.actionButtons
+  // ============================================================
+  actionButtonsContainer: {
+    gap: 4,                     // design spec: actionButtons.gap
+  },
+  actionButton: {
+    height: 48,                 // design spec: actionButtons.height
+    borderRadius: 12,           // design spec: actionButtons.borderRadius
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    height: 48,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
-  roleListItemSelected: {
-    backgroundColor: '#000000',
+  // Default variant - design spec: actionButtons.variants.default
+  actionButtonDefault: {
+    backgroundColor: 'transparent', // design spec: default.backgroundColor
+    borderWidth: 1,                 // design spec: default.borderWidth
+    borderColor: '#000000',         // design spec: default.borderColor
   },
-  roleListText: {
-    fontSize: 16,
-    color: '#111827',
-    fontWeight: '500',
+  // Selected variant - design spec: actionButtons.variants.selected
+  actionButtonSelected: {
+    backgroundColor: '#000000',     // design spec: selected.backgroundColor
+    borderWidth: 0,                 // design spec: selected.borderWidth
   },
-  roleListTextSelected: {
-    color: '#FFFFFF',
+  actionButtonText: {
+    fontSize: 16,                   // design spec: actionButtons.fontSize
+    fontFamily: theme.fonts.primary.medium, // design spec: actionButtons.fontFamily (Inter-Medium)
   },
 });

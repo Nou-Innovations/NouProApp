@@ -774,6 +774,21 @@
               "description": "Lightweight timeline of recent business activity (operational, not social)",
               "itemTypes": ["Order created", "Delivery completed", "Invoice sent", "Product added", "Stock updated", "Payment received"],
               "maxItems": 5,
+              "displayBehavior": {
+                "showMostRecent": "Display only the 5 most recent activity items",
+                "emptyState": {
+                  "condition": "When business has no activity (new business or no recorded activity)",
+                  "message": "No activity yet",
+                  "subMessage": "Your recent business activity will appear here",
+                  "icon": "time-outline"
+                },
+                "viewAllButton": {
+                  "text": "View all activity",
+                  "behavior": "Always visible",
+                  "disabledWhenEmpty": true,
+                  "enabledAction": "Navigate to AllActivityScreen"
+                }
+              },
               "seeAllLink": true
             },
             "postsSection": {

@@ -55,7 +55,7 @@ export type RootStackParamList = {
   
   // Overlay Screens (slide from right, no tab bar)
   InboxOverlay: undefined;
-  NotificationsOverlay: undefined;
+  Notifications: undefined;
   
   // Chat screens
   Chat: {

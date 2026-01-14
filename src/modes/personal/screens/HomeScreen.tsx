@@ -68,7 +68,7 @@ export default function HomeScreen() {
   
   const navigateToNotifications = useCallback(() => {
     // @ts-ignore
-    navigation.navigate('NotificationsOverlay');
+    navigation.navigate('Notifications');
   }, [navigation]);
 
   const handleBusinessPress = (businessId: string, expandBrandId?: string) => {

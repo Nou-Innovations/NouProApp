@@ -12,9 +12,12 @@ import {
   TouchableOpacity,
   FlatList,
 } from 'react-native';
-import { Icon } from '@/shared/utils/icons';
+import { Icon, iconMap } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
+import AppButton from '@/shared/components/ui/AppButton';
+
+type IconName = keyof typeof iconMap;
 
 export type ActivityType = 
   | 'order_created' 
@@ -45,16 +48,16 @@ interface ProActivityTimelineProps {
   onSeeAll?: () => void;
 }
 
-const TYPE_CONFIG: Record<ActivityType, { icon: keyof typeof Icon.glyphMap; color: string }> = {
-  order_created: { icon: 'cart-outline', color: '#0075FF' },
-  order_confirmed: { icon: 'checkmark-circle-outline', color: '#2ACF01' },
-  delivery_completed: { icon: 'checkmark-done-outline', color: '#2ACF01' },
-  delivery_started: { icon: 'car-outline', color: '#0075FF' },
-  invoice_sent: { icon: 'send-outline', color: '#A76AF0' },
-  invoice_paid: { icon: 'cash-outline', color: '#2ACF01' },
-  product_added: { icon: 'add-circle-outline', color: '#0075FF' },
-  stock_updated: { icon: 'cube-outline', color: '#FFB600' },
-  message_received: { icon: 'mail-outline', color: '#0075FF' },
+const TYPE_CONFIG: Record<ActivityType, { icon: IconName; color: string }> = {
+  order_created: { icon: 'cart', color: '#007AFF' },
+  order_confirmed: { icon: 'checkmark-circle', color: '#34C759' },
+  delivery_completed: { icon: 'checkmark-done', color: '#34C759' },
+  delivery_started: { icon: 'car', color: '#FF9500' },
+  invoice_sent: { icon: 'send', color: '#9C27B0' },
+  invoice_paid: { icon: 'cash', color: '#34C759' },
+  product_added: { icon: 'add-circle', color: '#007AFF' },
+  stock_updated: { icon: 'cube', color: '#FF9500' },
+  message_received: { icon: 'mail', color: '#007AFF' },
 };
 
 export function ProActivityTimeline({ 
@@ -68,7 +71,7 @@ export function ProActivityTimeline({
 
   const renderSkeletonItem = () => (
     <View style={styles.itemContainer}>
-      <View style={[styles.skeletonDot, { backgroundColor: appTheme.colors.borderColor }]} />
+      <View style={[styles.skeletonDot, { backgroundColor: appTheme.colors.borderColor, marginRight: 12 }]} />
       <View style={styles.itemContent}>
         <View style={[styles.skeletonTitle, { backgroundColor: appTheme.colors.borderColor }]} />
         <View style={[styles.skeletonTime, { backgroundColor: appTheme.colors.borderColor }]} />
@@ -124,17 +127,30 @@ export function ProActivityTimeline({
         </View>
         <View style={[styles.emptyContainer, { backgroundColor: appTheme.colors.surface }]}>
           <Icon name="time-outline" size={32} color={appTheme.colors.textMuted} />
-          <Text style={[styles.emptyText, { color: appTheme.colors.textMuted }]}>
-            No recent activity
+          <Text style={[styles.emptyTitle, { color: appTheme.colors.textMuted }]}>
+            No activity yet
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: appTheme.colors.textMuted }]}>
+            Your recent business activity will appear here
           </Text>
         </View>
+        {onSeeAll && (
+          <View style={styles.seeAllButtonContainer}>
+            <AppButton
+              title="View all activity"
+              onPress={onSeeAll}
+              variant="outline"
+              size="small"
+              disabled={true}
+            />
+          </View>
+        )}
       </View>
     );
   }
 
-  const renderItem = ({ item, index }: { item: ActivityItem; index: number }) => {
+  const renderItem = ({ item }: { item: ActivityItem }) => {
     const config = TYPE_CONFIG[item.type];
-    const isLast = index === displayItems.length - 1;
 
     return (
       <TouchableOpacity
@@ -143,14 +159,9 @@ export function ProActivityTimeline({
         activeOpacity={item.onPress ? 0.7 : 1}
         disabled={!item.onPress}
       >
-        {/* Timeline dot and line */}
-        <View style={styles.timelineLeft}>
-          <View style={[styles.dot, { backgroundColor: config.color }]}>
-            <Icon name={config.icon} size={12} color="#FFFFFF" />
-          </View>
-          {!isLast && (
-            <View style={[styles.line, { backgroundColor: appTheme.colors.borderColor }]} />
-          )}
+        {/* Icon box - same color logic as notifications */}
+        <View style={[styles.iconBox, { backgroundColor: config.color + '20' }]}>
+          <Icon name={config.icon} size={20} color={config.color} />
         </View>
         
         {/* Content */}
@@ -170,7 +181,7 @@ export function ProActivityTimeline({
         
         {/* Arrow if pressable */}
         {item.onPress && (
-          <Icon name="chevron-forward" size={16} color={appTheme.colors.textMuted} />
+          <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
         )}
       </TouchableOpacity>
     );
@@ -195,16 +206,14 @@ export function ProActivityTimeline({
       </View>
       
       {(hasMore || onSeeAll) && (
-        <TouchableOpacity
-          style={[styles.seeAllButton, { borderColor: appTheme.colors.borderColor }]}
-          onPress={onSeeAll}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.seeAllText, { color: appTheme.colors.primary }]}>
-            View all activity
-          </Text>
-          <Icon name="chevron-forward" size={16} color={appTheme.colors.primary} />
-        </TouchableOpacity>
+        <View style={styles.seeAllButtonContainer}>
+          <AppButton
+            title="View all activity"
+            onPress={onSeeAll || (() => {})}
+            variant="outline"
+            size="small"
+          />
+        </View>
       )}
     </View>
   );
@@ -230,64 +239,42 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   listContent: {
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   itemContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
   },
-  timelineLeft: {
-    alignItems: 'center',
-    marginRight: 12,
-    width: 24,
-  },
-  dot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  line: {
-    width: 2,
-    flex: 1,
-    minHeight: 20,
-    marginTop: 4,
+    marginRight: 12,
   },
   itemContent: {
     flex: 1,
     gap: 2,
   },
   itemTitle: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
-    lineHeight: 18,
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.semiBold,
+    lineHeight: 20,
   },
   itemDescription: {
-    fontSize: 13,
-    fontFamily: theme.fonts.primary.regular,
-  },
-  timestamp: {
-    fontSize: 11,
-    fontFamily: theme.fonts.primary.regular,
-    marginTop: 2,
-  },
-  seeAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.sm,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 4,
-  },
-  seeAllText: {
     fontSize: 14,
     fontFamily: theme.fonts.primary.semiBold,
+  },
+  timestamp: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+  },
+  seeAllButtonContainer: {
+    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.sm,
   },
   errorContainer: {
     alignItems: 'center',
@@ -307,25 +294,31 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.lg,
     marginHorizontal: theme.spacing.md,
     borderRadius: 12,
-    gap: 8,
+    gap: 4,
   },
-  emptyText: {
+  emptyTitle: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.semiBold,
+    marginTop: 8,
+  },
+  emptySubtitle: {
     fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
+    fontFamily: theme.fonts.primary.regular,
+    textAlign: 'center',
   },
   skeletonDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
   },
   skeletonTitle: {
     width: '70%',
-    height: 14,
+    height: 16,
     borderRadius: 4,
   },
   skeletonTime: {
     width: '30%',
-    height: 10,
+    height: 14,
     borderRadius: 4,
     marginTop: 4,
   },

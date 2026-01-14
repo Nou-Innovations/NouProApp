@@ -266,7 +266,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
               {formatExperienceDate(startDate)} - Present
             </Text>
           </View>
-          <Icon name="chevron-forward" size={20} color={appTheme.colors.textLight} />
+          <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
         </TouchableOpacity>
       </View>
     );

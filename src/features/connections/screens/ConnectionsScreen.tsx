@@ -2,7 +2,7 @@
  * ConnectionsScreen
  * Shows list of users and companies connected with the profile owner
  * Includes filter to show All, Users, or Companies
- * Following design.json specifications
+ * Following design.json specifications - connectionsScreen section
  */
 
 import React, { useState, useMemo } from 'react';
@@ -202,7 +202,7 @@ export default function ConnectionsScreen() {
     }
   };
 
-  // Header - design.json: connectionsScreen.header
+  // Header - design.json: headers.secondaryHeader (height: 56, title: 24px medium)
   const renderHeader = () => (
     <View style={[styles.header, { backgroundColor: appTheme.colors.background }]}>
       <TouchableOpacity
@@ -210,41 +210,41 @@ export default function ConnectionsScreen() {
         onPress={() => navigation.goBack()}
         activeOpacity={0.7}
       >
-        <Icon name="chevron-back" size={28} color={appTheme.colors.text} />
+        <Icon name="chevron-back" size={32} color={appTheme.colors.text} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: appTheme.colors.text }]}>
         Connections
       </Text>
-      <View style={{ width: 44 }} />
+      <View style={styles.headerRightSpacer} />
     </View>
   );
 
-  // Search bar - design.json: components.inputs.searchInput
+  // Search bar - design.json: connectionsScreen.searchBar + components.inputs.searchInput
   const renderSearchBar = () => (
     <View 
       style={[
         styles.searchContainer, 
         { 
           backgroundColor: appTheme.colors.cardBackground,
-          borderColor: isSearchFocused || searchQuery ? appTheme.colors.primary : '#E1E4EA',
+          borderColor: isSearchFocused || searchQuery ? appTheme.colors.primary : appTheme.colors.borderColor,
         }
       ]}
     >
       <Icon 
         name="search" 
         size={20} 
-        color={isSearchFocused || searchQuery ? appTheme.colors.primary : '#A4AAB8'} 
+        color={isSearchFocused || searchQuery ? appTheme.colors.primary : appTheme.colors.textMuted} 
       />
       <TextInput
         style={[
           styles.searchInput, 
           { 
             color: appTheme.colors.text,
-            fontFamily: searchQuery ? theme.fonts.primary.semiBold : theme.fonts.primary.regular,
+            fontFamily: searchQuery ? theme.fonts.primary.semiBold : theme.fonts.primary.medium,
           }
         ]}
         placeholder="Search connections"
-        placeholderTextColor="#A4AAB8"
+        placeholderTextColor={appTheme.colors.textMuted}
         value={searchQuery}
         onChangeText={setSearchQuery}
         onFocus={() => setIsSearchFocused(true)}
@@ -252,15 +252,15 @@ export default function ConnectionsScreen() {
       />
       {searchQuery.length > 0 && (
         <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
-          <Icon name="close-circle" size={20} color="#A4AAB8" />
+          <Icon name="close-circle" size={20} color={appTheme.colors.textMuted} />
         </TouchableOpacity>
       )}
     </View>
   );
 
-  // Filter bar - design.json: components.filterBar (tab style with underline)
+  // Filter bar - design.json: components.filterBar (full-width indicator)
   const renderFilterBar = () => (
-    <View style={[styles.filterBar, { borderBottomColor: '#E5E7EB' }]}>
+    <View style={[styles.filterBar, { borderBottomColor: appTheme.colors.borderColor }]}>
       {FILTERS.map((filter) => {
         const isActive = activeFilter === filter.id;
         return (
@@ -274,15 +274,15 @@ export default function ConnectionsScreen() {
               style={[
                 styles.filterTabText,
                 { 
-                  color: isActive ? appTheme.colors.text : '#777777',
-                  fontFamily: isActive ? theme.fonts.primary.semiBold : theme.fonts.primary.medium,
+                  color: isActive ? appTheme.colors.text : appTheme.colors.textMuted,
+                  fontFamily: isActive ? theme.fonts.primary.bold : theme.fonts.primary.medium,
                 },
               ]}
             >
               {filter.label}
             </Text>
             {isActive && (
-              <View style={[styles.filterIndicator, { backgroundColor: appTheme.colors.accent }]} />
+              <View style={[styles.filterIndicator, { backgroundColor: appTheme.colors.text }]} />
             )}
           </TouchableOpacity>
         );
@@ -290,10 +290,10 @@ export default function ConnectionsScreen() {
     </View>
   );
 
-  // User connection item - design.json: connectionsScreen.listItem
+  // User connection item - design.json: connectionsScreen.listItem (avatarRadius: 24 for users)
   const renderUserItem = (item: UserConnection) => (
     <TouchableOpacity
-      style={[styles.connectionItem, { borderBottomColor: '#E1E4EA' }]}
+      style={[styles.connectionItem, { borderBottomColor: appTheme.colors.borderColor }]}
       onPress={() => handleConnectionPress(item)}
       activeOpacity={0.7}
     >
@@ -302,30 +302,26 @@ export default function ConnectionsScreen() {
         userName={item.name}
         imageUri={item.avatar_url}
         size={48}
+        style={styles.userAvatar}
       />
       <View style={styles.connectionInfo}>
         <Text style={[styles.connectionName, { color: appTheme.colors.text }]}>
           {item.name}
         </Text>
         {item.job_title && (
-          <Text style={[styles.connectionSubtitle, { color: '#575B66' }]}>
+          <Text style={[styles.connectionSubtitle, { color: appTheme.colors.secondary }]}>
             {item.job_title}
           </Text>
         )}
-        {item.company && (
-          <Text style={[styles.connectionMeta, { color: '#A4AAB8' }]}>
-            {item.company}
-          </Text>
-        )}
       </View>
-      <Icon name="chevron-forward" size={20} color="#A4AAB8" />
+      <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
     </TouchableOpacity>
   );
 
-  // Company connection item - design.json: followingScreen.listItem (for companies)
+  // Company connection item - design.json: connectionsScreen.listItem (avatarRadius: 8 for companies)
   const renderCompanyItem = (item: CompanyConnection) => (
     <TouchableOpacity
-      style={[styles.connectionItem, { borderBottomColor: '#E1E4EA' }]}
+      style={[styles.connectionItem, { borderBottomColor: appTheme.colors.borderColor }]}
       onPress={() => handleConnectionPress(item)}
       activeOpacity={0.7}
     >
@@ -341,20 +337,12 @@ export default function ConnectionsScreen() {
           {item.name}
         </Text>
         {item.industry && (
-          <Text style={[styles.connectionSubtitle, { color: '#575B66' }]}>
+          <Text style={[styles.connectionSubtitle, { color: appTheme.colors.secondary }]}>
             {item.industry}
           </Text>
         )}
-        {item.description && (
-          <Text 
-            style={[styles.connectionMeta, { color: '#A4AAB8' }]}
-            numberOfLines={1}
-          >
-            {item.description}
-          </Text>
-        )}
       </View>
-      <Icon name="chevron-forward" size={20} color="#A4AAB8" />
+      <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
     </TouchableOpacity>
   );
 
@@ -390,12 +378,12 @@ export default function ConnectionsScreen() {
         <Icon 
           name={emptyIcon} 
           size={60} 
-          color="#A4AAB8" 
+          color={appTheme.colors.textMuted} 
         />
         <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>
           {emptyTitle}
         </Text>
-        <Text style={[styles.emptySubtitle, { color: '#575B66' }]}>
+        <Text style={[styles.emptySubtitle, { color: appTheme.colors.secondary }]}>
           {emptyMessage}
         </Text>
       </View>
@@ -427,35 +415,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  // Header - design.json: overlayScreens.header (height: 52)
+  // Header - design.json: headers.secondaryHeader (height: 56)
   header: {
-    height: 52,
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E1E4EA',
+    paddingRight: 8,
   },
   backButton: {
-    width: 44,
-    height: 44,
+    width: 56,
+    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.primary.bold,
+    fontSize: 24,
     textAlign: 'center',
+    flex: 1,
   },
-  // Search bar - design.json: components.inputs.searchInput
+  headerRightSpacer: {
+    width: 56,
+  },
+  // Search bar - design.json: connectionsScreen.searchBar
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-    height: 40,
+    marginVertical: 12,
+    height: 48,
     paddingHorizontal: 16,
     borderRadius: 8,
     borderWidth: 1,
@@ -466,7 +454,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     height: '100%',
   },
-  // Filter bar - design.json: components.filterBar
+  // Filter bar - design.json: components.filterBar (height: 40, full-width indicator)
   filterBar: {
     height: 40,
     flexDirection: 'row',
@@ -481,13 +469,13 @@ const styles = StyleSheet.create({
   filterTabText: {
     fontSize: 14,
   },
+  // Full-width indicator per design.json filterBar.selected.indicatorPosition
   filterIndicator: {
     position: 'absolute',
     bottom: 0,
-    left: '20%',
-    right: '20%',
+    left: 0,
+    right: 0,
     height: 2.5,
-    borderRadius: 1.25,
   },
   // List items - design.json: connectionsScreen.listItem
   connectionItem: {
@@ -498,23 +486,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     gap: 12,
   },
+  // All avatars use 8px border radius - no difference between user and company
+  userAvatar: {
+    borderRadius: 8,
+  },
   companyAvatar: {
     borderRadius: 8,
   },
   connectionInfo: {
     flex: 1,
   },
+  // design.json: connectionsScreen.listItem.nameTypography
   connectionName: {
     fontSize: 16,
     fontFamily: theme.fonts.primary.medium,
   },
+  // design.json: connectionsScreen.listItem.subtitleTypography
   connectionSubtitle: {
     fontSize: 14,
-    fontFamily: theme.fonts.primary.regular,
-    marginTop: 2,
-  },
-  connectionMeta: {
-    fontSize: 13,
     fontFamily: theme.fonts.primary.regular,
     marginTop: 2,
   },

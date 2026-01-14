@@ -147,7 +147,7 @@ export function BrandPresentationPost({
             </Text>
           </TouchableOpacity>
         </View>
-        <Icon name="chevron-forward" size={20} color={appTheme.colors.textMuted} />
+        <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
       </TouchableOpacity>
 
       {/* Products Carousel */}

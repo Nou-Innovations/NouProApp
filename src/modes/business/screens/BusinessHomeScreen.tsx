@@ -2,7 +2,6 @@
  * BusinessHomeScreen - Pro Mode Home
  * Business-operating dashboard with:
  * - Header with title and Inbox/Notifications icons (FIXED)
- * - KPI chips row (FIXED)
  * - Activity Timeline (FIXED - feed scrolls over it)
  * - Posts section (SCROLLABLE - scrolls under header, over activity)
  * - Swipe from right edge to reveal InboxOverlay
@@ -15,7 +14,6 @@ import {
   StyleSheet,
   RefreshControl,
   Dimensions,
-  TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -32,15 +30,11 @@ import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useNotifications } from '@/shared/context/NotificationContext';
-import { useProfileStore } from '@/shared/store/profileStore';
-import { Icon } from '@/shared/utils/icons';
 import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
 
 // Pro Home Components
 import {
-  ProKpiChipsRow,
   ProActivityTimeline,
-  type KpiChip,
   type ActivityItem,
 } from '../components';
 
@@ -51,10 +45,8 @@ import {
   NewProductPost,
 } from '@/modes/personal/components';
 
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Threshold for sticky header activation
-const STICKY_THRESHOLD = 50;
 // Edge swipe threshold (pixels from right edge)
 const EDGE_SWIPE_THRESHOLD = 40;
 // Minimum swipe distance to trigger navigation
@@ -469,18 +461,22 @@ export default function BusinessHomeScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
   const { unreadCount, inboxUnreadCount } = useNotifications();
-  const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const insets = useSafeAreaInsets();
   
   // State
   const [refreshing, setRefreshing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [activitySectionHeight, setActivitySectionHeight] = useState(0);
   
   // Ref for bottom sheet
   const bottomSheetRef = useRef<BottomSheet>(null);
   
   // Calculate header height (safe area + header)
   const headerHeight = insets.top + 56; // 56 is approximate header height
+  
+  // Measure activity section height
+  const onActivitySectionLayout = useCallback((event: { nativeEvent: { layout: { height: number } } }) => {
+    setActivitySectionHeight(event.nativeEvent.layout.height);
+  }, []);
   
   // Track if feed is in sticky mode (expanded to top) - 0 = collapsed, 1 = expanded
   const expandProgress = useSharedValue(0);
@@ -499,18 +495,18 @@ export default function BusinessHomeScreen() {
   
   const navigateToNotifications = useCallback(() => {
     // @ts-ignore
-    navigation.navigate('NotificationsOverlay');
+    navigation.navigate('Notifications');
   }, [navigation]);
 
   // Bottom sheet snap points - showing peek of feed, then expanded to top
   const snapPoints = useMemo(() => {
-    // When activity section is measured, calculate snap points
-    // Snap point 0: Just show the "Feed" title below activity (peek)
-    // Snap point 1: Expanded to top (below header)
-    const peekHeight = 120; // Show "Feed" title + part of first post
+    // Calculate remaining space below activity section (with 16px gap)
+    // Total used space = headerHeight + activitySectionHeight + 8px (marginTop) + 16px (gap)
+    const usedSpace = headerHeight + activitySectionHeight + 96;
+    const peekHeight = Math.max(SCREEN_HEIGHT - usedSpace, 150); // Minimum 150px peek
     const expandedHeight = SCREEN_HEIGHT - headerHeight;
     return [peekHeight, expandedHeight];
-  }, [headerHeight]);
+  }, [headerHeight, activitySectionHeight]);
   
   // Handle bottom sheet changes - animate with ease-in-out
   const handleSheetChange = useCallback((index: number) => {
@@ -587,59 +583,7 @@ export default function BusinessHomeScreen() {
     console.log('Connect/Disconnect:', companyId, isConnected);
   };
 
-  // KPI Chips data
-  const kpiChips: KpiChip[] = [
-    {
-      id: 'new-orders',
-      label: 'New Orders',
-      value: 3,
-      icon: 'cart-outline',
-      color: '#0075FF',
-      onPress: () => navigation.navigate('OrderDetail' as never, { orderId: 'all-new' } as never),
-    },
-    {
-      id: 'deliveries-today',
-      label: 'Deliveries Today',
-      value: 5,
-      icon: 'car-outline',
-      color: '#2ACF01',
-      onPress: () => navigation.navigate('Deliveries' as never),
-    },
-    {
-      id: 'pending-deliveries',
-      label: 'Pending',
-      value: 2,
-      icon: 'time-outline',
-      color: '#FFB600',
-      onPress: () => navigation.navigate('Deliveries' as never),
-    },
-    {
-      id: 'low-stock',
-      label: 'Low Stock',
-      value: 8,
-      icon: 'cube-outline',
-      color: '#FF7A00',
-      onPress: () => navigation.navigate('Products' as never),
-    },
-    {
-      id: 'overdue-invoices',
-      label: 'Overdue',
-      value: 1,
-      icon: 'document-text-outline',
-      color: '#FF2400',
-      onPress: () => navigation.navigate('Invoices' as never),
-    },
-    {
-      id: 'unread-messages',
-      label: 'Messages',
-      value: inboxUnreadCount,
-      icon: 'mail-outline',
-      color: '#A76AF0',
-      onPress: navigateToInbox,
-    },
-  ];
-
-  // Activity Timeline mock data
+  // Activity Timeline data
   const activityItems: ActivityItem[] = [
     {
       id: 'act-1',
@@ -682,19 +626,6 @@ export default function BusinessHomeScreen() {
       onPress: () => navigation.navigate('DeliveryDetail' as never, { deliveryId: '457' } as never),
     },
   ];
-
-  // Render badge
-  const renderBadge = (count: number) => {
-    if (count <= 0) return null;
-    
-    return (
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>
-          {count > 99 ? '99+' : count.toString()}
-        </Text>
-      </View>
-    );
-  };
 
   // Render custom header using PrimaryHeader
   const renderHeader = () => (
@@ -788,22 +719,14 @@ export default function BusinessHomeScreen() {
             {/* Activity Section - FULLY INTERACTIVE background content */}
             <View 
               style={[styles.activitySection, { backgroundColor: appTheme.colors.surface }]}
+              onLayout={onActivitySectionLayout}
             >
-              {/* KPI Chips Row */}
-              <ProKpiChipsRow 
-                chips={kpiChips} 
-                isLoading={isLoading}
-              />
-              
               {/* Activity Timeline */}
-              <View style={styles.sectionSpacing}>
-                <ProActivityTimeline
-                  items={activityItems}
-                  isLoading={isLoading}
-                  maxItems={5}
-                  onSeeAll={() => console.log('See all activity')}
-                />
-              </View>
+              <ProActivityTimeline
+                items={activityItems}
+                maxItems={5}
+                onSeeAll={() => navigation.navigate('AllActivity' as never)}
+              />
             </View>
             
             {/* Bottom Sheet - Feed section that slides over Activity */}
@@ -880,6 +803,7 @@ const styles = StyleSheet.create({
   activitySection: {
     // Normal flow - takes its natural height
     // Fully interactive as background content
+    marginTop: 8,
     paddingBottom: theme.spacing.md,
   },
   bottomSheetBackground: {
@@ -904,52 +828,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: theme.spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    minHeight: 48,
-  },
-  title: {
-    fontSize: 32,
-    fontFamily: theme.fonts.primary.semiBold,
-    lineHeight: 36,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    backgroundColor: '#D23030',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontFamily: theme.fonts.primary.bold,
-  },
-  sectionSpacing: {
-    marginTop: theme.spacing.md,
   },
   postsSection: {
     paddingHorizontal: 0,

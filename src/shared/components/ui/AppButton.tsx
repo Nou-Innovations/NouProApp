@@ -5,7 +5,7 @@ import theme from '@/shared/theme';
 import { ButtonText } from './Typography';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'disable' | 'alert' | 'confirm';
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'disabled' | 'alert' | 'confirm';
 type ButtonSize = 'default' | 'small';
 
 interface AppButtonProps {
@@ -39,7 +39,7 @@ const AppButton: React.FC<AppButtonProps> = ({
     let specificButtonStyle: ViewStyle = {};
     let specificTextStyle: TextStyle = {};
 
-    const actualVariant = disabled && variant !== 'disable' ? 'disable' : variant;
+    const actualVariant = disabled && variant !== 'disabled' ? 'disabled' : variant;
 
     switch (actualVariant) {
       case 'primary':
@@ -68,7 +68,7 @@ const AppButton: React.FC<AppButtonProps> = ({
           color: appTheme.colors.primary,
         };
         break;
-      case 'disable':
+      case 'disabled':
         specificButtonStyle = {
           backgroundColor: appTheme.colors.buttonBackgroundDisabled,
         };
@@ -104,7 +104,7 @@ const AppButton: React.FC<AppButtonProps> = ({
   };
 
   const { button: variantButtonStyle, text: variantTextStyle } = getButtonStyles();
-  const isDisabled = disabled || loading || variant === 'disable';
+  const isDisabled = disabled || loading || variant === 'disabled';
   const spinnerColor = variant === 'primary' || variant === 'alert' || variant === 'confirm'
     ? appTheme.colors.textInverse 
     : appTheme.colors.primary;

@@ -163,7 +163,7 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Text style={[styles.brandPlaceholder, { color: appTheme.colors.textFieldLabelDefault }]}>Brand</Text>
                 )}
               </View>
-              <Icon name="chevron-forward" size={20} color={appTheme.colors.textLight} />
+              <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
             </TouchableOpacity>
           </View>
           

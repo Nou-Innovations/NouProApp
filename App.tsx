@@ -78,8 +78,7 @@ import DeliveryDetailScreen from '@/features/deliveries/screens/DeliveryDetailSc
 import CreateDeliveryScreen from '@/features/deliveries/screens/CreateDeliveryScreen';
 
 // Screens - Notifications
-import NotificationScreen from '@/features/notifications/screens/NotificationScreen';
-import NotificationsOverlayScreen from '@/features/notifications/screens/NotificationsOverlayScreen';
+import NotificationsScreen from '@/features/notifications/screens/NotificationsScreen';
 
 // Screens - Personal (from modes)
 import EditPersonalProfileScreen from '@/modes/personal/screens/EditPersonalProfileScreen';
@@ -91,6 +90,9 @@ import PersonalDeliveryDetailScreen from '@/modes/personal/screens/PersonalDeliv
 // Screens - Settings
 import ChangePasswordScreen from '@/features/settings/screens/ChangePasswordScreen';
 import SecuritySettingsScreen from '@/features/settings/screens/SecuritySettingsScreen';
+
+// Screens - Business Activity
+import { AllActivityScreen } from '@/modes/business/screens';
 
 // Screens - Business/Team
 import TeamManagementScreen from '@/features/team/screens/TeamManagementScreen';
@@ -215,10 +217,10 @@ function AppNavigator() {
             fullScreenGestureEnabled: true,
           }}
         />
-        <RootStack.Screen 
-          name="NotificationsOverlay" 
-          component={NotificationsOverlayScreen} 
-          options={{ 
+        <RootStack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{
             headerShown: false,
             animation: 'slide_from_right',
             gestureEnabled: true,
@@ -256,13 +258,6 @@ function AppNavigator() {
         {/* Order Screens */}
         <RootStack.Screen name="OrderDetail" component={OrderDetailScreen} />
         
-        {/* Notification Screen */}
-        <RootStack.Screen 
-          name="Notifications" 
-          component={NotificationScreen}
-          options={{ headerShown: false }}
-        />
-        
         {/* Settings Screens */}
         <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
         <RootStack.Screen name="SecuritySettings" component={SecuritySettingsScreen} />
@@ -281,6 +276,9 @@ function AppNavigator() {
         
         {/* Social Screens */}
         <RootStack.Screen name="Connections" component={ConnectionsScreen} />
+        
+        {/* Business Activity */}
+        <RootStack.Screen name="AllActivity" component={AllActivityScreen} />
       </RootStack.Navigator>
       <StatusBar style={isDarkMode ? "light" : "dark"} />
     </NavigationContainer>

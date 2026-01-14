@@ -596,7 +596,13 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
 
           {/* Social Stats - Connections count */}
           <View style={styles.socialStats}>
-            <TouchableOpacity style={styles.socialStatItem}>
+            <TouchableOpacity 
+              style={styles.socialStatItem}
+              onPress={() => {
+                // @ts-ignore
+                navigation.navigate('Connections', { userId: businessId });
+              }}
+            >
               <Text style={[styles.socialStatCount, { color: appTheme.colors.text }]}>
                 {(business as any).connections_count ?? 128}
               </Text>

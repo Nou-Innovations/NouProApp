@@ -211,26 +211,24 @@ export default function PersonalSettingsScreen() {
   );
 
   const renderHelpCommunitySection = () => (
-    <View style={styles.communitySection}>
-      <TouchableOpacity
-        style={[styles.communityButton, { backgroundColor: '#DBEAFE' }]}
-        onPress={handleHelpCommunity}
-      >
-        <View style={styles.communityContent}>
-          <View style={styles.communityIcon}>
-            <Icon name="heart-outline" size={24} color="#3B82F6" />
-          </View>
-          <View style={styles.communityText}>
-            <Text style={[styles.communityTitle, { color: '#3B82F6', fontFamily: theme.fonts.primary.bold }]}>
-              Help the Community grow
-            </Text>
-            <Text style={[styles.communitySubtitle, { color: appTheme.colors.secondary }]}>
-              Propose features, report bugs, and share your feedback
-            </Text>
-          </View>
+    <TouchableOpacity
+      style={[styles.communityButton, { backgroundColor: '#DBEAFE' }]}
+      onPress={handleHelpCommunity}
+    >
+      <View style={styles.communityContent}>
+        <View style={styles.communityIcon}>
+          <Icon name="heart-outline" size={24} color="#3B82F6" />
         </View>
-      </TouchableOpacity>
-    </View>
+        <View style={styles.communityText}>
+          <Text style={[styles.communityTitle, { color: '#3B82F6', fontFamily: theme.fonts.primary.bold }]}>
+            Help the Community grow
+          </Text>
+          <Text style={[styles.communitySubtitle, { color: appTheme.colors.secondary }]}>
+            Propose features, report bugs, and share your feedback
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 
   const renderLogoutButton = () => (
@@ -239,7 +237,7 @@ export default function PersonalSettingsScreen() {
       onPress={handleLogout}
     >
       <Icon name="log-out-outline" size={20} color="#DC2626" />
-      <Text style={styles.logoutText}>Log Out</Text>
+      <Text style={styles.logoutText}>Log out</Text>
     </TouchableOpacity>
   );
 
@@ -376,12 +374,21 @@ export default function PersonalSettingsScreen() {
         title="Settings"
         leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
       />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false} 
+        bounces={false}
+        contentContainerStyle={styles.scrollViewContent}
+      >
         {renderSettingsSection()}
+      </ScrollView>
+
+      {/* Bottom Fixed Buttons */}
+      <View style={styles.bottomButtonsContainer}>
         {renderHelpCommunitySection()}
         {renderLogoutButton()}
-        <View style={{ height: theme.spacing.xl }} />
-      </ScrollView>
+      </View>
+
       {renderProfileSwitcherModal()}
     </SafeAreaView>
   );
@@ -391,8 +398,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    paddingBottom: theme.spacing.xl,
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
   },
   settingsSection: {
     marginTop: theme.spacing.sm,
@@ -416,9 +426,10 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.semiBold,
     marginLeft: theme.spacing.md,
   },
-  communitySection: {
+  bottomButtonsContainer: {
     paddingHorizontal: 12,
-    marginTop: theme.spacing.xxl,
+    paddingBottom: 40,
+    gap: 8,
   },
   communityButton: {
     height: 80,
@@ -453,7 +464,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 12,
     marginTop: theme.spacing.sm,
     height: 56,
     borderRadius: 8,

@@ -188,7 +188,7 @@ export default function ModalListExampleScreen() {
           </Text>
         )}
       </View>
-      <Icon name="chevron-forward" size={20} color={appTheme.colors.textLight} />
+      <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
     </TouchableOpacity>
   );
 

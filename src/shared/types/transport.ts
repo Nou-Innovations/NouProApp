@@ -6,7 +6,7 @@
 /**
  * Vehicle type classification
  */
-export type VehicleType = 'van' | 'truck' | 'motorcycle' | 'car' | 'bicycle' | 'other';
+export type VehicleType = 'bicycle' | 'motorcycle' | 'scooter' | 'car' | 'van' | 'pickup' | 'truck' | 'lorry' | 'other';
 
 /**
  * Vehicle operational status
@@ -64,18 +64,24 @@ export interface UpdateTransportPayload {
  */
 export const getVehicleIcon = (type: VehicleType): string => {
   switch (type) {
-    case 'van':
-      return 'bus-outline';
-    case 'truck':
-      return 'cube-outline';
-    case 'motorcycle':
-      return 'bicycle-outline';
-    case 'car':
-      return 'car-outline';
     case 'bicycle':
-      return 'bicycle-outline';
+      return 'bike';
+    case 'motorcycle':
+      return 'bike';
+    case 'scooter':
+      return 'bike';
+    case 'car':
+      return 'car';
+    case 'van':
+      return 'bus';
+    case 'pickup':
+      return 'truck';
+    case 'truck':
+      return 'truck';
+    case 'lorry':
+      return 'truck';
     default:
-      return 'car-outline';
+      return 'car';
   }
 };
 

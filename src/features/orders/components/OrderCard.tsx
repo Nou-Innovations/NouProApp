@@ -94,7 +94,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, type, onPress }) => {
 
       {/* Right Section - Arrow */}
       <View style={styles.arrowContainer}>
-        <Icon name="chevron-forward" size={20} color={appTheme.colors.textSecondary} />
+        <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
       </View>
     </TouchableOpacity>
   );

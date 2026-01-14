@@ -1286,8 +1286,8 @@
         "borderTopLeftRadius": 20,
         "borderTopRightRadius": 20,
         "backgroundColor": "#FFFFFF",
-        "paddingTop": 16,
-        "paddingHorizontal": 16,
+        "paddingTop": 8,
+        "paddingHorizontal": 12,
         "overlayColor": "rgba(0, 0, 0, 0.5)",
         "handleIndicator": {
           "width": 36,
@@ -1303,7 +1303,7 @@
           "height": 48,
           "borderRadius": 12,
           "fontSize": 16,
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Inter-semiBold",
           "variants": {
             "default": {
               "description": "Default outline button - primary color for text and border",
@@ -2081,7 +2081,7 @@
         "borderBottomWidth": 1,
         "borderColor": "#E1E4EA",
         "avatarSize": 48,
-        "avatarRadius": 24,
+        "avatarRadius": 8,
         "contentGap": 12,
         "nameTypography": {
           "fontFamily": "Inter-Medium",
@@ -2489,7 +2489,24 @@
         }
       },
       "activityTimeline": {
-        "description": "Recent activity feed",
+        "description": "Recent activity feed showing the 5 most recent business updates",
+        "behavior": {
+          "maxItems": 5,
+          "displayRule": "Show only the 5 most recent activity items",
+          "emptyState": {
+            "icon": "time-outline",
+            "iconSize": 32,
+            "message": "No activity yet",
+            "description": "Your recent business activity will appear here"
+          },
+          "viewAllButton": {
+            "text": "View all activity",
+            "variant": "outline",
+            "size": "small",
+            "disabledWhenEmpty": true,
+            "navigatesTo": "AllActivityScreen"
+          }
+        },
         "sectionTitle": {
           "fontFamily": "Inter-Bold",
           "fontSize": 18,
@@ -2501,37 +2518,37 @@
           "paddingVertical": 8
         },
         "itemContainer": {
-          "paddingVertical": 10,
-          "paddingHorizontal": 12
+          "paddingVertical": 12,
+          "paddingHorizontal": 0
         },
-        "dot": {
-          "width": 24,
-          "height": 24,
-          "borderRadius": 12,
-          "iconSize": 12,
-          "iconColor": "#FFFFFF"
-        },
-        "line": {
-          "width": 2,
-          "backgroundColor": "#E1E4EA",
-          "marginTop": 4
+        "iconBox": {
+          "width": 36,
+          "height": 36,
+          "borderRadius": 8,
+          "padding": 8,
+          "iconSize": 20,
+          "backgroundOpacity": "20%",
+          "note": "Icon and background use same color, background at 20% opacity"
         },
         "itemTitle": {
-          "fontFamily": "Inter-Medium",
-          "fontSize": 14,
-          "lineHeight": 18,
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 16,
+          "lineHeight": 20,
           "color": "#000000"
         },
         "itemDescription": {
-          "fontFamily": "Inter-Regular",
-          "fontSize": 13,
+          "fontFamily": "Inter-SemiBold",
+          "fontSize": 14,
           "color": "#575B66"
         },
         "timestamp": {
-          "fontFamily": "Inter-Regular",
-          "fontSize": 11,
-          "color": "#A4AAB8",
-          "marginTop": 2
+          "fontFamily": "Inter-Medium",
+          "fontSize": 14,
+          "color": "#A4AAB8"
+        },
+        "chevron": {
+          "size": 20,
+          "color": "#A4AAB8"
         }
       },
       "postsSection": {
@@ -2587,23 +2604,16 @@
       },
       "notificationsOverlay": {
         "description": "Notifications accessed via Home header",
-        "markAllReadButton": {
-          "paddingHorizontal": 12,
-          "paddingVertical": 8,
-          "fontFamily": "Inter-Medium",
-          "fontSize": 14
-        },
         "notificationItem": {
           "paddingVertical": 14,
           "paddingHorizontal": 16,
           "borderBottomWidth": 1,
           "borderColor": "#E1E4EA",
           "gap": 12,
-          "unreadDot": {
-            "width": 8,
-            "height": 8,
-            "borderRadius": 4,
-            "backgroundColor": "#D23030"
+          "unreadState": {
+            "description": "Unread items use highlighted background (consistent with DeliveryCard/InvoiceCard)",
+            "backgroundColor": "#F6F7F9",
+            "colorToken": "highlightedRow"
           },
           "iconContainer": {
             "width": 40,
@@ -2612,25 +2622,35 @@
             "backgroundOpacity": 0.15
           },
           "title": {
+            "fontFamily": "Inter-SemiBold",
+            "fontSize": 16,
+            "color": "#000000",
+            "colorToken": "primary"
+          },
+          "subtitle": {
             "fontFamily": "Inter-Medium",
-            "fontSize": 15,
-            "lineHeight": 20
-          },
-          "titleUnread": {
-            "fontFamily": "Inter-Bold"
-          },
-          "body": {
-            "fontFamily": "Inter-Regular",
-            "fontSize": 13,
-            "lineHeight": 18,
+            "fontSize": 14,
             "color": "#575B66",
+            "colorToken": "textSecondary",
             "numberOfLines": 2
           },
           "timestamp": {
-            "fontFamily": "Inter-Regular",
-            "fontSize": 11,
+            "description": "Displayed on same line as title",
+            "fontFamily": "Inter-Medium",
+            "fontSize": 14,
             "color": "#A4AAB8",
-            "marginTop": 4
+            "colorToken": "textMuted"
+          },
+          "staffButton": {
+            "description": "Small outline button for role selection, full width",
+            "height": 40,
+            "borderRadius": 8,
+            "borderWidth": 1,
+            "borderColor": "#000000",
+            "backgroundColor": "transparent",
+            "textColor": "#000000",
+            "fontSize": 14,
+            "fontFamily": "Inter-SemiBold"
           }
         }
       }

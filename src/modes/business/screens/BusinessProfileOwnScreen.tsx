@@ -393,20 +393,20 @@ export default function BusinessProfileOwnScreen() {
         </Text>
       )}
 
-      {/* Followers Stats */}
+      {/* Social Stats */}
       <View style={styles.socialStats}>
         <TouchableOpacity 
           style={styles.socialStatItem}
           onPress={() => {
             // @ts-ignore
-            navigation.navigate('Followers', { businessId: activeBusiness?.id || '' });
+            navigation.navigate('Connections', { userId: activeBusiness?.id || '' });
           }}
         >
           <Text style={[styles.socialStatCount, { color: appTheme.colors.text }]}>
-            {activeBusiness?.followers_count ?? 0}
+            {(activeBusiness as any)?.connections_count ?? 0}
           </Text>
           <Text style={[styles.socialStatLabel, { color: appTheme.colors.secondary }]}>
-            Followers
+            Connections
           </Text>
         </TouchableOpacity>
       </View>
@@ -854,7 +854,7 @@ export default function BusinessProfileOwnScreen() {
                   Start a new business from scratch
                 </Text>
               </View>
-              <Icon name="chevron-forward" size={20} color={appTheme.colors.textLight} />
+              <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -872,7 +872,7 @@ export default function BusinessProfileOwnScreen() {
                   Search and join an existing business
                 </Text>
               </View>
-              <Icon name="chevron-forward" size={20} color={appTheme.colors.textLight} />
+              <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
             </TouchableOpacity>
           </View>
         </Animated.View>

@@ -176,7 +176,7 @@ export function TaskCard({
       <Icon
         name="chevron-forward"
         size={20}
-        color={appTheme.colors.textLight}
+        color={appTheme.colors.iconMuted}
         style={styles.arrow}
       />
     </TouchableOpacity>

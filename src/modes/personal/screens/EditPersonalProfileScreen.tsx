@@ -542,7 +542,7 @@ export default function EditPersonalProfileScreen() {
               <Icon
                 name="chevron-forward"
                 size={20}
-                color={appTheme.colors.textLight}
+                color={appTheme.colors.iconMuted}
               />
             </TouchableOpacity>
             {/* Show on profile toggle */}

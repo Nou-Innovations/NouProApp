@@ -223,7 +223,7 @@ export default function DashboardScreen() {
           </Text>
         </View>
         
-        <Icon name="chevron-forward" size={16} color={appTheme.colors.textMuted} />
+        <Icon name="chevron-forward" size={16} color={appTheme.colors.iconMuted} />
       </TouchableOpacity>
     );
   };

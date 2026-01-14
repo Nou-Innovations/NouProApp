@@ -23,6 +23,4 @@ export {
   updateProductStock,
   toggleProductDisplayable,
   toggleProductListed,
-} from './products.service';
-
-// Types are exported from @/shared/types/product
+} from './products.service';// Types are exported from @/shared/types/product

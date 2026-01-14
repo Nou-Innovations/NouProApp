@@ -607,9 +607,9 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
                 alignItems: 'center',
                 padding: 16,
                 borderRadius: 12,
-                backgroundColor: appTheme.colors.cardBackground,
+                backgroundColor: theme.colors.cardBackground,
                 borderWidth: 1,
-                borderColor: appTheme.colors.borderColor,
+                borderColor: theme.colors.borderColor,
               }}
               onPress={() => {
                 handleMoreOptionSelect(item);
@@ -623,16 +623,16 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
                 borderRadius: 12,
                 justifyContent: 'center',
                 alignItems: 'center',
-                backgroundColor: appTheme.colors.surface,
+                backgroundColor: theme.colors.surface,
                 marginRight: 16,
               }}>
-                <Icon name={item.icon} size={24} color={appTheme.colors.text} />
+                <Icon name={item.icon} size={24} color={theme.colors.text} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '500', color: appTheme.colors.text, marginBottom: 4 }}>
+                <Text style={{ fontSize: 16, fontWeight: '500', color: theme.colors.text, marginBottom: 4 }}>
                   {item.title}
                 </Text>
-                <Text style={{ fontSize: 14, color: appTheme.colors.textSecondary }}>
+                <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>
                   {item.description}
                 </Text>
               </View>

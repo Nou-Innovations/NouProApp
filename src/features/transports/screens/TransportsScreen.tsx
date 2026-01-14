@@ -20,11 +20,12 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { AppSearchBar, Avatar } from '@/shared/components/ui';
+import { AppSearchBar, Avatar, AppButton } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 
 // Transport/Vehicle type
-export type VehicleType = 'van' | 'truck' | 'motorcycle' | 'car' | 'bicycle' | 'other';
+export type VehicleType = 'bicycle' | 'motorcycle' | 'scooter' | 'car' | 'van' | 'pickup' | 'truck' | 'lorry' | 'other';
 export type VehicleStatus = 'available' | 'in_use' | 'maintenance' | 'inactive';
 
 export interface Transport {
@@ -48,18 +49,24 @@ export interface Transport {
 // Get icon for vehicle type
 const getVehicleIcon = (type: VehicleType): string => {
   switch (type) {
-    case 'van':
-      return 'bus-outline';
-    case 'truck':
-      return 'cube-outline';
-    case 'motorcycle':
-      return 'bicycle-outline';
-    case 'car':
-      return 'car-outline';
     case 'bicycle':
-      return 'bicycle-outline';
+      return 'bike';
+    case 'motorcycle':
+      return 'bike';
+    case 'scooter':
+      return 'bike';
+    case 'car':
+      return 'car';
+    case 'van':
+      return 'bus';
+    case 'pickup':
+      return 'truck';
+    case 'truck':
+      return 'truck';
+    case 'lorry':
+      return 'truck';
     default:
-      return 'car-outline';
+      return 'car';
   }
 };
 
@@ -101,7 +108,6 @@ interface TransportCardProps {
   onPress: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onAssignStaff: () => void;
   showDivider?: boolean;
 }
 
@@ -110,7 +116,6 @@ const TransportCard: React.FC<TransportCardProps> = ({
   onPress,
   onEdit,
   onDelete,
-  onAssignStaff,
   showDivider = true,
 }) => {
   const { theme: appTheme } = useTheme();
@@ -121,10 +126,6 @@ const TransportCard: React.FC<TransportCardProps> = ({
       'Choose an action',
       [
         { text: 'Edit Vehicle', onPress: onEdit },
-        { 
-          text: transport.assigned_staff_id ? 'Change Assignment' : 'Assign Staff',
-          onPress: onAssignStaff,
-        },
         { text: 'Delete Vehicle', onPress: onDelete, style: 'destructive' },
         { text: 'Cancel', style: 'cancel' },
       ]
@@ -151,74 +152,30 @@ const TransportCard: React.FC<TransportCardProps> = ({
 
         {/* Middle: Info */}
         <View style={styles.cardInfo}>
+          {/* Row 1: Name + Status (right aligned) */}
           <View style={styles.nameRow}>
             <Text style={[styles.vehicleName, { color: appTheme.colors.text }]} numberOfLines={1}>
               {transport.name}
             </Text>
             <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
-              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
               <Text style={[styles.statusText, { color: statusColor }]}>
                 {getStatusLabel(transport.status)}
               </Text>
             </View>
           </View>
           
+          {/* Row 2: License Plate + Location (right aligned) - no location for inactive */}
           <View style={styles.detailsRow}>
             {transport.license_plate && (
-              <View style={styles.detailItem}>
-                <Text style={[styles.detailLabel, { color: appTheme.colors.textMuted }]}>
-                  Plate:
-                </Text>
-                <Text style={[styles.detailValue, { color: appTheme.colors.text }]}>
-                  {transport.license_plate}
-                </Text>
-              </View>
+              <Text style={[styles.licensePlate, { color: appTheme.colors.textSecondary }]}>
+                {transport.license_plate}
+              </Text>
             )}
-            
-            {transport.capacity && (
-              <View style={styles.detailItem}>
-                <Text style={[styles.detailLabel, { color: appTheme.colors.textMuted }]}>
-                  Capacity:
-                </Text>
-                <Text style={[styles.detailValue, { color: appTheme.colors.text }]}>
-                  {transport.capacity}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Assigned Staff */}
-          <View style={styles.assignmentRow}>
-            {transport.assigned_staff_id ? (
-              <View style={styles.assignedStaff}>
-                <Avatar
-                  userId={transport.assigned_staff_id}
-                  userName={transport.assigned_staff_name || 'Staff'}
-                  imageUri={transport.assigned_staff_avatar}
-                  size={24}
-                />
-                <Text style={[styles.assignedStaffName, { color: appTheme.colors.textSecondary }]}>
-                  {transport.assigned_staff_name}
-                </Text>
-              </View>
-            ) : (
-              <TouchableOpacity 
-                style={styles.assignButton}
-                onPress={onAssignStaff}
-                activeOpacity={0.7}
-              >
-                <Icon name="person-add-outline" size={16} color={appTheme.colors.info} />
-                <Text style={[styles.assignButtonText, { color: appTheme.colors.info }]}>
-                  Assign Staff
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {transport.current_location_name && (
-              <View style={styles.currentLocation}>
+            {transport.status !== 'inactive' && (
+              <View style={styles.locationRow}>
                 <Icon name="location-outline" size={14} color={appTheme.colors.textMuted} />
-                <Text style={[styles.currentLocationText, { color: appTheme.colors.textMuted }]} numberOfLines={1}>
-                  {transport.current_location_name}
+                <Text style={[styles.locationText, { color: appTheme.colors.textMuted }]} numberOfLines={1}>
+                  {transport.status === 'in_use' ? 'On road' : (transport.current_location_name || '—')}
                 </Text>
               </View>
             )}
@@ -236,7 +193,7 @@ const TransportCard: React.FC<TransportCardProps> = ({
       </TouchableOpacity>
       
       {showDivider && (
-        <View style={[styles.divider, { backgroundColor: appTheme.colors.borderColor }]} />
+        <View style={[styles.divider, { backgroundColor: appTheme.colors.surface }]} />
       )}
     </View>
   );
@@ -255,6 +212,8 @@ export default function TransportsScreen() {
   const [transports, setTransports] = useState<Transport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTransport, setSelectedTransport] = useState<Transport | null>(null);
+  const [showTransportSheet, setShowTransportSheet] = useState(false);
 
   // Check permissions
   const isSuperAdmin = isSuperAdminRole();
@@ -363,11 +322,19 @@ export default function TransportsScreen() {
   };
 
   const handleTransportPress = (transport: Transport) => {
-    // TODO: Navigate to transport detail screen
-    Alert.alert(
-      transport.name,
-      `Type: ${transport.vehicle_type}\nPlate: ${transport.license_plate}\nStatus: ${getStatusLabel(transport.status)}${transport.notes ? `\nNotes: ${transport.notes}` : ''}`
-    );
+    setSelectedTransport(transport);
+    setShowTransportSheet(true);
+  };
+
+  const handleCloseSheet = () => {
+    setShowTransportSheet(false);
+    setSelectedTransport(null);
+  };
+
+  const handleAssignStaff = (transport: Transport) => {
+    handleCloseSheet();
+    // TODO: Open staff assignment modal
+    Alert.alert('Assign Staff', `Assign staff to ${transport.name}`);
   };
 
   const handleEditTransport = (transport: Transport) => {
@@ -391,11 +358,6 @@ export default function TransportsScreen() {
         },
       ]
     );
-  };
-
-  const handleAssignStaff = (transport: Transport) => {
-    // TODO: Open staff assignment modal
-    Alert.alert('Assign Staff', `Assign staff to ${transport.name}`);
   };
 
   const handleAddTransport = () => {
@@ -539,7 +501,6 @@ export default function TransportsScreen() {
                         onPress={() => handleTransportPress(transport)}
                         onEdit={() => handleEditTransport(transport)}
                         onDelete={() => handleDeleteTransport(transport)}
-                        onAssignStaff={() => handleAssignStaff(transport)}
                         showDivider={index < activeTransports.length - 1}
                       />
                     ))}
@@ -563,7 +524,6 @@ export default function TransportsScreen() {
                         onPress={() => handleTransportPress(transport)}
                         onEdit={() => handleEditTransport(transport)}
                         onDelete={() => handleDeleteTransport(transport)}
-                        onAssignStaff={() => handleAssignStaff(transport)}
                         showDivider={index < maintenanceTransports.length - 1}
                       />
                     ))}
@@ -587,7 +547,6 @@ export default function TransportsScreen() {
                         onPress={() => handleTransportPress(transport)}
                         onEdit={() => handleEditTransport(transport)}
                         onDelete={() => handleDeleteTransport(transport)}
-                        onAssignStaff={() => handleAssignStaff(transport)}
                         showDivider={index < inactiveTransports.length - 1}
                       />
                     ))}
@@ -600,6 +559,130 @@ export default function TransportsScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
+
+      {/* Vehicle Details Bottom Sheet */}
+      <AppBottomSheet
+        visible={showTransportSheet}
+        onClose={handleCloseSheet}
+        title={selectedTransport?.name}
+      >
+        {selectedTransport && (
+          <View style={styles.sheetContent}>
+            {/* Status */}
+            <View style={styles.sheetRow}>
+              <Text style={[styles.sheetLabel, { color: appTheme.colors.textSecondary }]}>
+                Status
+              </Text>
+              <View style={[
+                styles.sheetStatusBadge,
+                { backgroundColor: `${getStatusColor(selectedTransport.status, appTheme)}15` }
+              ]}>
+                <View style={[
+                  styles.sheetStatusDot,
+                  { backgroundColor: getStatusColor(selectedTransport.status, appTheme) }
+                ]} />
+                <Text style={[
+                  styles.sheetStatusText,
+                  { color: getStatusColor(selectedTransport.status, appTheme) }
+                ]}>
+                  {getStatusLabel(selectedTransport.status)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Vehicle Type */}
+            <View style={styles.sheetRow}>
+              <Text style={[styles.sheetLabel, { color: appTheme.colors.textSecondary }]}>
+                Type
+              </Text>
+              <Text style={[styles.sheetValue, { color: appTheme.colors.text }]}>
+                {selectedTransport.vehicle_type.charAt(0).toUpperCase() + selectedTransport.vehicle_type.slice(1)}
+              </Text>
+            </View>
+
+            {/* License Plate */}
+            {selectedTransport.license_plate && (
+              <View style={styles.sheetRow}>
+                <Text style={[styles.sheetLabel, { color: appTheme.colors.textSecondary }]}>
+                  License Plate
+                </Text>
+                <Text style={[styles.sheetValue, { color: appTheme.colors.text }]}>
+                  {selectedTransport.license_plate}
+                </Text>
+              </View>
+            )}
+
+            {/* Capacity */}
+            {selectedTransport.capacity && (
+              <View style={styles.sheetRow}>
+                <Text style={[styles.sheetLabel, { color: appTheme.colors.textSecondary }]}>
+                  Capacity
+                </Text>
+                <Text style={[styles.sheetValue, { color: appTheme.colors.text }]}>
+                  {selectedTransport.capacity}
+                </Text>
+              </View>
+            )}
+
+            {/* Location */}
+            {selectedTransport.current_location_name && (
+              <View style={styles.sheetRow}>
+                <Text style={[styles.sheetLabel, { color: appTheme.colors.textSecondary }]}>
+                  Location
+                </Text>
+                <Text style={[styles.sheetValue, { color: appTheme.colors.text }]}>
+                  {selectedTransport.current_location_name}
+                </Text>
+              </View>
+            )}
+
+            {/* Assigned Staff */}
+            <View style={styles.sheetRow}>
+              <Text style={[styles.sheetLabel, { color: appTheme.colors.textSecondary }]}>
+                Assigned Staff
+              </Text>
+              {selectedTransport.assigned_staff_id ? (
+                <View style={styles.sheetAssignedStaff}>
+                  <Avatar
+                    userId={selectedTransport.assigned_staff_id}
+                    userName={selectedTransport.assigned_staff_name || 'Staff'}
+                    imageUri={selectedTransport.assigned_staff_avatar}
+                    size={24}
+                  />
+                  <Text style={[styles.sheetValue, { color: appTheme.colors.text }]}>
+                    {selectedTransport.assigned_staff_name}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.sheetValue, { color: appTheme.colors.textMuted }]}>
+                  Not assigned
+                </Text>
+              )}
+            </View>
+
+            {/* Notes */}
+            {selectedTransport.notes && (
+              <View style={styles.sheetRow}>
+                <Text style={[styles.sheetLabel, { color: appTheme.colors.textSecondary }]}>
+                  Notes
+                </Text>
+                <Text style={[styles.sheetValue, { color: appTheme.colors.text }]}>
+                  {selectedTransport.notes}
+                </Text>
+              </View>
+            )}
+
+            {/* Assign Staff Button */}
+            <View style={styles.sheetButton}>
+              <AppButton
+                title={selectedTransport.assigned_staff_id ? 'Change Assignment' : 'Assign Staff'}
+                onPress={() => handleAssignStaff(selectedTransport)}
+                variant="primary"
+              />
+            </View>
+          </View>
+        )}
+      </AppBottomSheet>
     </SafeAreaView>
   );
 }
@@ -659,10 +742,8 @@ const styles = StyleSheet.create({
   // Transport Card Styles
   cardContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingVertical: 12,
-    paddingLeft: 8,
-    paddingRight: 0,
   },
   iconContainer: {
     width: 48,
@@ -670,29 +751,31 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   cardInfo: {
     flex: 1,
-    marginRight: 8,
+    marginRight: 4, // 4px gap between content and options button
+    justifyContent: 'center',
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   vehicleName: {
     fontSize: 16,
     fontFamily: theme.fonts.primary.bold,
-    flex: 1,
+    flexShrink: 1,
     marginRight: 8,
   },
   statusBadge: {
+    width: 88,
+    height: 22,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    justifyContent: 'center',
     borderRadius: 4,
     gap: 4,
   },
@@ -703,70 +786,81 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontFamily: theme.fonts.primary.medium,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-    marginBottom: 8,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  detailLabel: {
-    fontSize: 13,
-    fontFamily: theme.fonts.primary.regular,
-  },
-  detailValue: {
-    fontSize: 13,
     fontFamily: theme.fonts.primary.semiBold,
   },
-  assignmentRow: {
+  detailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  assignedStaff: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  assignedStaffName: {
-    fontSize: 13,
-    fontFamily: theme.fonts.primary.medium,
-  },
-  assignButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  assignButtonText: {
-    fontSize: 13,
-    fontFamily: theme.fonts.primary.medium,
-  },
-  currentLocation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    maxWidth: '50%',
-  },
-  currentLocationText: {
-    fontSize: 12,
+  licensePlate: {
+    fontSize: 14,
     fontFamily: theme.fonts.primary.regular,
+    flexShrink: 1,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
+  },
+  locationText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.medium,
   },
   optionsButton: {
-    paddingRight: 4,
-    paddingLeft: 12,
-    height: 48,
+    paddingRight: 0,
+    paddingLeft: 4,
+    paddingVertical: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   divider: {
     height: 1,
-    marginLeft: 68, // iconContainer width + marginRight
+    // Full width within the 12px padded container
+  },
+  // Bottom Sheet Styles
+  sheetContent: {
+    gap: 16,
+    paddingBottom: 8,
+  },
+  sheetRow: {
+    gap: 4,
+  },
+  sheetLabel: {
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.medium,
+  },
+  sheetValue: {
+    fontSize: 15,
+    fontFamily: theme.fonts.primary.regular,
+    lineHeight: 22,
+  },
+  sheetStatusBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+    gap: 6,
+  },
+  sheetStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  sheetStatusText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.medium,
+  },
+  sheetAssignedStaff: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sheetButton: {
+    marginTop: 8,
   },
   // Loading & Empty States
   loadingContainer: {

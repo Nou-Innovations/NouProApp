@@ -62,6 +62,8 @@ import {
   // Transport
   Car,
   Truck,
+  Bike,
+  Bus,
   
   // Status
   AlertCircle,
@@ -193,6 +195,8 @@ export {
   // Transport
   Car,
   Truck,
+  Bike,
+  Bus,
   
   // Status
   AlertCircle,
@@ -443,6 +447,15 @@ export const iconMap: Record<string, LucideIcon> = {
   'car': Car,
   'car-outline': Car,
   'truck': Truck,
+  'truck-outline': Truck,
+  'bike': Bike,
+  'bike-outline': Bike,
+  'bicycle': Bike,
+  'bicycle-outline': Bike,
+  'bus': Bus,
+  'bus-outline': Bus,
+  'van': Bus,
+  'van-outline': Bus,
   
   // Status
   'alert-circle': AlertCircle,

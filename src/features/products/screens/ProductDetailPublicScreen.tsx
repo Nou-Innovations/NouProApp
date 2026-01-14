@@ -203,7 +203,7 @@ const ProductDetailPublicScreen: React.FC<Props> = ({ route, navigation }) => {
                   by {businessName}
                 </Text>
               </View>
-              <Icon name="chevron-forward" size={20} color={appTheme.colors.textMuted} />
+              <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
             </TouchableOpacity>
           )}
 

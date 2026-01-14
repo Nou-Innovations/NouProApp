@@ -15,11 +15,13 @@ import {
   Animated,
   Dimensions,
   Platform,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Icon } from '@/shared/utils/icons';
+import { MessageSquare } from '@/shared/utils/icons';
 import AppSearchBar, { AppSearchBarRef } from '@/shared/components/ui/AppSearchBar';
+import AppButton from '@/shared/components/ui/AppButton';
 import FilterBar from '@/features/search/components/FilterBar';
 import MessageCard from '@/features/inbox/components/MessageCard';
 import NewChatModalList from '@/features/inbox/components/NewChatModalList';
@@ -226,6 +228,36 @@ export default function InboxOverlayScreen() {
   const { setInboxUnreadCount } = useNotifications();
   const { currentCompany } = useCompanyStore();
   const searchBarRef = useRef<AppSearchBarRef>(null);
+  const keyboardHeightAnim = useRef(new Animated.Value(0)).current;
+
+  // Track keyboard visibility for empty state centering with smooth animation
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        Animated.timing(keyboardHeightAnim, {
+          toValue: e.endCoordinates.height,
+          duration: Platform.OS === 'ios' ? e.duration : 250,
+          useNativeDriver: false,
+        }).start();
+      }
+    );
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      (e) => {
+        Animated.timing(keyboardHeightAnim, {
+          toValue: 0,
+          duration: Platform.OS === 'ios' ? e?.duration || 250 : 250,
+          useNativeDriver: false,
+        }).start();
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, [keyboardHeightAnim]);
   
   // Detect if we're in personal or business mode
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
@@ -237,7 +269,7 @@ export default function InboxOverlayScreen() {
   // Filter chats based on mode, company, filter, and search
   const filteredChats = useMemo(() => {
     // Select the appropriate chat list based on mode
-    let chats = isPersonalMode ? mockPersonalChats : mockBusinessChats;
+    let chats: any[] = isPersonalMode ? mockPersonalChats : mockBusinessChats;
 
     // Filter by company only in business mode (personal chats don't have companyId)
     if (!isPersonalMode && currentCompany) {
@@ -420,28 +452,29 @@ export default function InboxOverlayScreen() {
           );
         }}
         ListEmptyComponent={() => (
-          <View style={styles.emptyListContainer}>
-            <Icon
-              name="chatbubbles-outline"
-              size={60}
-              color={appTheme.colors.textLight}
+          <Animated.View style={[styles.emptyListContainer, { paddingBottom: keyboardHeightAnim }]}>
+            <MessageSquare
+              size={40}
+              color={appTheme.colors.iconColor}
+              strokeWidth={1.5}
             />
-            <Text style={[styles.emptyListText, { color: appTheme.colors.textLight }]}>
-              No conversations found
+            <Text style={[styles.emptyListTitle, { color: appTheme.colors.text }]}>
+              No conversation yet
             </Text>
-            <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textLight }]}>
+            <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textSecondary }]}>
               {filter !== 'all'
                 ? `No ${filter} conversations found`
                 : 'Start a conversation with a client or partner'
               }
             </Text>
-            <TouchableOpacity
-              style={[styles.startChatButton, { backgroundColor: appTheme.colors.primary }]}
-              onPress={handleNewChat}
-            >
-              <Text style={styles.startChatButtonText}>Start New Chat</Text>
-            </TouchableOpacity>
-          </View>
+            <View style={styles.emptyListButtonContainer}>
+              <AppButton
+                title="Start a conversation"
+                onPress={handleNewChat}
+                variant="primary"
+              />
+            </View>
+          </Animated.View>
         )}
         style={{ flex: 1 }}
         contentContainerStyle={styles.listContent}
@@ -476,37 +509,30 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   listContent: {
+    flexGrow: 1,
     paddingBottom: theme.spacing.lg,
   },
   emptyListContainer: {
-    marginTop: 60,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
-  emptyListText: {
-    fontSize: 16,
-    marginTop: 16,
-    marginBottom: 8,
+  emptyListTitle: {
+    fontSize: 24,
+    fontFamily: theme.fonts.primary.bold,
+    marginTop: 24,
     textAlign: 'center',
-    fontFamily: theme.fonts.primary.medium,
   },
   emptyListSubtext: {
     fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 20,
     fontFamily: theme.fonts.primary.regular,
+    textAlign: 'center',
+    marginTop: 8,
   },
-  startChatButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  startChatButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16,
+  emptyListButtonContainer: {
+    marginTop: 32,
+    width: '100%',
   },
 });
 
