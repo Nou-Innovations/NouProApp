@@ -14,7 +14,6 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
-  Linking,
   Animated,
   Modal,
   Dimensions,
@@ -66,31 +65,17 @@ export default function PersonalSettingsScreen() {
   };
 
   const handleHelpCommunity = () => {
-    // Navigate to community feedback page or open link
-    Linking.openURL('https://noupro.app/community');
+    // @ts-ignore
+    navigation.navigate('FeedbackCategories');
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Log Out', 
-          style: 'destructive', 
-          onPress: () => {
-            // Clear auth state and navigate to login
-            console.log('Logout');
-            // @ts-ignore
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Login' }],
-            });
-          }
-        },
-      ]
-    );
+  const handlePrivacyPolicy = () => {
+    Alert.alert('Privacy Policy', 'Navigate to privacy policy screen');
+  };
+
+  const handleProfile = () => {
+    // @ts-ignore
+    navigation.navigate('PersonalProfileSettings');
   };
 
   // Profile switcher modal functions
@@ -207,6 +192,30 @@ export default function PersonalSettingsScreen() {
           ios_backgroundColor="#E9E9EA"
         />
       </View>
+
+      {/* Privacy Policy */}
+      <TouchableOpacity
+        style={[styles.settingRow, { borderBottomColor: appTheme.colors.borderColor }]}
+        onPress={handlePrivacyPolicy}
+      >
+        <View style={styles.settingLeft}>
+          <Icon name="document-text-outline" size={24} color={appTheme.colors.iconColor} />
+          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Privacy Policy</Text>
+        </View>
+        <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+      </TouchableOpacity>
+
+      {/* Profile */}
+      <TouchableOpacity
+        style={[styles.settingRow, { borderBottomColor: appTheme.colors.borderColor }]}
+        onPress={handleProfile}
+      >
+        <View style={styles.settingLeft}>
+          <Icon name="person-circle-outline" size={24} color={appTheme.colors.iconColor} />
+          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Profile</Text>
+        </View>
+        <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+      </TouchableOpacity>
     </View>
   );
 
@@ -228,16 +237,6 @@ export default function PersonalSettingsScreen() {
           </Text>
         </View>
       </View>
-    </TouchableOpacity>
-  );
-
-  const renderLogoutButton = () => (
-    <TouchableOpacity
-      style={styles.logoutButton}
-      onPress={handleLogout}
-    >
-      <Icon name="log-out-outline" size={20} color="#DC2626" />
-      <Text style={styles.logoutText}>Log out</Text>
     </TouchableOpacity>
   );
 
@@ -386,7 +385,6 @@ export default function PersonalSettingsScreen() {
       {/* Bottom Fixed Buttons */}
       <View style={styles.bottomButtonsContainer}>
         {renderHelpCommunitySection()}
-        {renderLogoutButton()}
       </View>
 
       {renderProfileSwitcherModal()}
@@ -459,22 +457,6 @@ const styles = StyleSheet.create({
   communitySubtitle: {
     fontSize: theme.fontSize.sm,
     fontFamily: theme.fonts.primary.medium,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: theme.spacing.sm,
-    height: 56,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#DC2626',
-    gap: theme.spacing.md,
-  },
-  logoutText: {
-    fontSize: theme.fontSize.base,
-    fontFamily: theme.fonts.primary.semiBold,
-    color: '#DC2626',
   },
   // Modal styles
   modalOverlay: {

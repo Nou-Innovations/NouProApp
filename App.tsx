@@ -90,9 +90,19 @@ import PersonalDeliveryDetailScreen from '@/modes/personal/screens/PersonalDeliv
 // Screens - Settings
 import ChangePasswordScreen from '@/features/settings/screens/ChangePasswordScreen';
 import SecuritySettingsScreen from '@/features/settings/screens/SecuritySettingsScreen';
+import ProfileSettingsScreen from '@/features/settings/screens/ProfileSettingsScreen';
+import PersonalProfileSettingsScreen from '@/features/settings/screens/PersonalProfileSettingsScreen';
+import TwoFactorAuthScreen from '@/features/settings/screens/TwoFactorAuthScreen';
+import BiometricLoginScreen from '@/features/settings/screens/BiometricLoginScreen';
 
 // Screens - Business Activity
 import { AllActivityScreen } from '@/modes/business/screens';
+
+// Screens - Subscription
+import { SubscriptionPlansScreen } from '@/features/subscription';
+
+// Screens - Feedback
+import { FeedbackCategoriesScreen, FeedbackListScreen, AddSuggestionScreen } from '@/features/feedback';
 
 // Screens - Business/Team
 import TeamManagementScreen from '@/features/team/screens/TeamManagementScreen';
@@ -100,7 +110,9 @@ import InviteStaffScreen from '@/features/team/screens/InviteStaffScreen';
 
 // Screens - Locations & Transports
 import LocationsScreen from '@/features/locations/screens/LocationsScreen';
+import AddLocationScreen from '@/features/locations/screens/AddLocationScreen';
 import TransportsScreen from '@/features/transports/screens/TransportsScreen';
+import AddTransportScreen from '@/features/transports/screens/AddTransportScreen';
 
 // Screens - Orders
 import OrderDetailScreen from '@/features/orders/screens/OrderDetailScreen';
@@ -261,6 +273,10 @@ function AppNavigator() {
         {/* Settings Screens */}
         <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
         <RootStack.Screen name="SecuritySettings" component={SecuritySettingsScreen} />
+        <RootStack.Screen name="TwoFactorAuth" component={TwoFactorAuthScreen} />
+        <RootStack.Screen name="BiometricLogin" component={BiometricLoginScreen} />
+        <RootStack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
+        <RootStack.Screen name="PersonalProfileSettings" component={PersonalProfileSettingsScreen} />
         <RootStack.Screen name="PersonalSettings" component={PersonalSettingsScreen} />
         <RootStack.Screen name="PersonalDeliveryDetail" component={PersonalDeliveryDetailScreen} />
         <RootStack.Screen name="CompanySettings" component={CompanySettingsScreen} />
@@ -272,13 +288,23 @@ function AppNavigator() {
         
         {/* Locations & Transports */}
         <RootStack.Screen name="Locations" component={LocationsScreen} />
+        <RootStack.Screen name="AddLocation" component={AddLocationScreen} />
         <RootStack.Screen name="Transports" component={TransportsScreen} />
+        <RootStack.Screen name="AddTransport" component={AddTransportScreen} />
         
         {/* Social Screens */}
         <RootStack.Screen name="Connections" component={ConnectionsScreen} />
         
         {/* Business Activity */}
         <RootStack.Screen name="AllActivity" component={AllActivityScreen} />
+        
+        {/* Subscription */}
+        <RootStack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
+        
+        {/* Feedback */}
+        <RootStack.Screen name="FeedbackCategories" component={FeedbackCategoriesScreen} />
+        <RootStack.Screen name="FeedbackList" component={FeedbackListScreen} />
+        <RootStack.Screen name="AddSuggestion" component={AddSuggestionScreen} />
       </RootStack.Navigator>
       <StatusBar style={isDarkMode ? "light" : "dark"} />
     </NavigationContainer>
@@ -299,14 +325,42 @@ function AuthNavigatorWithContainer() {
 // ========== Store Initializers ==========
 
 /**
- * Initialize company store
+ * Initialize company store and locations
+ * 
+ * Location Selection Logic:
+ * - Fetches business locations when a business is active
+ * - If business has only one location (main/primary), auto-selects it
+ * - If business has multiple locations, shows "All Locations" option
+ * - Location dropdown is disabled when there's only one location
  */
 function CompanyStoreInitializer({ children }: { children: React.ReactNode }) {
   const fetchCompanies = useBusinessStore((state) => state.fetchCompanies);
+  const fetchLocations = useBusinessStore((state) => state.fetchLocations);
+  const locations = useBusinessStore((state) => state.locations);
+  const currentLocation = useBusinessStore((state) => state.currentLocation);
+  const setLocation = useBusinessStore((state) => state.setLocation);
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
 
+  // Fetch companies on mount
   useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
+
+  // Fetch locations when business changes
+  useEffect(() => {
+    if (activeBusiness?.id) {
+      fetchLocations(activeBusiness.id);
+    }
+  }, [activeBusiness?.id, fetchLocations]);
+
+  // Auto-select primary location if business has only one location
+  useEffect(() => {
+    if (locations.length === 1 && !currentLocation) {
+      // Single location - auto-select it
+      const primaryLocation = locations[0];
+      setLocation(primaryLocation);
+    }
+  }, [locations, currentLocation, setLocation]);
 
   return <>{children}</>;
 }

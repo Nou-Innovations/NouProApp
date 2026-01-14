@@ -8,5 +8,4 @@ export { default as AddWorkExperienceScreen } from './AddWorkExperienceScreen';
 export { default as EditWorkExperienceScreen } from './EditWorkExperienceScreen';
 export { default as PersonalDeliveryDetailScreen } from './PersonalDeliveryDetailScreen';
 export { default as PersonalSettingsScreen } from './PersonalSettingsScreen';
-export { default as DashboardScreen } from './DashboardScreen';
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -19,15 +18,13 @@ import {
   Car, 
   ShieldCheck, 
   FileText, 
-  LogOut, 
+  User,
   Heart, 
-  Trash2,
   LucideIcon,
 } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { AppModal } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import theme from '@/shared/theme';
@@ -81,17 +78,11 @@ const SettingsOption: React.FC<SettingsOptionProps> = ({
 
 export default function CompanySettingsScreen() {
   const navigation = useNavigation();
-  const { theme: appTheme, isDarkMode } = useTheme();
+  const { theme: appTheme } = useTheme();
   const { currentCompany } = useBusinessStore();
   
   // Use profileStore for role checks (single source of truth)
-  const isSuperAdminRole = useProfileStore((state) => state.isSuperAdmin);
   const isAdminRole = useProfileStore((state) => state.isAdmin);
-  
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
-
-  const isSuperAdmin = isSuperAdminRole();
   const isAdmin = isAdminRole();
 
   if (!isAdmin) {
@@ -145,35 +136,19 @@ export default function CompanySettingsScreen() {
     Alert.alert('Privacy Policy', 'Navigate to privacy policy screen');
   };
 
-  const handleLeaveWorkplace = () => {
-    setShowLeaveDialog(true);
+  const handleProfile = () => {
+    // @ts-ignore
+    navigation.navigate('ProfileSettings');
   };
 
   const handleExplorePlans = () => {
-    Alert.alert('Subscription', 'Navigate to subscription plans screen');
+    // @ts-ignore
+    navigation.navigate('SubscriptionPlans');
   };
 
   const handleHelpCommunity = () => {
-    Linking.openURL('https://noupro.app/community');
-  };
-
-  const handleDeleteCompany = () => {
-    if (!isSuperAdmin) {
-      Alert.alert('Access Denied', 'Only Super Admins can delete companies.');
-      return;
-    }
-    setShowDeleteDialog(true);
-  };
-
-  const confirmDeleteCompany = () => {
-    setShowDeleteDialog(false);
-    Alert.alert('Delete Company', 'Company deletion process started...');
-  };
-
-  const confirmLeaveWorkplace = () => {
-    setShowLeaveDialog(false);
-    Alert.alert('Leave Workplace', 'You have left the workplace.');
-    navigation.goBack();
+    // @ts-ignore
+    navigation.navigate('FeedbackCategories');
   };
 
   return (
@@ -230,10 +205,9 @@ export default function CompanySettingsScreen() {
             onPress={handlePrivacyPolicy}
           />
           <SettingsOption
-            icon={LogOut}
-            title="Leave workplace"
-            onPress={handleLeaveWorkplace}
-            isDestructive
+            icon={User}
+            title="Profile"
+            onPress={handleProfile}
           />
         </View>
       </ScrollView>
@@ -259,66 +233,7 @@ export default function CompanySettingsScreen() {
             </View>
           </View>
         </TouchableOpacity>
-
-        {/* Delete Company Button */}
-        {isSuperAdmin && (
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={handleDeleteCompany}
-          >
-            <Trash2 size={20} color="#DC2626" strokeWidth={2} />
-            <Text style={styles.deleteButtonText}>Delete Company</Text>
-          </TouchableOpacity>
-        )}
       </View>
-
-      {/* Delete Confirmation Dialog */}
-      <AppModal
-        visible={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
-        title="Delete Company?"
-        message="This action cannot be undone. All company data will be permanently deleted."
-        footer={
-          <View style={styles.modalFooter}>
-            <AppButton
-              title="Delete"
-              onPress={confirmDeleteCompany}
-              variant="alert"
-              style={{ flex: 1, marginRight: 8 }}
-            />
-            <AppButton
-              title="Cancel"
-              onPress={() => setShowDeleteDialog(false)}
-              variant="outline"
-              style={{ flex: 1 }}
-            />
-          </View>
-        }
-      />
-
-      {/* Leave Workplace Confirmation Dialog */}
-      <AppModal
-        visible={showLeaveDialog}
-        onClose={() => setShowLeaveDialog(false)}
-        title="Leave Workplace?"
-        message="Are you sure you want to leave this workplace?"
-        footer={
-          <View style={styles.modalFooter}>
-            <AppButton
-              title="Leave"
-              onPress={confirmLeaveWorkplace}
-              variant="alert"
-              style={{ flex: 1, marginRight: 8 }}
-            />
-            <AppButton
-              title="Cancel"
-              onPress={() => setShowLeaveDialog(false)}
-              variant="outline"
-              style={{ flex: 1 }}
-            />
-          </View>
-        }
-      />
     </SafeAreaView>
   );
 }
@@ -391,21 +306,6 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     fontFamily: theme.fonts.primary.medium,
   },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 56,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#DC2626',
-    gap: theme.spacing.md,
-  },
-  deleteButtonText: {
-    fontSize: theme.fontSize.base,
-    fontFamily: theme.fonts.primary.semiBold,
-    color: '#DC2626',
-  },
   accessDeniedContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -433,9 +333,5 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontFamily: theme.fonts.primary.bold,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    marginTop: 8,
   },
 });

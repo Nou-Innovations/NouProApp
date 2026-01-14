@@ -25,19 +25,21 @@ export default function SecuritySettingsScreen({ navigation }: SecuritySettingsS
   const staySignedIn = useProfileStore((state) => state.staySignedIn);
   const setStaySignedIn = useProfileStore((state) => state.setStaySignedIn);
   const isPersonalMode = useProfileStore((state) => state.isPersonalMode);
+  
+  // Security settings
+  const twoFactorEnabled = useProfileStore((state) => state.twoFactorEnabled);
+  const biometricEnabled = useProfileStore((state) => state.biometricEnabled);
 
   const handleChangePassword = () => {
     navigation.navigate('ChangePassword');
   };
 
   const handleTwoFactorAuth = () => {
-    // TODO: Implement Two-Factor Authentication setup
-    console.log('Two-Factor Authentication pressed');
+    navigation.navigate('TwoFactorAuth');
   };
 
   const handleBiometricLogin = () => {
-    // TODO: Implement Biometric Login setup
-    console.log('Biometric Login pressed');
+    navigation.navigate('BiometricLogin');
   };
 
   const handleStaySignedInToggle = (value: boolean) => {
@@ -58,27 +60,42 @@ export default function SecuritySettingsScreen({ navigation }: SecuritySettingsS
         <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
       </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={[styles.settingItem, { borderBottomColor: appTheme.colors.borderColor }]} 
-        onPress={handleTwoFactorAuth}
-      >
-        <View style={styles.settingLeft}>
-          <Icon name="shield-checkmark-outline" size={24} color={appTheme.colors.iconColor} />
-          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Two-Factor Authentication</Text>
-        </View>
-        <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
-      </TouchableOpacity>
+      {/* Two-Factor and Biometric - Only shown in Personal mode */}
+      {isPersonalMode() && (
+        <>
+          <TouchableOpacity 
+            style={[styles.settingItem, { borderBottomColor: appTheme.colors.borderColor }]} 
+            onPress={handleTwoFactorAuth}
+          >
+            <View style={styles.settingLeft}>
+              <Icon name="shield-checkmark-outline" size={24} color={appTheme.colors.iconColor} />
+              <View style={styles.settingTextContainer}>
+                <Text style={[styles.settingTitle, { color: appTheme.colors.text }]}>Two-Factor Authentication</Text>
+                <Text style={[styles.settingDescription, { color: twoFactorEnabled ? '#10B981' : appTheme.colors.textLight }]}>
+                  {twoFactorEnabled ? 'Enabled' : 'Disabled'}
+                </Text>
+              </View>
+            </View>
+            <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+          </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={[styles.settingItem, { borderBottomColor: appTheme.colors.borderColor }]} 
-        onPress={handleBiometricLogin}
-      >
-        <View style={styles.settingLeft}>
-          <Icon name="finger-print-outline" size={24} color={appTheme.colors.iconColor} />
-          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Biometric Login</Text>
-        </View>
-        <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
-      </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.settingItem, { borderBottomColor: appTheme.colors.borderColor }]} 
+            onPress={handleBiometricLogin}
+          >
+            <View style={styles.settingLeft}>
+              <Icon name="finger-print-outline" size={24} color={appTheme.colors.iconColor} />
+              <View style={styles.settingTextContainer}>
+                <Text style={[styles.settingTitle, { color: appTheme.colors.text }]}>Biometric Login</Text>
+                <Text style={[styles.settingDescription, { color: biometricEnabled ? '#10B981' : appTheme.colors.textLight }]}>
+                  {biometricEnabled ? 'Enabled' : 'Disabled'}
+                </Text>
+              </View>
+            </View>
+            <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+          </TouchableOpacity>
+        </>
+      )}
 
       {/* Stay Signed In Toggle - Only shown in Personal mode */}
       {isPersonalMode() && (

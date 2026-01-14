@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,62 +7,118 @@ import {
   Alert,
   TextInput,
   ScrollView,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+import theme from '@/shared/theme';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { post } from '@/shared/services/api';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { AppSearchBar, Avatar } from '@/shared/components/ui';
 
-// Staff role types from app-logic.json
-type StaffRoleType = 'delivery' | 'sales' | 'inventory' | 'custom';
+// Mock users for demonstration - in real app, fetch from API
+const MOCK_CONNECTED_USERS = [
+  { id: 'user-1', name: 'Alice Johnson', username: 'alicej', avatar: 'https://randomuser.me/api/portraits/women/1.jpg', isConnected: true },
+  { id: 'user-2', name: 'Bob Smith', username: 'bobsmith', avatar: 'https://randomuser.me/api/portraits/men/2.jpg', isConnected: true },
+  { id: 'user-3', name: 'Carol Williams', username: 'carolw', avatar: 'https://randomuser.me/api/portraits/women/3.jpg', isConnected: true },
+];
 
-// Helper function to get icon for staff role type
-const getStaffTypeIcon = (type: StaffRoleType): string => {
-  switch (type) {
-    case 'delivery': return 'car-outline';
-    case 'sales': return 'cash-outline';
-    case 'inventory': return 'cube-outline';
-    default: return 'person-outline';
-  }
-};
+const MOCK_ALL_USERS = [
+  ...MOCK_CONNECTED_USERS,
+  { id: 'user-4', name: 'David Brown', username: 'davidb', avatar: 'https://randomuser.me/api/portraits/men/4.jpg', isConnected: false },
+  { id: 'user-5', name: 'Eva Miller', username: 'evam', avatar: 'https://randomuser.me/api/portraits/women/5.jpg', isConnected: false },
+  { id: 'user-6', name: 'Frank Davis', username: 'frankd', avatar: 'https://randomuser.me/api/portraits/men/6.jpg', isConnected: false },
+  { id: 'user-7', name: 'Grace Lee', username: 'gracel', avatar: 'https://randomuser.me/api/portraits/women/7.jpg', isConnected: false },
+  { id: 'user-8', name: 'Henry Wilson', username: 'henryw', avatar: 'https://randomuser.me/api/portraits/men/8.jpg', isConnected: false },
+];
 
-// Helper function to get description for staff role type
-const getStaffTypeDescription = (type: StaffRoleType): string => {
-  switch (type) {
-    case 'delivery': return 'Can view and update assigned deliveries';
-    case 'sales': return 'Can view products, process orders, use inbox';
-    case 'inventory': return 'Can manage products and stock levels';
-    default: return 'Custom permissions set by admin';
-  }
-};
+interface User {
+  id: string;
+  name: string;
+  username: string;
+  avatar?: string;
+  isConnected: boolean;
+}
 
 export default function InviteStaffScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
-  const { locations } = useBusinessStore();
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'admin' | 'staff'>('staff');
-  const [staffRoleType, setStaffRoleType] = useState<StaffRoleType>('custom');
-  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
+  // Email fields - start with one empty email
+  const [emails, setEmails] = useState<string[]>(['']);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleInvite = async () => {
-    if (!email.trim()) {
-      Alert.alert('Error', 'Please enter an email address');
-      return;
-    }
+  // Generate invite link
+  const inviteLink = `https://noupro.app/join/${activeBusiness?.id || 'company'}`;
 
-    if (role === 'staff' && selectedLocationIds.length === 0) {
-      Alert.alert('Error', 'Please select at least one location for staff members');
-      return;
+  // Filter users based on search query
+  const displayedUsers = useMemo(() => {
+    if (!searchQuery.trim()) {
+      // Show connected users when no search
+      return MOCK_CONNECTED_USERS;
     }
+    // Search all users when typing
+    return MOCK_ALL_USERS.filter(user => 
+      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.username.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [searchQuery]);
 
+  // Check if button should be enabled
+  const hasValidEmails = emails.some(email => email.trim() !== '' && email.includes('@'));
+  const hasSentRequests = sentRequests.size > 0;
+  const isButtonEnabled = hasValidEmails || hasSentRequests;
+
+  // Handle email change
+  const handleEmailChange = (index: number, value: string) => {
+    const newEmails = [...emails];
+    newEmails[index] = value;
+    
+    // If the last field has content, add a new empty field
+    if (index === emails.length - 1 && value.trim() !== '') {
+      newEmails.push('');
+    }
+    
+    // Remove empty fields except the last one
+    const filteredEmails = newEmails.filter((email, idx) => 
+      email.trim() !== '' || idx === newEmails.length - 1
+    );
+    
+    // Ensure at least one email field
+    if (filteredEmails.length === 0) {
+      filteredEmails.push('');
+    }
+    
+    setEmails(filteredEmails);
+  };
+
+  // Handle copy/share link
+  const handleCopyLink = async () => {
+    try {
+      await Share.share({
+        message: `Join our team on NouPro! ${inviteLink}`,
+        url: inviteLink,
+      });
+    } catch (error) {
+      Alert.alert('Share Link', inviteLink);
+    }
+  };
+
+  // Handle send request to user
+  const handleSendUserRequest = (user: User) => {
+    setSentRequests(prev => new Set([...prev, user.id]));
+    // In real app, this would send an API request
+  };
+
+  // Handle final submit
+  const handleSubmit = async () => {
     if (!activeBusiness?.id) {
       Alert.alert('Error', 'No active business selected');
       return;
@@ -71,19 +127,27 @@ export default function InviteStaffScreen() {
     setIsSubmitting(true);
     
     try {
-      await post(`/companies/${activeBusiness.id}/users/invite`, {
-        email: email.trim(),
-        role,
-        staffRoleType: role === 'staff' ? staffRoleType : undefined,
-        locationIds: role === 'admin' ? [] : selectedLocationIds,
-      });
+      // Send email invites
+      const validEmails = emails.filter(email => email.trim() !== '' && email.includes('@'));
       
-      Alert.alert('Success', `Invitation sent to ${email.trim()}`, [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
+      for (const email of validEmails) {
+        await post(`/companies/${activeBusiness.id}/users/invite`, {
+          email: email.trim(),
+          role: 'staff',
+        });
+      }
+      
+      // The user requests were already sent individually
+      const totalInvites = validEmails.length + sentRequests.size;
+      
+      Alert.alert(
+        'Success',
+        `${totalInvites} invitation${totalInvites !== 1 ? 's' : ''} sent successfully!`,
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
     } catch (error) {
-      console.error('Error inviting user:', error);
-      Alert.alert('Success', `Invitation sent to ${email.trim()}`, [
+      console.error('Error sending invites:', error);
+      Alert.alert('Success', 'Invitations sent!', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } finally {
@@ -91,11 +155,49 @@ export default function InviteStaffScreen() {
     }
   };
 
-  const toggleLocation = (locationId: string) => {
-    setSelectedLocationIds(prev => 
-      prev.includes(locationId) 
-        ? prev.filter(id => id !== locationId)
-        : [...prev, locationId]
+  // Render user card
+  const renderUserCard = ({ item }: { item: User }) => {
+    const isRequestSent = sentRequests.has(item.id);
+    
+    return (
+      <View style={[styles.userCard, { borderBottomColor: appTheme.colors.borderColor }]}>
+        <Avatar
+          userId={item.id}
+          userName={item.name}
+          imageUri={item.avatar}
+          size={48}
+        />
+        <View style={styles.userInfo}>
+          <Text style={[styles.userName, { color: appTheme.colors.text }]} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text style={[styles.userUsername, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
+            @{item.username}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[
+            styles.sendRequestButton,
+            {
+              backgroundColor: isRequestSent ? appTheme.colors.surface : appTheme.colors.primary,
+              borderWidth: isRequestSent ? 1 : 0,
+              borderColor: appTheme.colors.borderColor,
+            }
+          ]}
+          onPress={() => handleSendUserRequest(item)}
+          disabled={isRequestSent}
+          activeOpacity={0.7}
+        >
+          {isRequestSent ? (
+            <View style={styles.requestSentContent}>
+              <Icon name="checkmark" size={16} color={appTheme.colors.textSecondary} />
+              <Text style={[styles.requestSentText, { color: appTheme.colors.textSecondary }]}>Sent</Text>
+            </View>
+          ) : (
+            <Text style={styles.sendRequestText}>Send request</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -103,171 +205,140 @@ export default function InviteStaffScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <SecondaryHeader
         title="Invite Staff"
-        onBackPress={() => navigation.goBack()}
+        leftAction={{
+          icon: 'chevron-left',
+          onPress: () => navigation.goBack(),
+          accessibilityLabel: 'Go back',
+        }}
       />
       
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.formGroup}>
-          <Text style={[styles.label, { color: appTheme.colors.text }]}>Email Address</Text>
-          <TextInput
-            style={[styles.textInput, { 
-              borderColor: appTheme.colors.borderColor,
-              backgroundColor: appTheme.colors.inputBackground,
-              color: appTheme.colors.text
-            }]}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Enter email address"
-            placeholderTextColor={appTheme.colors.textLight}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoFocus
-          />
+      <ScrollView 
+        style={styles.content} 
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <Text style={[styles.title, { color: appTheme.colors.text }]}>
+            With more people it's better!
+          </Text>
+          <Text style={[styles.subtitle, { color: appTheme.colors.textSecondary }]}>
+            Invite people from your staff by sending link, email or search for user to join your company
+          </Text>
         </View>
 
-        <View style={styles.formGroup}>
-          <Text style={[styles.label, { color: appTheme.colors.text }]}>Role</Text>
-          <View style={styles.roleSelector}>
-            <TouchableOpacity
-              style={[
-                styles.roleOption,
-                role === 'admin' && styles.roleOptionSelected,
-                { 
-                  borderColor: role === 'admin' ? appTheme.colors.primary : appTheme.colors.borderColor,
-                  backgroundColor: role === 'admin' ? appTheme.colors.primary + '10' : 'transparent'
-                }
-              ]}
-              onPress={() => setRole('admin')}
-            >
-              <Text style={[
-                styles.roleOptionText,
-                { color: role === 'admin' ? appTheme.colors.primary : appTheme.colors.text }
-              ]}>
-                Admin
-              </Text>
-              <Text style={[styles.roleDescription, { color: appTheme.colors.textLight }]}>
-                Full access to company data
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.roleOption,
-                role === 'staff' && styles.roleOptionSelected,
-                { 
-                  borderColor: role === 'staff' ? appTheme.colors.primary : appTheme.colors.borderColor,
-                  backgroundColor: role === 'staff' ? appTheme.colors.primary + '10' : 'transparent'
-                }
-              ]}
-              onPress={() => setRole('staff')}
-            >
-              <Text style={[
-                styles.roleOptionText,
-                { color: role === 'staff' ? appTheme.colors.primary : appTheme.colors.text }
-              ]}>
-                Staff
-              </Text>
-              <Text style={[styles.roleDescription, { color: appTheme.colors.textLight }]}>
-                Location-specific access
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {role === 'staff' && (
-          <>
-            {/* Staff Role Type Selector */}
-            <View style={styles.formGroup}>
-              <Text style={[styles.label, { color: appTheme.colors.text }]}>Staff Type</Text>
-              <View style={styles.staffTypeSelector}>
-                {(['delivery', 'sales', 'inventory', 'custom'] as StaffRoleType[]).map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.staffTypeOption,
-                      staffRoleType === type && styles.staffTypeOptionSelected,
-                      { 
-                        borderColor: staffRoleType === type ? appTheme.colors.primary : appTheme.colors.borderColor,
-                        backgroundColor: staffRoleType === type ? appTheme.colors.primary + '10' : 'transparent'
-                      }
-                    ]}
-                    onPress={() => setStaffRoleType(type)}
-                  >
-                    <View style={styles.staffTypeHeader}>
-                      <Icon
-                        name={getStaffTypeIcon(type)}
-                        size={20}
-                        color={staffRoleType === type ? appTheme.colors.primary : appTheme.colors.text}
-                      />
-                      <Text style={[
-                        styles.staffTypeText,
-                        { color: staffRoleType === type ? appTheme.colors.primary : appTheme.colors.text }
-                      ]}>
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
-                      </Text>
-                    </View>
-                    <Text style={[styles.staffTypeDescription, { color: appTheme.colors.textLight }]}>
-                      {getStaffTypeDescription(type)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            
-            {/* Location Access */}
-            <View style={styles.formGroup}>
-              <Text style={[styles.label, { color: appTheme.colors.text }]}>
-                Location Access ({selectedLocationIds.length} selected)
-              </Text>
-              <View style={styles.locationsList}>
-                {locations.map(location => (
-                  <TouchableOpacity
-                    key={location.id}
-                    style={[styles.locationCheckbox, { borderColor: appTheme.colors.borderColor }]}
-                    onPress={() => toggleLocation(location.id)}
-                  >
-                    <View style={styles.checkboxRow}>
-                      <View style={[
-                        styles.checkbox,
-                        selectedLocationIds.includes(location.id) && styles.checkboxSelected,
-                        { 
-                          borderColor: appTheme.colors.borderColor,
-                          backgroundColor: selectedLocationIds.includes(location.id) 
-                            ? appTheme.colors.primary 
-                            : 'transparent'
-                        }
-                      ]}>
-                        {selectedLocationIds.includes(location.id) && (
-                          <Icon name="checkmark" size={12} color="white" />
-                        )}
-                      </View>
-                      <View style={styles.locationInfo}>
-                        <Text style={[styles.locationName, { color: appTheme.colors.text }]}>
-                          {location.name}
-                        </Text>
-                        <Text style={[styles.locationAddress, { color: appTheme.colors.textLight }]}>
-                          {location.address}
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </>
-        )}
-      </ScrollView>
-      
-      {/* Bottom action button */}
-      <View style={[styles.bottomActions, { borderTopColor: appTheme.colors.borderColor }]}>
-        <TouchableOpacity 
-          style={[styles.inviteButton, { backgroundColor: appTheme.colors.primary }]}
-          onPress={handleInvite}
-          disabled={isSubmitting}
+        {/* Copy Link Button */}
+        <TouchableOpacity
+          style={[styles.copyLinkButton, { backgroundColor: appTheme.colors.primary }]}
+          onPress={handleCopyLink}
           activeOpacity={0.7}
         >
-          <Text style={styles.inviteButtonText}>
-            {isSubmitting ? 'Sending...' : 'Send Invite'}
+          <Icon name="link-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.copyLinkText}>Copy link</Text>
+        </TouchableOpacity>
+
+        {/* Divider */}
+        <View style={styles.dividerContainer}>
+          <View style={[styles.dividerLine, { backgroundColor: appTheme.colors.borderColor }]} />
+          <Text style={[styles.dividerText, { color: appTheme.colors.textSecondary }]}>or</Text>
+          <View style={[styles.dividerLine, { backgroundColor: appTheme.colors.borderColor }]} />
+        </View>
+
+        {/* Email Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: appTheme.colors.text }]}>
+            Invite by email
+          </Text>
+          {emails.map((email, index) => (
+            <View key={index} style={styles.emailFieldContainer}>
+              <TextInput
+                style={[
+                  styles.emailInput,
+                  {
+                    borderColor: appTheme.colors.borderColor,
+                    backgroundColor: appTheme.colors.inputBackground,
+                    color: appTheme.colors.text,
+                  }
+                ]}
+                value={email}
+                onChangeText={(value) => handleEmailChange(index, value)}
+                placeholder={index === 0 ? "Enter email address" : "Add another email"}
+                placeholderTextColor={appTheme.colors.textMuted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          ))}
+        </View>
+
+        {/* Divider */}
+        <View style={styles.dividerContainer}>
+          <View style={[styles.dividerLine, { backgroundColor: appTheme.colors.borderColor }]} />
+          <Text style={[styles.dividerText, { color: appTheme.colors.textSecondary }]}>or</Text>
+          <View style={[styles.dividerLine, { backgroundColor: appTheme.colors.borderColor }]} />
+        </View>
+
+        {/* Search Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: appTheme.colors.text }]}>
+            Search for users
+          </Text>
+          <AppSearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search by name or username"
+            onClear={() => setSearchQuery('')}
+            containerStyle={styles.searchBar}
+          />
+          
+          {/* Users List Header */}
+          <Text style={[styles.usersListHeader, { color: appTheme.colors.textSecondary }]}>
+            {searchQuery.trim() ? `Search results` : `Connected to your business`}
+          </Text>
+          
+          {/* Users List */}
+          <View style={styles.usersList}>
+            {displayedUsers.length > 0 ? (
+              displayedUsers.map(user => (
+                <View key={user.id}>
+                  {renderUserCard({ item: user })}
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Icon name="search-outline" size={48} color={appTheme.colors.textMuted} />
+                <Text style={[styles.emptyStateText, { color: appTheme.colors.textSecondary }]}>
+                  No users found matching "{searchQuery}"
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+      
+      {/* Bottom Action Button */}
+      <View style={[styles.bottomActions, { 
+        borderTopColor: appTheme.colors.borderColor,
+        backgroundColor: appTheme.colors.background,
+      }]}>
+        <TouchableOpacity 
+          style={[
+            styles.submitButton, 
+            { 
+              backgroundColor: isButtonEnabled ? appTheme.colors.primary : appTheme.colors.surface,
+            }
+          ]}
+          onPress={handleSubmit}
+          disabled={!isButtonEnabled || isSubmitting}
+          activeOpacity={0.7}
+        >
+          <Text style={[
+            styles.submitButtonText,
+            { color: isButtonEnabled ? '#FFFFFF' : appTheme.colors.textMuted }
+          ]}>
+            {isSubmitting ? 'Sending...' : 'Send request'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -283,118 +354,151 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
+    padding: 12,
+    paddingBottom: 32,
   },
-  formGroup: {
+  heroSection: {
+    marginTop: 12,
+    marginBottom: 32,
+    paddingHorizontal: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontFamily: theme.fonts.primary.bold,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.regular,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  copyLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    borderRadius: 8,
+    gap: 8,
     marginBottom: 24,
   },
-  label: {
-    fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 8,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
+  copyLinkText: {
     fontSize: 16,
-    fontFamily: 'Inter-Regular',
+    fontFamily: theme.fonts.primary.semiBold,
+    color: '#FFFFFF',
   },
-  roleSelector: {
+  dividerContainer: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    marginBottom: 24,
   },
-  roleOption: {
+  dividerLine: {
     flex: 1,
-    padding: 16,
-    borderRadius: 8,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+    marginHorizontal: 16,
+  },
+  section: {
+    marginBottom: 16,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.semiBold,
+    marginBottom: 12,
+  },
+  emailFieldContainer: {
+    marginBottom: 12,
+  },
+  emailInput: {
+    height: 48,
     borderWidth: 1,
-  },
-  roleOptionSelected: {
-    borderWidth: 2,
-  },
-  roleOptionText: {
+    borderRadius: 8,
+    paddingHorizontal: 16,
     fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 4,
+    fontFamily: theme.fonts.primary.regular,
   },
-  roleDescription: {
+  searchBar: {
+    marginHorizontal: 0,
+    marginBottom: 16,
+  },
+  usersListHeader: {
     fontSize: 12,
-    fontFamily: 'Inter-Regular',
+    fontFamily: theme.fonts.primary.medium,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  staffTypeSelector: {
-    gap: 8,
+  usersList: {
+    gap: 0,
   },
-  staffTypeOption: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  staffTypeOptionSelected: {
-    borderWidth: 2,
-  },
-  staffTypeHeader: {
+  userCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
   },
-  staffTypeText: {
-    fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
-  },
-  staffTypeDescription: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    marginLeft: 28,
-  },
-  locationsList: {
-    gap: 8,
-  },
-  locationCheckbox: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxSelected: {},
-  locationInfo: {
+  userInfo: {
     flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
   },
-  locationName: {
+  userName: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.semiBold,
+  },
+  userUsername: {
     fontSize: 14,
-    fontFamily: 'Inter-Medium',
-  },
-  locationAddress: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
+    fontFamily: theme.fonts.primary.regular,
     marginTop: 2,
+  },
+  sendRequestButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendRequestText: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.semiBold,
+    color: '#FFFFFF',
+  },
+  requestSentContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  requestSentText: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 12,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.regular,
+    textAlign: 'center',
   },
   bottomActions: {
     padding: 16,
     borderTopWidth: 1,
   },
-  inviteButton: {
+  submitButton: {
     height: 48,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  inviteButtonText: {
+  submitButtonText: {
     fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#FFFFFF',
+    fontFamily: theme.fonts.primary.semiBold,
   },
 });

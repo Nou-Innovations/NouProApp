@@ -11,6 +11,8 @@ import {
   ChevronUp,
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
+  ArrowDown,
   X,
   
   // Actions
@@ -144,6 +146,8 @@ export {
   ChevronUp,
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
+  ArrowDown,
   X,
   
   // Actions
@@ -295,6 +299,8 @@ export const iconMap: Record<string, LucideIcon> = {
   'chevron-right': ChevronRight,
   'arrow-left': ArrowLeft,
   'arrow-right': ArrowRight,
+  'arrow-up': ArrowUp,
+  'arrow-down': ArrowDown,
   'x': X,
   'x-circle': XCircle,
   

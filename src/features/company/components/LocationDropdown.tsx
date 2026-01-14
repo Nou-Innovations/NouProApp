@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -32,12 +32,30 @@ export default function LocationDropdown({
   } = useBusinessStore();
   const { theme: appTheme } = useTheme();
 
+  // Defensive check for undefined/null locations
+  const safeLocations = Array.isArray(locations) ? locations : [];
+
+  // Check if there's only one location (single/main location)
+  const hasSingleLocation = safeLocations.length === 1;
+  const primaryLocation = safeLocations.find(loc => (loc as any).is_primary) || safeLocations[0];
+
+  // Auto-select the primary location if there's only one location
+  useEffect(() => {
+    if (hasSingleLocation && primaryLocation && !selectedLocationId) {
+      if (onLocationSelect) {
+        onLocationSelect(primaryLocation.id);
+      } else {
+        setLocation(primaryLocation);
+      }
+    }
+  }, [hasSingleLocation, primaryLocation?.id]);
+
   const selectedLocation = selectedLocationId 
-    ? locations.find(loc => loc.id === selectedLocationId)
-    : currentLocation;
+    ? safeLocations.find(loc => loc.id === selectedLocationId)
+    : hasSingleLocation ? primaryLocation : currentLocation;
 
   const handleLocationSelect = (locationId: string | null) => {
-    const location = locationId ? locations.find(loc => loc.id === locationId) : null;
+    const location = locationId ? safeLocations.find(loc => loc.id === locationId) : null;
     
     if (onLocationSelect) {
       onLocationSelect(locationId);
@@ -50,31 +68,52 @@ export default function LocationDropdown({
   };
 
   const getDisplayText = () => {
+    // If single location, always show that location's name
+    if (hasSingleLocation && primaryLocation) {
+      return primaryLocation.name;
+    }
     if (!selectedLocationId && !selectedLocation) {
       return 'All Locations';
     }
     return selectedLocation?.name || 'All Locations';
   };
 
+  // Only show "All Locations" option if there are multiple locations
+  const shouldShowAllLocations = showAllLocationsOption && !hasSingleLocation;
+
   const dropdownOptions = [
-    ...(showAllLocationsOption ? [{ id: null, name: 'All Locations' }] : []),
-    ...locations.map(loc => ({ id: loc.id, name: loc.name }))
+    ...(shouldShowAllLocations ? [{ id: null, name: 'All Locations' }] : []),
+    ...safeLocations.map(loc => ({ id: loc.id, name: loc.name }))
   ];
+
+  // Don't allow opening dropdown if only one location
+  const handleOpenDropdown = () => {
+    if (hasSingleLocation) return;
+    setIsOpen(true);
+  };
 
   return (
     <View style={[styles.container, style]}>
       <TouchableOpacity 
-        style={[styles.dropdownTrigger, { borderColor: appTheme.colors.borderColor }]}
-        onPress={() => setIsOpen(true)}
+        style={[
+          styles.dropdownTrigger, 
+          { borderColor: appTheme.colors.borderColor },
+          hasSingleLocation && styles.singleLocationTrigger
+        ]}
+        onPress={handleOpenDropdown}
+        disabled={hasSingleLocation}
+        activeOpacity={hasSingleLocation ? 1 : 0.7}
       >
         <Text style={[styles.dropdownText, { color: appTheme.colors.text }]}>
           {getDisplayText()}
         </Text>
-        <Icon 
-          name="chevron-down" 
-          size={16} 
-          color={appTheme.colors.textLight} 
-        />
+        {!hasSingleLocation && (
+          <Icon 
+            name="chevron-down" 
+            size={16} 
+            color={appTheme.colors.textLight} 
+          />
+        )}
       </TouchableOpacity>
 
       <Modal 
@@ -177,6 +216,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  singleLocationTrigger: {
+    // No extra styling needed when single location - just shows the location name
   },
   dropdownText: {
     fontSize: 14,

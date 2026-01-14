@@ -294,8 +294,7 @@ export default function LocationsScreen() {
   };
 
   const handleAddLocation = () => {
-    // TODO: Navigate to create location screen
-    Alert.alert('Add Location', 'Create new location screen coming soon');
+    navigation.navigate('AddLocation' as any);
   };
 
   // Filter locations based on search query

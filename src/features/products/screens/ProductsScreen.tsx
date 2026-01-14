@@ -66,7 +66,7 @@ const ProductsScreen: React.FC = () => {
   const isAdmin = useProfileStore((state) => state.isAdmin);
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
-  const { currentCompany, currentLocation } = useBusinessStore();
+  const { currentCompany, currentLocation, locations } = useBusinessStore();
   
   // Profile store for RBAC
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
@@ -266,30 +266,42 @@ const ProductsScreen: React.FC = () => {
   // Check user permissions for global vs location-scoped access
   const canViewAllProducts = isAdmin();
 
-  // Create location dropdown items
+  // Check if business has only one location (with defensive check for undefined/null)
+  const safeLocations = Array.isArray(locations) ? locations : [];
+  const hasSingleLocation = safeLocations.length === 1;
+  const primaryLocation = safeLocations.find(loc => (loc as any).is_primary) || safeLocations[0];
+
+  // Auto-select primary location when there's only one
+  useEffect(() => {
+    if (hasSingleLocation && primaryLocation && !selectedLocationId) {
+      setSelectedLocationId(primaryLocation.id);
+    }
+  }, [hasSingleLocation, primaryLocation?.id]);
+
+  // Create location dropdown items using business store locations
   const locationItems: DropdownItem[] = useMemo(() => {
     const items: DropdownItem[] = [];
     
-    // Always add "All Locations" option
-    items.push({
-      id: 'all',
-      title: 'All Locations',
-      icon: 'grid',
-    });
-    
-    // Add company locations
-    if (currentCompany?.locations) {
-      currentCompany.locations.forEach(location => {
-        items.push({
-          id: location.id,
-          title: location.name,
-          icon: 'location',
-        });
+    // Only add "All Locations" option if there are multiple locations
+    if (!hasSingleLocation) {
+      items.push({
+        id: 'all',
+        title: 'All Locations',
+        icon: 'grid',
       });
     }
     
+    // Add business locations from store
+    safeLocations.forEach(location => {
+      items.push({
+        id: location.id,
+        title: location.name,
+        icon: 'location',
+      });
+    });
+    
     return items;
-  }, [currentCompany?.locations]);
+  }, [safeLocations, hasSingleLocation]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
@@ -317,16 +329,22 @@ const ProductsScreen: React.FC = () => {
                   borderColor: appTheme.colors.borderColor,
                   backgroundColor: appTheme.colors.background
                 }]}
-                onPress={() => setShowLocationDropdown(true)}
+                onPress={() => !hasSingleLocation && setShowLocationDropdown(true)}
+                disabled={hasSingleLocation}
+                activeOpacity={hasSingleLocation ? 1 : 0.7}
               >
                 <Text style={[styles.locationText, { 
                   color: appTheme.colors.textSecondary 
                 }]}>
-                  {selectedLocationId ? 
-                    currentCompany?.locations?.find(l => l.id === selectedLocationId)?.name || 'All Locations' 
-                    : 'All Locations'}
+                  {hasSingleLocation && primaryLocation
+                    ? primaryLocation.name
+                    : selectedLocationId 
+                      ? safeLocations.find(l => l.id === selectedLocationId)?.name || 'All Locations' 
+                      : 'All Locations'}
                 </Text>
-                <Icon name="chevron-down" size={16} color={appTheme.colors.textSecondary} />
+                {!hasSingleLocation && (
+                  <Icon name="chevron-down" size={16} color={appTheme.colors.textSecondary} />
+                )}
               </TouchableOpacity>
             </View>
             

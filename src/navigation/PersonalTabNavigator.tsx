@@ -5,7 +5,6 @@
  * Updated navigation structure:
  * - Home: Feed & updates from businesses, suggestions
  * - Explore: Discover businesses, browse categories, search
- * - Dashboard: Activity overview, orders, personal stats (NEW - replaces Inbox)
  * - Activity: All orders/tasks placed as a person
  * - Profile: Personal settings, switch/manage business profiles
  * 
@@ -18,7 +17,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { 
   Home, 
   Search,
-  LayoutGrid,
   List,
 } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -29,7 +27,6 @@ import { PersonalTabParamList } from '@/shared/types/navigation';
 // Import screens from modes
 import HomeScreen from '@/modes/personal/screens/HomeScreen';
 import ExploreScreen from '@/modes/personal/screens/ExploreScreen';
-import DashboardScreen from '@/modes/personal/screens/DashboardScreen';
 import ActivityScreen from '@/modes/personal/screens/ActivityScreen';
 import PersonalProfileScreen from '@/modes/personal/screens/PersonalProfileScreen';
 
@@ -117,26 +114,6 @@ export function PersonalTabNavigator() {
           ),
           tabBarIcon: ({ color, focused }) => (
             <Search size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-          ),
-        }}
-      />
-      
-      {/* Dashboard Tab - NEW (replaces Inbox) */}
-      <Tab.Screen
-        name="Dashboard"
-        component={DashboardScreen}
-        options={{
-          tabBarLabel: ({ focused, color }) => (
-            <Text style={{
-              fontSize: theme.fontSize.xs,
-              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color: color,
-            }}>
-              Dashboard
-            </Text>
-          ),
-          tabBarIcon: ({ color, focused }) => (
-            <LayoutGrid size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />

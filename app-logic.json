@@ -199,11 +199,6 @@
           "description": "Discover businesses, browse categories, search businesses/products"
         },
         {
-          "name": "Dashboard",
-          "icon": "grid",
-          "description": "Personal activity overview, active orders, pending deliveries, connections, favorites. Replaces Inbox tab."
-        },
-        {
           "name": "Activity",
           "altName": "Orders",
           "icon": "list",
@@ -826,7 +821,7 @@
         "screens": [
           {
             "Search bar": "Search for a product by name or brand",
-            "Location selector": "Select a location to view products",
+            "Location selector": "Select a location to view products (shows only own business locations, auto-selects if single location - see locationsAndModesMVP.locationSelectionUI)",
             "Status selector": "Select a status to filter products",
             "Category selector": "Select a category to filter products",
             "Product tags": "View product tags"
@@ -1346,6 +1341,50 @@
         "roles": ["super_admin", "admin", "staff"],
         "permissions": ["orders", "stock", "deliveries", "invoices"],
         "statuses": ["pending", "accepted", "rejected", "locked"]
+      }
+    },
+
+    "locationSelectionUI": {
+      "description": "Location dropdown behavior in main screens (Products, Invoices, Deliveries, Orders)",
+      "version": "1.0.0",
+      "dataSource": "businessStore.locations - only shows locations belonging to the current business",
+      "behavior": {
+        "singleLocation": {
+          "description": "Business has only one location (the main/primary location)",
+          "rules": [
+            "Auto-selects the primary location on mount",
+            "Hides 'All Locations' option from dropdown",
+            "Disables the dropdown (no chevron icon)",
+            "Displays only the location name",
+            "User cannot change selection"
+          ]
+        },
+        "multipleLocations": {
+          "description": "Business has more than one location",
+          "rules": [
+            "Shows 'All Locations' option at the top",
+            "Lists all business locations below",
+            "Dropdown is interactive with chevron icon",
+            "User can switch between locations",
+            "Filters data based on selected location"
+          ]
+        }
+      },
+      "implementation": {
+        "component": "LocationDropdown (src/features/company/components/LocationDropdown.tsx)",
+        "screens": ["ProductsScreen", "InvoicesScreen", "DeliveryScreen", "OrderDetailScreen"],
+        "store": "useBusinessStore().locations",
+        "autoSelectLogic": "If locations.length === 1, auto-select locations[0] (primary)"
+      },
+      "initializationFlow": {
+        "description": "Location data is fetched and initialized in App.tsx CompanyStoreInitializer",
+        "steps": [
+          "1. App mounts, CompanyStoreInitializer runs",
+          "2. fetchCompanies() called on mount",
+          "3. When activeBusiness changes, fetchLocations(businessId) is called",
+          "4. If only one location exists, it is auto-selected as currentLocation",
+          "5. Screens use locations from businessStore, not currentCompany.locations"
+        ]
       }
     },
 
@@ -2044,7 +2083,6 @@
               "screens": [
                 "HomeScreen",
                 "ExploreScreen", 
-                "DashboardScreen",
                 "ActivityScreen",
                 "PersonalProfileScreen",
                 "PersonalProfileScreenNew",
@@ -2543,7 +2581,7 @@
         "rootStack": "createNativeStackNavigator containing all screens",
         "tabNavigators": {
           "PersonalTabNavigator": {
-            "tabs": ["Home", "Explore", "Dashboard", "Activity", "PersonalProfile"],
+            "tabs": ["Home", "Explore", "Activity", "PersonalProfile"],
             "screenSource": "@/modes/personal/screens/",
             "note": "Inbox removed from tabs, now an overlay from Home"
           },

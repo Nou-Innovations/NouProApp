@@ -361,8 +361,7 @@ export default function TransportsScreen() {
   };
 
   const handleAddTransport = () => {
-    // TODO: Navigate to create transport screen
-    Alert.alert('Add Vehicle', 'Create new vehicle screen coming soon');
+    navigation.navigate('AddTransport' as never);
   };
 
   // Filter transports based on search query

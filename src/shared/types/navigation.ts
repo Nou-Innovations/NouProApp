@@ -21,7 +21,6 @@ import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigat
 export type PersonalTabParamList = {
   Home: undefined;
   Explore: undefined;
-  Dashboard: undefined; // NEW - replaces Inbox tab
   Activity: undefined;
   PersonalProfile: undefined;
 };
@@ -111,9 +110,12 @@ export type RootStackParamList = {
   Settings: undefined;
   PersonalSettings: undefined;
   BusinessSettings: undefined;
-  Notifications: undefined;
   ChangePassword: undefined;
   SecuritySettings: undefined;
+  ProfileSettings: undefined;
+  PersonalProfileSettings: undefined;
+  TwoFactorAuth: undefined;
+  BiometricLogin: undefined;
   SubscriptionSettings: undefined;
   
   // Team management
@@ -122,10 +124,13 @@ export type RootStackParamList = {
   
   // Locations & Transports
   Locations: undefined;
+  AddLocation: undefined;
   Transports: undefined;
+  AddTransport: undefined;
   
   // Subscription
   Subscription: undefined;
+  SubscriptionPlans: undefined;
   
   // Business creation/editing
   CreateBusiness: undefined;
@@ -140,6 +145,14 @@ export type RootStackParamList = {
   
   // Social screens (Connections)
   Connections: { userId: string };
+  
+  // Business Activity
+  AllActivity: undefined;
+  
+  // Feedback screens
+  FeedbackCategories: undefined;
+  FeedbackList: { categoryId: string; categoryTitle: string };
+  AddSuggestion: { categoryId: string; categoryTitle: string };
   
   // Auth screens (if needed)
   Auth: undefined;

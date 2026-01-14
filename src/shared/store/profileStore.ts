@@ -28,6 +28,10 @@ interface ProfileState {
   // Stay signed in preference (OFF by default = require sign in every time)
   staySignedIn: boolean;
   
+  // Security settings (Personal mode only)
+  twoFactorEnabled: boolean;
+  biometricEnabled: boolean;
+  
   // Current user (Personal Profile) - REQUIRED
   currentUser: User | null;
   
@@ -98,6 +102,10 @@ interface ProfileActions {
   // Stay signed in preference
   setStaySignedIn: (value: boolean) => void;
   
+  // Security settings (Personal mode only)
+  setTwoFactorEnabled: (value: boolean) => void;
+  setBiometricEnabled: (value: boolean) => void;
+  
   // Computed getters (as functions since Zustand doesn't support true getters)
   isPersonalMode: () => boolean;
   isBusinessMode: () => boolean;
@@ -119,6 +127,9 @@ const initialState: ProfileState = {
   accessToken: null,
   refreshToken: null,
   staySignedIn: false, // OFF by default = require sign in every time
+  // Security settings
+  twoFactorEnabled: false,
+  biometricEnabled: false,
   // User
   currentUser: null,
   activeMode: 'personal',
@@ -390,6 +401,16 @@ export const useProfileStore = create<ProfileStore>()(
        */
       setStaySignedIn: (value: boolean) => set({ staySignedIn: value }),
 
+      /**
+       * Set two-factor authentication enabled
+       */
+      setTwoFactorEnabled: (value: boolean) => set({ twoFactorEnabled: value }),
+
+      /**
+       * Set biometric login enabled
+       */
+      setBiometricEnabled: (value: boolean) => set({ biometricEnabled: value }),
+
       // ========== Computed Getters ==========
 
       /**
@@ -459,6 +480,8 @@ export const useProfileStore = create<ProfileStore>()(
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         staySignedIn: state.staySignedIn,
+        twoFactorEnabled: state.twoFactorEnabled,
+        biometricEnabled: state.biometricEnabled,
         activeMode: state.activeMode,
         activeBusinessId: state.activeBusinessId,
       } as ProfileStore),
