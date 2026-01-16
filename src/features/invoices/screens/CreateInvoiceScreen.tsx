@@ -211,13 +211,6 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
     }));
   };
 
-  const toggleDocumentType = () => {
-    setDocumentType(prev => prev === 'Invoice' ? 'Estimate' : 'Invoice');
-    setFooterText(documentType === 'Invoice' 
-      ? 'This estimate is valid for 30 days' 
-      : 'Payment due within 30 days');
-  };
-
   const validateForm = (): boolean => {
     const newErrors: ValidationError[] = [];
     
@@ -315,17 +308,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
       <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
         <SecondaryHeader
           title={`Create ${documentType}`}
-          leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
-          rightElement={
-            <TouchableOpacity 
-              style={[styles.toggleButton, { backgroundColor: appTheme.colors.lightGrey }]} 
-              onPress={toggleDocumentType}
-            >
-              <Text style={[styles.toggleText, { color: appTheme.colors.text }]}>
-                {documentType === 'Invoice' ? 'Switch to Estimate' : 'Switch to Invoice'}
-              </Text>
-            </TouchableOpacity>
-          }
+          leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack() }}
         />
         
         <ScrollView
@@ -534,7 +517,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
               onChangeText={setNotes}
               placeholder="Enter notes for your client"
               isMultiline
-              numberOfLines={4}
+              minHeight={48}
               containerStyle={styles.fieldMargin}
             />
             
@@ -544,7 +527,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
               onChangeText={setTerms}
               placeholder="Enter terms and conditions"
               isMultiline
-              numberOfLines={4}
+              minHeight={48}
               containerStyle={styles.fieldMargin}
             />
           </AccordionSection>
@@ -640,27 +623,28 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
         </ScrollView>
 
         {/* Sticky Footer */}
-        <View style={[styles.stickyFooter, { backgroundColor: appTheme.colors.background, borderTopColor: appTheme.colors.borderColor }]}>
+        <View style={[styles.stickyFooter, { backgroundColor: appTheme.colors.cardBackground, borderTopColor: appTheme.colors.borderColor }]}>
+          <View style={styles.footerButtonRow}>
+            <AppButton
+              title="Save Draft"
+              onPress={handleSaveDraft}
+              variant="outline"
+              style={styles.footerButtonHalf}
+              loading={isSaving}
+              disabled={isSaving || isSending}
+            />
+            <AppButton
+              title="Preview"
+              onPress={handlePreview}
+              variant="outline"
+              style={styles.footerButtonHalf}
+              disabled={isSaving || isSending}
+            />
+          </View>
           <AppButton
-            title="Save Draft"
-            onPress={handleSaveDraft}
-            variant="outline"
-            style={styles.footerButton}
-            loading={isSaving}
-            disabled={isSaving || isSending}
-          />
-          <AppButton
-            title="Preview"
-            onPress={handlePreview}
-            variant="secondary"
-            style={styles.footerButton}
-            disabled={isSaving || isSending}
-          />
-          <AppButton
-            title="Send"
+            title={`Send ${documentType}`}
             onPress={handleSend}
             variant="primary"
-            style={styles.footerButton}
             loading={isSending}
             disabled={isSaving || isSending || errors.length > 0}
           />
@@ -706,19 +690,14 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
             setShowSuccessDialog(false);
             navigation.goBack();
           }}
+          variant="success"
           title="Success"
           message={successMessage}
-          footer={
-            <AppButton
-              title="OK"
-              onPress={() => {
-                setShowSuccessDialog(false);
-                navigation.goBack();
-              }}
-              variant="confirm"
-              style={{ width: '100%' }}
-            />
-          }
+          primaryButtonText="OK"
+          onPrimaryAction={() => {
+            setShowSuccessDialog(false);
+            navigation.goBack();
+          }}
         />
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -736,7 +715,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollViewContent: {
-    paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 80,
   },
@@ -891,35 +869,24 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.bold,
   },
   footerSpacer: {
-    height: 100,
+    height: 200,
   },
   stickyFooter: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    flexDirection: 'column',
+    padding: 12,
+    paddingBottom: 32,
     borderTopWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 5,
+    gap: 10,
   },
-  footerButton: {
+  footerButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  footerButtonHalf: {
     flex: 1,
-    marginHorizontal: 4,
-  },
-  toggleButton: {
-    padding: 8,
-    borderRadius: 8,
-  },
-  toggleText: {
-    fontSize: 12,
-    fontWeight: '500',
-    fontFamily: theme.fonts.primary.medium,
   },
 });

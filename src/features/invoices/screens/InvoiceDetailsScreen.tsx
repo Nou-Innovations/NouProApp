@@ -586,16 +586,11 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
       <AppModal
         visible={showSuccessDialog}
         onClose={() => setShowSuccessDialog(false)}
+        variant="success"
         title="Success"
         message={successMessage}
-        footer={
-          <AppButton
-            title="OK"
-            onPress={() => setShowSuccessDialog(false)}
-            variant="confirm"
-            style={{ width: '100%' }}
-          />
-        }
+        primaryButtonText="OK"
+        onPrimaryAction={() => setShowSuccessDialog(false)}
       />
 
       {/* More Options Bottom Sheet */}

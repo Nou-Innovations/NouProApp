@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
   container: {
     borderBottomWidth: 1,
     paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.md,
+    paddingHorizontal: 12,
   },
   headerContainer: {
     flexDirection: 'row',

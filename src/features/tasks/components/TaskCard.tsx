@@ -5,11 +5,11 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import Pill from '@/shared/components/ui/Pill';
+import { ListItemCard } from '@/shared/components/ui';
 import Avatar from '@/shared/components/ui/Avatar';
 
 export type TaskType = 'delivery' | 'order' | 'invoice' | 'general';
@@ -28,7 +28,7 @@ interface TaskCardProps {
   onPress?: () => void;
 }
 
-const TASK_ICONS: Record<TaskType, keyof typeof Icon.glyphMap> = {
+const TASK_ICONS: Record<TaskType, string> = {
   delivery: 'car-outline',
   order: 'receipt-outline',
   invoice: 'document-text-outline',
@@ -79,165 +79,101 @@ export function TaskCard({
     return new Date(dueDate) < new Date();
   };
 
-  return (
-    <TouchableOpacity
-      style={[
-        styles.container,
-        { 
-          backgroundColor: appTheme.colors.cardBackground,
-          borderBottomColor: appTheme.colors.borderColor,
-        },
-        isOverdue() && styles.overdueContainer,
-      ]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      {/* Icon */}
-      <View
-        style={[
-          styles.iconContainer,
-          { backgroundColor: STATUS_COLORS[status] + '20' },
-        ]}
-      >
-        <Icon
-          name={TASK_ICONS[type]}
-          size={24}
-          color={STATUS_COLORS[status]}
-        />
-      </View>
-
-      {/* Content */}
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: appTheme.colors.text }]} numberOfLines={1}>
-            {title}
-          </Text>
-          <Pill
-            text={STATUS_LABELS[status]}
-            color={STATUS_COLORS[status]}
+  // Build extra info content
+  const extraInfoContent = () => {
+    const elements: React.ReactNode[] = [];
+    
+    // Business info
+    if (businessName) {
+      elements.push(
+        <View key="business" style={styles.businessRow}>
+          <Avatar
+            userId={id}
+            userName={businessName}
+            imageUri={businessLogo}
+            size={20}
           />
-        </View>
-
-        {description && (
-          <Text
-            style={[styles.description, { color: appTheme.colors.textLight }]}
-            numberOfLines={2}
-          >
-            {description}
+          <Text style={[styles.businessName, { color: appTheme.colors.textSecondary }]}>
+            {businessName}
           </Text>
-        )}
-
-        {/* Business Info */}
-        {businessName && (
-          <View style={styles.businessRow}>
-            <Avatar
-              userId={id}
-              userName={businessName}
-              imageUri={businessLogo}
-              size={20}
-            />
-            <Text style={[styles.businessName, { color: appTheme.colors.textLight }]}>
-              {businessName}
-            </Text>
-          </View>
-        )}
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          {dueDate && (
-            <View style={styles.dateRow}>
-              <Icon
-                name="time-outline"
-                size={14}
-                color={isOverdue() ? appTheme.colors.error : appTheme.colors.textLight}
-              />
-              <Text
-                style={[
-                  styles.dateText,
-                  { color: isOverdue() ? appTheme.colors.error : appTheme.colors.textLight },
-                ]}
-              >
-                Due: {formatDate(dueDate)}
-              </Text>
-            </View>
-          )}
-          {assignedAt && !dueDate && (
-            <View style={styles.dateRow}>
-              <Icon name="calendar-outline" size={14} color={appTheme.colors.textLight} />
-              <Text style={[styles.dateText, { color: appTheme.colors.textLight }]}>
-                Assigned: {formatDate(assignedAt)}
-              </Text>
-            </View>
-          )}
         </View>
-      </View>
+      );
+    }
 
-      {/* Arrow */}
-      <Icon
-        name="chevron-forward"
-        size={20}
-        color={appTheme.colors.iconMuted}
-        style={styles.arrow}
-      />
-    </TouchableOpacity>
+    // Date info
+    if (dueDate) {
+      elements.push(
+        <View key="date" style={styles.dateRow}>
+          <Icon
+            name="time-outline"
+            size={14}
+            color={isOverdue() ? appTheme.colors.error : appTheme.colors.textMuted}
+          />
+          <Text
+            style={[
+              styles.dateText,
+              { color: isOverdue() ? appTheme.colors.error : appTheme.colors.textMuted },
+            ]}
+          >
+            Due: {formatDate(dueDate)}
+          </Text>
+        </View>
+      );
+    } else if (assignedAt) {
+      elements.push(
+        <View key="date" style={styles.dateRow}>
+          <Icon name="calendar-outline" size={14} color={appTheme.colors.textMuted} />
+          <Text style={[styles.dateText, { color: appTheme.colors.textMuted }]}>
+            Assigned: {formatDate(assignedAt)}
+          </Text>
+        </View>
+      );
+    }
+
+    return elements.length > 0 ? <View>{elements}</View> : null;
+  };
+
+  // Container style with overdue indicator
+  const containerStyle: ViewStyle | undefined = isOverdue() 
+    ? { borderLeftWidth: 3, borderLeftColor: '#EF4444' }
+    : undefined;
+
+  return (
+    <ListItemCard
+      avatar={{
+        type: 'icon',
+        icon: TASK_ICONS[type],
+        iconColor: STATUS_COLORS[status],
+        backgroundColor: STATUS_COLORS[status] + '20',
+        borderRadius: 12,
+      }}
+      title={title}
+      subtitle={description}
+      rightRow1={{
+        statusPill: {
+          text: STATUS_LABELS[status],
+          color: STATUS_COLORS[status],
+        },
+      }}
+      showChevron
+      bottomElement={extraInfoContent()}
+      onPress={onPress}
+      showDivider
+      style={containerStyle}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.md,
-    borderBottomWidth: 1,
-  },
-  overdueContainer: {
-    borderLeftWidth: 3,
-    borderLeftColor: '#EF4444',
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    flex: 1,
-    marginLeft: theme.spacing.sm,
-    marginRight: theme.spacing.sm,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  title: {
-    flex: 1,
-    fontSize: theme.fontSize.base,
-    fontFamily: theme.fonts.primary.medium,
-    marginRight: theme.spacing.sm,
-  },
-  description: {
-    fontSize: theme.fontSize.sm,
-    fontFamily: theme.fonts.primary.regular,
-    lineHeight: 18,
-    marginBottom: 8,
-  },
   businessRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   businessName: {
     fontSize: theme.fontSize.sm,
     fontFamily: theme.fonts.primary.regular,
     marginLeft: 6,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   dateRow: {
     flexDirection: 'row',
@@ -248,10 +184,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.regular,
     marginLeft: 4,
   },
-  arrow: {
-    alignSelf: 'center',
-  },
 });
 
 export default TaskCard;
-

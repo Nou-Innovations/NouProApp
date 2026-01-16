@@ -152,72 +152,39 @@ export default function ProfileSettingsScreen({ navigation }: ProfileSettingsScr
       <AppModal
         visible={showAreYouSureDialog}
         onClose={() => setShowAreYouSureDialog(false)}
+        variant="confirm"
         title="Are you sure?"
         message="You are about to delete this company. This action is irreversible."
-        footer={
-          <View style={styles.modalFooter}>
-            <AppButton
-              title="Yes, I'm sure"
-              onPress={handleConfirmAreYouSure}
-              variant="alert"
-              style={{ flex: 1, marginRight: 8 }}
-            />
-            <AppButton
-              title="No"
-              onPress={() => setShowAreYouSureDialog(false)}
-              variant="outline"
-              style={{ flex: 1 }}
-            />
-          </View>
-        }
+        primaryButtonText="Yes, I'm sure"
+        onPrimaryAction={handleConfirmAreYouSure}
+        secondaryButtonText="No"
+        onSecondaryAction={() => setShowAreYouSureDialog(false)}
       />
 
       {/* Delete Confirmation Dialog */}
       <AppModal
         visible={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
+        variant="delete"
         title="Delete Company?"
         message="This action cannot be undone. All company data will be permanently deleted."
-        footer={
-          <View style={styles.modalFooter}>
-            <AppButton
-              title="Delete"
-              onPress={confirmDeleteCompany}
-              variant="alert"
-              style={{ flex: 1, marginRight: 8 }}
-            />
-            <AppButton
-              title="Cancel"
-              onPress={() => setShowDeleteDialog(false)}
-              variant="outline"
-              style={{ flex: 1 }}
-            />
-          </View>
-        }
+        primaryButtonText="Delete"
+        onPrimaryAction={confirmDeleteCompany}
+        secondaryButtonText="Cancel"
+        onSecondaryAction={() => setShowDeleteDialog(false)}
       />
 
       {/* Leave Workplace Confirmation Dialog */}
       <AppModal
         visible={showLeaveDialog}
         onClose={() => setShowLeaveDialog(false)}
+        variant="delete"
         title="Leave Workplace?"
         message="Are you sure you want to leave this workplace?"
-        footer={
-          <View style={styles.modalFooter}>
-            <AppButton
-              title="Leave"
-              onPress={confirmLeaveWorkplace}
-              variant="alert"
-              style={{ flex: 1, marginRight: 8 }}
-            />
-            <AppButton
-              title="Cancel"
-              onPress={() => setShowLeaveDialog(false)}
-              variant="outline"
-              style={{ flex: 1 }}
-            />
-          </View>
-        }
+        primaryButtonText="Leave"
+        onPrimaryAction={confirmLeaveWorkplace}
+        secondaryButtonText="Cancel"
+        onSecondaryAction={() => setShowLeaveDialog(false)}
       />
     </SafeAreaView>
   );
@@ -269,9 +236,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 16,
     marginHorizontal: 20,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    marginTop: 8,
   },
 });

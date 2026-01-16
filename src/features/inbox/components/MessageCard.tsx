@@ -1,12 +1,12 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import theme from '@/shared/theme';
-import { Text, BodyBold, Caption } from '@/shared/components/ui/Typography';
+import { Text } from '@/shared/components/ui/Typography';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { userAvatarService } from '@/shared/services/userAvatarService';
-import Avatar from '@/shared/components/ui/Avatar';
+import { ListItemCard } from '@/shared/components/ui';
 
 export type MessageType = 
   | 'text'
@@ -80,22 +80,6 @@ export default function MessageCard({
 
   // Check if this chat has unread messages and hasn't been viewed
   const hasUnreadMessages = unreadCount && unreadCount > 0 && !isItemViewed(chatId);
-
-  // Determine spacing between name and message
-  const getNameMessageSpacing = () => {
-    // For special message types (non-text), always use theme spacing
-    if (type !== 'text') {
-      return theme.spacing.sm;
-    }
-    
-    // For text messages, estimate if it will be 2 lines
-    // Approximate: if message is longer than ~60 characters, it will likely wrap to 2 lines
-    const estimatedTwoLines = message.length > 60;
-    
-    return estimatedTwoLines ? 0 : theme.spacing.sm;
-  };
-
-  const nameMessageSpacing = getNameMessageSpacing();
 
   const getStatusIcon = () => {
     const iconColor = appTheme.colors.textSecondary;
@@ -182,100 +166,56 @@ export default function MessageCard({
     }
   };
 
+  // Build message preview with optional type icon
+  const messagePreview = type === 'delivery' ? getDeliveryStatusText() : message;
+  const statusIcon = type !== 'text' ? getStatusIcon() : null;
+
+  // Build subtitle content with icon prefix if needed
+  const subtitleContent = statusIcon ? (
+    <View style={styles.messageRow}>
+      <View style={styles.statusIconContainer}>
+        {statusIcon}
+      </View>
+      <Text style={[styles.message, { color: appTheme.colors.textSecondary }]} numberOfLines={2}>
+        {messagePreview}
+      </Text>
+    </View>
+  ) : messagePreview;
+
   return (
-    <TouchableOpacity 
-      style={[
-        styles.container, 
-        { 
-          backgroundColor: appTheme.colors.cardBackground,
-          borderBottomColor: appTheme.colors.borderColor 
-        },
-        hasUnreadMessages ? { backgroundColor: appTheme.colors.highlightedRow } : null
-      ]} 
+    <ListItemCard
+      avatar={{
+        type: avatar ? 'image' : 'initials',
+        userId: userId,
+        userName: name,
+        imageUri: avatar,
+      }}
+      title={name}
+      subtitle={typeof subtitleContent === 'string' ? subtitleContent : undefined}
+      rightRow1={{ timestamp: time }}
+      rightRow2={getStatusIndicator()}
+      bottomElement={typeof subtitleContent !== 'string' ? subtitleContent : undefined}
       onPress={onPress}
-    >
-      <View style={styles.avatarContainer}>
-        <Avatar
-          userId={userId}
-          userName={name}
-          imageUri={avatar}
-          size={theme.avatarSizes.md}
-          style={styles.avatar}
-        />
-      </View>
-
-      <View style={styles.contentContainer}>
-        <View style={[styles.headerRow, { marginBottom: nameMessageSpacing }]}>
-          <BodyBold style={{ color: appTheme.colors.text }} numberOfLines={1}>{name}</BodyBold>
-          <Caption style={[styles.time, { color: appTheme.colors.textSecondary }]}>{time}</Caption>
-        </View>
-
-        <View style={styles.messageRow}>
-          {type !== 'text' && (
-            <View style={styles.statusIconContainer}>
-              {getStatusIcon()}
-            </View>
-          )}
-          <Text style={[styles.message, { color: appTheme.colors.textSecondary, fontSize: 14, lineHeight: 20 }]} numberOfLines={2}>
-            {type === 'delivery' ? getDeliveryStatusText() : message}
-          </Text>
-          <View style={styles.statusContainer}>
-            {getStatusIndicator()}
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
+      showDivider
+      style={hasUnreadMessages ? { backgroundColor: appTheme.colors.highlightedRow } : undefined}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    paddingTop: theme.spacing.sm + 4,
-    paddingBottom: theme.spacing.sm + 4,
-    paddingHorizontal: theme.spacing.sm + 4,
-    borderBottomWidth: 1,
-    alignItems: 'flex-start',
-  },
-  avatarContainer: {
-    marginRight: theme.spacing.md,
-  },
-  avatar: {
-    width: theme.avatarSizes.lg,
-    height: theme.avatarSizes.lg,
-    borderRadius: theme.borderRadius.md,
-  },
-  avatarPlaceholder: {
-    width: theme.avatarSizes.md,
-    height: theme.avatarSizes.md,
-    borderRadius: theme.borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  contentContainer: {
-    flex: 1,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  time: {
-  },
   messageRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: -4,
   },
   statusIconContainer: {
     marginRight: theme.spacing.sm,
   },
   message: {
     flex: 1,
-    marginRight: theme.spacing.sm,
-  },
-  statusContainer: {
-    minWidth: theme.iconSizes.xl,
-    alignItems: 'flex-end',
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: theme.fonts.primary.medium,
   },
   unreadBadge: {
     backgroundColor: theme.colors.badgeBackground,
@@ -296,4 +236,4 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     lineHeight: theme.lineHeight.xs,
   },
-}); 
+});

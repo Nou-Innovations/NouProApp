@@ -1,9 +1,11 @@
 import React, { useState, useMemo, ReactNode } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text, Image } from 'react-native';
+import { View, StyleSheet, Text, ScrollView } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useNavigation } from '@react-navigation/native';
-import ModalList, { ModalListItem } from '@/shared/components/ui/ModalList';
+import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+import { ListItemCard } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 
 interface NewChatModalListProps {
@@ -14,8 +16,15 @@ interface NewChatModalListProps {
   canManageExternal?: boolean;
 }
 
-// Extended ModalListItem with custom properties
-interface ExtendedModalListItem extends ModalListItem {
+// Item type for the list
+interface ChatListItem {
+  id: string;
+  title: string;
+  subtitle?: string;
+  avatar?: string;
+  icon?: string;
+  iconColor?: string;
+  backgroundColor?: string;
   isAction?: boolean;
   type?: 'company' | 'contact';
   originalData?: any;
@@ -115,9 +124,9 @@ export default function NewChatModalList({
   const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Convert data to ModalListItem format and combine with action options
+  // Convert data to list item format and combine with action options
   const modalItems = useMemo(() => {
-    const actionItems: ExtendedModalListItem[] = [
+    const actionItems: ChatListItem[] = [
       {
         id: 'new-group',
         title: 'New group',
@@ -125,7 +134,7 @@ export default function NewChatModalList({
         icon: 'people',
         iconColor: appTheme.colors.primary,
         backgroundColor: appTheme.colors.primary + '10',
-        isAction: true, // Custom property to identify action items
+        isAction: true,
       },
       {
         id: 'new-contact',
@@ -138,8 +147,8 @@ export default function NewChatModalList({
       },
     ];
 
-    // Convert companies to ModalListItem format
-    const companyItems: ExtendedModalListItem[] = MOCK_COMPANIES.map(company => ({
+    // Convert companies to list item format
+    const companyItems: ChatListItem[] = MOCK_COMPANIES.map(company => ({
       id: company.id,
       title: company.name,
       subtitle: company.location,
@@ -150,8 +159,8 @@ export default function NewChatModalList({
       originalData: company,
     }));
 
-    // Convert contacts to ModalListItem format
-    const contactItems: ExtendedModalListItem[] = MOCK_CONTACTS.map(contact => ({
+    // Convert contacts to list item format
+    const contactItems: ChatListItem[] = MOCK_CONTACTS.map(contact => ({
       id: contact.id,
       title: contact.name,
       subtitle: `${contact.role} • ${contact.company}`,
@@ -192,7 +201,7 @@ export default function NewChatModalList({
     });
   }, [modalItems, searchQuery]);
 
-  const handleItemSelect = (item: ExtendedModalListItem) => {
+  const handleItemSelect = (item: ChatListItem) => {
     // Handle action items
     if (item.isAction) {
       if (item.id === 'new-group') {
@@ -200,7 +209,7 @@ export default function NewChatModalList({
       } else if (item.id === 'new-contact') {
         onNewContact();
       }
-      onClose(); // Close modal after action
+      onClose();
       return;
     }
 
@@ -231,100 +240,45 @@ export default function NewChatModalList({
         unreadCount: 0,
       });
     }
-    onClose(); // Close modal after navigation
+    onClose();
   };
 
-  const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
-  };
-
-  const renderCustomItem = (item: ExtendedModalListItem, index: number): ReactNode => {
+  const renderItem = (item: ChatListItem, index: number): ReactNode => {
     const isLast = index === filteredItems.length - 1;
 
     // Custom rendering for action items
     if (item.isAction) {
       return (
-        <TouchableOpacity
+        <ListItemCard
           key={item.id}
-          style={[
-            styles.actionItem,
-            {
-              backgroundColor: item.backgroundColor,
-              borderBottomColor: appTheme.colors.borderColor,
-            },
-            isLast && styles.lastItem,
-          ]}
+          avatar={{
+            type: 'icon',
+            icon: item.icon || 'person',
+            iconColor: 'white',
+            backgroundColor: appTheme.colors.primary,
+          }}
+          title={item.title}
+          subtitle={item.subtitle}
           onPress={() => handleItemSelect(item)}
-        >
-          <View style={styles.actionContent}>
-            <View style={[styles.actionIconContainer, { backgroundColor: appTheme.colors.primary }]}>
-              <Icon name={item.icon as any} size={20} color="white" />
-            </View>
-            <View style={styles.actionTextContainer}>
-              <Text style={[styles.actionTitle, { color: appTheme.colors.text }]}>
-                {item.title}
-              </Text>
-              <Text style={[styles.actionSubtitle, { color: appTheme.colors.textLight }]}>
-                {item.subtitle}
-              </Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+          showDivider={!isLast}
+          style={{ backgroundColor: item.backgroundColor, marginBottom: 8 }}
+        />
       );
     }
 
     // Default rendering for contacts and companies
     return (
-      <TouchableOpacity
+      <ListItemCard
         key={item.id}
-        style={[
-          styles.regularItem,
-          {
-            borderBottomColor: appTheme.colors.borderColor,
-          },
-          isLast && styles.lastItem,
-        ]}
+        avatar={item.avatar 
+          ? { type: 'image', imageUri: item.avatar, userId: item.id, userName: item.title }
+          : { type: 'icon', icon: item.icon || 'person', iconColor: item.iconColor || appTheme.colors.textSecondary, backgroundColor: appTheme.colors.inputBackground }
+        }
+        title={item.title}
+        subtitle={item.subtitle}
         onPress={() => handleItemSelect(item)}
-      >
-        <View style={styles.itemRow}>
-          {/* Avatar or Icon */}
-          {item.avatar ? (
-            <Image 
-              source={{ uri: item.avatar }} 
-              style={styles.modalItemAvatar}
-            />
-          ) : (
-            <View style={[
-              styles.modalItemAvatarPlaceholder,
-              { backgroundColor: appTheme.colors.inputBackground }
-            ]}>
-              <Icon 
-                name={item.icon || 'person'} 
-                size={24} 
-                color={item.iconColor || appTheme.colors.textLight} 
-              />
-            </View>
-          )}
-          
-          {/* Item info */}
-          <View style={styles.modalItemInfo}>
-            <Text style={[
-              styles.modalItemName,
-              { color: appTheme.colors.text }
-            ]}>
-              {item.title}
-            </Text>
-            {item.subtitle && (
-              <Text style={[
-                styles.modalItemDetails,
-                { color: appTheme.colors.textLight }
-              ]}>
-                {item.subtitle}
-              </Text>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
+        showDivider={!isLast}
+      />
     );
   };
 
@@ -340,62 +294,57 @@ export default function NewChatModalList({
     </View>
   );
 
+  // Check if we have non-action items to show
+  const hasDataItems = filteredItems.some(item => !item.isAction);
+
   return (
-    <ModalList
+    <AppBottomSheet
       visible={visible}
       onClose={onClose}
       title="New chat"
-      items={filteredItems as ModalListItem[]}
-      onSelectItem={handleItemSelect as (item: ModalListItem) => void}
-      hasSearch={true}
-      searchPlaceholder="Search contacts, companies..."
-      onSearchChange={handleSearchChange}
-      renderItem={renderCustomItem as (item: ModalListItem, index: number) => ReactNode}
-      renderEmptyState={renderEmptyState as () => ReactNode}
-      maxHeight={undefined} // Let it auto-calculate based on content
-      containerStyle={styles.modalContainer}
-    />
+    >
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <AppSearchBar
+          placeholder="Search contacts, companies..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onClear={() => setSearchQuery('')}
+        />
+      </View>
+
+      {/* List Content */}
+      <ScrollView 
+        style={styles.listContainer} 
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {filteredItems.length > 0 ? (
+          filteredItems.map((item, index) => renderItem(item, index))
+        ) : (
+          renderEmptyState()
+        )}
+
+        {/* Show empty state when search has no results (except action items) */}
+        {searchQuery.trim() && !hasDataItems && filteredItems.length > 0 && (
+          renderEmptyState()
+        )}
+      </ScrollView>
+    </AppBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  searchContainer: {
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  listContainer: {
+    maxHeight: 450,
+  },
+  scrollContent: {
     paddingBottom: 40,
-  },
-  actionItem: {
-    height: 60,
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    marginHorizontal: 12,
-    borderBottomWidth: 0.5,
-    marginBottom: 8,
-  },
-  lastItem: {
-    borderBottomWidth: 0,
-  },
-  actionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.md,
-  },
-  actionTextContainer: {
-    flex: 1,
-  },
-  actionTitle: {
-    fontSize: theme.fontSize.base,
-    fontFamily: theme.fonts.primary.semiBold,
-    marginBottom: 2,
-  },
-  actionSubtitle: {
-    fontSize: theme.fontSize.sm,
-    fontFamily: theme.fonts.primary.regular,
   },
   emptyState: {
     flex: 1,
@@ -415,41 +364,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 32,
   },
-  regularItem: {
-    height: 60,
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    marginHorizontal: 12,
-    borderBottomWidth: 0.5,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  modalItemAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  modalItemAvatarPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalItemInfo: {
-    flex: 1,
-  },
-  modalItemName: {
-    fontSize: theme.fontSize.base,
-    fontFamily: theme.fonts.primary.semiBold,
-    marginBottom: 2,
-  },
-  modalItemDetails: {
-    fontSize: theme.fontSize.sm,
-    fontFamily: theme.fonts.primary.regular,
-  },
-}); 
+});

@@ -4,6 +4,8 @@
  * This ensures visual consistency across all overlay components.
  */
 
+import { theme } from "@/shared/theme";
+
 export const OVERLAY = {
   /** Backdrop color for all overlays */
   backdrop: 'rgba(0,0,0,0.5)',
@@ -15,12 +17,12 @@ export const OVERLAY = {
 
 export const MODAL_TYPOGRAPHY = {
   title: { 
-    fontSize: 16, 
-    fontWeight: '700' as const,
+    fontSize: 24, 
+    fontFamily: theme.fonts.primary.bold,
   },
   body: { 
-    fontSize: 14, 
-    fontWeight: '500' as const, 
-    lineHeight: 18,
+    fontSize: 16, 
+    fontFamily: 'Inter-medium',
+    lineHeight: 24,
   },
 } as const;

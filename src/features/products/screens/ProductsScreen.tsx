@@ -111,6 +111,7 @@ const ProductsScreen: React.FC = () => {
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const [paywallFeature, setPaywallFeature] = useState<string>('');
   const [headerTitleLayout, setHeaderTitleLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const hasEditedProducts = Object.keys(editedProducts).length > 0;
 
   const listData: ListItem[] = useMemo(() => {
     const data: ListItem[] = [];
@@ -195,7 +196,7 @@ const ProductsScreen: React.FC = () => {
     handleProductUpdate(productId, 'isDisplayable', !currentPublishState);
   }, [canPublish, activeBusiness?.plan, handleProductUpdate]);
   
-  const renderListItem = useCallback(({ item }: { item: ListItem }) => {
+  const renderListItem = useCallback(({ item, index }: { item: ListItem; index: number }) => {
     if (item.type === 'brand') {
       return (
         <BrandCard 
@@ -203,12 +204,15 @@ const ProductsScreen: React.FC = () => {
           brandLogo={item.data.logo}
           productCount={item.data.productCount}
           isExpanded={expandedBrandName === item.data.name}
+          isFirst={index === 0}
           onPress={() => handleBrandPress(item.data.name)}
         />
       );
     } else {
       const editedData = editedProducts[item.data.id] || {};
       const currentProductData = { ...item.data, ...editedData };
+      const nextItem = listData[index + 1];
+      const isLastProduct = !nextItem || nextItem.type === 'brand';
       return (
         <ProductCard 
           product={currentProductData} 
@@ -217,10 +221,11 @@ const ProductsScreen: React.FC = () => {
           onUpdate={(field, value) => handleProductUpdate(item.data.id, field, value)}
           onPublishToggle={handlePublishToggle}
           showPublishToggle={isEditing && canPublish}
+          isLastProduct={isLastProduct}
         />
       );
     }
-  }, [expandedBrandName, handleBrandPress, isEditing, editedProducts, handleProductUpdate, handlePublishToggle, canPublish]);
+  }, [expandedBrandName, handleBrandPress, isEditing, editedProducts, handleProductUpdate, handlePublishToggle, canPublish, listData]);
 
   const keyExtractor = useCallback((item: ListItem) => {
      return item.type === 'brand' ? `brand-${item.data.name}` : `product-${item.data.id}`;
@@ -321,6 +326,7 @@ const ProductsScreen: React.FC = () => {
                 icon: isEditing ? 'save' : 'pencil',
                 onPress: toggleEditMode,
                 accessibilityLabel: isEditing ? 'Save changes' : 'Edit products',
+                iconColor: isEditing && hasEditedProducts ? appTheme.colors.success : undefined,
               }] : []),
             ]}
           />
@@ -482,44 +488,28 @@ const ProductsScreen: React.FC = () => {
         showEditMode={isAdmin()}
       />
       
-      {/* Save Confirmation Modal */}
+      {/* Save Confirmation Dialog */}
       <AppModal
         visible={showSaveConfirmation}
         onClose={handleCancelSaveDialog}
+        variant="confirm"
         title="Unsaved Changes"
         message="Would you like to save your changes?"
-        footer={
-          <View style={styles.modalFooter}>
-            <AppButton
-              title="Save Changes"
-              onPress={handleConfirmSave}
-              variant="confirm"
-              style={{ flex: 1, marginRight: 8 }}
-            />
-            <AppButton
-              title="Discard"
-              onPress={handleDiscardChanges}
-              variant="outline"
-              style={{ flex: 1 }}
-            />
-          </View>
-        }
+        primaryButtonText="Save Changes"
+        onPrimaryAction={handleConfirmSave}
+        secondaryButtonText="Discard"
+        onSecondaryAction={handleDiscardChanges}
       />
 
       {/* Success Dialog */}
       <AppModal
         visible={showSuccessDialog}
         onClose={() => setShowSuccessDialog(false)}
+        variant="success"
         title="Success"
         message="Changes saved successfully!"
-        footer={
-          <AppButton
-            title="OK"
-            onPress={() => setShowSuccessDialog(false)}
-            variant="confirm"
-            style={{ width: '100%' }}
-          />
-        }
+        primaryButtonText="OK"
+        onPrimaryAction={() => setShowSuccessDialog(false)}
       />
 
       {/* Paywall Modal for Free Plan Users */}
@@ -672,11 +662,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '500',
-  },
-  // AppModal footer styles
-  modalFooter: {
-    flexDirection: 'row',
-    marginTop: 8,
   },
 }); 
 

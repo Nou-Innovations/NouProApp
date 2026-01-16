@@ -10,22 +10,28 @@ interface BrandCardProps {
   brandLogo?: string;
   productCount: number;
   isExpanded: boolean;
+  isFirst?: boolean;
   onPress?: () => void;
 }
 
-const BrandCard: React.FC<BrandCardProps> = ({ brandName, brandLogo, productCount, isExpanded, onPress }) => {
-  const logoSize = isExpanded ? 48 : 52;
+const BrandCard: React.FC<BrandCardProps> = ({ brandName, brandLogo, productCount, isExpanded, isFirst = false, onPress }) => {
+  const logoSize = 48;
   const { theme: appTheme } = useTheme();
 
   return (
-    <TouchableOpacity 
-      onPress={onPress} 
+    <TouchableOpacity
+      onPress={onPress}
       style={[
-        styles.cardContainer, 
-        { 
+        styles.cardContainer,
+        {
           backgroundColor: appTheme.colors.cardBackground,
-          borderBottomColor: appTheme.colors.borderColor 
-        }
+          borderBottomColor: appTheme.colors.surface,
+        },
+        (isFirst || isExpanded) && {
+          borderTopWidth: 1,
+          borderTopColor: isExpanded ? appTheme.colors.primary : appTheme.colors.surface,
+        },
+        isExpanded && { borderBottomWidth: 0 },
       ]}
     >
       <View style={styles.cardContent}>
@@ -47,8 +53,8 @@ const BrandCard: React.FC<BrandCardProps> = ({ brandName, brandLogo, productCoun
           </View>
         )}
         <View style={styles.textContainer}>
-          <BodyBold style={[styles.brandName, { color: appTheme.colors.text }]}>{brandName}</BodyBold>
-          <Caption style={[styles.productCount, { color: appTheme.colors.textLight }]}>
+          <BodyBold style={[styles.brandName, { color: appTheme.colors.primary }]}>{brandName}</BodyBold>
+          <Caption style={[styles.productCount, { color: appTheme.colors.textSecondary }]}>
             {productCount} product{productCount !== 1 ? 's' : ''}
           </Caption>
         </View>
@@ -56,7 +62,7 @@ const BrandCard: React.FC<BrandCardProps> = ({ brandName, brandLogo, productCoun
       <Icon 
         name={isExpanded ? "chevron-down-outline" : "chevron-forward-outline"} 
         size={20} 
-        color={appTheme.colors.iconColor} 
+        color={isExpanded ? appTheme.colors.primary : appTheme.colors.iconMuted} 
       />
     </TouchableOpacity>
   );
@@ -90,9 +96,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   brandName: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.bold,
     marginBottom: 4,
   },
   productCount: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
   },
 });
 

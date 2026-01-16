@@ -9,6 +9,7 @@ interface AvatarProps {
   userName: string;
   imageUri?: string | null;
   size?: number;
+  borderRadius?: number;
   style?: ViewStyle;
   textStyle?: TextStyle;
   showFallback?: boolean;
@@ -19,6 +20,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   userName,
   imageUri,
   size = theme.avatarSizes.sm, // Default to sm (40px)
+  borderRadius = theme.borderRadius.md, // Default to 8px
   style,
   textStyle,
   showFallback = true,
@@ -55,7 +57,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   const avatarStyle: ViewStyle = {
     width: size,
     height: size,
-    borderRadius: theme.borderRadius.md,
+    borderRadius,
     backgroundColor: shouldShowFallback ? backgroundColor : 'transparent',
     justifyContent: 'center',
     alignItems: 'center',

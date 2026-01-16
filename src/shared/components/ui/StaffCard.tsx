@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { Avatar } from './Avatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ActionBottomSheet, { ActionItem } from './ActionBottomSheet';
+import AppBottomSheet, { AppBottomSheetItem } from './AppBottomSheet';
+import ListItemCard from './ListItemCard';
 
 export type StaffRole = 'superAdmin' | 'admin' | 'staff';
 
@@ -49,6 +49,45 @@ const ALL_ROLES: { id: StaffRole; title: string }[] = [
   { id: 'superAdmin', title: 'Super Admin' },
 ];
 
+/** Role Badge/Button component */
+const RoleBadge: React.FC<{
+  role: StaffRole;
+  editable: boolean;
+  onPress?: () => void;
+}> = ({ role, editable, onPress }) => {
+  const { theme: appTheme } = useTheme();
+  
+  if (editable) {
+    return (
+      <TouchableOpacity
+        style={[styles.roleButton, { backgroundColor: appTheme.colors.primary }]}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.roleButtonText}>{getRoleLabel(role)}</Text>
+      </TouchableOpacity>
+    );
+  }
+  
+  return (
+    <View style={[styles.roleBadge, { backgroundColor: appTheme.colors.surface }]}>
+      <Text style={[styles.roleBadgeText, { color: appTheme.colors.textSecondary }]}>
+        {getRoleLabel(role)}
+      </Text>
+    </View>
+  );
+};
+
+/** You Badge component */
+const YouBadge: React.FC = () => {
+  const { theme: appTheme } = useTheme();
+  return (
+    <View style={[styles.youBadge, { backgroundColor: appTheme.colors.primary }]}>
+      <Text style={styles.youBadgeText}>You</Text>
+    </View>
+  );
+};
+
 export const StaffCard: React.FC<StaffCardProps> = ({
   staff,
   isCurrentUser = false,
@@ -68,12 +107,12 @@ export const StaffCard: React.FC<StaffCardProps> = ({
   const displayUsername = staff.username || staff.email;
 
   // Options items
-  const optionItems: ActionItem[] = [];
+  const optionItems: AppBottomSheetItem[] = [];
   if (onReport && !isCurrentUser) {
-    optionItems.push({ id: 'report', title: 'Report User' });
+    optionItems.push({ id: 'report', title: 'Report User', variant: 'destructive' });
   }
   if (canRemove && !isCurrentUser && onRemove) {
-    optionItems.push({ id: 'remove', title: 'Remove from Staff' });
+    optionItems.push({ id: 'remove', title: 'Remove from Staff', variant: 'destructive' });
   }
 
   const handleRoleSelect = (role: StaffRole) => {
@@ -83,80 +122,43 @@ export const StaffCard: React.FC<StaffCardProps> = ({
     setShowRoleSheet(false);
   };
 
-  const handleOptionSelect = (item: ActionItem) => {
+  const handleOptionSelect = (item: AppBottomSheetItem) => {
     if (item.id === 'report' && onReport) {
       onReport(staff);
     } else if (item.id === 'remove' && onRemove) {
       onRemove(staff);
     }
-    setShowOptionsSheet(false);
   };
+
+  // Build right row content
+  const rightRow1Content = (
+    <View style={styles.rightRow1}>
+      <RoleBadge 
+        role={staff.role} 
+        editable={canManageRole && !isCurrentUser}
+        onPress={() => setShowRoleSheet(true)}
+      />
+      {isCurrentUser && <YouBadge />}
+    </View>
+  );
 
   return (
     <>
-      <View style={styles.container}>
-        {/* Avatar */}
-        <Avatar
-          userId={staff.id}
-          userName={staff.name}
-          imageUri={staff.avatar}
-          size={48}
-          style={styles.avatar}
-        />
-
-        {/* Info */}
-        <View style={styles.infoContainer}>
-          <View style={styles.nameRow}>
-            <Text style={[styles.name, { color: appTheme.colors.text }]} numberOfLines={1}>
-              {staff.name}
-            </Text>
-            {isCurrentUser && (
-              <View style={[styles.youBadge, { backgroundColor: appTheme.colors.primary }]}>
-                <Text style={styles.youBadgeText}>You</Text>
-              </View>
-            )}
-          </View>
-          <Text style={[styles.username, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
-            @{displayUsername.replace('@', '').split('@')[0]}
-          </Text>
-        </View>
-
-        {/* Actions */}
-        <View style={styles.actionsContainer}>
-          {/* Role Button */}
-          {canManageRole && !isCurrentUser ? (
-            <TouchableOpacity
-              style={[styles.roleButton, { backgroundColor: appTheme.colors.primary }]}
-              onPress={() => setShowRoleSheet(true)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.roleButtonText}>{getRoleLabel(staff.role)}</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={[styles.roleBadge, { backgroundColor: appTheme.colors.surface }]}>
-              <Text style={[styles.roleBadgeText, { color: appTheme.colors.textSecondary }]}>
-                {getRoleLabel(staff.role)}
-              </Text>
-            </View>
-          )}
-
-          {/* Options Button - No border, no gap */}
-          {optionItems.length > 0 && (
-            <TouchableOpacity
-              style={styles.optionsButton}
-              onPress={() => setShowOptionsSheet(true)}
-              activeOpacity={0.7}
-            >
-              <Icon name="ellipsis-vertical" size={20} color={appTheme.colors.text} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-      
-      {/* Divider */}
-      {showDivider && (
-        <View style={[styles.divider, { backgroundColor: appTheme.colors.borderColor }]} />
-      )}
+      <ListItemCard
+        avatar={{
+          type: 'image',
+          userId: staff.id,
+          userName: staff.name,
+          imageUri: staff.avatar,
+        }}
+        title={staff.name}
+        subtitle={`@${displayUsername.replace('@', '').split('@')[0]}`}
+        rightRow1={{ timestamp: undefined }} // We use custom rightRow2 instead
+        rightRow2={rightRow1Content}
+        showOptionsButton={optionItems.length > 0}
+        onOptionsPress={() => setShowOptionsSheet(true)}
+        showDivider={showDivider}
+      />
 
       {/* Role Selection Sheet - Custom with all 3 options */}
       <Modal
@@ -220,62 +222,25 @@ export const StaffCard: React.FC<StaffCardProps> = ({
       </Modal>
 
       {/* Options Sheet */}
-      <ActionBottomSheet
+      <AppBottomSheet
         visible={showOptionsSheet}
         onClose={() => setShowOptionsSheet(false)}
         title="Options"
-        actionItems={optionItems}
-        onActionPress={handleOptionSelect}
+        items={optionItems}
+        onSelectItem={handleOptionSelect}
       />
     </>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingLeft: 8,
-    paddingRight: 0,
-  },
-  avatar: {
-    marginRight: 12,
-  },
-  infoContainer: {
-    flex: 1,
-    marginRight: 8,
-  },
-  nameRow: {
+  // Right row content
+  rightRow1: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  name: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.bold,
-    flexShrink: 1,
-  },
-  youBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  youBadgeText: {
-    fontSize: 10,
-    fontFamily: theme.fonts.primary.semiBold,
-    color: '#FFFFFF',
-  },
-  username: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
-    marginTop: 2,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 0, // No gap between buttons
-  },
+  // Role Button/Badge
   roleButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -301,15 +266,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.fonts.primary.medium,
   },
-  optionsButton: {
-    paddingRight: 4,
-    paddingLeft: 12,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+  // You Badge
+  youBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
-  divider: {
-    height: 1,
+  youBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.fonts.primary.semiBold,
+    color: '#FFFFFF',
   },
   // Role Sheet Modal Styles
   modalOverlay: {

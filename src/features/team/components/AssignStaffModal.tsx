@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
-import ModalList, { ModalListItem } from '@/shared/components/ui/ModalList';
+import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import AppButton from '@/shared/components/ui/AppButton';
+import ListItemCard from '@/shared/components/ui/ListItemCard';
+import theme from '@/shared/theme';
 
 // Types for staff assignment
 interface Staff {
@@ -11,6 +14,15 @@ interface Staff {
   name: string;
   role: string;
   avatar?: string;
+  assignedRole?: 'driver' | 'teamLeader' | 'staff';
+}
+
+interface StaffItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  avatar?: string;
+  backgroundColor?: string;
   assignedRole?: 'driver' | 'teamLeader' | 'staff';
 }
 
@@ -32,13 +44,14 @@ export default function AssignStaffModal({
   title = 'Assign Staff',
 }: AssignStaffModalProps) {
   const { theme: appTheme } = useTheme();
-  const [filteredStaff, setFilteredStaff] = useState<ModalListItem[]>([]);
+  const [filteredStaff, setFilteredStaff] = useState<StaffItem[]>([]);
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
   const [tempSelectedStaff, setTempSelectedStaff] = useState<Staff[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Convert staff to ModalListItem format
+  // Convert staff to StaffItem format
   useEffect(() => {
-    const staffItems: ModalListItem[] = staff.map(member => {
+    const staffItems: StaffItem[] = staff.map(member => {
       const assignedRole = selectedStaff.find(s => s.id === member.id)?.assignedRole;
       
       return {
@@ -46,9 +59,8 @@ export default function AssignStaffModal({
         title: member.name,
         subtitle: member.role,
         avatar: member.avatar,
-        icon: member.avatar ? undefined : 'person',
         backgroundColor: assignedRole ? getAssignedRoleColor(assignedRole) : undefined,
-        assignedRole, // Store the assigned role for later use
+        assignedRole,
       };
     });
     
@@ -69,13 +81,14 @@ export default function AssignStaffModal({
   };
 
   const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    
     if (!query.trim()) {
       setFilteredStaff(staff.map(member => ({
         id: member.id,
         title: member.name,
         subtitle: member.role,
         avatar: member.avatar,
-        icon: member.avatar ? undefined : 'person',
         backgroundColor: member.assignedRole ? getAssignedRoleColor(member.assignedRole) : undefined,
         assignedRole: member.assignedRole,
       })));
@@ -92,7 +105,6 @@ export default function AssignStaffModal({
       title: member.name,
       subtitle: member.role,
       avatar: member.avatar,
-      icon: member.avatar ? undefined : 'person',
       backgroundColor: member.assignedRole ? getAssignedRoleColor(member.assignedRole) : undefined,
       assignedRole: member.assignedRole,
     })));
@@ -104,6 +116,13 @@ export default function AssignStaffModal({
     // Update temp selected staff
     const newTempSelected = staff.filter(member => selectedIds.includes(member.id));
     setTempSelectedStaff(newTempSelected);
+  };
+
+  const toggleSelection = (itemId: string) => {
+    const newSelection = selectedStaffIds.includes(itemId)
+      ? selectedStaffIds.filter(id => id !== itemId)
+      : [...selectedStaffIds, itemId];
+    handleSelectionChange(newSelection);
   };
 
   const assignRole = (staffId: string, role: 'driver' | 'teamLeader') => {
@@ -128,193 +147,142 @@ export default function AssignStaffModal({
     onClose();
   };
 
-  const renderCustomItem = (item: ModalListItem, index: number) => {
+  const renderItem = (item: StaffItem, index: number) => {
     const isSelected = selectedStaffIds.includes(item.id);
     const isLast = index === filteredStaff.length - 1;
     const staffMember = tempSelectedStaff.find(s => s.id === item.id);
 
-    return (
-      <View key={item.id}>
-        {/* Main staff row */}
+    // Role icon prefix
+    const roleIconPrefix = staffMember?.assignedRole === 'driver' ? (
+      <View style={styles.roleIcon}>
+        <Icon name="car" size={20} color="#0500FF" />
+      </View>
+    ) : staffMember?.assignedRole === 'teamLeader' ? (
+      <View style={styles.roleIcon}>
+        <Icon name="star" size={20} color="#F59E0B" />
+      </View>
+    ) : null;
+
+    // Role assignment buttons
+    const roleAssignmentButtons = isSelected ? (
+      <View style={styles.roleAssignmentContainer}>
         <TouchableOpacity
           style={[
-            styles.staffRow,
-            {
-              backgroundColor: item.backgroundColor || 'transparent',
-              borderBottomColor: appTheme.colors.borderColor,
-            },
-            isLast && styles.lastItem,
+            styles.roleButton,
+            styles.driverButton,
+            staffMember?.assignedRole === 'driver' && styles.roleButtonActive,
           ]}
-          onPress={() => {
-            const newSelection = isSelected
-              ? selectedStaffIds.filter(id => id !== item.id)
-              : [...selectedStaffIds, item.id];
-            handleSelectionChange(newSelection);
-          }}
+          onPress={() => assignRole(item.id, 'driver')}
         >
-          <View style={styles.staffContent}>
-            {/* Role icon */}
-            {staffMember?.assignedRole === 'driver' && (
-              <View style={styles.roleIcon}>
-                <Icon name="car" size={20} color="#0500FF" />
-              </View>
-            )}
-            {staffMember?.assignedRole === 'teamLeader' && (
-              <View style={styles.roleIcon}>
-                <Icon name="star" size={20} color="#F59E0B" />
-              </View>
-            )}
-            
-            {/* Avatar */}
-            {item.avatar ? (
-              <Image source={{ uri: item.avatar }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatarPlaceholder, { backgroundColor: appTheme.colors.inputBackground }]}>
-                <Icon name="person" size={24} color={appTheme.colors.textLight} />
-              </View>
-            )}
-            
-            {/* Staff info */}
-            <View style={styles.staffInfo}>
-              <Text style={[styles.staffName, { color: appTheme.colors.text }]}>
-                {item.title}
-              </Text>
-              <Text style={[styles.staffRole, { color: appTheme.colors.textLight }]}>
-                {item.subtitle}
-              </Text>
-            </View>
-            
-            {/* Checkbox */}
-            <View style={styles.checkbox}>
-              {isSelected ? (
-                <View style={[styles.checkboxChecked, { backgroundColor: appTheme.colors.primary }]}>
-                  <Icon name="checkmark" size={18} color="white" />
-                </View>
-              ) : (
-                <View style={[styles.checkboxUnchecked, { borderColor: appTheme.colors.borderColor }]} />
-              )}
-            </View>
-          </View>
+          <Icon name="car" size={16} color="white" />
+          <Text style={styles.roleButtonText}>Driver</Text>
         </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.roleButton,
+            styles.teamLeaderButton,
+            staffMember?.assignedRole === 'teamLeader' && styles.roleButtonActive,
+          ]}
+          onPress={() => assignRole(item.id, 'teamLeader')}
+        >
+          <Icon name="star" size={16} color="white" />
+          <Text style={styles.roleButtonText}>Team Leader</Text>
+        </TouchableOpacity>
+      </View>
+    ) : null;
 
-        {/* Role assignment buttons - Only show when staff is selected */}
-        {isSelected && (
-          <View style={styles.roleAssignmentContainer}>
-            <TouchableOpacity
-              style={[
-                styles.roleButton,
-                styles.driverButton,
-                staffMember?.assignedRole === 'driver' && styles.roleButtonActive,
-              ]}
-              onPress={() => assignRole(item.id, 'driver')}
-            >
-              <Icon name="car" size={16} color="white" />
-              <Text style={styles.roleButtonText}>Driver</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.roleButton,
-                styles.teamLeaderButton,
-                staffMember?.assignedRole === 'teamLeader' && styles.roleButtonActive,
-              ]}
-              onPress={() => assignRole(item.id, 'teamLeader')}
-            >
-              <Icon name="star" size={16} color="white" />
-              <Text style={styles.roleButtonText}>Team Leader</Text>
-            </TouchableOpacity>
+    return (
+      <View key={item.id} style={[
+        item.backgroundColor ? { backgroundColor: item.backgroundColor } : undefined,
+      ]}>
+        <View style={styles.cardRow}>
+          {roleIconPrefix}
+          <View style={styles.cardContent}>
+            <ListItemCard
+              avatar={item.avatar 
+                ? { type: 'image', imageUri: item.avatar, userId: item.id, userName: item.title }
+                : { type: 'icon', icon: 'person', iconColor: appTheme.colors.textSecondary, backgroundColor: appTheme.colors.inputBackground }
+              }
+              title={item.title}
+              subtitle={item.subtitle}
+              onPress={() => toggleSelection(item.id)}
+              showCheckmark
+              selected={isSelected}
+              showDivider={!isLast && !isSelected}
+              style={{ paddingHorizontal: 0 }}
+            />
           </View>
+        </View>
+        {roleAssignmentButtons}
+        {!isLast && isSelected && (
+          <View style={[styles.divider, { backgroundColor: appTheme.colors.surface }]} />
         )}
       </View>
     );
   };
 
   return (
-    <ModalList
+    <AppBottomSheet
       visible={visible}
       onClose={onClose}
       title={title}
-      items={filteredStaff}
-      onSelectItem={() => {}} // Handled by custom render
-      hasSearch={true}
-      searchPlaceholder="Search staff..."
-      onSearchChange={handleSearch}
-      multiSelect={true}
-      selectedItems={selectedStaffIds}
-      onSelectionChange={handleSelectionChange}
-      renderItem={renderCustomItem}
-      footerActions={
-        selectedStaffIds.length > 0 ? (
+    >
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <AppSearchBar
+          placeholder="Search staff..."
+          value={searchQuery}
+          onChangeText={handleSearch}
+          onClear={() => handleSearch('')}
+        />
+      </View>
+
+      {/* Staff List */}
+      <ScrollView 
+        style={styles.listContainer} 
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {filteredStaff.map((item, index) => renderItem(item, index))}
+      </ScrollView>
+
+      {/* Footer Action */}
+      {selectedStaffIds.length > 0 && (
+        <View style={styles.footerActions}>
           <AppButton
             title={`Confirm (${selectedStaffIds.length} staff selected)`}
             onPress={handleConfirm}
           />
-        ) : null
-      }
-    />
+        </View>
+      )}
+    </AppBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  staffRow: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+  searchContainer: {
+    paddingHorizontal: 12,
+    paddingBottom: 8,
   },
-  lastItem: {
-    borderBottomWidth: 0,
+  listContainer: {
+    maxHeight: 400,
   },
-  staffContent: {
+  cardRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
+    alignItems: 'flex-start',
+    paddingHorizontal: 0,
   },
   roleIcon: {
     marginRight: 8,
+    marginTop: 14,
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginRight: 12,
-  },
-  avatarPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  staffInfo: {
+  cardContent: {
     flex: 1,
-  },
-  staffName: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  staffRole: {
-    fontSize: 14,
-  },
-  checkbox: {
-    marginLeft: 12,
-  },
-  checkboxChecked: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxUnchecked: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
   },
   roleAssignmentContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
+    paddingHorizontal: 4,
     paddingVertical: 8,
     gap: 8,
   },
@@ -338,6 +306,14 @@ const styles = StyleSheet.create({
   roleButtonText: {
     color: 'white',
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: theme.fonts.primary.medium,
   },
-}); 
+  divider: {
+    height: 1,
+    marginHorizontal: 8,
+  },
+  footerActions: {
+    paddingTop: 16,
+    paddingBottom: 16,
+  },
+});

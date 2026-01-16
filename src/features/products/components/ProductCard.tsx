@@ -6,7 +6,6 @@ import {
   TouchableOpacity, 
   TextInput,
   Switch,
-  Modal,
   ViewStyle,
   TextStyle,
 } from 'react-native';
@@ -20,6 +19,7 @@ import Pill from '@/shared/components/ui/Pill';
 import theme from '@/shared/theme';
 import { Text, BodyBold, Caption, Label } from '@/shared/components/ui/Typography';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 
 // Helper function to format numbers
 const formatNumber = (value: number | undefined | null, type: 'currency' | 'stock'): string => {
@@ -57,6 +57,8 @@ interface ProductCardProps {
   onPublishToggle?: (productId: string, currentPublishState: boolean) => void;
   /** Whether to show the publish toggle (requires paid plan). Default: true */
   showPublishToggle?: boolean;
+  /** Whether this is the last product in a list/group */
+  isLastProduct?: boolean;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
@@ -66,6 +68,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onUpdate,
   onPublishToggle,
   showPublishToggle = true,
+  isLastProduct = false,
 }) => {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const { theme: appTheme } = useTheme();
@@ -102,7 +105,15 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   if (isEditing) {
     return (
-      <View style={[styles.cardContainerEditing, { backgroundColor: appTheme.colors.cardBackground, borderBottomColor: appTheme.colors.borderColor }]}>
+      <View
+        style={[
+          styles.cardContainerEditing,
+          {
+            backgroundColor: appTheme.colors.cardBackground,
+            borderBottomColor: isLastProduct ? appTheme.colors.primary : appTheme.colors.surface,
+          },
+        ]}
+      >
         <View style={styles.topSectionEditing}>
           <View style={styles.imageContainerEditing}>
             {product.productPicture ? (
@@ -132,9 +143,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
               <View style={styles.publishSectionEditing}>
                 <Label style={[
                   styles.publishLabel, 
-                  { color: product.isDisplayable ? appTheme.colors.success : appTheme.colors.textSecondary }
+                  { color: product.isDisplayable ? appTheme.colors.success : appTheme.colors.textMuted }
                 ]}>
-                  {product.isDisplayable ? 'Published' : 'Private'}
+                  {product.isDisplayable ? 'Public' : 'Private'}
                 </Label> 
                 <Switch
                     trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
@@ -182,31 +193,33 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </View>
         </View>
 
-        <Modal
-          transparent={true}
+        <AppBottomSheet
           visible={showStatusModal}
-          onRequestClose={toggleStatusModal}
-          animationType="fade"
+          onClose={toggleStatusModal}
+          title="Availability"
         >
-          <TouchableOpacity 
-            style={[styles.statusModalOverlay, { backgroundColor: 'rgba(0,0,0,0.4)' }]}
-            activeOpacity={1}
-            onPressOut={toggleStatusModal}
-          >
-            <View style={[styles.statusModalContainer, { backgroundColor: appTheme.colors.cardBackground }]}>
-              {productStatuses.map((statusOption) => (
-                <TouchableOpacity 
-                  key={statusOption} 
-                  style={[styles.statusModalItem, { borderBottomColor: appTheme.colors.borderColor }]}
-                  onPress={() => handleSelectStatus(statusOption)}
-                >
-                  <View style={[styles.statusModalColorIndicator, { backgroundColor: getProductStatusColor(statusOption)}]} />
-                  <Text style={[styles.statusModalItemText, { color: appTheme.colors.text }]}>{statusOption}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </TouchableOpacity>
-        </Modal>
+          {productStatuses.map((statusOption, index) => (
+            <TouchableOpacity
+              key={statusOption}
+              style={[
+                styles.statusModalItem,
+                { borderBottomColor: appTheme.colors.borderColor },
+                index === productStatuses.length - 1 && { borderBottomWidth: 0 },
+              ]}
+              onPress={() => handleSelectStatus(statusOption)}
+            >
+              <View
+                style={[
+                  styles.statusModalColorIndicator,
+                  { backgroundColor: getProductStatusColor(statusOption) },
+                ]}
+              />
+              <Text style={[styles.statusModalItemText, { color: appTheme.colors.text }]}>
+                {statusOption}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </AppBottomSheet>
       </View>
     );
   } else {
@@ -216,7 +229,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           styles.cardContainer, 
           { 
             backgroundColor: appTheme.colors.cardBackground,
-            borderBottomColor: appTheme.colors.borderColor 
+            borderBottomColor: isLastProduct ? appTheme.colors.primary : appTheme.colors.surface,
           }
         ]} 
         onPress={onPress} 
@@ -232,18 +245,45 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
         </View>
         <View style={styles.mainContentContainer}>
-          <View style={styles.topRow}>
-            <BodyBold style={[styles.productName, { color: appTheme.colors.text }]} numberOfLines={2}>{product.name}</BodyBold>
-            <Label style={[styles.productStatusText, { color: appTheme.colors.textSecondary }]}>{product.status ?? 'Unknown'}</Label>
+          <View style={styles.infoRow}>
+            <BodyBold style={[styles.productName, { color: appTheme.colors.text }]} numberOfLines={2}>
+              {product.name}
+            </BodyBold>
+            <Text
+              style={[
+                styles.availabilityStatus,
+                { color: getProductStatusColor(product.status) },
+              ]}
+            >
+              {product.status ?? 'Unknown'}
+            </Text>
           </View>
-          {product.unit && (
-            <Caption style={[styles.productDetailText, styles.unitText, { color: appTheme.colors.textSecondary }]}>{product.unit}</Caption>
-          )}
-          <View style={styles.stockPriceRowDisplay}> 
-            <Text style={[styles.productDetailText, { color: appTheme.colors.textSecondary }]}>
+          <View style={[styles.infoRow, styles.infoRowSpacing]}>
+            {product.unit ? (
+              <Text style={[styles.unitText, { color: appTheme.colors.textSecondary }]}>
+                {product.unit}
+              </Text>
+            ) : (
+              <View style={styles.leftSpacer} />
+            )}
+            <Text
+              style={[
+                styles.publicStatus,
+                {
+                  color: product.isDisplayable
+                    ? appTheme.colors.success
+                    : appTheme.colors.textMuted,
+                },
+              ]}
+            >
+              {product.isDisplayable ? 'Public' : 'Private'}
+            </Text>
+          </View>
+          <View style={[styles.infoRow, styles.infoRowSpacing]}>
+            <Text style={[styles.stockStatus, { color: appTheme.colors.textSecondary }]}>
               In stock: {formatNumber(product.stockQuantity, 'stock')}
             </Text>
-            <Text style={[styles.productPriceText, { color: appTheme.colors.text }]}>
+            <Text style={[styles.productPriceText, { color: appTheme.colors.secondary }]}>
               {formatNumber(product.price, 'currency')}
             </Text>
           </View>
@@ -256,15 +296,15 @@ const ProductCard: React.FC<ProductCardProps> = ({
 const styles = StyleSheet.create({
   cardContainer: { 
     flexDirection: 'row', 
-    paddingVertical: theme.spacing.sm + 4, 
+    paddingVertical: 12,
     paddingHorizontal: theme.spacing.md, 
     borderBottomWidth: 1, 
-    alignItems: 'flex-start' 
+    alignItems: 'center',
   },
   imageContainer: { 
     width: 64, 
     height: 64, 
-    marginRight: theme.spacing.md - 4 
+    marginRight: 12,
   },
   productImage: { 
     width: '100%', 
@@ -287,28 +327,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'flex-start', 
-    marginBottom: 4 
+    marginBottom: 4,
   },
   productName: { 
     flex: 1, 
     marginRight: theme.spacing.sm 
   },
-  productStatusText: { 
-    textAlign: 'right' 
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  unitText: { 
-    marginBottom: 4 
+  infoRowSpacing: {
+    marginTop: 4,
   },
-  productDetailText: { 
+  availabilityStatus: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+    textAlign: 'right',
   },
-  stockPriceRowDisplay: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginTop: 4 
+  unitText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
   },
-  productPriceText: { 
-    fontFamily: theme.fonts.primary.medium
+  publicStatus: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+    textAlign: 'right',
+  },
+  stockStatus: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.medium,
+  },
+  productPriceText: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.medium,
+    textAlign: 'right',
+  },
+  leftSpacer: {
+    flex: 1,
   },
 
   cardContainerEditing: { 
@@ -370,22 +429,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, 
     fontSize: theme.fontSize.base, 
     fontFamily: theme.fonts.primary.regular,
-  },
-  statusModalOverlay: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-  },
-  statusModalContainer: { 
-    borderRadius: theme.borderRadius.md, 
-    paddingVertical: theme.spacing.sm, 
-    width: '75%', 
-    maxHeight: '60%', 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.25, 
-    shadowRadius: 3.84, 
-    elevation: 5 
   },
   statusModalItem: { 
     flexDirection: 'row', 

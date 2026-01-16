@@ -10,7 +10,6 @@ import {
   Text,
   FlatList,
   StyleSheet,
-  TouchableOpacity,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +18,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import SecondaryHeader from '@/shared/components/layout/headers/SecondaryHeader';
+import { ListItemCard } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 
 // Types
@@ -249,34 +249,20 @@ export default function AllActivityScreen() {
     const config = TYPE_CONFIG[item.type];
 
     return (
-      <TouchableOpacity
-        style={[styles.itemContainer, { borderBottomColor: appTheme.colors.borderColor }]}
+      <ListItemCard
+        avatar={{
+          type: 'icon',
+          icon: config.icon,
+          iconColor: config.color,
+          backgroundColor: config.color + '20',
+        }}
+        title={item.title}
+        subtitle={item.description}
+        rightRow1={{ timestamp: item.timestamp }}
+        showChevron
         onPress={() => handleItemPress(item)}
-        activeOpacity={0.7}
-      >
-        {/* Icon box */}
-        <View style={[styles.iconBox, { backgroundColor: config.color + '20' }]}>
-          <Icon name={config.icon as any} size={20} color={config.color} />
-        </View>
-        
-        {/* Content */}
-        <View style={styles.itemContent}>
-          <Text style={[styles.itemTitle, { color: appTheme.colors.text }]} numberOfLines={2}>
-            {item.title}
-          </Text>
-          {item.description && (
-            <Text style={[styles.itemDescription, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
-              {item.description}
-            </Text>
-          )}
-          <Text style={[styles.timestamp, { color: appTheme.colors.textMuted }]}>
-            {item.timestamp}
-          </Text>
-        </View>
-        
-        {/* Chevron */}
-        <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
-      </TouchableOpacity>
+        showDivider
+      />
     );
   };
 
@@ -350,37 +336,7 @@ const styles = StyleSheet.create({
   listContentEmpty: {
     flex: 1,
   },
-  itemContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 12,
-    paddingHorizontal: theme.spacing.md,
-  },
-  iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  itemContent: {
-    flex: 1,
-    gap: 2,
-  },
-  itemTitle: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-    lineHeight: 20,
-  },
-  itemDescription: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.semiBold,
-  },
-  timestamp: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
-  },
+  // Empty state (unchanged)
   emptyContainer: {
     flex: 1,
     alignItems: 'center',

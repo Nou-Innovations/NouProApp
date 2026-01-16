@@ -646,19 +646,14 @@ export default function EditPersonalProfileScreen() {
           setShowSuccessDialog(false);
           navigation.goBack();
         }}
+        variant="success"
         title="Success"
         message={successMessage}
-        footer={
-          <AppButton
-            title="OK"
-            onPress={() => {
-              setShowSuccessDialog(false);
-              navigation.goBack();
-            }}
-            variant="confirm"
-            style={{ width: '100%' }}
-          />
-        }
+        primaryButtonText="OK"
+        onPrimaryAction={() => {
+          setShowSuccessDialog(false);
+          navigation.goBack();
+        }}
       />
     </SafeAreaView>
   );

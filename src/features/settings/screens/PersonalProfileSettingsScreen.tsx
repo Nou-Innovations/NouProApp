@@ -133,48 +133,26 @@ export default function PersonalProfileSettingsScreen({ navigation }: PersonalPr
       <AppModal
         visible={showAreYouSureDialog}
         onClose={() => setShowAreYouSureDialog(false)}
+        variant="confirm"
         title="Are you sure?"
         message="You are about to delete your account. This action is irreversible."
-        footer={
-          <View style={styles.modalFooter}>
-            <AppButton
-              title="Yes, I'm sure"
-              onPress={handleConfirmAreYouSure}
-              variant="alert"
-              style={{ flex: 1, marginRight: 8 }}
-            />
-            <AppButton
-              title="No"
-              onPress={() => setShowAreYouSureDialog(false)}
-              variant="outline"
-              style={{ flex: 1 }}
-            />
-          </View>
-        }
+        primaryButtonText="Yes, I'm sure"
+        onPrimaryAction={handleConfirmAreYouSure}
+        secondaryButtonText="No"
+        onSecondaryAction={() => setShowAreYouSureDialog(false)}
       />
 
       {/* Delete Confirmation Dialog */}
       <AppModal
         visible={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
+        variant="delete"
         title="Delete Account?"
         message="This action cannot be undone. All your data will be permanently deleted."
-        footer={
-          <View style={styles.modalFooter}>
-            <AppButton
-              title="Delete"
-              onPress={confirmDeleteAccount}
-              variant="alert"
-              style={{ flex: 1, marginRight: 8 }}
-            />
-            <AppButton
-              title="Cancel"
-              onPress={() => setShowDeleteDialog(false)}
-              variant="outline"
-              style={{ flex: 1 }}
-            />
-          </View>
-        }
+        primaryButtonText="Delete"
+        onPrimaryAction={confirmDeleteAccount}
+        secondaryButtonText="Cancel"
+        onSecondaryAction={() => setShowDeleteDialog(false)}
       />
     </SafeAreaView>
   );
@@ -219,9 +197,5 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.base,
     fontFamily: theme.fonts.primary.semiBold,
     marginLeft: theme.spacing.md,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    marginTop: 8,
   },
 });

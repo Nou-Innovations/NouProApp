@@ -8,6 +8,7 @@ export type HeaderAction = {
   onPress: () => void;
   accessibilityLabel?: string;
   badge?: number; // Optional badge count for notification icons
+  iconColor?: string;
 };
 
 /**
@@ -93,7 +94,12 @@ export default function PrimaryHeader({
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel={a.accessibilityLabel}
           >
-            <Icon name={a.icon} size={24} color={theme.colors.iconColor} strokeWidth={2} />
+            <Icon
+              name={a.icon}
+              size={24}
+              color={a.iconColor ?? theme.colors.iconColor}
+              strokeWidth={2}
+            />
             {a.badge && a.badge > 0 ? (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>

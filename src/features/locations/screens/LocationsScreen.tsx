@@ -21,7 +21,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { AppSearchBar, AppButton } from '@/shared/components/ui';
+import { AppSearchBar, AppButton, ListItemCard } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 
@@ -75,71 +75,30 @@ const LocationCard: React.FC<LocationCardProps> = ({
     );
   };
 
+  // Status pill config for non-primary locations
+  const statusPillConfig = !isPrimaryLocation ? {
+    text: location.operating_mode === 'INDEPENDENT' ? 'Independent' : 'Dependent',
+    color: location.operating_mode === 'INDEPENDENT' 
+      ? appTheme.colors.success 
+      : appTheme.colors.info,
+  } : undefined;
+
   return (
-    <View>
-      <TouchableOpacity
-        style={styles.cardContainer}
-        onPress={onPress}
-        activeOpacity={0.7}
-      >
-        {/* Left: Icon Container */}
-        <View style={[styles.iconContainer, { backgroundColor: appTheme.colors.surface }]}>
-          <Icon 
-            name={location.is_primary ? 'business' : 'location-outline'} 
-            size={24} 
-            color={appTheme.colors.primary} 
-          />
-        </View>
-
-        {/* Middle: Info */}
-        <View style={styles.cardInfo}>
-          <View style={styles.nameRow}>
-            <Text style={[styles.locationName, { color: appTheme.colors.text }]} numberOfLines={1}>
-              {location.name}
-            </Text>
-            {/* Show status badge aligned right, but not for primary/parent location */}
-            {!isPrimaryLocation && (
-              <View style={[
-                styles.modeBadge,
-                { 
-                  backgroundColor: location.operating_mode === 'INDEPENDENT' 
-                    ? 'rgba(42, 207, 1, 0.1)' 
-                    : 'rgba(0, 117, 255, 0.1)'
-                }
-              ]}>
-                <Text style={[
-                  styles.modeBadgeText,
-                  { 
-                    color: location.operating_mode === 'INDEPENDENT' 
-                      ? appTheme.colors.success 
-                      : appTheme.colors.info
-                  }
-                ]}>
-                  {location.operating_mode === 'INDEPENDENT' ? 'Independent' : 'Dependent'}
-                </Text>
-              </View>
-            )}
-          </View>
-          
-          <Text style={[styles.locationAddress, { color: appTheme.colors.textSecondary }]} numberOfLines={2}>
-            {location.address}
-          </Text>
-        </View>
-
-        {/* Right: Options Button */}
-        <TouchableOpacity
-          style={styles.optionsButton}
-          onPress={handleOptionsPress}
-          activeOpacity={0.7}
-        >
-          <Icon name="ellipsis-vertical" size={20} color={appTheme.colors.text} />
-        </TouchableOpacity>
-      </TouchableOpacity>
-      
-      {showDivider && (
-        <View style={[styles.divider, { backgroundColor: appTheme.colors.surface }]} />
-      )}
-    </View>
+    <ListItemCard
+      avatar={{
+        type: 'icon',
+        icon: location.is_primary ? 'business' : 'location-outline',
+        iconColor: appTheme.colors.primary,
+        backgroundColor: appTheme.colors.surface,
+      }}
+      title={location.name}
+      subtitle={location.address}
+      rightRow1={statusPillConfig ? { statusPill: statusPillConfig } : undefined}
+      onPress={onPress}
+      showOptionsButton
+      onOptionsPress={handleOptionsPress}
+      showDivider={showDivider}
+    />
   );
 };
 
@@ -550,10 +509,9 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 24,
-    paddingHorizontal: 12,
   },
   sectionsContainer: {
-    // padding handled by listContent
+    // padding handled by ListItemCard
   },
   singleLocationContainer: {
     paddingTop: 12,
@@ -574,60 +532,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.bold,
   },
   sectionContent: {},
-  // Location Card Styles
-  cardContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  cardInfo: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  locationName: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.bold,
-    flexShrink: 1,
-    marginRight: 8,
-  },
-  modeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  modeBadgeText: {
-    fontSize: 12,
-    fontFamily: theme.fonts.primary.medium,
-  },
-  locationAddress: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
-    lineHeight: 20,
-  },
-  optionsButton: {
-    paddingRight: 0,
-    paddingLeft: 12,
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  divider: {
-    height: 1,
-  },
   // Bottom Sheet Styles - matching About section from UserProfileScreen
   sheetContent: {
     gap: 0,

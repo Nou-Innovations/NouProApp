@@ -27,7 +27,7 @@ import { useNotifications } from '@/shared/context/NotificationContext';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/features/search/components/FilterBar';
-import { AppModal } from '@/shared/components/ui';
+import { AppModal, ListItemCard } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import theme from '@/shared/theme';
 
@@ -226,93 +226,71 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
   const isAccepted = notification.status === 'accepted';
   const iconColor = getIconColor(notification.type);
 
-  return (
-    <TouchableOpacity
-      style={[
-        styles.notificationCard,
-        { 
-          backgroundColor: appTheme.colors.background,
-          borderBottomColor: appTheme.colors.borderColor,
-        },
-        // Highlighted background for unread items (same as DeliveryCard/InvoiceCard)
-        !notification.read && { backgroundColor: appTheme.colors.highlightedRow },
-      ]}
-      onPress={() => onPress(notification)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.notificationContent}>
-        {/* Icon Container - design spec: borderRadius 10, backgroundOpacity 0.15 */}
-        <View style={[styles.iconContainer, { backgroundColor: iconColor + '26' }]}>
-          <Icon 
-            name={getIconName(notification.type)} 
-            size={theme.iconSizes.sm} 
-            color={iconColor} 
-          />
-        </View>
-        
-        <View style={styles.textContainer}>
-          {/* Title Row with Timestamp */}
-          <View style={styles.titleRow}>
-            <Text 
-              style={[styles.title, { color: appTheme.colors.primary }]} 
-              numberOfLines={1}
-            >
-              {notification.title}
-            </Text>
-            <Text style={[styles.timestamp, { color: appTheme.colors.textMuted }]}>
-              {notification.time}
-            </Text>
-          </View>
-          
-          {/* Subtitle/Description - 14px medium textSecondary */}
-          <Text 
-            style={[styles.subtitle, { color: appTheme.colors.textSecondary }]} 
-            numberOfLines={2}
-          >
-            {notification.description}
+  // Build bottom element
+  const bottomElement = (() => {
+    // Staff Button for Accepted Join Requests
+    if (((notification.type === 'staff_request' && isAccepted) || notification.type === 'join_accepted') && canManageRequests) {
+      return (
+        <TouchableOpacity
+          style={[styles.staffButton, { borderColor: appTheme.colors.primary }]}
+          onPress={handleStaffButtonPress}
+        >
+          <Text style={[styles.staffButtonText, { color: appTheme.colors.primary }]}>
+            {currentRole}
           </Text>
-          
-          {/* Staff Button for Accepted Join Requests - Small Outline Button, Full Width */}
-          {((notification.type === 'staff_request' && isAccepted) || notification.type === 'join_accepted') && canManageRequests && (
-            <TouchableOpacity
-              style={[styles.staffButton, { borderColor: appTheme.colors.primary }]}
-              onPress={handleStaffButtonPress}
-            >
-              <Text style={[styles.staffButtonText, { color: appTheme.colors.primary }]}>
-                {currentRole}
-              </Text>
-              <Icon 
-                name="chevron-down" 
-                size={20} 
-                color={appTheme.colors.primary} 
-              />
-            </TouchableOpacity>
-          )}
-          
-          {/* Action Buttons for Pending Requests */}
-          {isRequestType && canManageRequests && isPending && (
-            <View style={styles.requestButtons}>
-              <TouchableOpacity
-                style={[styles.requestButton, styles.declineButton, { borderColor: appTheme.colors.primary }]}
-                onPress={() => handleRequestAction('decline')}
-              >
-                <Text style={[styles.declineButtonText, { color: appTheme.colors.primary }]}>
-                  Decline
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.requestButton, styles.confirmButton, { backgroundColor: appTheme.colors.primary }]}
-                onPress={() => handleRequestAction('accept')}
-              >
-                <Text style={[styles.confirmButtonText, { color: appTheme.colors.textInverse }]}>
-                  Confirm
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          <Icon 
+            name="chevron-down" 
+            size={20} 
+            color={appTheme.colors.primary} 
+          />
+        </TouchableOpacity>
+      );
+    }
+    
+    // Action Buttons for Pending Requests
+    if (isRequestType && canManageRequests && isPending) {
+      return (
+        <View style={styles.requestButtons}>
+          <TouchableOpacity
+            style={[styles.requestButton, styles.declineButton, { borderColor: appTheme.colors.primary }]}
+            onPress={() => handleRequestAction('decline')}
+          >
+            <Text style={[styles.declineButtonText, { color: appTheme.colors.primary }]}>
+              Decline
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.requestButton, styles.confirmButton, { backgroundColor: appTheme.colors.primary }]}
+            onPress={() => handleRequestAction('accept')}
+          >
+            <Text style={[styles.confirmButtonText, { color: appTheme.colors.textInverse }]}>
+              Confirm
+            </Text>
+          </TouchableOpacity>
         </View>
-      </View>
-    </TouchableOpacity>
+      );
+    }
+    
+    return null;
+  })();
+
+  return (
+    <ListItemCard
+      avatar={{
+        type: 'icon',
+        icon: getIconName(notification.type),
+        iconColor: iconColor,
+        backgroundColor: iconColor + '26',
+        borderRadius: 10,
+      }}
+      title={notification.title}
+      subtitle={notification.description}
+      rightRow1={{ timestamp: notification.time }}
+      onPress={() => onPress(notification)}
+      bottomElement={bottomElement}
+      showDivider
+      style={!notification.read ? { backgroundColor: appTheme.colors.highlightedRow } : undefined}
+    />
   );
 };
 
@@ -628,40 +606,24 @@ export default function NotificationsScreen() {
       <AppModal
         visible={showConfirmDialog}
         onClose={handleCancelRoleChange}
+        variant="confirm"
         title="Change Role"
         message={`Change role to ${pendingRole}?`}
-        footer={
-          <View style={styles.modalFooter}>
-            <AppButton
-              title="Confirm"
-              onPress={handleConfirmRoleChange}
-              variant="confirm"
-              style={{ flex: 1, marginRight: 8 }}
-            />
-            <AppButton
-              title="Cancel"
-              onPress={handleCancelRoleChange}
-              variant="outline"
-              style={{ flex: 1 }}
-            />
-          </View>
-        }
+        primaryButtonText="Confirm"
+        onPrimaryAction={handleConfirmRoleChange}
+        secondaryButtonText="Cancel"
+        onSecondaryAction={handleCancelRoleChange}
       />
 
       {/* Success Dialog */}
       <AppModal
         visible={showSuccessDialog}
         onClose={() => setShowSuccessDialog(false)}
+        variant="success"
         title="Role Updated"
         message={successMessage}
-        footer={
-          <AppButton
-            title="OK"
-            onPress={() => setShowSuccessDialog(false)}
-            variant="confirm"
-            style={{ width: '100%' }}
-          />
-        }
+        primaryButtonText="OK"
+        onPrimaryAction={() => setShowSuccessDialog(false)}
       />
     </SafeAreaView>
   );
@@ -675,57 +637,9 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.lg,
     flexGrow: 1,
   },
-  // Notification Card - design spec: components.overlayScreens.notificationsOverlay.notificationItem
-  notificationCard: {
-    paddingVertical: 14, // design spec
-    paddingHorizontal: theme.spacing.md, // 16
-    borderBottomWidth: 1,
-  },
-  notificationContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12, // design spec
-  },
-  // Icon Container - design spec: width 40, height 40, borderRadius 10
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10, // design spec (not 8)
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textContainer: {
-    flex: 1,
-  },
-  // Title Row - title and timestamp on same line
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  // Title - 16px semiBold primary color
-  title: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-    flex: 1,
-    marginRight: theme.spacing.sm,
-  },
-  // Subtitle - 14px medium textSecondary
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: theme.fonts.primary.medium,
-  },
-  // Timestamp - 14px medium textMuted, same line as title
-  timestamp: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
-  },
-  // Request Action Buttons - Small buttons (40px height)
+  // NotificationCard action buttons (used in ListItemCard bottomElement)
   requestButtons: {
     flexDirection: 'row',
-    marginTop: 12,
     gap: theme.spacing.sm,
   },
   requestButton: {
@@ -761,7 +675,6 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     backgroundColor: 'transparent',
-    marginTop: 12,
   },
   staffButtonText: {
     fontSize: 14,
@@ -843,9 +756,5 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 16,                   // design spec: actionButtons.fontSize
     fontFamily: theme.fonts.primary.medium, // design spec: actionButtons.fontFamily (Inter-Medium)
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    marginTop: 8,
   },
 });

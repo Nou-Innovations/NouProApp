@@ -14,8 +14,9 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { get, del } from '@/shared/services/api';
-import { AppSearchBar, StaffCard, StaffMember, StaffRole as StaffCardRole, Avatar, AppModal, AppBottomSheet } from '@/shared/components/ui';
+import { AppSearchBar, StaffCard, StaffMember, StaffRole as StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
+import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 
 // User type for team management
@@ -413,37 +414,22 @@ export default function TeamManagementScreen() {
                   
                   <View style={styles.sectionContent}>
                     {joinRequests.map((request, index) => (
-                      <View key={request.id}>
-                        <View style={styles.requestCard}>
-                          {/* Top row: Avatar, Name/Username, 3-dots - same as Staff/Pending cards */}
-                          <View style={styles.requestCardTopRow}>
-                            <Avatar
-                              userId={request.userId}
-                              userName={request.userName}
-                              imageUri={request.userAvatar}
-                              size={48}
-                              style={styles.requestCardAvatar}
-                            />
-                            <View style={styles.requestCardInfo}>
-                              <Text style={[styles.requestCardName, { color: appTheme.colors.text }]} numberOfLines={1}>
-                                {request.userName}
-                              </Text>
-                              <Text style={[styles.requestCardUsername, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
-                                @{request.userEmail.split('@')[0]}
-                              </Text>
-                            </View>
-                            <TouchableOpacity 
-                              style={styles.requestCardOptionsButton}
-                              onPress={() => {
-                                setSelectedJoinRequest(request);
-                                setShowJoinRequestOptions(true);
-                              }}
-                              activeOpacity={0.7}
-                            >
-                              <Icon name="ellipsis-vertical" size={20} color={appTheme.colors.text} />
-                            </TouchableOpacity>
-                          </View>
-                          {/* Bottom row: Accept + Decline buttons */}
+                      <ListItemCard
+                        key={request.id}
+                        avatar={{
+                          type: 'image',
+                          userId: request.userId,
+                          userName: request.userName,
+                          imageUri: request.userAvatar,
+                        }}
+                        title={request.userName}
+                        subtitle={`@${request.userEmail.split('@')[0]}`}
+                        showOptionsButton
+                        onOptionsPress={() => {
+                          setSelectedJoinRequest(request);
+                          setShowJoinRequestOptions(true);
+                        }}
+                        bottomElement={
                           <View style={styles.requestCardButtons}>
                             <TouchableOpacity 
                               style={[styles.requestCardButtonPrimary, { backgroundColor: appTheme.colors.primary }]}
@@ -460,11 +446,9 @@ export default function TeamManagementScreen() {
                               <Text style={[styles.requestCardButtonOutlineText, { color: appTheme.colors.primary }]}>Decline</Text>
                             </TouchableOpacity>
                           </View>
-                        </View>
-                        {index < joinRequests.length - 1 && (
-                          <View style={[styles.listDivider, { backgroundColor: appTheme.colors.borderColor }]} />
-                        )}
-                      </View>
+                        }
+                        showDivider={index < joinRequests.length - 1}
+                      />
                     ))}
                   </View>
                 </View>
@@ -481,22 +465,16 @@ export default function TeamManagementScreen() {
                   
                   <View style={styles.sectionContent}>
                     {pendingInvites.map((invite, index) => (
-                      <View key={invite.id}>
-                        <View style={styles.pendingCard}>
-                          <Avatar
-                            userId={invite.id}
-                            userName={invite.name || invite.email}
-                            size={48}
-                            style={styles.pendingCardAvatar}
-                          />
-                          <View style={styles.pendingCardInfo}>
-                            <Text style={[styles.pendingCardName, { color: appTheme.colors.text }]} numberOfLines={1}>
-                              {invite.name || invite.email.split('@')[0]}
-                            </Text>
-                            <Text style={[styles.pendingCardUsername, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
-                              @{invite.email.split('@')[0]}
-                            </Text>
-                          </View>
+                      <ListItemCard
+                        key={invite.id}
+                        avatar={{
+                          type: 'initials',
+                          userId: invite.id,
+                          userName: invite.name || invite.email,
+                        }}
+                        title={invite.name || invite.email.split('@')[0]}
+                        subtitle={`@${invite.email.split('@')[0]}`}
+                        rightRow2={
                           <TouchableOpacity 
                             style={[styles.pendingCardButton, { backgroundColor: appTheme.colors.surface }]}
                             onPress={() => handleCancelInvite(invite)}
@@ -504,21 +482,14 @@ export default function TeamManagementScreen() {
                           >
                             <Text style={[styles.pendingCardButtonText, { color: appTheme.colors.textMuted }]}>Pending request</Text>
                           </TouchableOpacity>
-                          <TouchableOpacity 
-                            style={styles.pendingCardOptionsButton}
-                            onPress={() => {
-                              setSelectedPendingInvite(invite);
-                              setShowPendingInviteOptions(true);
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <Icon name="ellipsis-vertical" size={20} color={appTheme.colors.text} />
-                          </TouchableOpacity>
-                        </View>
-                        {index < pendingInvites.length - 1 && (
-                          <View style={[styles.listDivider, { backgroundColor: appTheme.colors.borderColor }]} />
-                        )}
-                      </View>
+                        }
+                        showOptionsButton
+                        onOptionsPress={() => {
+                          setSelectedPendingInvite(invite);
+                          setShowPendingInviteOptions(true);
+                        }}
+                        showDivider={index < pendingInvites.length - 1}
+                      />
                     ))}
                   </View>
                 </View>
@@ -581,16 +552,11 @@ export default function TeamManagementScreen() {
       <AppModal
         visible={showSuccessDialog}
         onClose={() => setShowSuccessDialog(false)}
+        variant="success"
         title="Success"
         message={successMessage}
-        footer={
-          <AppButton
-            title="OK"
-            onPress={() => setShowSuccessDialog(false)}
-            variant="confirm"
-            style={{ width: '100%' }}
-          />
-        }
+        primaryButtonText="OK"
+        onPrimaryAction={() => setShowSuccessDialog(false)}
       />
 
       {/* Join Request Options Bottom Sheet */}
@@ -656,7 +622,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   sectionsContainer: {
-    paddingHorizontal: 12,
+    // padding handled by ListItemCard
   },
   section: {
     marginBottom: 16,
@@ -689,45 +655,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
   },
-  // Request Card styles (for Join Requests) - matches Staff/Pending card layout
-  requestCard: {
-    paddingVertical: 12,
-    paddingLeft: 8,
-    paddingRight: 0,
-  },
-  requestCardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  requestCardAvatar: {
-    marginRight: 12,
-  },
-  requestCardInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  requestCardName: {
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-  },
-  requestCardUsername: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    marginTop: 2,
-  },
-  requestCardOptionsButton: {
-    paddingRight: 4,
-    paddingLeft: 12,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  // Request Card bottom buttons (used in ListItemCard bottomElement)
   requestCardButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    marginLeft: 60, // Avatar width (48) + marginRight (12)
-    marginRight: 4, // Match optionsButton paddingRight
     gap: 8,
   },
   requestCardButtonPrimary: {
@@ -754,30 +685,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
   },
-  // Pending Card styles (for Pending Invites) - matches Staff card layout
-  pendingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingLeft: 8,
-    paddingRight: 0,
-  },
-  pendingCardAvatar: {
-    marginRight: 12,
-  },
-  pendingCardInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  pendingCardName: {
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-  },
-  pendingCardUsername: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    marginTop: 2,
-  },
+  // Pending Card button (used in ListItemCard rightRow2)
   pendingCardButton: {
     width: 112,
     height: 40,
@@ -788,13 +696,6 @@ const styles = StyleSheet.create({
   pendingCardButtonText: {
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
-  },
-  pendingCardOptionsButton: {
-    paddingRight: 4,
-    paddingLeft: 12,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   listDivider: {
     height: 1,

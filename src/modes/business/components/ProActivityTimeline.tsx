@@ -9,13 +9,13 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   FlatList,
 } from 'react-native';
 import { Icon, iconMap } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import AppButton from '@/shared/components/ui/AppButton';
+import { ListItemCard } from '@/shared/components/ui';
 
 type IconName = keyof typeof iconMap;
 
@@ -70,9 +70,9 @@ export function ProActivityTimeline({
   const { theme: appTheme } = useTheme();
 
   const renderSkeletonItem = () => (
-    <View style={styles.itemContainer}>
-      <View style={[styles.skeletonDot, { backgroundColor: appTheme.colors.borderColor, marginRight: 12 }]} />
-      <View style={styles.itemContent}>
+    <View style={styles.skeletonItem}>
+      <View style={[styles.skeletonDot, { backgroundColor: appTheme.colors.borderColor }]} />
+      <View style={styles.skeletonContent}>
         <View style={[styles.skeletonTitle, { backgroundColor: appTheme.colors.borderColor }]} />
         <View style={[styles.skeletonTime, { backgroundColor: appTheme.colors.borderColor }]} />
       </View>
@@ -153,37 +153,21 @@ export function ProActivityTimeline({
     const config = TYPE_CONFIG[item.type];
 
     return (
-      <TouchableOpacity
-        style={styles.itemContainer}
+      <ListItemCard
+        avatar={{
+          type: 'icon',
+          icon: config.icon,
+          iconColor: config.color,
+          backgroundColor: config.color + '20',
+        }}
+        title={item.title}
+        subtitle={item.description}
+        rightRow1={{ timestamp: item.timestamp }}
+        showChevron={!!item.onPress}
         onPress={item.onPress}
-        activeOpacity={item.onPress ? 0.7 : 1}
-        disabled={!item.onPress}
-      >
-        {/* Icon box - same color logic as notifications */}
-        <View style={[styles.iconBox, { backgroundColor: config.color + '20' }]}>
-          <Icon name={config.icon} size={20} color={config.color} />
-        </View>
-        
-        {/* Content */}
-        <View style={styles.itemContent}>
-          <Text style={[styles.itemTitle, { color: appTheme.colors.text }]} numberOfLines={2}>
-            {item.title}
-          </Text>
-          {item.description && (
-            <Text style={[styles.itemDescription, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
-              {item.description}
-            </Text>
-          )}
-          <Text style={[styles.timestamp, { color: appTheme.colors.textMuted }]}>
-            {item.timestamp}
-          </Text>
-        </View>
-        
-        {/* Arrow if pressable */}
-        {item.onPress && (
-          <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
-        )}
-      </TouchableOpacity>
+        showDivider={false}
+        style={{ backgroundColor: 'transparent' }}
+      />
     );
   };
 
@@ -241,37 +225,6 @@ const styles = StyleSheet.create({
   listContent: {
     paddingVertical: 4,
   },
-  itemContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 12,
-    paddingHorizontal: 0,
-  },
-  iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  itemContent: {
-    flex: 1,
-    gap: 2,
-  },
-  itemTitle: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-    lineHeight: 20,
-  },
-  itemDescription: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.semiBold,
-  },
-  timestamp: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
-  },
   seeAllButtonContainer: {
     marginHorizontal: theme.spacing.md,
     marginTop: theme.spacing.sm,
@@ -282,7 +235,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.lg,
     marginHorizontal: theme.spacing.md,
     borderRadius: 12,
-    gap: 8,
+    gap: 4,
   },
   errorText: {
     fontSize: 14,
@@ -306,10 +259,21 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.regular,
     textAlign: 'center',
   },
+  skeletonItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
   skeletonDot: {
-    width: 36,
-    height: 36,
+    width: 48,
+    height: 48,
     borderRadius: 8,
+    marginRight: 12,
+  },
+  skeletonContent: {
+    flex: 1,
+    gap: 4,
   },
   skeletonTitle: {
     width: '70%',
@@ -320,7 +284,6 @@ const styles = StyleSheet.create({
     width: '30%',
     height: 14,
     borderRadius: 4,
-    marginTop: 4,
   },
 });
 

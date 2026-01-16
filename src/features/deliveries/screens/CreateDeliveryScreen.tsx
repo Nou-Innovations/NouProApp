@@ -31,7 +31,7 @@ import { RootStackParamList } from '@/shared/types/navigation';
 import { mockStaff, mockTransportModes, Staff, TransportMode } from '@/shared/data/mockDeliveries';
 import { mockBrands } from '@/shared/data/businessProfile';
 import { formatCurrency } from '@/shared/data/mockOrders';
-import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, TimeSelector } from '@/shared/components/ui';
+import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, TimeSelector, ListItemCard } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 
@@ -471,46 +471,25 @@ export default function CreateDeliveryScreen() {
             containerStyle={styles.searchBarContainer}
           />
           <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
-            {filteredClients.map((item) => (
-              <TouchableOpacity
+            {filteredClients.map((item, index) => (
+              <ListItemCard
                 key={item.id}
-                style={[
-                  styles.selectionItem,
-                  { 
-                    borderColor: selectedClient?.id === item.id ? appTheme.colors.primary : appTheme.colors.borderColor,
-                    backgroundColor: selectedClient?.id === item.id ? `${appTheme.colors.primary}08` : appTheme.colors.cardBackground,
-                  }
-                ]}
+                avatar={{
+                  type: 'initials',
+                  userId: item.id,
+                  userName: item.name,
+                }}
+                title={item.name}
+                subtitle={`${item.type} • ${item.address}`}
                 onPress={() => {
                   setSelectedClient(item);
                   setShowClientModal(false);
                   setClientSearch('');
                 }}
-              >
-                <View style={[styles.selectionAvatar, { backgroundColor: getAvatarColor(item.name) }]}>
-                  <Text style={styles.selectionAvatarText}>{getInitials(item.name)}</Text>
-                </View>
-                <View style={styles.selectionContent}>
-                  <Text style={[styles.selectionTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
-                    {item.name}
-                  </Text>
-                  <View style={styles.selectionMeta}>
-                    <View style={[styles.typeBadge, { backgroundColor: appTheme.colors.surface }]}>
-                      <Text style={[styles.typeBadgeText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.medium }]}>
-                        {item.type}
-                      </Text>
-                    </View>
-                    <Text style={[styles.selectionSubtitle, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
-                      {item.address}
-                    </Text>
-                  </View>
-                </View>
-                {selectedClient?.id === item.id && (
-                  <View style={[styles.checkCircle, { backgroundColor: appTheme.colors.primary }]}>
-                    <Icon name="checkmark" size={16} color="#FFFFFF" />
-                  </View>
-                )}
-              </TouchableOpacity>
+                selected={selectedClient?.id === item.id}
+                showCheckmark
+                showDivider={index < filteredClients.length - 1}
+              />
             ))}
             {filteredClients.length === 0 && (
               <View style={styles.emptyState}>
@@ -533,38 +512,25 @@ export default function CreateDeliveryScreen() {
       >
         <View style={styles.bottomSheetContent}>
           <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
-            {safeLocations.filter(loc => loc.id !== currentLocation?.id).map((item) => (
-              <TouchableOpacity
+            {safeLocations.filter(loc => loc.id !== currentLocation?.id).map((item, index, arr) => (
+              <ListItemCard
                 key={item.id}
-                style={[
-                  styles.selectionItem,
-                  { 
-                    borderColor: selectedLocation?.id === item.id ? appTheme.colors.primary : appTheme.colors.borderColor,
-                    backgroundColor: selectedLocation?.id === item.id ? `${appTheme.colors.primary}08` : appTheme.colors.cardBackground,
-                  }
-                ]}
+                avatar={{
+                  type: 'icon',
+                  icon: 'location',
+                  iconColor: '#FFFFFF',
+                  backgroundColor: '#EAB308',
+                }}
+                title={item.name}
+                subtitle={item.address}
                 onPress={() => {
                   setSelectedLocation(item);
                   setShowLocationModal(false);
                 }}
-              >
-                <View style={[styles.selectionAvatar, { backgroundColor: '#EAB308' }]}>
-                  <Icon name="location" size={20} color="#FFFFFF" />
-                </View>
-                <View style={styles.selectionContent}>
-                  <Text style={[styles.selectionTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
-                    {item.name}
-                  </Text>
-                  <Text style={[styles.selectionSubtitle, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
-                    {item.address}
-                  </Text>
-                </View>
-                {selectedLocation?.id === item.id && (
-                  <View style={[styles.checkCircle, { backgroundColor: appTheme.colors.primary }]}>
-                    <Icon name="checkmark" size={16} color="#FFFFFF" />
-                  </View>
-                )}
-              </TouchableOpacity>
+                selected={selectedLocation?.id === item.id}
+                showCheckmark
+                showDivider={index < arr.length - 1}
+              />
             ))}
             {safeLocations.filter(loc => loc.id !== currentLocation?.id).length === 0 && (
               <View style={styles.emptyState}>
@@ -755,35 +721,24 @@ export default function CreateDeliveryScreen() {
       >
         <View style={styles.bottomSheetContent}>
           <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
-            {mockTransportModes.map((item) => (
-              <TouchableOpacity
+            {mockTransportModes.map((item, index) => (
+              <ListItemCard
                 key={item.id}
-                style={[
-                  styles.selectionItem,
-                  { 
-                    borderColor: selectedTransport?.id === item.id ? appTheme.colors.primary : appTheme.colors.borderColor,
-                    backgroundColor: selectedTransport?.id === item.id ? `${appTheme.colors.primary}08` : appTheme.colors.cardBackground,
-                  }
-                ]}
+                avatar={{
+                  type: 'icon',
+                  icon: item.icon,
+                  iconColor: '#FFFFFF',
+                  backgroundColor: appTheme.colors.info,
+                }}
+                title={item.name}
                 onPress={() => {
                   setSelectedTransport(item);
                   setShowTransportModal(false);
                 }}
-              >
-                <View style={[styles.selectionAvatar, { backgroundColor: appTheme.colors.info }]}>
-                  <Icon name={item.icon as any} size={22} color="#FFFFFF" />
-                </View>
-                <View style={styles.selectionContent}>
-                  <Text style={[styles.selectionTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
-                    {item.name}
-                  </Text>
-                </View>
-                {selectedTransport?.id === item.id && (
-                  <View style={[styles.checkCircle, { backgroundColor: appTheme.colors.primary }]}>
-                    <Icon name="checkmark" size={16} color="#FFFFFF" />
-                  </View>
-                )}
-              </TouchableOpacity>
+                selected={selectedTransport?.id === item.id}
+                showCheckmark
+                showDivider={index < mockTransportModes.length - 1}
+              />
             ))}
             <View style={{ height: 20 }} />
           </ScrollView>
@@ -808,41 +763,25 @@ export default function CreateDeliveryScreen() {
             containerStyle={styles.searchBarContainer}
           />
           <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
-            {filteredStaff.map((item) => (
-              <TouchableOpacity
+            {filteredStaff.map((item, index) => (
+              <ListItemCard
                 key={item.id}
-                style={[
-                  styles.selectionItem,
-                  { 
-                    borderColor: selectedStaff?.id === item.id ? appTheme.colors.primary : appTheme.colors.borderColor,
-                    backgroundColor: selectedStaff?.id === item.id ? `${appTheme.colors.primary}08` : appTheme.colors.cardBackground,
-                  }
-                ]}
+                avatar={{
+                  type: 'initials',
+                  userId: item.id,
+                  userName: item.name,
+                }}
+                title={item.name}
+                subtitle={item.role}
                 onPress={() => {
                   setSelectedStaff(item);
                   setShowStaffModal(false);
                   setStaffSearch('');
                 }}
-              >
-                <View style={[styles.selectionAvatar, { backgroundColor: getAvatarColor(item.name) }]}>
-                  <Text style={styles.selectionAvatarText}>{getInitials(item.name)}</Text>
-                </View>
-                <View style={styles.selectionContent}>
-                  <Text style={[styles.selectionTitle, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
-                    {item.name}
-                  </Text>
-                  <View style={[styles.roleBadge, { backgroundColor: appTheme.colors.surface }]}>
-                    <Text style={[styles.roleBadgeText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.medium }]}>
-                      {item.role}
-                    </Text>
-                  </View>
-                </View>
-                {selectedStaff?.id === item.id && (
-                  <View style={[styles.checkCircle, { backgroundColor: appTheme.colors.primary }]}>
-                    <Icon name="checkmark" size={16} color="#FFFFFF" />
-                  </View>
-                )}
-              </TouchableOpacity>
+                selected={selectedStaff?.id === item.id}
+                showCheckmark
+                showDivider={index < filteredStaff.length - 1}
+              />
             ))}
             {filteredStaff.length === 0 && (
               <View style={styles.emptyState}>
@@ -864,19 +803,14 @@ export default function CreateDeliveryScreen() {
           setShowSuccessDialog(false);
           navigation.goBack();
         }}
+        variant="success"
         title="Success"
         message={successMessage}
-        footer={
-          <AppButton
-            title="OK"
-            onPress={() => {
-              setShowSuccessDialog(false);
-              navigation.goBack();
-            }}
-            variant="confirm"
-            style={{ width: '100%' }}
-          />
-        }
+        primaryButtonText="OK"
+        onPrimaryAction={() => {
+          setShowSuccessDialog(false);
+          navigation.goBack();
+        }}
       />
     </SafeAreaView>
   );
@@ -970,73 +904,13 @@ const styles = StyleSheet.create({
     maxHeight: 500,
   },
   searchBarContainer: {
-    marginHorizontal: 0,
+    marginHorizontal: 12,
     marginBottom: 12,
   },
   modalScrollList: {
     maxHeight: 400,
   },
-  // Selection item styles (used by all selection modals)
-  selectionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    marginBottom: 10,
-  },
-  selectionAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  selectionAvatarText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  selectionContent: {
-    flex: 1,
-  },
-  selectionTitle: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  selectionSubtitle: {
-    fontSize: 13,
-  },
-  selectionMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  typeBadgeText: {
-    fontSize: 11,
-  },
-  roleBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  roleBadgeText: {
-    fontSize: 12,
-  },
-  checkCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  // Empty state for selection modals
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1127,6 +1001,7 @@ const styles = StyleSheet.create({
   },
   // Schedule modal specific
   scheduleContent: {
+    paddingHorizontal: 12,
     paddingBottom: 16,
   },
   scheduleSection: {
