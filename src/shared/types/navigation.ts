@@ -11,6 +11,52 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
 
+// ========== Shared Types for Registration Flow ==========
+
+/**
+ * Registration user data passed between screens
+ */
+export interface RegistrationUserData {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  countryCode: string;
+  email?: string;
+}
+
+/**
+ * Business basic data for registration
+ */
+export interface BusinessBasicData {
+  name: string;
+  type: string;
+  phone: string;
+  countryCode: string;
+  email?: string;
+  website?: string;
+}
+
+/**
+ * Business location data
+ */
+export interface BusinessLocationData {
+  address: string;
+  latitude: number;
+  longitude: number;
+}
+
+/**
+ * Full business data for final step
+ */
+export interface FullBusinessData extends BusinessBasicData {
+  location: BusinessLocationData;
+  businessHours: {
+    day: string;
+    isOpen: boolean;
+    timeSlots: { open: string; close: string }[];
+  }[];
+}
+
 // ========== Personal Mode Tab Navigator ==========
 
 /**
@@ -150,14 +196,71 @@ export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
+  
+  // Business Registration (accessible from ProfileSwitcher)
+  BusinessBasicInfo: { fromProfileSwitcher?: boolean };
+  BusinessLocation: { 
+    businessData: BusinessBasicData;
+    fromProfileSwitcher?: boolean;
+  };
+  BusinessHours: { 
+    businessData: BusinessBasicData;
+    location: BusinessLocationData;
+    fromProfileSwitcher?: boolean;
+  };
+  UploadBusinessLogo: { 
+    businessData: FullBusinessData;
+    fromProfileSwitcher?: boolean;
+  };
 };
 
 // ========== Auth Stack Navigator ==========
 
 export type AuthStackParamList = {
+  // Launch screen
+  Launch: undefined;
+  
+  // Login
   Login: undefined;
-  Register: undefined;
   ForgotPassword: undefined;
+  
+  // Personal Registration Flow
+  CreateAccount: undefined;
+  PhoneVerification: { 
+    userData: RegistrationUserData;
+    verificationMethod: 'phone';
+  };
+  EmailVerification: { 
+    userData: RegistrationUserData;
+    verificationMethod: 'email';
+  };
+  CreatePassword: { 
+    userData: RegistrationUserData;
+  };
+  UploadProfilePicture: { 
+    userData: RegistrationUserData;
+    password: string;
+  };
+  ChoosePath: undefined;
+  
+  // Join Company Flow
+  SelectCompany: undefined;
+  
+  // Business Registration Flow
+  BusinessBasicInfo: { fromProfileSwitcher?: boolean };
+  BusinessLocation: { 
+    businessData: BusinessBasicData;
+    fromProfileSwitcher?: boolean;
+  };
+  BusinessHours: { 
+    businessData: BusinessBasicData;
+    location: BusinessLocationData;
+    fromProfileSwitcher?: boolean;
+  };
+  UploadBusinessLogo: { 
+    businessData: FullBusinessData;
+    fromProfileSwitcher?: boolean;
+  };
 };
 
 // ========== Screen Props Types ==========

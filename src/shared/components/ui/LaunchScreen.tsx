@@ -156,11 +156,15 @@ export default function LaunchScreen({
     }
   }, [progress]);
 
-  // Mark animation complete
+  // Mark animation complete (only call onFinished if signed in)
   const markAnimationDone = useCallback(() => {
     setAnimationDone(true);
-    onFinished?.();
-  }, [onFinished]);
+    // Only auto-navigate to main app if user is signed in
+    // If not signed in, they need to tap "Join" or "Sign In"
+    if (isSignedIn) {
+      onFinished?.();
+    }
+  }, [onFinished, isSignedIn]);
 
   // Calculate logo final position: 80px below safe area top
   // Logo starts at center, so we calculate how much to move up

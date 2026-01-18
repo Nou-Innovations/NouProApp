@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -7,10 +7,18 @@ import {
   TextInputProps,
   TouchableOpacity,
   ViewStyle,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
+
+// Animation duration for state transitions (150ms for snappy feel)
+const ANIMATION_DURATION = 150;
+
+// Create animated touchable for border color animation
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 interface AppTextFieldProps extends Omit<TextInputProps, 'style' | 'multiline'> {
   /** The label text displayed above the field */
@@ -25,6 +33,8 @@ interface AppTextFieldProps extends Omit<TextInputProps, 'style' | 'multiline'> 
   leftIcon?: keyof typeof Icon.glyphMap;
   /** Whether the field is in error state */
   error?: boolean;
+  /** Whether this field is required - shows error border when empty */
+  required?: boolean;
   /** Custom container style (wraps label + field) */
   containerStyle?: ViewStyle;
   /** Whether the field is disabled */
@@ -59,15 +69,14 @@ interface AppTextFieldProps extends Omit<TextInputProps, 'style' | 'multiline'> 
  * Design: Label positioned ABOVE the field (not floating inside)
  * 
  * Dimensions:
- * - Field height: 40px
+ * - Field height: 48px
  * - Border: 1px, radius: 8px
  * - Label: 14px, 8px above field, 8px margin from left
  * 
  * States:
- * - Inactive: border grey, placeholder 16px grey, vertically centered
- * - Selected: border black, placeholder light grey, caret 2px x 24px
- * - Typing: placeholder hidden, text 16px black
- * - Filled: border grey, text stays black
+ * - Inactive: border borderColor, placeholder textMuted, text textSecondary
+ * - Active/Focused: border primary, caret primary, icons primary
+ * - Error: border error, label error
  * 
  * Variants: password, numeric, phone, email, dropdown, multiSelect, multiline
  */
@@ -78,6 +87,7 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
   placeholder,
   leftIcon,
   error = false,
+  required = false,
   containerStyle,
   disabled = false,
   // Multiline props
@@ -97,6 +107,19 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
   
+  // Animation value for focus state transitions (0 = unfocused, 1 = focused)
+  const focusAnim = useRef(new Animated.Value(0)).current;
+  
+  // Animate focus state changes with ease-in-out
+  useEffect(() => {
+    Animated.timing(focusAnim, {
+      toValue: isFocused ? 1 : 0,
+      duration: ANIMATION_DURATION,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false, // Required for color animations
+    }).start();
+  }, [isFocused, focusAnim]);
+  
   // Get text field config from theme
   const tfConfig = theme.textField;
   
@@ -104,30 +127,72 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
   const hasValue = value.length > 0;
   const hasMultiSelectValue = multiSelect && selectedCount > 0;
   
-  // Calculate border color based on state
-  const getBorderColor = () => {
-    if (error) return appTheme.colors.error;
-    if (isFocused) return appTheme.colors.textFieldBorderSelected;
-    return appTheme.colors.textFieldBorderDefault;
-  };
+  // Check if required field is missing value (for dropdown/multiSelect, check selectedCount)
+  const isRequiredEmpty = required && (
+    multiSelect ? selectedCount === 0 : !hasValue
+  );
+  
+  // Animated border color (Default: borderColor, Selected: primary, Error/Required empty: error)
+  const animatedBorderColor = (error || isRequiredEmpty)
+    ? appTheme.colors.error 
+    : focusAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [appTheme.colors.borderColor, appTheme.colors.primary],
+      });
   
   // Calculate label color based on state
+  // Default: textSecondary, Error/Required empty: error
   const getLabelColor = () => {
-    if (error) return appTheme.colors.error;
-    return appTheme.colors.textFieldLabelDefault;
+    if (error || isRequiredEmpty) return appTheme.colors.error;
+    return appTheme.colors.textSecondary;
   };
   
-  // Calculate placeholder color based on state
+  // Animated placeholder color (Default: textMuted, Selected: borderColor)
+  const animatedPlaceholderColor = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [appTheme.colors.textMuted, appTheme.colors.borderColor],
+  });
+  
+  // Get placeholder color (non-animated fallback for placeholderTextColor)
   const getPlaceholderColor = () => {
-    if (isFocused) return appTheme.colors.textFieldPlaceholder; // light grey when selected
-    return appTheme.colors.textFieldLabelDefault; // grey when inactive
+    if (isFocused) return appTheme.colors.borderColor;
+    return appTheme.colors.textMuted;
   };
   
-  // Calculate icon color based on state
+  // Animated icon color (Default: textSecondary, Active: primary, Error/Required empty: error)
+  const animatedIconColor = (error || isRequiredEmpty)
+    ? appTheme.colors.error
+    : focusAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [appTheme.colors.textSecondary, appTheme.colors.primary],
+      });
+  
+  // Get icon color (non-animated for Icon component)
   const getIconColor = () => {
-    if (error) return appTheme.colors.error;
-    if (isFocused) return appTheme.colors.textFieldBorderSelected;
-    return appTheme.colors.textFieldLabelDefault;
+    if (error || isRequiredEmpty) return appTheme.colors.error;
+    if (isFocused) return appTheme.colors.primary;
+    return appTheme.colors.textSecondary;
+  };
+  
+  // Get input text color (typed text uses primary color)
+  const getInputColor = () => {
+    return appTheme.colors.primary;
+  };
+  
+  // Get caret color
+  const getCaretColor = () => {
+    return appTheme.colors.primary;
+  };
+  
+  // Animated icon stroke width (default: 2, active: 2.5)
+  const animatedStrokeWidth = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [tfConfig.icon.strokeWidthDefault, tfConfig.icon.strokeWidthActive],
+  });
+  
+  // Get icon stroke width (non-animated for Icon component)
+  const getIconStrokeWidth = () => {
+    return isFocused ? tfConfig.icon.strokeWidthActive : tfConfig.icon.strokeWidthDefault;
   };
   
   // Calculate field height
@@ -140,7 +205,7 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
   
   // Calculate left padding based on icon presence
   const getLeftPadding = () => {
-    return leftIcon ? tfConfig.iconContainerWidth : tfConfig.paddingHorizontal;
+    return leftIcon ? tfConfig.icon.containerWidth : tfConfig.paddingHorizontal;
   };
   
   // Generate the count display text for multi-select
@@ -192,8 +257,8 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
           {label}
         </Text>
         
-        {/* Field Container */}
-        <TouchableOpacity
+        {/* Field Container - Animated border color */}
+        <AnimatedTouchableOpacity
           onPress={handlePress}
           disabled={disabled}
           activeOpacity={0.7}
@@ -203,7 +268,7 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
               height: tfConfig.height,
               borderRadius: tfConfig.borderRadius,
               borderWidth: tfConfig.borderWidth,
-              borderColor: getBorderColor(),
+              borderColor: animatedBorderColor,
               backgroundColor: appTheme.colors.inputBackground,
               paddingLeft: getLeftPadding(),
               paddingRight: tfConfig.paddingHorizontal,
@@ -213,11 +278,12 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
         >
           {/* Left Icon */}
           {leftIcon && (
-            <View style={[styles.iconContainer, { width: tfConfig.iconContainerWidth }]}>
+            <View style={[styles.iconContainer, { width: tfConfig.icon.containerWidth }]}>
               <Icon
                 name={leftIcon}
-                size={tfConfig.iconSize}
+                size={tfConfig.icon.size}
                 color={getIconColor()}
+                strokeWidth={getIconStrokeWidth()}
               />
             </View>
           )}
@@ -230,7 +296,7 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
                 fontSize: tfConfig.input.fontSize,
                 color: showPlaceholder 
                   ? getPlaceholderColor() 
-                  : appTheme.colors.textFieldText,
+                  : getInputColor(),
                 fontFamily: theme.fonts.primary.semiBold,
               },
             ]}
@@ -243,9 +309,10 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
           <Icon
             name={multiSelect ? 'chevron-forward' : 'chevron-down'}
             size={tfConfig.dropdown.rightIconSize}
-            color={appTheme.colors.textFieldLabelDefault}
+            color={isFocused ? appTheme.colors.primary : appTheme.colors.textSecondary}
+            strokeWidth={getIconStrokeWidth()}
           />
-        </TouchableOpacity>
+        </AnimatedTouchableOpacity>
       </View>
     );
   }
@@ -267,8 +334,8 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
         {label}
       </Text>
       
-      {/* Field Container */}
-      <TouchableOpacity
+      {/* Field Container - Animated border color */}
+      <AnimatedTouchableOpacity
         onPress={handlePress}
         activeOpacity={1}
         style={[
@@ -278,7 +345,7 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
             minHeight: isMultiline ? getFieldHeight() : undefined,
             borderRadius: tfConfig.borderRadius,
             borderWidth: tfConfig.borderWidth,
-            borderColor: getBorderColor(),
+            borderColor: animatedBorderColor,
             backgroundColor: appTheme.colors.inputBackground,
             paddingLeft: getLeftPadding(),
             paddingRight: tfConfig.paddingHorizontal,
@@ -291,15 +358,16 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
           <View style={[
             styles.iconContainer, 
             { 
-              width: tfConfig.iconContainerWidth,
+              width: tfConfig.icon.containerWidth,
               justifyContent: isMultiline ? 'flex-start' : 'center',
               paddingTop: isMultiline ? tfConfig.multiline.paddingVertical : 0,
             }
           ]}>
             <Icon
               name={leftIcon}
-              size={tfConfig.iconSize}
+              size={tfConfig.icon.size}
               color={getIconColor()}
+              strokeWidth={getIconStrokeWidth()}
             />
           </View>
         )}
@@ -314,7 +382,8 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
           placeholder={placeholder}
           placeholderTextColor={getPlaceholderColor()}
           editable={!disabled}
-          selectionColor={appTheme.colors.textFieldBorderSelected}
+          selectionColor={getCaretColor()}
+          cursorColor={getCaretColor()}
           multiline={isMultiline}
           numberOfLines={isMultiline ? numberOfLines : 1}
           textAlignVertical={isMultiline ? 'top' : 'center'}
@@ -322,15 +391,16 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
             styles.input,
             {
               fontSize: tfConfig.input.fontSize,
-              color: appTheme.colors.textFieldText,
-              fontFamily: theme.fonts.primary.semiBold,
+              color: getInputColor(),
+              // Placeholder uses medium, typed text uses semiBold
+              fontFamily: hasValue ? theme.fonts.primary.semiBold : theme.fonts.primary.medium,
               paddingVertical: isMultiline ? tfConfig.multiline.paddingVertical : 0,
               lineHeight: isMultiline ? tfConfig.multiline.lineHeight : undefined,
             },
           ]}
           {...textInputProps}
         />
-      </TouchableOpacity>
+      </AnimatedTouchableOpacity>
     </View>
   );
 };

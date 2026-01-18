@@ -72,12 +72,12 @@ export const lightTheme = {
     caretColor: '#000000',
     
     // Text field specific colors (consolidated)
-    textFieldBorderDefault: '#E1E4EA',
-    textFieldBorderSelected: '#000000',
-    textFieldLabelDefault: '#575B66',
-    textFieldLabelSelected: '#000000',
-    textFieldPlaceholder: '#A4AAB8',
-    textFieldText: '#000000',
+    textFieldBorderDefault: 'textMuted',
+    textFieldBorderSelected: 'primary',
+    textFieldLabelDefault: 'textSecondary',
+    textFieldPlaceholderDefault: 'textMuted',
+    textFieldPlaceholderSelected: 'borderColor',
+    textFieldText: 'primary',
     
     // Switch colors (from design.json)
     switchTrackOff: '#E9E9EA',
@@ -164,14 +164,27 @@ export const lightTheme = {
     iconButton: 40,
     iconButtonSmall: 32,
   },
-  // Text field specifications (from design.json)
+  // Text field specifications
   // Label is positioned ABOVE the field, not floating inside
   textField: {
     // Field dimensions
-    height: 40,
+    height: 52,
     borderRadius: 8,
     paddingHorizontal: 16,
     borderWidth: 1,
+    
+    // Color tokens (reference names from colors object)
+    // These indicate which color to use from appTheme.colors
+    colorTokens: {
+      borderDefault: 'borderColor',
+      borderActive: 'primary',
+      labelColor: 'textSecondary',
+      inputColor: 'primary',  // Text being typed uses primary color
+      placeholderColor: 'borderColor',
+      caretColor: 'primary',
+      iconDefault: 'textSecondary',
+      iconActive: 'primary',
+    },
     
     // Label (above field)
     label: {
@@ -193,12 +206,16 @@ export const lightTheme = {
     // Caret
     caret: {
       width: 2,
-      height: 24,
+      marginVertical: 4,
     },
     
     // Icon configuration
-    iconContainerWidth: 48,
-    iconSize: 20,
+    icon: {
+      size: 20,
+      containerWidth: 48,
+      strokeWidthDefault: 2,
+      strokeWidthActive: 2.5,
+    },
     
     // Dropdown/selection
     dropdown: {

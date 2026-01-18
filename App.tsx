@@ -9,7 +9,7 @@
 
 import 'react-native-gesture-handler';
 import './tailwind.css';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { NavigationContainer, Theme, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -26,9 +26,6 @@ import theme from '@/shared/theme';
 import { ThemeProvider, useTheme } from '@/shared/theme/ThemeProvider';
 import { NotificationProvider } from '@/shared/context/NotificationContext';
 
-// Components
-import LaunchScreen from '@/shared/components/ui/LaunchScreen';
-
 // Stores
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
@@ -43,6 +40,18 @@ import { userAvatarService } from '@/shared/services/userAvatarService';
 // Screens - Auth
 import LoginScreen from '@/features/auth/screens/LoginScreen';
 import RegisterScreen from '@/features/auth/screens/RegisterScreen';
+import CreateAccountScreen from '@/features/auth/screens/CreateAccountScreen';
+import PhoneVerificationScreen from '@/features/auth/screens/PhoneVerificationScreen';
+import EmailVerificationScreen from '@/features/auth/screens/EmailVerificationScreen';
+import CreatePasswordScreen from '@/features/auth/screens/CreatePasswordScreen';
+import UploadProfilePictureScreen from '@/features/auth/screens/UploadProfilePictureScreen';
+import ChoosePathScreen from '@/features/auth/screens/ChoosePathScreen';
+import SelectCompanyScreen from '@/features/auth/screens/SelectCompanyScreen';
+import BusinessBasicInfoScreen from '@/features/auth/screens/BusinessBasicInfoScreen';
+import BusinessLocationScreen from '@/features/auth/screens/BusinessLocationScreen';
+import BusinessHoursScreen from '@/features/auth/screens/BusinessHoursScreen';
+import UploadBusinessLogoScreen from '@/features/auth/screens/UploadBusinessLogoScreen';
+import LaunchScreenWrapper from '@/features/auth/screens/LaunchScreenWrapper';
 
 // Screens - Inbox
 import ChatScreen from '@/features/inbox/screens/ChatScreen';
@@ -165,18 +174,46 @@ function MainTabNavigator() {
 }
 
 /**
- * Auth Navigator - Login/Register flow
+ * Auth Navigator - Launch/Login/Register flow
  */
 function AuthNavigator() {
   return (
     <AuthStack.Navigator
+      initialRouteName="Launch"
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
+        gestureEnabled: true,
       }}
     >
+      {/* Launch Screen */}
+      <AuthStack.Screen 
+        name="Launch" 
+        component={LaunchScreenWrapper}
+        options={{
+          animation: 'none', // No animation for initial screen
+        }}
+      />
+      
+      {/* Login */}
       <AuthStack.Screen name="Login" component={LoginScreen} />
-      <AuthStack.Screen name="Register" component={RegisterScreen} />
+      
+      {/* Personal Registration Flow */}
+      <AuthStack.Screen name="CreateAccount" component={CreateAccountScreen} />
+      <AuthStack.Screen name="PhoneVerification" component={PhoneVerificationScreen} />
+      <AuthStack.Screen name="EmailVerification" component={EmailVerificationScreen} />
+      <AuthStack.Screen name="CreatePassword" component={CreatePasswordScreen} />
+      <AuthStack.Screen name="UploadProfilePicture" component={UploadProfilePictureScreen} />
+      <AuthStack.Screen name="ChoosePath" component={ChoosePathScreen} />
+      
+      {/* Join Company Flow */}
+      <AuthStack.Screen name="SelectCompany" component={SelectCompanyScreen} />
+      
+      {/* Business Registration Flow */}
+      <AuthStack.Screen name="BusinessBasicInfo" component={BusinessBasicInfoScreen} />
+      <AuthStack.Screen name="BusinessLocation" component={BusinessLocationScreen} />
+      <AuthStack.Screen name="BusinessHours" component={BusinessHoursScreen} />
+      <AuthStack.Screen name="UploadBusinessLogo" component={UploadBusinessLogoScreen} />
     </AuthStack.Navigator>
   );
 }
@@ -200,7 +237,11 @@ function AppNavigator() {
     <NavigationContainer theme={navTheme}>
       <RootStack.Navigator
         initialRouteName="MainTabs"
-        screenOptions={{ headerShown: false }}
+        screenOptions={{ 
+          headerShown: false,
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+        }}
       >
         {/* Main Tab Navigator */}
         <RootStack.Screen name="MainTabs" component={MainTabNavigator} />
@@ -294,6 +335,12 @@ function AppNavigator() {
         <RootStack.Screen name="FeedbackCategories" component={FeedbackCategoriesScreen} />
         <RootStack.Screen name="FeedbackList" component={FeedbackListScreen} />
         <RootStack.Screen name="AddSuggestion" component={AddSuggestionScreen} />
+        
+        {/* Business Registration (from ProfileSwitcher) */}
+        <RootStack.Screen name="BusinessBasicInfo" component={BusinessBasicInfoScreen} />
+        <RootStack.Screen name="BusinessLocation" component={BusinessLocationScreen} />
+        <RootStack.Screen name="BusinessHours" component={BusinessHoursScreen} />
+        <RootStack.Screen name="UploadBusinessLogo" component={UploadBusinessLogoScreen} />
       </RootStack.Navigator>
       <StatusBar style={isDarkMode ? "light" : "dark"} />
     </NavigationContainer>
@@ -386,7 +433,7 @@ function ProfileStoreInitializer({ children }: { children: React.ReactNode }) {
 
 // ========== App State Types ==========
 
-type AppScreen = 'launch' | 'auth' | 'main';
+type AppScreen = 'auth' | 'main';
 
 // ========== Main App Component ==========
 
@@ -403,11 +450,9 @@ type AppScreen = 'launch' | 'auth' | 'main';
 const AppWithTheme = () => {
   // State
   const [resourcesReady, setResourcesReady] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>('launch');
-  const [loadingProgress, setLoadingProgress] = useState<number | undefined>(undefined);
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>('auth'); // Start with auth (includes launch)
   
   // Auth state from store
-  const isAuthenticated = useProfileStore((state) => state.isAuthenticated);
   const currentUser = useProfileStore((state) => state.currentUser);
   const accessToken = useProfileStore((state) => state.accessToken);
   
@@ -456,41 +501,6 @@ const AppWithTheme = () => {
     }
   }, [resourcesReady]);
 
-  // Handle "Join the club" button press
-  const handleJoin = useCallback(() => {
-    setCurrentScreen('auth');
-  }, []);
-
-  // Handle "Sign In" link press
-  const handleSignIn = useCallback(() => {
-    setCurrentScreen('auth');
-  }, []);
-
-  // Handle launch animation finished (for signed-in users)
-  const handleLaunchFinished = useCallback(() => {
-    // Simulate loading progress (replace with real data loading)
-    // Fewer steps, smoother animation handled by LaunchScreen
-    const progressSteps = [
-      { value: 0.15, delay: 200 },
-      { value: 0.45, delay: 800 },
-      { value: 0.75, delay: 600 },
-      { value: 1.0, delay: 500 },
-    ];
-    
-    let totalDelay = 0;
-    progressSteps.forEach(({ value, delay }) => {
-      totalDelay += delay;
-      setTimeout(() => {
-        setLoadingProgress(value);
-      }, totalDelay);
-    });
-    
-    // Navigate to main app after all progress completes
-    setTimeout(() => {
-      setCurrentScreen('main');
-    }, totalDelay + 600);
-  }, []);
-
   // Watch for successful auth (user logs in)
   useEffect(() => {
     if (currentScreen === 'auth' && isSignedIn) {
@@ -507,18 +517,6 @@ const AppWithTheme = () => {
   // Render based on current screen
   const renderScreen = () => {
     switch (currentScreen) {
-      case 'launch':
-        return (
-          <LaunchScreen
-            isSignedIn={true} // Force signed-in flow for testing
-            progress={loadingProgress}
-            onJoin={handleJoin}
-            onSignIn={handleSignIn}
-            onFinished={handleLaunchFinished}
-            backgroundImage={require('./assets/launch/bg-earth.jpg')}
-          />
-        );
-      
       case 'auth':
         return <AuthNavigatorWithContainer />;
       

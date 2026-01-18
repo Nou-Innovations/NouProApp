@@ -113,9 +113,9 @@ export function ProfileSwitcher({
    */
   const handleCreateBusiness = () => {
     setModalVisible(false);
-    // Navigate to create business screen
+    // Navigate to business registration flow
     // @ts-ignore - Will be properly typed after navigation refactor
-    navigation.navigate('CreateBusiness');
+    navigation.navigate('BusinessBasicInfo', { fromProfileSwitcher: true });
   };
 
   /**

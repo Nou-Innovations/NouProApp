@@ -1,3 +1,8 @@
+/**
+ * CreateAccountScreen
+ * First step of registration - basic user information
+ */
+
 import React, { useState } from 'react';
 import {
   View,
@@ -9,8 +14,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome, AntDesign } from '@expo/vector-icons';
-import { useProfileStore } from '@/shared/store/profileStore';
-import { authAPI } from '@/shared/services/api';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/shared/types/navigation';
 import theme from '@/shared/theme';
@@ -18,58 +21,47 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import AppButton from '@/shared/components/ui/AppButton';
+import PhoneNumberField from '@/shared/components/ui/PhoneNumberField';
 
-type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
+type Props = NativeStackScreenProps<AuthStackParamList, 'CreateAccount'>;
 
-export default function RegisterScreen({ navigation }: Props) {
+export default function CreateAccountScreen({ navigation }: Props) {
   const { theme: appTheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [businessName, setBusinessName] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   
-  // Use profileStore for auth (single source of truth)
-  const login = useProfileStore((state) => state.login);
+  // Form state
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [countryCode, setCountryCode] = useState('+230');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
-  const handleRegister = async () => {
-    if (!name || !email || !password || !confirmPassword) {
+  // Check if form is valid
+  const isFormValid = firstName.trim() && lastName.trim() && phoneNumber.trim();
+
+  const handleContinue = () => {
+    setHasAttemptedSubmit(true);
+    
+    if (!isFormValid) {
       setError('Please fill in all required fields');
       return;
     }
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    setLoading(true);
     setError('');
-
-    try {
-      // Call API and get response
-      const response = await authAPI.register({
-        name,
-        email,
-        password,
-        businessName: businessName || undefined,
-      });
-      
-      // Use profileStore.login() to set user + tokens + businesses
-      login(
-        response.data?.user || response.user,
-        response.data?.token || response.token,
-        response.data?.refreshToken || response.refreshToken,
-        response.data?.businesses // optional: user's businesses
-      );
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to register');
-    } finally {
-      setLoading(false);
-    }
+    
+    // Navigate to phone verification
+    navigation.navigate('PhoneVerification', {
+      userData: {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phone: phoneNumber.trim(),
+        countryCode,
+        email: email.trim() || undefined,
+      },
+      verificationMethod: 'phone',
+    });
   };
 
   const handleGoogleSignUp = async () => {
@@ -98,10 +90,10 @@ export default function RegisterScreen({ navigation }: Props) {
           {/* Header Section */}
           <View style={styles.headerSection}>
             <Text style={[styles.title, { color: appTheme.colors.text }]}>
-              Create Account
+              Create an account
             </Text>
             <Text style={[styles.subtitle, { color: appTheme.colors.textSecondary }]}>
-              Sign up to get started
+              Enter your information to get started
             </Text>
           </View>
 
@@ -113,57 +105,62 @@ export default function RegisterScreen({ navigation }: Props) {
           {/* Form Fields */}
           <View style={styles.formContainer}>
             <AppTextField
-              label="Full Name"
-              value={name}
-              onChangeText={setName}
-              placeholder="Enter your full name"
+              label="First Name"
+              value={firstName}
+              onChangeText={(text) => {
+                setFirstName(text);
+                if (error) setError('');
+              }}
+              placeholder="Enter your first name"
               leftIcon="person-outline"
+              error={hasAttemptedSubmit && !firstName.trim()}
             />
 
             <AppTextField
-              label="Email"
+              label="Last Name"
+              value={lastName}
+              onChangeText={(text) => {
+                setLastName(text);
+                if (error) setError('');
+              }}
+              placeholder="Enter your last name"
+              leftIcon="person-outline"
+              error={hasAttemptedSubmit && !lastName.trim()}
+            />
+
+            <PhoneNumberField
+              label="Phone Number"
+              value={phoneNumber}
+              onChangeText={(text) => {
+                setPhoneNumber(text);
+                if (error) setError('');
+              }}
+              countryCode={countryCode}
+              onCountryCodeChange={setCountryCode}
+              placeholder="Enter your phone number"
+              error={hasAttemptedSubmit && !phoneNumber.trim()}
+            />
+
+            <AppTextField
+              label="Email Address (Optional)"
               value={email}
-              onChangeText={setEmail}
-              placeholder="Enter your email"
+              onChangeText={(text) => {
+                setEmail(text);
+                if (error) setError('');
+              }}
+              placeholder="Enter your email address"
               keyboardType="email-address"
               autoCapitalize="none"
               leftIcon="mail-outline"
             />
 
-            <AppTextField
-              label="Business Name (Optional)"
-              value={businessName}
-              onChangeText={setBusinessName}
-              placeholder="Enter your business name"
-              leftIcon="business-outline"
-            />
-
-            <AppTextField
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Enter your password"
-              secureTextEntry
-              leftIcon="lock-closed-outline"
-            />
-
-            <AppTextField
-              label="Confirm Password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="Confirm your password"
-              secureTextEntry
-              leftIcon="lock-closed-outline"
-            />
-
-            {/* Register Button */}
+            {/* Continue Button */}
             <AppButton
-              title="Register"
-              onPress={handleRegister}
-              loading={loading}
-              disabled={loading}
-              variant="primary"
-              style={styles.registerButton}
+              title="Continue"
+              onPress={handleContinue}
+              variant={isFormValid ? 'primary' : 'disabled'}
+              disabled={!isFormValid}
+              style={styles.continueButton}
             />
 
             {/* Divider */}
@@ -199,7 +196,7 @@ export default function RegisterScreen({ navigation }: Props) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Fixed Bottom - Login Link (stays at bottom even with keyboard) */}
+      {/* Fixed Bottom - Login Link */}
       <View style={[
         styles.bottomContainer, 
         { 
@@ -233,7 +230,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 100, // Space for fixed bottom container
+    paddingBottom: 100,
   },
   headerSection: {
     alignItems: 'flex-start',
@@ -258,7 +255,7 @@ const styles = StyleSheet.create({
   formContainer: {
     gap: 16,
   },
-  registerButton: {
+  continueButton: {
     marginTop: 8,
   },
   dividerContainer: {
