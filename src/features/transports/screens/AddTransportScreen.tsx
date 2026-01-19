@@ -23,6 +23,7 @@ import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import ListItemCard from '@/shared/components/ui/ListItemCard';
 import { VehicleType } from './TransportsScreen';
 
 // Vehicle type options with labels and icons
@@ -254,49 +255,22 @@ export default function AddTransportScreen() {
         onClose={() => setShowTypeSheet(false)}
         title="Select Vehicle Type"
       >
-        <View style={styles.typeOptionsContainer}>
-          {VEHICLE_TYPE_OPTIONS.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.typeOption,
-                {
-                  backgroundColor: vehicleType === option.value 
-                    ? `${appTheme.colors.primary}15` 
-                    : 'transparent',
-                  borderColor: vehicleType === option.value 
-                    ? appTheme.colors.primary 
-                    : appTheme.colors.borderColor,
-                }
-              ]}
-              onPress={() => handleSelectType(option.value)}
-              activeOpacity={0.7}
-            >
-              <View style={[
-                styles.typeOptionIcon,
-                { backgroundColor: appTheme.colors.surface }
-              ]}>
-                <Icon 
-                  name={option.icon as any} 
-                  size={24} 
-                  color={vehicleType === option.value ? appTheme.colors.primary : appTheme.colors.textSecondary} 
-                />
-              </View>
-              <Text style={[
-                styles.typeOptionLabel,
-                { 
-                  color: vehicleType === option.value ? appTheme.colors.primary : appTheme.colors.text,
-                  fontFamily: vehicleType === option.value ? theme.fonts.primary.semiBold : theme.fonts.primary.regular,
-                }
-              ]}>
-                {option.label}
-              </Text>
-              {vehicleType === option.value && (
-                <Icon name="checkmark" size={20} color={appTheme.colors.primary} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
+        {VEHICLE_TYPE_OPTIONS.map((option, index) => (
+          <ListItemCard
+            key={option.value}
+            avatar={{
+              type: 'icon',
+              icon: option.icon,
+              iconColor: appTheme.colors.text,
+              backgroundColor: appTheme.colors.surface,
+            }}
+            title={option.label}
+            onPress={() => handleSelectType(option.value)}
+            selected={vehicleType === option.value}
+            showCheckmark
+            showDivider={index < VEHICLE_TYPE_OPTIONS.length - 1}
+          />
+        ))}
       </AppBottomSheet>
     </SafeAreaView>
   );

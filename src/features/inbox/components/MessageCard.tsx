@@ -182,6 +182,16 @@ export default function MessageCard({
     </View>
   ) : messagePreview;
 
+  // Build right column with timestamp on top and status indicator below
+  const rightColumnContent = (
+    <View style={styles.rightColumn}>
+      <Text style={[styles.timestamp, { color: appTheme.colors.textMuted }]}>{time}</Text>
+      <View style={styles.statusIndicatorContainer}>
+        {getStatusIndicator()}
+      </View>
+    </View>
+  );
+
   return (
     <ListItemCard
       avatar={{
@@ -192,8 +202,7 @@ export default function MessageCard({
       }}
       title={name}
       subtitle={typeof subtitleContent === 'string' ? subtitleContent : undefined}
-      rightRow1={{ timestamp: time }}
-      rightRow2={getStatusIndicator()}
+      rightColumn={rightColumnContent}
       bottomElement={typeof subtitleContent !== 'string' ? subtitleContent : undefined}
       onPress={onPress}
       showDivider
@@ -216,6 +225,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     fontFamily: theme.fonts.primary.medium,
+  },
+  rightColumn: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  timestamp: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+  },
+  statusIndicatorContainer: {
+    minHeight: 24,
+    justifyContent: 'center',
   },
   unreadBadge: {
     backgroundColor: theme.colors.badgeBackground,

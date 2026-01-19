@@ -1,6 +1,15 @@
 /**
  * ImageUploadField Component
- * Reusable image picker field for profile pictures and logos
+ * 
+ * Universal image picker field for profile pictures and logos.
+ * 
+ * Design Specs:
+ * - Size: 200x200px (default, customizable)
+ * - Border: 1px dashed
+ * - Border Radius: 16px
+ * - Camera Icon: 32px
+ * - Placeholder Text: 16px semi-bold
+ * - "Change picture" Text: 16px semi-bold, primary color
  */
 
 import React, { useState } from 'react';
@@ -11,12 +20,17 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { imageService } from '@/shared/services/imageService';
+
+// Design constants
+const FIELD_SIZE = 200;
+const BORDER_RADIUS = 16;
+const ICON_SIZE = 32;
+const TEXT_SIZE = 16;
 
 interface ImageUploadFieldProps {
   /** Current image URI */
@@ -27,12 +41,12 @@ interface ImageUploadFieldProps {
   placeholder?: string;
   /** Change text shown after upload */
   changeText?: string;
-  /** Size of the field (default: 200) */
+  /** Size of the field (default: 200px) */
   size?: number;
   /** Whether the field is disabled */
   disabled?: boolean;
-  /** Show square shape (for logos) vs circle (for profile) */
-  variant?: 'circle' | 'square';
+  /** Show loading state externally (optional - component also manages internal loading) */
+  isLoading?: boolean;
 }
 
 export default function ImageUploadField({
@@ -40,62 +54,46 @@ export default function ImageUploadField({
   onImageSelected,
   placeholder = 'Add Profile picture',
   changeText = 'Change picture',
-  size = 200,
+  size = FIELD_SIZE,
   disabled = false,
-  variant = 'circle',
+  isLoading: externalLoading = false,
 }: ImageUploadFieldProps) {
   const { theme: appTheme } = useTheme();
-  const [isLoading, setIsLoading] = useState(false);
+  const [internalLoading, setInternalLoading] = useState(false);
+  
+  // Use external loading state if provided, otherwise use internal
+  const isLoading = externalLoading || internalLoading;
 
   const handlePress = () => {
     if (disabled || isLoading) return;
 
-    Alert.alert(
-      'Select Photo',
-      'Choose how you want to add your photo',
-      [
-        {
-          text: 'Take Photo',
-          onPress: handleTakePhoto,
-        },
-        {
-          text: 'Choose from Gallery',
-          onPress: handleChooseFromGallery,
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
+    // Use imageService's built-in picker options
+    imageService.showImagePickerOptions(handleTakePhoto, handleChooseFromGallery);
   };
 
   const handleTakePhoto = async () => {
-    setIsLoading(true);
+    setInternalLoading(true);
     try {
       const result = await imageService.openCamera();
       if (result.success && result.imageUri) {
         onImageSelected(result.imageUri);
       }
     } finally {
-      setIsLoading(false);
+      setInternalLoading(false);
     }
   };
 
   const handleChooseFromGallery = async () => {
-    setIsLoading(true);
+    setInternalLoading(true);
     try {
       const result = await imageService.openGallery();
       if (result.success && result.imageUri) {
         onImageSelected(result.imageUri);
       }
     } finally {
-      setIsLoading(false);
+      setInternalLoading(false);
     }
   };
-
-  // Always use 16px border radius per design spec
-  const borderRadius = 16;
 
   return (
     <View style={styles.container}>
@@ -105,7 +103,6 @@ export default function ImageUploadField({
           {
             width: size,
             height: size,
-            borderRadius,
             borderColor: appTheme.colors.borderColor,
             backgroundColor: appTheme.colors.inputBackground,
           },
@@ -124,14 +121,14 @@ export default function ImageUploadField({
               {
                 width: size - 2,
                 height: size - 2,
-                borderRadius: borderRadius - 1,
+                borderRadius: BORDER_RADIUS - 1,
               },
             ]}
             resizeMode="cover"
           />
         ) : (
           <View style={styles.placeholderContainer}>
-            <Icon name="camera" size={40} color={appTheme.colors.textMuted} />
+            <Icon name="camera" size={ICON_SIZE} color={appTheme.colors.textMuted} />
             <Text style={[styles.placeholderText, { color: appTheme.colors.textMuted }]}>
               {placeholder}
             </Text>
@@ -162,6 +159,7 @@ const styles = StyleSheet.create({
   field: {
     borderWidth: 1,
     borderStyle: 'dashed',
+    borderRadius: BORDER_RADIUS,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -176,8 +174,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   placeholderText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.medium,
+    fontSize: TEXT_SIZE,
+    fontFamily: theme.fonts.primary.semiBold,
     textAlign: 'center',
   },
   changeButton: {
@@ -185,7 +183,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   changeText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.medium,
+    fontSize: TEXT_SIZE,
+    fontFamily: theme.fonts.primary.semiBold,
   },
 });

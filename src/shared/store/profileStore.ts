@@ -54,6 +54,9 @@ interface ProfileState {
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
+  
+  // New user flag - true when user just registered, false after first home screen view
+  isNewUser: boolean;
 }
 
 /**
@@ -74,9 +77,11 @@ interface ProfileActions {
   initialize: (user: User) => void;
   
   // Full login - sets user, tokens, and businesses in one call
-  login: (user: User, accessToken: string, refreshToken?: string, businesses?: UserBusiness[]) => void;
+  login: (user: User, accessToken: string, refreshToken?: string, businesses?: UserBusiness[], isNewUser?: boolean) => void;
   // Full logout - clears everything
   logout: () => void;
+  // Clear new user flag (after showing welcome message)
+  clearNewUserFlag: () => void;
   
   // Profile switching
   switchToPersonal: () => void;
@@ -142,6 +147,7 @@ const initialState: ProfileState = {
   isLoading: false,
   isInitialized: false,
   error: null,
+  isNewUser: false,
 };
 
 /**
@@ -190,8 +196,9 @@ export const useProfileStore = create<ProfileStore>()(
 
       /**
        * Full login - sets user, tokens, and optionally businesses
+       * isNewUser flag is true for newly registered users to show welcome message
        */
-      login: (user: User, accessToken: string, refreshToken?: string, businesses?: UserBusiness[]) => {
+      login: (user: User, accessToken: string, refreshToken?: string, businesses?: UserBusiness[], isNewUser?: boolean) => {
         set({
           currentUser: user,
           accessToken,
@@ -199,6 +206,7 @@ export const useProfileStore = create<ProfileStore>()(
           userBusinesses: businesses ?? [],
           isInitialized: true,
           error: null,
+          isNewUser: isNewUser ?? false,
         });
       },
 
@@ -210,6 +218,13 @@ export const useProfileStore = create<ProfileStore>()(
           ...initialState,
           isInitialized: true, // Keep initialized to prevent dev seed re-run
         });
+      },
+
+      /**
+       * Clear new user flag (after showing welcome message)
+       */
+      clearNewUserFlag: () => {
+        set({ isNewUser: false });
       },
 
       /**
@@ -475,7 +490,8 @@ export const useProfileStore = create<ProfileStore>()(
     {
       name: 'noupro-profile-store',
       storage: createJSONStorage(() => AsyncStorage),
-      // Persist auth tokens and mode preferences
+      // Persist auth tokens, user data, and mode preferences
+      // Note: currentUser and userBusinesses are persisted for "Stay Signed In" feature
       partialize: (state: ProfileStore) => ({
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
@@ -484,7 +500,30 @@ export const useProfileStore = create<ProfileStore>()(
         biometricEnabled: state.biometricEnabled,
         activeMode: state.activeMode,
         activeBusinessId: state.activeBusinessId,
+        // Persist user data for "Stay Signed In" feature
+        currentUser: state.currentUser,
+        userBusinesses: state.userBusinesses,
+        activeBusiness: state.activeBusiness,
+        currentUserRole: state.currentUserRole,
+        currentStaffEntry: state.currentStaffEntry,
+        currentStaffRoleType: state.currentStaffRoleType,
       } as ProfileStore),
+      // On rehydration, clear auth if "Stay Signed In" is disabled
+      onRehydrateStorage: () => (state) => {
+        if (state && !state.staySignedIn) {
+          // Clear auth data if user didn't want to stay signed in
+          state.accessToken = null;
+          state.refreshToken = null;
+          state.currentUser = null;
+          state.userBusinesses = [];
+          state.activeBusiness = null;
+          state.activeBusinessId = null;
+          state.currentUserRole = null;
+          state.currentStaffEntry = null;
+          state.currentStaffRoleType = null;
+          state.activeMode = 'personal';
+        }
+      },
     }
   )
 );

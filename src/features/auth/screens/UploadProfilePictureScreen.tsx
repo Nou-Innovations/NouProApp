@@ -17,6 +17,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
 import AppButton from '@/shared/components/ui/AppButton';
 import ImageUploadField from '@/shared/components/ui/ImageUploadField';
+import { authAPI } from '@/shared/services/api';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'UploadProfilePicture'>;
 
@@ -27,20 +28,54 @@ export default function UploadProfilePictureScreen({ navigation, route }: Props)
   
   // State
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleImageSelected = (uri: string) => {
     setProfileImage(uri);
+    setError('');
+  };
+
+  const registerUser = async (withProfilePicture: boolean) => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Call registration API
+      const response = await authAPI.register({
+        name: `${userData.firstName} ${userData.lastName}`,
+        email: userData.email || '',
+        password,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        phone: userData.phone,
+        countryCode: userData.countryCode,
+        profilePicture: withProfilePicture ? profileImage : undefined,
+      });
+      
+      // Extract auth data from response
+      const pendingAuth = {
+        user: response.data?.user || response.user,
+        token: response.data?.token || response.token,
+        refreshToken: response.data?.refreshToken || response.refreshToken,
+        businesses: response.data?.businesses || [],
+      };
+      
+      // Navigate to choose path with pending auth data (don't login yet)
+      navigation.navigate('ChoosePath', { pendingAuth });
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Failed to create account');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDone = async () => {
-    // TODO: Save user profile with image
-    // For now, navigate to choose path
-    navigation.navigate('ChoosePath');
+    await registerUser(true);
   };
 
-  const handleLater = () => {
-    // Skip profile picture, navigate to choose path
-    navigation.navigate('ChoosePath');
+  const handleLater = async () => {
+    await registerUser(false);
   };
 
   return (
@@ -55,6 +90,11 @@ export default function UploadProfilePictureScreen({ navigation, route }: Props)
             Add a picture to complete your profile.
           </Text>
         </View>
+
+        {/* Error Message */}
+        {error ? (
+          <Text style={[styles.errorText, { color: appTheme.colors.error }]}>{error}</Text>
+        ) : null}
 
         {/* Image Upload Field */}
         <View style={styles.imageContainer}>
@@ -77,15 +117,17 @@ export default function UploadProfilePictureScreen({ navigation, route }: Props)
         <AppButton
           title="Done"
           onPress={handleDone}
-          variant={profileImage ? 'primary' : 'disabled'}
-          disabled={!profileImage}
+          variant={profileImage && !loading ? 'primary' : 'disabled'}
+          disabled={!profileImage || loading}
+          loading={loading}
         />
         <TouchableOpacity
           style={styles.laterButton}
           onPress={handleLater}
+          disabled={loading}
         >
-          <Text style={[styles.laterText, { color: appTheme.colors.text }]}>
-            Later
+          <Text style={[styles.laterText, { color: loading ? appTheme.colors.textMuted : appTheme.colors.text }]}>
+            {loading ? 'Creating account...' : 'Later'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -115,6 +157,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: theme.fonts.primary.regular,
     lineHeight: 24,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.regular,
+    marginBottom: 16,
   },
   imageContainer: {
     alignItems: 'center',

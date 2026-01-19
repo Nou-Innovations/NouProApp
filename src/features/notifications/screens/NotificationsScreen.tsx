@@ -7,7 +7,7 @@
  * Design System: components.overlayScreens.notificationsOverlay
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
+import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/features/search/components/FilterBar';
@@ -34,7 +35,7 @@ import theme from '@/shared/theme';
 // Types
 interface Notification {
   id: string;
-  type: 'message' | 'delivery' | 'invoice' | 'system' | 'staff_request' | 'company_request' | 'connection_accepted' | 'join_accepted';
+  type: 'message' | 'delivery' | 'invoice' | 'system' | 'staff_request' | 'company_request' | 'connection_accepted' | 'join_accepted' | 'onboarding_create_business' | 'onboarding_join_company';
   title: string;
   description: string;
   time: string;
@@ -158,6 +159,28 @@ const MOCK_NOTIFICATIONS: Notification[] = [
 
 const notificationFilterStatuses = ['all', 'request', 'deliveries', 'invoices'];
 
+// Onboarding notifications for new users who skipped business/company selection
+const ONBOARDING_NOTIFICATIONS: Notification[] = [
+  {
+    id: 'onboarding-create-business',
+    type: 'onboarding_create_business',
+    title: 'Create your Business profile',
+    description: 'Set up your own business and start managing your operations',
+    time: 'Just now',
+    read: false,
+    avatar: null,
+  },
+  {
+    id: 'onboarding-join-company',
+    type: 'onboarding_join_company',
+    title: 'Join an existing Company',
+    description: 'Request to join a company and collaborate with your team',
+    time: 'Just now',
+    read: false,
+    avatar: null,
+  },
+];
+
 // Type colors from design system - proHome.typeColors
 const TYPE_COLORS = {
   message: '#0075FF',  // info
@@ -168,6 +191,8 @@ const TYPE_COLORS = {
   company_request: '#FF7A00',  // lowStock (orange)
   connection_accepted: '#2ACF01', // success
   join_accepted: '#A76AF0',    // inReview
+  onboarding_create_business: '#0075FF', // info (blue)
+  onboarding_join_company: '#FF7A00',    // orange
 };
 
 const NotificationCard: React.FC<NotificationCardProps> = ({ 
@@ -198,6 +223,10 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
         return 'business';
       case 'join_accepted':
         return 'person-add';
+      case 'onboarding_create_business':
+        return 'business-outline';
+      case 'onboarding_join_company':
+        return 'people-outline';
       default:
         return 'notifications';
     }
@@ -310,12 +339,27 @@ export default function NotificationsScreen() {
   const { theme: appTheme } = useTheme();
   const { markAllAsRead, setUnreadCount } = useNotifications();
   const insets = useSafeAreaInsets();
+  
+  // Check if user is new (just registered and skipped business setup)
+  const isNewUser = useProfileStore((state) => state.isNewUser);
+  const userBusinesses = useProfileStore((state) => state.userBusinesses);
+  
+  // Show onboarding notifications for new users with no businesses
+  const isOnboardingUser = isNewUser && userBusinesses.length === 0;
+  
+  // Get the appropriate notifications based on user status
+  const effectiveNotifications = useMemo(() => {
+    if (isOnboardingUser) {
+      return ONBOARDING_NOTIFICATIONS;
+    }
+    return notifications;
+  }, [isOnboardingUser, notifications]);
 
   // Mock current user role
   const currentUserRole: 'admin' | 'super_admin' | 'user' = 'admin';
 
   // Calculate unread count
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = effectiveNotifications.filter(n => !n.read).length;
 
   // Update global unread count
   React.useEffect(() => {
@@ -414,7 +458,7 @@ export default function NotificationsScreen() {
     setPendingRole(null);
   };
 
-  const filteredNotifications = notifications.filter(notification => {
+  const filteredNotifications = effectiveNotifications.filter(notification => {
     const searchMatch = notification.title.toLowerCase().includes(search.toLowerCase()) || 
                         notification.description.toLowerCase().includes(search.toLowerCase());
     
@@ -455,6 +499,14 @@ export default function NotificationsScreen() {
         break;
       case 'invoice':
         navigation.navigate('Invoices', { filter: 'received', highlightInvoice: 'invoice-1' });
+        break;
+      case 'onboarding_create_business':
+        // Navigate to business creation flow
+        navigation.navigate('BusinessBasicInfo', { fromProfileSwitcher: true });
+        break;
+      case 'onboarding_join_company':
+        // Navigate to select company flow (from main app)
+        navigation.navigate('SelectCompany', { fromOnboarding: true });
         break;
       default:
         console.log('Notification pressed:', notification.id);

@@ -34,14 +34,17 @@ export const lightTheme = {
     // Status colors (specific states)
     statusNewOrder: '#6E0000',       // New order / Discontinued
     statusDiscontinued: '#6E0000',   // Discontinued (alias)
+    statusDiscontinuedBg: '#200000', // Discontinued background (dark red)
     statusOngoing: '#0075FF',        // Ongoing
     statusDone: '#2ACF01',           // Done / Paid / Import
     statusPaid: '#2ACF01',           // Paid (alias)
+    statusPaidText: '#001004',       // Paid text (dark green)
     statusImport: '#2ACF01',         // Import (alias)
     statusInReview: '#A76AF0',       // In review
     statusPending: '#FFB600',        // Pending / In Production
     statusInProduction: '#FFB600',   // In Production (alias)
     statusLowStock: '#FF7A00',       // Low Stock / Export
+    statusLowStockText: '#FFEBBD',   // Low Stock text
     statusExport: '#FF7A00',         // Export (alias)
     statusCanceled: '#FF6B6B',       // Canceled
     statusUnpaid: '#FF2400',         // Unpaid / Out of Stock
@@ -267,14 +270,17 @@ export const darkTheme = {
     // Status colors (specific states) - same as light theme
     statusNewOrder: '#6E0000',
     statusDiscontinued: '#6E0000',
+    statusDiscontinuedBg: '#200000',
     statusOngoing: '#0075FF',
     statusDone: '#2ACF01',
     statusPaid: '#2ACF01',
+    statusPaidText: '#001004',
     statusImport: '#2ACF01',
     statusInReview: '#A76AF0',
     statusPending: '#FFB600',
     statusInProduction: '#FFB600',
     statusLowStock: '#FF7A00',
+    statusLowStockText: '#FFEBBD',
     statusExport: '#FF7A00',
     statusCanceled: '#FF6B6B',
     statusUnpaid: '#FF2400',

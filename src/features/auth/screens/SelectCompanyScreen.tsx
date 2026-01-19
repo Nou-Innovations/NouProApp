@@ -44,10 +44,15 @@ interface Company {
   industry: string;
 }
 
-export default function SelectCompanyScreen({ navigation }: Props) {
+export default function SelectCompanyScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const login = useProfileStore((state) => state.login);
+  const clearNewUserFlag = useProfileStore((state) => state.clearNewUserFlag);
+  
+  // Get params - pendingAuth is optional (not present when coming from main app)
+  const pendingAuth = route.params?.pendingAuth;
+  const fromOnboarding = route.params?.fromOnboarding ?? false;
   
   // State
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,18 +98,23 @@ export default function SelectCompanyScreen({ navigation }: Props) {
   const handleSuccessModalContinue = () => {
     setShowSuccessModal(false);
     
-    // Complete registration and login
-    const mockUser = {
-      id: `user_${Date.now()}`,
-      name: 'New User',
-      email: 'newuser@example.com',
-      avatar_url: undefined,
-    };
-    const mockToken = `mock_token_${Date.now()}`;
-    const mockRefreshToken = `mock_refresh_${Date.now()}`;
-    
-    // Login the user - this will trigger navigation to main app
-    login(mockUser, mockToken, mockRefreshToken);
+    if (pendingAuth) {
+      // Coming from registration flow - complete registration and login
+      // Pass isNewUser=true to show welcome message
+      login(
+        pendingAuth.user,
+        pendingAuth.token,
+        pendingAuth.refreshToken,
+        pendingAuth.businesses || [],
+        true // isNewUser
+      );
+    } else {
+      // Coming from main app (onboarding notification) - clear new user flag and go back
+      if (fromOnboarding) {
+        clearNewUserFlag();
+      }
+      navigation.goBack();
+    }
   };
 
   const renderCompanyItem = ({ item }: { item: Company }) => {

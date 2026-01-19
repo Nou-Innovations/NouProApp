@@ -21,6 +21,7 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
+import { useNotifications } from '@/shared/context/NotificationContext';
 import theme from '@/shared/theme';
 import { PersonalTabParamList } from '@/shared/types/navigation';
 
@@ -38,6 +39,10 @@ const Tab = createBottomTabNavigator<PersonalTabParamList>();
 export function PersonalTabNavigator() {
   const { theme: appTheme } = useTheme();
   const currentUser = useProfileStore((state) => state.currentUser);
+  const { unreadCount, inboxUnreadCount } = useNotifications();
+  
+  // Combined count for Home tab badge (notifications + inbox)
+  const totalUnreadCount = unreadCount + inboxUnreadCount;
 
   /**
    * Render user profile picture or fallback icon (24x24px, border radius 4px)
@@ -93,7 +98,16 @@ export function PersonalTabNavigator() {
             </Text>
           ),
           tabBarIcon: ({ color, focused }) => (
-            <Home size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+            <View style={{ position: 'relative' }}>
+              <Home size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+              {totalUnreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {totalUnreadCount > 9 ? '9+' : totalUnreadCount.toString()}
+                  </Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
@@ -164,7 +178,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -10,
-    backgroundColor: '#D23030',
+    backgroundColor: theme.colors.accent,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -175,7 +189,7 @@ const styles = StyleSheet.create({
   notificationBadgeText: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: 'white',
+    color: theme.colors.textInverse,
     textAlign: 'center',
   },
   profileIconContainer: {

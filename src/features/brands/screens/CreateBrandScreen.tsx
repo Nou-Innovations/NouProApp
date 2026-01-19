@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from 'App';
+import { RootStackParamList } from '@/shared/types/navigation';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppButton from '@/shared/components/ui/AppButton';
 import AppTextField from '@/shared/components/ui/AppTextField';
@@ -21,7 +21,8 @@ const CreateBrandScreen: React.FC<Props> = ({ navigation }) => {
   }, [brandName]);
 
   const handleSave = () => {
-    navigation.navigate('CreateProduct', { selectedBrand: brandName });
+    // Save brand and navigate back to CreateProduct with the brand name
+    navigation.navigate('CreateProduct', { selectedBrand: brandName.trim() });
   };
 
   const handleSelectImage = (imageUri: string) => {
@@ -94,7 +95,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: 16,
-  }
+  },
 });
 
 export default CreateBrandScreen;

@@ -17,6 +17,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import AppBottomSheet from './AppBottomSheet';
+import ListItemCard from './ListItemCard';
 
 // Country codes data
 const COUNTRY_CODES = [
@@ -158,31 +159,21 @@ export default function PhoneNumberField({
           style={styles.countryList} 
           showsVerticalScrollIndicator={false}
         >
-          {COUNTRY_CODES.map((country) => (
-            <TouchableOpacity
+          {COUNTRY_CODES.map((country, index) => (
+            <ListItemCard
               key={country.code}
-              style={[
-                styles.countryOption,
-                countryCode === country.code && {
-                  backgroundColor: `${appTheme.colors.primary}10`,
-                },
-              ]}
+              avatar={{
+                type: 'initials',
+                userName: country.flag,
+                userId: country.code,
+              }}
+              title={country.country}
+              subtitle={country.code}
               onPress={() => handleSelectCountry(country.code)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.countryOptionFlag}>{country.flag}</Text>
-              <View style={styles.countryOptionInfo}>
-                <Text style={[styles.countryOptionName, { color: appTheme.colors.text }]}>
-                  {country.country}
-                </Text>
-                <Text style={[styles.countryOptionCode, { color: appTheme.colors.textSecondary }]}>
-                  {country.code}
-                </Text>
-              </View>
-              {countryCode === country.code && (
-                <Icon name="checkmark" size={20} color={appTheme.colors.primary} />
-              )}
-            </TouchableOpacity>
+              selected={countryCode === country.code}
+              showCheckmark
+              showDivider={index < COUNTRY_CODES.length - 1}
+            />
           ))}
         </ScrollView>
       </AppBottomSheet>

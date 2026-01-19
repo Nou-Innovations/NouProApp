@@ -27,7 +27,7 @@ export default function UploadBusinessLogoScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const rootNavigation = useNavigation();
-  const { businessData, fromProfileSwitcher } = route.params;
+  const { businessData, fromProfileSwitcher, pendingAuth } = route.params;
   const login = useProfileStore((state) => state.login);
   const switchToBusiness = useProfileStore((state) => state.switchToBusiness);
   
@@ -69,19 +69,16 @@ export default function UploadBusinessLogoScreen({ navigation, route }: Props) {
       // The user is already logged in, just go back
       // @ts-ignore
       rootNavigation.goBack();
-    } else {
-      // Coming from registration - complete registration and login
-      const mockUser = {
-        id: `user_${Date.now()}`,
-        name: 'New User',
-        email: 'newuser@example.com',
-        avatar_url: undefined,
-      };
-      const mockToken = `mock_token_${Date.now()}`;
-      const mockRefreshToken = `mock_refresh_${Date.now()}`;
-      
-      // Login the user - this will trigger navigation to main app
-      login(mockUser, mockToken, mockRefreshToken);
+    } else if (pendingAuth) {
+      // Coming from registration - use pendingAuth to login
+      // Pass isNewUser=true to show welcome message
+      login(
+        pendingAuth.user,
+        pendingAuth.token,
+        pendingAuth.refreshToken,
+        pendingAuth.businesses || [],
+        true // isNewUser
+      );
     }
   };
 

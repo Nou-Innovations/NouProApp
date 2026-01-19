@@ -45,7 +45,7 @@ const DEFAULT_BUSINESS_HOURS: BusinessHour[] = [
 export default function BusinessHoursScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { businessData, location, fromProfileSwitcher } = route.params;
+  const { businessData, location, fromProfileSwitcher, pendingAuth } = route.params;
   
   // State
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>(DEFAULT_BUSINESS_HOURS);
@@ -71,6 +71,7 @@ export default function BusinessHoursScreen({ navigation, route }: Props) {
     navigation.navigate('UploadBusinessLogo', {
       businessData: fullBusinessData,
       fromProfileSwitcher,
+      pendingAuth,
     });
   };
 

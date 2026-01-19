@@ -87,6 +87,10 @@ export interface ListItemCardProps {
   rightRow2?: React.ReactNode;
   /** Row 3 right: Custom content */
   rightRow3?: React.ReactNode;
+  
+  // === RIGHT COLUMN (stacked, alternative to row-aligned) ===
+  /** Custom right column element that spans all rows (use instead of rightRow1/2/3) */
+  rightColumn?: React.ReactNode;
 
   // === OPTIONS BUTTON (far right) ===
   /** Show 3-dots options button */
@@ -99,6 +103,13 @@ export interface ListItemCardProps {
   showCheckmark?: boolean;
   /** Whether item is selected (fills checkmark) */
   selected?: boolean;
+
+  // === STATUS PILL (left of checkmark, for vehicle status etc.) ===
+  /** Status pill configuration (appears left of checkmark) */
+  statusPill?: {
+    text: string;
+    color: string;
+  };
 
   // === CHEVRON (far right, for navigation) ===
   /** Show chevron arrow (for navigation indication) */
@@ -115,8 +126,8 @@ export interface ListItemCardProps {
   disabled?: boolean;
 
   // === SELECTION VARIANT ===
-  /** Selection style: 'highlight' changes bg, 'border' adds border */
-  selectionVariant?: 'highlight' | 'border';
+  /** Selection style: 'highlight' changes bg, 'border' adds border, 'optionList' for checkbox list */
+  selectionVariant?: 'highlight' | 'border' | 'optionList';
 
   // === DIVIDER ===
   /** Show bottom divider */
@@ -141,10 +152,23 @@ const StatusPill: React.FC<{ text: string; color: string }> = ({ text, color }) 
 };
 
 /** Checkmark circle for selections */
-const Checkmark: React.FC<{ selected: boolean; color: string }> = ({ selected, color }) => {
+const Checkmark: React.FC<{ 
+  selected: boolean; 
+  color: string;
+  isOptionList?: boolean;
+}> = ({ selected, color, isOptionList }) => {
   const { theme: appTheme } = useTheme();
   
   if (selected) {
+    // Option list variant: white bg, no border, primary icon
+    if (isOptionList) {
+      return (
+        <View style={[styles.checkmark, styles.checkmarkOptionList]}>
+          <Icon name="checkmark" size={LIST_ITEM_CARD.checkmark.iconSize} color={color} />
+        </View>
+      );
+    }
+    // Default: colored bg with white icon
     return (
       <View style={[styles.checkmark, { backgroundColor: color }]}>
         <Icon name="checkmark" size={LIST_ITEM_CARD.checkmark.iconSize} color="#FFFFFF" />
@@ -176,9 +200,9 @@ const OptionsButton: React.FC<{ onPress?: () => void; color: string }> = ({ onPr
   );
 };
 
-/** Icon Avatar - when avatar type is 'icon' */
+/** Icon Avatar - when avatar type is 'icon' or just a colored circle */
 const IconAvatar: React.FC<{
-  icon: string;
+  icon?: string;
   iconColor?: string;
   backgroundColor?: string;
   borderRadius?: number;
@@ -190,7 +214,7 @@ const IconAvatar: React.FC<{
   
   return (
     <View style={[styles.iconAvatar, { backgroundColor: bgColor, borderRadius: radius }]}>
-      <Icon name={icon as any} size={LIST_ITEM_CARD.avatar.iconSize} color={color} />
+      {icon ? <Icon name={icon as any} size={LIST_ITEM_CARD.avatar.iconSize} color={color} /> : null}
     </View>
   );
 };
@@ -207,10 +231,12 @@ export function ListItemCard({
   rightRow1,
   rightRow2,
   rightRow3,
+  rightColumn,
   showOptionsButton = false,
   onOptionsPress,
   showCheckmark = false,
   selected = false,
+  statusPill,
   showChevron = false,
   bottomElement,
   onPress,
@@ -221,12 +247,20 @@ export function ListItemCard({
 }: ListItemCardProps) {
   const { theme: appTheme } = useTheme();
 
+  // Check if options button is shown (only this gets 4px right padding)
+  const hasOptionsButton = showOptionsButton;
+
   // Determine container styles based on selection variant
   const getContainerStyle = (): ViewStyle[] => {
     const baseStyles: ViewStyle[] = [
       styles.container,
       { backgroundColor: appTheme.colors.cardBackground },
     ];
+
+    // Reduce right padding ONLY when options button is shown (4px)
+    if (hasOptionsButton) {
+      baseStyles.push(styles.containerWithOptionsButton);
+    }
 
     if (selectionVariant === 'highlight' && selected) {
       baseStyles.push({ backgroundColor: `${appTheme.colors.primary}08` });
@@ -240,6 +274,14 @@ export function ListItemCard({
       });
     }
 
+    // Option list variant: when selected, card bg becomes primary, 8px radius, no top/bottom border
+    if (selectionVariant === 'optionList') {
+      baseStyles.push(styles.optionListVariant);
+      if (selected) {
+        baseStyles.push({ backgroundColor: appTheme.colors.primary });
+      }
+    }
+
     if (style) {
       baseStyles.push(style);
     }
@@ -251,7 +293,7 @@ export function ListItemCard({
   const renderAvatar = () => {
     if (!avatar) return null;
 
-    if (avatar.type === 'icon' && avatar.icon) {
+    if (avatar.type === 'icon') {
       return (
         <IconAvatar
           icon={avatar.icon}
@@ -277,14 +319,33 @@ export function ListItemCard({
   // Check if we have right content for each row
   const hasRightRow1Content = rightRow1?.statusPill || rightRow1?.timestamp;
   
-  // Determine gap size: 4px when only title+subtitle, 2px when extraInfo present
+  // Check if there are any right elements (far right buttons or right row content)
+  const hasRightElements = showCheckmark || showOptionsButton || showChevron || rightRow1 || rightRow2 || rightRow3;
+  
+  // Determine gap size: 4px when right elements present or only title+subtitle, 2px when extraInfo without right elements
   const hasOnlyTwoLines = subtitle && !extraInfo;
-  const lineGap = hasOnlyTwoLines ? 4 : 2;
+  const lineGap = hasRightElements || hasOnlyTwoLines ? 4 : 2;
+
+  // Determine if this is optionList variant
+  const isOptionList = selectionVariant === 'optionList';
 
   // Render far right element (options button, checkmark, or chevron)
   const renderFarRight = () => {
     if (showCheckmark) {
-      return <Checkmark selected={selected} color={appTheme.colors.primary} />;
+      return (
+        <View style={styles.farRightContainer}>
+          {statusPill && (
+            <View style={[styles.statusPillFarRight, { backgroundColor: `${statusPill.color}20` }]}>
+              <Text style={[styles.statusPillText, { color: statusPill.color }]}>{statusPill.text}</Text>
+            </View>
+          )}
+          <Checkmark 
+            selected={selected} 
+            color={appTheme.colors.primary} 
+            isOptionList={isOptionList && selected}
+          />
+        </View>
+      );
     }
 
     if (showOptionsButton) {
@@ -321,61 +382,110 @@ export function ListItemCard({
 
           {/* Main Content - vertically centered with avatar */}
           <View style={styles.mainContent}>
-            {/* Row 1: Title + Right Row 1 (status pill, timestamp) */}
-            <View style={styles.contentRow}>
-              <Text
-                style={[styles.title, { color: appTheme.colors.text }]}
-                numberOfLines={1}
-              >
-                {title}
-              </Text>
-              {hasRightRow1Content && (
-                <View style={styles.rightRowContent}>
-                  {rightRow1?.statusPill && (
-                    <StatusPill text={rightRow1.statusPill.text} color={rightRow1.statusPill.color} />
+            {rightColumn ? (
+              /* When rightColumn is provided, render left content + right column side by side */
+              <View style={styles.contentWithRightColumn}>
+                <View style={styles.leftContent}>
+                  <Text
+                    style={[
+                      styles.title, 
+                      { color: isOptionList && selected ? '#FFFFFF' : appTheme.colors.text }
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {title}
+                  </Text>
+                  {subtitle && (
+                    <Text
+                      style={[
+                        styles.subtitle, 
+                        { color: isOptionList && selected ? appTheme.colors.textMuted : appTheme.colors.textSecondary },
+                        { marginTop: lineGap }
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {subtitle}
+                    </Text>
                   )}
-                  {rightRow1?.timestamp && (
-                    <Text style={[
-                      styles.timestamp, 
-                      { color: appTheme.colors.textMuted },
-                      // Add margin only when status pill is present
-                      rightRow1?.statusPill && { marginLeft: 8 }
-                    ]}>
-                      {rightRow1.timestamp}
+                  {extraInfo && (
+                    <Text
+                      style={[styles.extraInfo, { color: appTheme.colors.textMuted }, { marginTop: lineGap }]}
+                      numberOfLines={1}
+                    >
+                      {extraInfo}
                     </Text>
                   )}
                 </View>
-              )}
-            </View>
-
-            {/* Row 2: Subtitle + Right Row 2 */}
-            {(subtitle || rightRow2) && (
-              <View style={[styles.contentRow, { marginTop: lineGap }]}>
-                {subtitle && (
+                <View style={styles.rightColumnContainer}>
+                  {rightColumn}
+                </View>
+              </View>
+            ) : (
+              /* Default row-based layout */
+              <>
+                {/* Row 1: Title + Right Row 1 (status pill, timestamp) */}
+                <View style={styles.contentRow}>
                   <Text
-                    style={[styles.subtitle, { color: appTheme.colors.textSecondary }]}
+                    style={[
+                      styles.title, 
+                      { color: isOptionList && selected ? '#FFFFFF' : appTheme.colors.text }
+                    ]}
                     numberOfLines={1}
                   >
-                    {subtitle}
+                    {title}
                   </Text>
-                )}
-                {rightRow2 && <View style={styles.rightRowContent}>{rightRow2}</View>}
-              </View>
-            )}
+                  {hasRightRow1Content && (
+                    <View style={styles.rightRowContent}>
+                      {rightRow1?.statusPill && (
+                        <StatusPill text={rightRow1.statusPill.text} color={rightRow1.statusPill.color} />
+                      )}
+                      {rightRow1?.timestamp && (
+                        <Text style={[
+                          styles.timestamp, 
+                          { color: appTheme.colors.textMuted },
+                          // Add margin only when status pill is present
+                          rightRow1?.statusPill && { marginLeft: 8 }
+                        ]}>
+                          {rightRow1.timestamp}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                </View>
 
-            {/* Row 3: Extra Info + Right Row 3 */}
-            {(extraInfo || rightRow3) && (
-              <View style={[styles.contentRow, { marginTop: lineGap }]}>
-                {extraInfo && (
-                  <Text
-                    style={[styles.extraInfo, { color: appTheme.colors.textMuted }]}
-                    numberOfLines={1}
-                  >
-                    {extraInfo}
-                  </Text>
+                {/* Row 2: Subtitle + Right Row 2 */}
+                {(subtitle || rightRow2) && (
+                  <View style={[styles.contentRow, { marginTop: lineGap }]}>
+                    {subtitle && (
+                      <Text
+                        style={[
+                          styles.subtitle, 
+                          { color: isOptionList && selected ? appTheme.colors.textMuted : appTheme.colors.textSecondary }
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {subtitle}
+                      </Text>
+                    )}
+                    {rightRow2 && <View style={styles.rightRowContent}>{rightRow2}</View>}
+                  </View>
                 )}
-                {rightRow3 && <View style={styles.rightRowContent}>{rightRow3}</View>}
-              </View>
+
+                {/* Row 3: Extra Info + Right Row 3 */}
+                {(extraInfo || rightRow3) && (
+                  <View style={[styles.contentRow, { marginTop: lineGap }]}>
+                    {extraInfo && (
+                      <Text
+                        style={[styles.extraInfo, { color: appTheme.colors.textMuted }]}
+                        numberOfLines={1}
+                      >
+                        {extraInfo}
+                      </Text>
+                    )}
+                    {rightRow3 && <View style={styles.rightRowContent}>{rightRow3}</View>}
+                  </View>
+                )}
+              </>
             )}
           </View>
 
@@ -395,7 +505,7 @@ export function ListItemCard({
       </CardWrapper>
 
       {/* Divider */}
-      {showDivider && selectionVariant !== 'border' && (
+      {showDivider && selectionVariant !== 'border' && selectionVariant !== 'optionList' && (
         <View style={[styles.divider, { backgroundColor: appTheme.colors.surface }]} />
       )}
     </>
@@ -408,8 +518,12 @@ export function ListItemCard({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: LIST_ITEM_CARD.paddingHorizontal,
+    paddingLeft: LIST_ITEM_CARD.paddingHorizontal,
+    paddingRight: LIST_ITEM_CARD.paddingHorizontal,
     paddingVertical: LIST_ITEM_CARD.paddingVertical,
+  },
+  containerWithOptionsButton: {
+    paddingRight: 4, // Only 4px when options button (3-dots) is shown
   },
   borderVariant: {
     borderWidth: LIST_ITEM_CARD.selectionBorder.borderWidth,
@@ -435,6 +549,17 @@ const styles = StyleSheet.create({
   mainContent: {
     flex: 1,
     justifyContent: 'center',
+  },
+  contentWithRightColumn: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  leftContent: {
+    flex: 1,
+  },
+  rightColumnContainer: {
+    marginLeft: 8,
+    alignItems: 'flex-end',
   },
   contentRow: {
     flexDirection: 'row',
@@ -478,8 +603,7 @@ const styles = StyleSheet.create({
     width: LIST_ITEM_CARD.optionsButton.size,
     height: LIST_ITEM_CARD.optionsButton.size,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
+    alignItems: 'flex-end', // Align icon to right edge
   },
   checkmark: {
     width: LIST_ITEM_CARD.checkmark.size,
@@ -487,21 +611,36 @@ const styles = StyleSheet.create({
     borderRadius: LIST_ITEM_CARD.checkmark.borderRadius,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
   },
   checkmarkEmpty: {
     width: LIST_ITEM_CARD.checkmark.size,
     height: LIST_ITEM_CARD.checkmark.size,
     borderRadius: LIST_ITEM_CARD.checkmark.borderRadius,
     borderWidth: 2,
-    marginRight: 8,
+  },
+  checkmarkOptionList: {
+    backgroundColor: '#FFFFFF',
+  },
+  farRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusPillFarRight: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
   chevronContainer: {
     width: LIST_ITEM_CARD.optionsButton.size,
     height: LIST_ITEM_CARD.optionsButton.size,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+  },
+  optionListVariant: {
+    borderRadius: 8,
+    borderTopWidth: 0,
+    borderBottomWidth: 0,
   },
   bottomElement: {
     marginTop: 8,

@@ -11,7 +11,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { userAvatarService } from '@/shared/services/userAvatarService';
 import Avatar from '@/shared/components/ui/Avatar';
-import { AppBottomSheet } from '@/shared/components/ui';
+import { AppBottomSheet, ListItemCard } from '@/shared/components/ui';
 import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
 import { ProfileViewType, getProfileAdditionalOptions } from '@/shared/types/profile';
 import theme from '@/shared/theme';
@@ -105,6 +105,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     id: option.toLowerCase().replace(/\s/g, '-'),
     title: option,
     isDestructive: option === 'Block',
+    icon: option === 'Block' ? 'slash' : option === 'Report' ? 'flag' : option === 'Share Profile' ? 'share' : 'ellipsis-horizontal',
   }));
 
   const handleMoreOptionAction = (title: string) => {
@@ -352,22 +353,19 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
         onClose={() => setIsMoreOptionsVisible(false)}
         title="Options"
       >
-        {moreOptionsItems.map((item) => (
-          <TouchableOpacity
+        {moreOptionsItems.map((item, index) => (
+          <ListItemCard
             key={item.id}
-            style={[
-              styles.bottomSheetAction,
-              { borderColor: item.isDestructive ? appTheme.colors.error : appTheme.colors.primary }
-            ]}
+            avatar={{
+              type: 'icon',
+              icon: item.icon,
+              iconColor: item.isDestructive ? appTheme.colors.error : appTheme.colors.text,
+              backgroundColor: item.isDestructive ? `${appTheme.colors.error}15` : appTheme.colors.surface,
+            }}
+            title={item.title}
             onPress={() => handleMoreOptionAction(item.title)}
-          >
-            <Text style={[
-              styles.bottomSheetActionText,
-              { color: item.isDestructive ? appTheme.colors.error : appTheme.colors.primary }
-            ]}>
-              {item.title}
-            </Text>
-          </TouchableOpacity>
+            showDivider={index < moreOptionsItems.length - 1}
+          />
         ))}
       </AppBottomSheet>
     </SafeAreaView>

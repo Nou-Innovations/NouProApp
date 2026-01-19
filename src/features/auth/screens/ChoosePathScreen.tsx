@@ -24,10 +24,11 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'ChoosePath'>;
 
 type PathOption = 'create' | 'join' | null;
 
-export default function ChoosePathScreen({ navigation }: Props) {
+export default function ChoosePathScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const login = useProfileStore((state) => state.login);
+  const { pendingAuth } = route.params;
   
   // State
   const [selectedOption, setSelectedOption] = useState<PathOption>(null);
@@ -37,8 +38,8 @@ export default function ChoosePathScreen({ navigation }: Props) {
     if (!selectedOption) return;
 
     if (selectedOption === 'create') {
-      // Navigate to business creation
-      navigation.navigate('BusinessBasicInfo', { fromProfileSwitcher: false });
+      // Navigate to business creation (pass pendingAuth for later login)
+      navigation.navigate('BusinessBasicInfo', { fromProfileSwitcher: false, pendingAuth });
     } else {
       // Show success modal first, then navigate to select company
       setShowSuccessModal(true);
@@ -50,28 +51,25 @@ export default function ChoosePathScreen({ navigation }: Props) {
     setShowSuccessModal(true);
   };
 
-  // Complete registration and login
+  // Complete registration and login using the pending auth data
   const completeRegistration = () => {
-    // Create a mock user for now (in real app, this would be from API)
-    const mockUser = {
-      id: `user_${Date.now()}`,
-      name: 'New User',
-      email: 'newuser@example.com',
-      avatar_url: undefined,
-    };
-    const mockToken = `mock_token_${Date.now()}`;
-    const mockRefreshToken = `mock_refresh_${Date.now()}`;
-    
-    // Login the user - this will trigger navigation to main app
-    login(mockUser, mockToken, mockRefreshToken);
+    // Login the user with the auth data from registration
+    // Pass isNewUser=true to show welcome message
+    login(
+      pendingAuth.user,
+      pendingAuth.token,
+      pendingAuth.refreshToken,
+      pendingAuth.businesses || [],
+      true // isNewUser
+    );
   };
 
   const handleSuccessModalContinue = () => {
     setShowSuccessModal(false);
     
     if (selectedOption === 'join') {
-      // Navigate to select company
-      navigation.navigate('SelectCompany');
+      // Navigate to select company (pass pendingAuth for later login)
+      navigation.navigate('SelectCompany', { pendingAuth });
     } else {
       // Skip selected - complete registration and go to personal home
       completeRegistration();

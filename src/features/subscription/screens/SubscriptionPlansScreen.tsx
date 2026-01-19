@@ -48,6 +48,14 @@ const PLAN_ICONS: Record<SubscriptionPlan, React.ComponentType<any>> = {
   enterprise: Crown,
 };
 
+// Free trial days per plan
+const FREE_TRIAL_DAYS: Record<SubscriptionPlan, number> = {
+  free: 0,
+  pro: 14,
+  business: 31,
+  enterprise: 31,
+};
+
 interface PlanCardProps {
   plan: SubscriptionPlan;
   isSelected: boolean;
@@ -100,17 +108,15 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, isCurrentPlan, on
         onPressOut={handlePressOut}
         activeOpacity={1}
       >
-        {/* Popular Badge for Pro */}
+        {/* Top Badges */}
         {plan === 'pro' && (
-          <View style={[styles.popularBadge, { backgroundColor: planColor }]}>
-            <Text style={styles.popularBadgeText}>Most Popular</Text>
+          <View style={[styles.topBadge, styles.topBadgeLeft, { backgroundColor: planColor }]}>
+            <Text style={styles.topBadgeText}>Most Popular</Text>
           </View>
         )}
-        
-        {/* Current Plan Badge */}
         {isCurrentPlan && (
-          <View style={[styles.currentBadge, { backgroundColor: appTheme.colors.success }]}>
-            <Text style={styles.currentBadgeText}>Current Plan</Text>
+          <View style={[styles.topBadge, plan === 'pro' ? styles.topBadgeRight : styles.topBadgeLeft, { backgroundColor: appTheme.colors.success }]}>
+            <Text style={styles.topBadgeText}>Current Plan</Text>
           </View>
         )}
 
@@ -143,6 +149,15 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, isCurrentPlan, on
             </Text>
           )}
         </View>
+
+        {/* Free Trial Badge for paid plans */}
+        {FREE_TRIAL_DAYS[plan] > 0 && (
+          <View style={[styles.freeTrialBadge, { backgroundColor: planColor }]}>
+            <Text style={styles.freeTrialBadgeText}>
+              {FREE_TRIAL_DAYS[plan]} days free
+            </Text>
+          </View>
+        )}
 
         {/* Limits */}
         <View style={styles.limitsContainer}>
@@ -257,13 +272,6 @@ export default function SubscriptionPlansScreen() {
             />
           ))}
         </View>
-
-        {/* Info Text */}
-        <View style={styles.infoSection}>
-          <Text style={[styles.infoText, { color: appTheme.colors.textSecondary }]}>
-            All plans include a 7-day free trial. Cancel anytime.
-          </Text>
-        </View>
       </ScrollView>
 
       {/* Bottom CTA */}
@@ -325,28 +333,32 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  popularBadge: {
+  topBadge: {
     position: 'absolute',
-    top: -10,
-    right: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    top: -12,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  popularBadgeText: {
+  topBadgeLeft: {
+    left: 20,
+  },
+  topBadgeRight: {
+    right: 20,
+  },
+  topBadgeText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontFamily: theme.fonts.primary.bold,
   },
-  currentBadge: {
-    position: 'absolute',
-    top: -10,
-    left: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+  freeTrialBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 12,
   },
-  currentBadgeText: {
+  freeTrialBadgeText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontFamily: theme.fonts.primary.bold,
@@ -437,15 +449,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  infoSection: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-  },
-  infoText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.regular,
-    textAlign: 'center',
   },
   bottomCTA: {
     paddingHorizontal: 16,

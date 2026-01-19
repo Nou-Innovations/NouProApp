@@ -1,9 +1,13 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Animated, Modal, Pressable, StyleSheet, View, Text, TouchableOpacity, ScrollView, Dimensions, PanResponder } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { OVERLAY, MODAL_TYPOGRAPHY } from '@/shared/ui/tokens/overlays';
 import ListItemCard, { ListItemCardAvatarProps } from './ListItemCard';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const ANIMATION_DURATION = 300;
 
 // ============================================================================
 // TYPES
@@ -42,6 +46,9 @@ export interface AppBottomSheetProps {
   // List customization
   maxHeight?: number;
   renderItem?: (item: AppBottomSheetItem, index: number) => React.ReactNode;
+  
+  // Full height mode - makes the modal stick to the screen header
+  fullHeight?: boolean;
 }
 
 /**
@@ -71,24 +78,113 @@ export default function AppBottomSheet({
   onSelectionChange,
   maxHeight,
   renderItem,
+  fullHeight = false,
 }: AppBottomSheetProps) {
   const { theme } = useTheme();
-  const translateY = useRef(new Animated.Value(20)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
+  const [modalVisible, setModalVisible] = useState(false);
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const isClosing = useRef(false);
+  const dragY = useRef(0);
+  
+  // Calculate max height for the sheet (screen height - top safe area - some margin from top)
+  const maxSheetHeight = SCREEN_HEIGHT - insets.top - 20; // 20px margin from status bar
+  
+  // Pan responder for drag-to-close gesture on handle
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to vertical gestures
+        return Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+      },
+      onPanResponderGrant: () => {
+        dragY.current = 0;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // Only allow dragging down
+        if (gestureState.dy > 0) {
+          dragY.current = gestureState.dy;
+          translateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        // If dragged more than 100px or with velocity, close the sheet
+        if (gestureState.dy > 100 || gestureState.vy > 0.5) {
+          handleClose();
+        } else {
+          // Snap back to open position
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 10,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
+  // Handle opening animation
   useEffect(() => {
-    if (!visible) return;
-    translateY.setValue(20);
-    opacity.setValue(0);
+    if (visible && !modalVisible) {
+      // Show modal first, then animate
+      setModalVisible(true);
+      translateY.setValue(SCREEN_HEIGHT);
+      overlayOpacity.setValue(0);
+      
+      // Small delay to ensure modal is rendered before animating
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.timing(overlayOpacity, { 
+            toValue: 1, 
+            duration: ANIMATION_DURATION, 
+            useNativeDriver: true 
+          }),
+          Animated.timing(translateY, { 
+            toValue: 0, 
+            duration: ANIMATION_DURATION, 
+            useNativeDriver: true 
+          }),
+        ]).start();
+      });
+    }
+  }, [visible, modalVisible, translateY, overlayOpacity]);
+
+  // Handle closing animation
+  const handleClose = useCallback(() => {
+    if (isClosing.current) return;
+    isClosing.current = true;
+
     Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 0, duration: 180, useNativeDriver: true }),
-    ]).start();
-  }, [visible, opacity, translateY]);
+      Animated.timing(overlayOpacity, { 
+        toValue: 0, 
+        duration: ANIMATION_DURATION, 
+        useNativeDriver: true 
+      }),
+      Animated.timing(translateY, { 
+        toValue: SCREEN_HEIGHT, 
+        duration: ANIMATION_DURATION, 
+        useNativeDriver: true 
+      }),
+    ]).start(() => {
+      setModalVisible(false);
+      isClosing.current = false;
+      onClose();
+    });
+  }, [onClose, overlayOpacity, translateY]);
+
+  // Handle external visibility change (when parent sets visible to false)
+  useEffect(() => {
+    if (!visible && modalVisible && !isClosing.current) {
+      handleClose();
+    }
+  }, [visible, modalVisible, handleClose]);
 
   const overlayStyle = useMemo(
-    () => [styles.overlay, { backgroundColor: OVERLAY.backdrop, opacity }],
-    [opacity]
+    () => [styles.overlay, { backgroundColor: OVERLAY.backdrop, opacity: overlayOpacity }],
+    [overlayOpacity]
   );
 
   // Handle item press for list mode
@@ -102,7 +198,7 @@ export default function AppBottomSheet({
       onSelectionChange?.(newSelection);
     } else {
       onSelectItem?.(item);
-      onClose();
+      handleClose();
     }
   };
 
@@ -131,29 +227,23 @@ export default function AppBottomSheet({
     );
   };
 
-  // Render list content
+  // Render list content (items only, ScrollView is handled by parent)
   const renderListContent = () => {
     if (!items || items.length === 0) return null;
 
-    const listStyle = maxHeight ? { maxHeight } : undefined;
-
     return (
-      <ScrollView 
-        style={listStyle} 
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
+      <>
         {items.map((item, index) =>
           renderItem ? renderItem(item, index) : renderDefaultItem(item, index)
         )}
-      </ScrollView>
+      </>
     );
   };
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+    <Modal visible={modalVisible} transparent animationType="none" onRequestClose={handleClose}>
       <Animated.View style={overlayStyle}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <Pressable style={styles.backdrop} onPress={handleClose} />
 
         <Animated.View
           style={[
@@ -162,10 +252,18 @@ export default function AppBottomSheet({
               backgroundColor: theme.colors.cardBackground,
               borderTopColor: theme.colors.borderColor,
               transform: [{ translateY }],
+              maxHeight: maxSheetHeight,
+              // Don't add bottom padding when fullHeight - content handles its own scrolling
+              paddingBottom: fullHeight ? 0 : insets.bottom,
+              // When fullHeight is true, force the sheet to take full available height
+              ...(fullHeight && { height: maxSheetHeight }),
             },
           ]}
         >
-          <View style={styles.handle} />
+          {/* Fixed header section with drag handle */}
+          <Animated.View {...panResponder.panHandlers} style={styles.handleContainer}>
+            <View style={styles.handle} />
+          </Animated.View>
 
           {(title || true) && (
             <View style={styles.headerRow}>
@@ -173,7 +271,7 @@ export default function AppBottomSheet({
                 {title ?? ''}
               </Text>
               <TouchableOpacity 
-                onPress={onClose} 
+                onPress={handleClose} 
                 style={styles.closeBtn} 
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
@@ -182,10 +280,31 @@ export default function AppBottomSheet({
             </View>
           )}
 
-          <View style={styles.content}>
-            {/* Render items if provided, otherwise render children */}
-            {items ? renderListContent() : children}
-          </View>
+          {/* Content area */}
+          {items ? (
+            // Items mode: use ScrollView for list
+            <ScrollView 
+              style={[styles.content, fullHeight && styles.contentFullHeight]}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              contentContainerStyle={[
+                styles.contentContainer, 
+                fullHeight && styles.contentContainerFullHeight,
+                fullHeight && { paddingBottom: insets.bottom + 20 }
+              ]}
+            >
+              {renderListContent()}
+            </ScrollView>
+          ) : (
+            // Children mode: children manage their own scrolling
+            <View style={[
+              styles.content, 
+              fullHeight && styles.contentFullHeight,
+              fullHeight && { paddingBottom: insets.bottom }
+            ]}>
+              {children}
+            </View>
+          )}
         </Animated.View>
       </Animated.View>
     </Modal>
@@ -203,13 +322,19 @@ const styles = StyleSheet.create({
   sheet: {
     borderTopLeftRadius: OVERLAY.sheetRadius,
     borderTopRightRadius: OVERLAY.sheetRadius,
-    paddingTop: 8,
+    paddingTop: 0,
     paddingHorizontal: 0, // Cards handle their own 12px padding
     paddingBottom: 0,
     borderTopWidth: 1,
+    // Allow sheet to shrink to content size
+    flexShrink: 1,
+  },
+  handleContainer: {
+    paddingTop: 8,
+    paddingBottom: 0,
+    alignItems: 'center',
   },
   handle: {
-    alignSelf: 'center',
     width: 36,
     height: 4,
     borderRadius: 2,
@@ -236,6 +361,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: { 
+    // Allow content to scroll when sheet reaches max height
+    flexShrink: 1,
+  },
+  contentFullHeight: {
+    flex: 1,
+  },
+  contentContainer: {
     paddingTop: 0,
+  },
+  contentContainerFullHeight: {
+    flexGrow: 1,
   },
 });

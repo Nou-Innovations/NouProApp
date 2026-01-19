@@ -20,6 +20,7 @@ import theme from '@/shared/theme';
 import { Text, BodyBold, Caption, Label } from '@/shared/components/ui/Typography';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import ListItemCard from '@/shared/components/ui/ListItemCard';
 
 // Helper function to format numbers
 const formatNumber = (value: number | undefined | null, type: 'currency' | 'stock'): string => {
@@ -198,27 +199,24 @@ const ProductCard: React.FC<ProductCardProps> = ({
           onClose={toggleStatusModal}
           title="Availability"
         >
-          {productStatuses.map((statusOption, index) => (
-            <TouchableOpacity
-              key={statusOption}
-              style={[
-                styles.statusModalItem,
-                { borderBottomColor: appTheme.colors.borderColor },
-                index === productStatuses.length - 1 && { borderBottomWidth: 0 },
-              ]}
-              onPress={() => handleSelectStatus(statusOption)}
-            >
-              <View
-                style={[
-                  styles.statusModalColorIndicator,
-                  { backgroundColor: getProductStatusColor(statusOption) },
-                ]}
+          {productStatuses.map((statusOption, index) => {
+            const isSelected = product.status === statusOption;
+            return (
+              <ListItemCard
+                key={statusOption}
+                avatar={{
+                  type: 'icon',
+                  icon: '',
+                  backgroundColor: getProductStatusColor(statusOption),
+                }}
+                title={statusOption}
+                onPress={() => handleSelectStatus(statusOption)}
+                selected={isSelected}
+                showCheckmark
+                showDivider={index < productStatuses.length - 1}
               />
-              <Text style={[styles.statusModalItemText, { color: appTheme.colors.text }]}>
-                {statusOption}
-              </Text>
-            </TouchableOpacity>
-          ))}
+            );
+          })}
         </AppBottomSheet>
       </View>
     );

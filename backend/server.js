@@ -1265,12 +1265,38 @@ const errorResponse = (error, message = 'Error') => ({
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
   
+  // Debug logging
+  console.log('[Login] Received:', { email, passwordLength: password?.length, body: req.body });
+  
   // Simple mock authentication
   const user = users.find(u => u.email === email);
+  console.log('[Login] User found:', user ? user.email : 'NOT FOUND');
+  
   if (user && password === 'password') {
+    // Get user's businesses
+    const userMemberships = businessMembers.filter(m => 
+      m.userId === user.id && m.status === 'accepted'
+    );
+    
+    const userBusinesses = userMemberships.map(membership => {
+      const business = companies.find(c => c.id === membership.businessId);
+      return {
+        business,
+        role: membership.role,
+        staff_entry: {
+          id: membership.id,
+          status: membership.status,
+          role_type: membership.roleType || null,
+          joinedAt: membership.joinedAt,
+        }
+      };
+    }).filter(ub => ub.business); // Filter out any null businesses
+    
     res.json(successResponse({
       user,
-      token: 'mock-jwt-token-' + Date.now()
+      token: 'mock-jwt-token-' + Date.now(),
+      refreshToken: 'mock-refresh-token-' + Date.now(),
+      businesses: userBusinesses
     }));
   } else {
     res.status(401).json(errorResponse('Invalid credentials'));
@@ -1279,6 +1305,69 @@ app.post('/api/auth/login', (req, res) => {
 
 app.post('/api/auth/logout', (req, res) => {
   res.json(successResponse(null, 'Logged out successfully'));
+});
+
+// Register new user
+app.post('/api/auth/register', (req, res) => {
+  const { firstName, lastName, phone, countryCode, email, password, profilePicture } = req.body;
+  
+  // Validate required fields
+  if (!firstName || !lastName || !phone || !password) {
+    return res.status(400).json(errorResponse('Missing required fields: firstName, lastName, phone, password'));
+  }
+  
+  // Check if user already exists (by phone or email)
+  const existingUser = users.find(u => 
+    u.phone === phone || (email && u.email === email)
+  );
+  if (existingUser) {
+    return res.status(409).json(errorResponse('User with this phone or email already exists'));
+  }
+  
+  // Create new user
+  const newUser = {
+    id: uuidv4(),
+    firstName,
+    lastName,
+    name: `${firstName} ${lastName}`,
+    phone: `${countryCode || '+230'}${phone}`,
+    email: email || null,
+    profilePicture: profilePicture || null,
+    avatar: profilePicture || null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  
+  // Add to users array
+  users.push(newUser);
+  
+  // Generate token
+  const token = 'mock-jwt-token-' + Date.now();
+  
+  res.status(201).json(successResponse({
+    user: newUser,
+    token,
+    refreshToken: 'mock-refresh-token-' + Date.now(),
+    businesses: [] // New user has no businesses yet
+  }, 'Account created successfully'));
+});
+
+// Get current user
+app.get('/api/auth/me', (req, res) => {
+  // In a real app, extract user ID from JWT token
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json(errorResponse('Not authenticated'));
+  }
+  
+  // For mock purposes, return the first user or a default
+  // In production, decode JWT and find the user by ID
+  const user = users[0];
+  if (!user) {
+    return res.status(404).json(errorResponse('User not found'));
+  }
+  
+  res.json(successResponse({ user }));
 });
 
 // ============================================================================
@@ -2375,6 +2464,28 @@ app.get('/api/companies/:companyId/invoices', async (req, res) => {
   } catch (err) {
     console.error('Error fetching company invoices:', err);
     res.status(500).json(errorResponse('Failed to retrieve invoices', 'FETCH_ERROR'));
+  }
+});
+
+// Get single invoice by ID
+app.get('/api/companies/:companyId/invoices/:invoiceId', async (req, res) => {
+  try {
+    const { companyId, invoiceId } = req.params;
+    const invoice = await repos.invoiceRepo.getById(invoiceId);
+
+    if (!invoice) {
+      return res.status(404).json(errorResponse('Invoice not found', 'NOT_FOUND'));
+    }
+
+    // Verify the invoice belongs to the company
+    if (invoice.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Invoice not found', 'NOT_FOUND'));
+    }
+
+    res.json(successResponse(invoice));
+  } catch (err) {
+    console.error('Error fetching invoice:', err);
+    res.status(500).json(errorResponse('Failed to retrieve invoice', 'FETCH_ERROR'));
   }
 });
 

@@ -101,9 +101,9 @@ export default function PrimaryHeader({
               strokeWidth={2}
             />
             {a.badge && a.badge > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {a.badge > 99 ? '99+' : a.badge}
+              <View style={[styles.badge, { backgroundColor: theme.colors.accent }]}>
+                <Text style={[styles.badgeText, { color: theme.colors.textInverse }]}>
+                  {a.badge > 9 ? '9+' : a.badge}
                 </Text>
               </View>
             ) : null}

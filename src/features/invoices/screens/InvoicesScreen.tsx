@@ -15,7 +15,7 @@ import { Icon } from '@/shared/utils/icons';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/features/search/components/FilterBar';
 import InvoiceCard from '@/features/invoices/components/InvoiceCard';
-import { AppBottomSheet } from '@/shared/components/ui';
+import { AppBottomSheet, ListItemCard } from '@/shared/components/ui';
 
 // DropdownItem type (kept for location items)
 interface DropdownItem {
@@ -54,7 +54,7 @@ export default function InvoicesScreen() {
   const [showActionsModal, setShowActionsModal] = useState<boolean>(false);
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const { theme: appTheme } = useTheme();
-  const { setInvoicesUnreadCount } = useNotifications();
+  const { setInvoicesUnreadCount, isItemViewed } = useNotifications();
   const { currentCompany, currentLocation, locations, setLocation } = useBusinessStore();
   const selectedLocationId = currentLocation?.id || null;
   
@@ -102,13 +102,15 @@ export default function InvoicesScreen() {
     });
   }, [filteredInvoices, search, filter, activeTab]);
 
-  // Calculate new invoices count
-  const newInvoicesCount = filteredDocuments.filter(doc => doc.status === 'draft').length;
+  // Calculate unread count based on items not yet viewed
+  const unviewedInvoicesCount = useMemo(() => {
+    return filteredDocuments.filter(doc => !isItemViewed(doc.id)).length;
+  }, [filteredDocuments, isItemViewed]);
 
   // Update the invoices unread count when component mounts or data changes
   useEffect(() => {
-    setInvoicesUnreadCount(newInvoicesCount);
-  }, [newInvoicesCount, setInvoicesUnreadCount]);
+    setInvoicesUnreadCount(unviewedInvoicesCount);
+  }, [unviewedInvoicesCount, setInvoicesUnreadCount]);
 
   const handleLocationSelect = (item: DropdownItem) => {
     if (item.id === 'all') {
@@ -391,36 +393,29 @@ export default function InvoicesScreen() {
         onClose={() => setShowLocationDropdown(false)}
         title="Locations"
       >
-        <ScrollView style={{ maxHeight: 300 }}>
-          {locationItems.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[
-                styles.bottomSheetItem,
-                { borderBottomColor: appTheme.colors.borderColor },
-                (selectedLocationId || 'all') === item.id && { backgroundColor: `${appTheme.colors.primary}15` }
-              ]}
-              onPress={() => {
-                handleLocationSelect(item);
-                setShowLocationDropdown(false);
-              }}
-            >
-              <Icon 
-                name={item.icon || 'map-pin'} 
-                size={20} 
-                color={(selectedLocationId || 'all') === item.id ? appTheme.colors.primary : appTheme.colors.iconColor} 
+        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+          {locationItems.map((item, index) => {
+            const isSelected = (selectedLocationId || 'all') === item.id;
+            return (
+              <ListItemCard
+                key={item.id}
+                avatar={{
+                  type: 'icon',
+                  icon: item.icon || 'location',
+                  iconColor: isSelected ? appTheme.colors.primary : appTheme.colors.iconMuted,
+                  backgroundColor: appTheme.colors.surface,
+                }}
+                title={item.title}
+                onPress={() => {
+                  handleLocationSelect(item);
+                  setShowLocationDropdown(false);
+                }}
+                selected={isSelected}
+                showCheckmark
+                showDivider={index < locationItems.length - 1}
               />
-              <Text style={[
-                styles.bottomSheetItemText,
-                { color: (selectedLocationId || 'all') === item.id ? appTheme.colors.primary : appTheme.colors.text }
-              ]}>
-                {item.title}
-              </Text>
-              {(selectedLocationId || 'all') === item.id && (
-                <Icon name="check" size={20} color={appTheme.colors.primary} />
-              )}
-            </TouchableOpacity>
-          ))}
+            );
+          })}
         </ScrollView>
       </AppBottomSheet>
 

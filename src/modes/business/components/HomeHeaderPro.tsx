@@ -44,7 +44,7 @@ export function HomeHeaderPro({
     return (
       <View style={styles.badge}>
         <Text style={styles.badgeText}>
-          {count > 99 ? '99+' : count.toString()}
+          {count > 9 ? '9+' : count.toString()}
         </Text>
       </View>
     );
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 2,
     right: 2,
-    backgroundColor: '#D23030',
+    backgroundColor: theme.colors.accent,
     borderRadius: 10,
     minWidth: 18,
     height: 18,
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: theme.colors.textInverse,
     fontSize: 10,
     fontFamily: theme.fonts.primary.bold,
   },

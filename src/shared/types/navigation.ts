@@ -57,6 +57,16 @@ export interface FullBusinessData extends BusinessBasicData {
   }[];
 }
 
+/**
+ * Auth data passed after registration (before final login)
+ */
+export interface PendingAuthData {
+  user: any;
+  token: string;
+  refreshToken: string;
+  businesses?: any[];
+}
+
 // ========== Personal Mode Tab Navigator ==========
 
 /**
@@ -127,12 +137,21 @@ export type RootStackParamList = {
   ProductDetail: { productId: string };
   
   // Brand screens
-  CreateBrand: undefined;
-  BrandSelection: undefined;
+  CreateBrand: { selectedProducts?: { id: string; name: string; price: number; brandName: string }[] };
+  BrandSelection: { selectedBrand?: string };
+  SelectProductsForBrand: { 
+    brandName: string;
+    selectedProducts?: { id: string; name: string; price: number; brandName: string }[];
+  };
   
   // Invoice screens
   CreateInvoice: { type?: 'invoice' | 'estimate' };
   InvoiceDetails: { invoiceId: string };
+  ReceivedPayments: { 
+    invoiceId: string; 
+    totalAmount: number; 
+    paidAmount: number;
+  };
   
   // Delivery screens
   DeliveryDetail: { deliveryId: string };
@@ -199,6 +218,9 @@ export type RootStackParamList = {
   
   // Business Registration (accessible from ProfileSwitcher)
   BusinessBasicInfo: { fromProfileSwitcher?: boolean };
+  
+  // Join Company (accessible from onboarding notifications)
+  SelectCompany: { fromOnboarding?: boolean };
   BusinessLocation: { 
     businessData: BusinessBasicData;
     fromProfileSwitcher?: boolean;
@@ -241,25 +263,36 @@ export type AuthStackParamList = {
     userData: RegistrationUserData;
     password: string;
   };
-  ChoosePath: undefined;
+  ChoosePath: {
+    pendingAuth: import('./navigation').PendingAuthData;
+  };
   
   // Join Company Flow
-  SelectCompany: undefined;
+  SelectCompany: { 
+    pendingAuth?: import('./navigation').PendingAuthData;
+    fromOnboarding?: boolean;
+  };
   
   // Business Registration Flow
-  BusinessBasicInfo: { fromProfileSwitcher?: boolean };
+  BusinessBasicInfo: { 
+    fromProfileSwitcher?: boolean;
+    pendingAuth?: import('./navigation').PendingAuthData;
+  };
   BusinessLocation: { 
     businessData: BusinessBasicData;
     fromProfileSwitcher?: boolean;
+    pendingAuth?: import('./navigation').PendingAuthData;
   };
   BusinessHours: { 
     businessData: BusinessBasicData;
     location: BusinessLocationData;
     fromProfileSwitcher?: boolean;
+    pendingAuth?: import('./navigation').PendingAuthData;
   };
   UploadBusinessLogo: { 
     businessData: FullBusinessData;
     fromProfileSwitcher?: boolean;
+    pendingAuth?: import('./navigation').PendingAuthData;
   };
 };
 

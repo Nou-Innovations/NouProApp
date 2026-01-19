@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,10 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  TextInput,
+  Image,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
@@ -23,18 +27,26 @@ import AccordionSection from '@/shared/components/ui/AccordionSection';
 import ColorPicker from '@/shared/components/ui/ColorPicker';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { AppModal } from '@/shared/components/ui';
+import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, ListItemCard } from '@/shared/components/ui';
+import { mockBrands } from '@/shared/data/businessProfile';
+import { formatCurrency } from '@/shared/data/mockOrders';
 
-type InvoiceItemType = {
-  id: string;
-  description: string;
+// Mock connected businesses for client selection
+const mockConnectedBusinesses = [
+  { id: 'biz-001', name: 'FreshMart Retailers', type: 'Retailer', address: 'Port Louis, Mauritius' },
+  { id: 'biz-002', name: 'Tech Haven Store', type: 'Electronics', address: 'Curepipe, Mauritius' },
+  { id: 'biz-003', name: 'GreenLife Supermarket', type: 'Supermarket', address: 'Rose Hill, Mauritius' },
+  { id: 'biz-004', name: 'Island Electronics', type: 'Electronics', address: 'Quatre Bornes, Mauritius' },
+  { id: 'biz-005', name: 'Corner Shop Mauritius', type: 'Convenience', address: 'Vacoas, Mauritius' },
+];
+
+// Item type for selection
+interface SelectedItem {
+  product_id: string;
+  product_name: string;
   quantity: number;
-  unitPrice: number;
-  discount: number;
-  discountType: 'percentage' | 'fixed';
-  taxRate: number;
-  total: number;
-};
+  unit_price: number;
+}
 
 type ValidationError = {
   field: string;
@@ -59,27 +71,25 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
   const [isColorPickerVisible, setIsColorPickerVisible] = useState(false);
 
   // Client & Dates Section
-  const [selectedClient, setSelectedClient] = useState('');
-  const [selectedClientId, setSelectedClientId] = useState('');
-  const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
-  const [dueDate, setDueDate] = useState(
-    new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]
-  );
+  const [selectedClient, setSelectedClient] = useState<typeof mockConnectedBusinesses[0] | null>(null);
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+  const [issueDate, setIssueDate] = useState(new Date());
+  const [showIssueDateModal, setShowIssueDateModal] = useState(false);
+  const [dueDate, setDueDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+  const [showDueDateModal, setShowDueDateModal] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState('');
+  const referenceInputRef = useRef<TextInput>(null);
 
   // Line Items Section
-  const [lineItems, setLineItems] = useState<InvoiceItemType[]>([
-    {
-      id: '1',
-      description: '',
-      quantity: 1,
-      unitPrice: 0,
-      discount: 0,
-      discountType: 'percentage',
-      taxRate: 0,
-      total: 0,
-    },
-  ]);
+  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
+  const [showItemsModal, setShowItemsModal] = useState(false);
+  const [itemSearch, setItemSearch] = useState('');
+  const [focusedProductId, setFocusedProductId] = useState<string | null>(null);
+  const [activeInputId, setActiveInputId] = useState<string | null>(null);
+  const [editedProducts, setEditedProducts] = useState<Set<string>>(new Set());
+  const productInputRefs = useRef<{ [key: string]: TextInput | null }>({});
+  const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
 
   // Summary & Totals Section
   const [subtotal, setSubtotal] = useState(0);
@@ -116,27 +126,97 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Filtered clients based on search
+  const filteredClients = useMemo(() => {
+    if (!clientSearch) return mockConnectedBusinesses;
+    const searchLower = clientSearch.toLowerCase();
+    return mockConnectedBusinesses.filter(
+      (client) =>
+        client.name.toLowerCase().includes(searchLower) ||
+        client.address.toLowerCase().includes(searchLower) ||
+        client.type.toLowerCase().includes(searchLower)
+    );
+  }, [clientSearch]);
+
+  // Get all products from mock data
+  const allProducts = useMemo(() => {
+    return mockBrands.flatMap((brand) => 
+      brand.products.map((product) => ({
+        ...product,
+        brandName: brand.name,
+      }))
+    );
+  }, []);
+
+  // Check if form is complete for enabling Send button
+  const isFormComplete = useMemo(() => {
+    return selectedClient !== null && selectedItems.length > 0;
+  }, [selectedClient, selectedItems]);
+
+  // Format date for display
+  const formatDateDisplay = (date: Date): string => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  // Get initials from name
+  const getInitials = (name: string): string => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Get color for avatar based on name hash
+  const getAvatarColor = (name: string): string => {
+    const colors = ['#4ECDC4', '#6366F1', '#EC4899', '#F59E0B', '#10B981', '#8B5CF6'];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  // Handle Reference PO# focus to scroll into view
+  const handleReferenceFieldFocus = () => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 280, animated: true });
+    }, 300);
+  };
+
+  // Filtered products based on search
+  const filteredProducts = useMemo(() => {
+    if (!itemSearch) return allProducts;
+    const searchLower = itemSearch.toLowerCase();
+    return allProducts.filter(
+      (product) =>
+        product.name.toLowerCase().includes(searchLower) ||
+        product.brandName.toLowerCase().includes(searchLower)
+    );
+  }, [allProducts, itemSearch]);
+
+  // Calculate totals from selected items
+  const orderTotal = useMemo(() => {
+    return selectedItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+  }, [selectedItems]);
+
+  const totalItemsCount = useMemo(() => {
+    return selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  }, [selectedItems]);
+
   // Calculate the totals whenever line items change
   useEffect(() => {
     calculateTotals();
-  }, [lineItems, globalDiscount, globalDiscountType, shipping]);
+  }, [selectedItems, globalDiscount, globalDiscountType, shipping]);
 
   const calculateTotals = () => {
-    const calculatedSubtotal = lineItems.reduce((sum, item) => {
-      const lineSubtotal = item.quantity * item.unitPrice;
-      const lineDiscount = item.discountType === 'percentage' 
-        ? lineSubtotal * (item.discount / 100) 
-        : item.discount;
-      return sum + (lineSubtotal - lineDiscount);
-    }, 0);
-    
-    const calculatedTotalTax = lineItems.reduce((sum, item) => {
-      const lineSubtotal = item.quantity * item.unitPrice;
-      const lineDiscount = item.discountType === 'percentage' 
-        ? lineSubtotal * (item.discount / 100) 
-        : item.discount;
-      return sum + ((lineSubtotal - lineDiscount) * (item.taxRate / 100));
-    }, 0);
+    const calculatedSubtotal = orderTotal;
     
     let discountAmount = 0;
     if (globalDiscountType === 'percentage') {
@@ -145,11 +225,110 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
       discountAmount = globalDiscount;
     }
     
-    const calculatedTotal = calculatedSubtotal - discountAmount + calculatedTotalTax + shipping;
+    const calculatedTotal = calculatedSubtotal - discountAmount + totalTax + shipping;
     
     setSubtotal(calculatedSubtotal);
-    setTotalTax(calculatedTotalTax);
     setTotal(calculatedTotal);
+  };
+
+  // Get or create animation value for a product
+  const getAnimValue = (productId: string) => {
+    if (!animationRefs.current[productId]) {
+      animationRefs.current[productId] = new Animated.Value(0);
+    }
+    return animationRefs.current[productId];
+  };
+
+  // Handle adding item and focus input with animation
+  const handleAddItem = (product: any) => {
+    // Initialize animation value
+    const animValue = getAnimValue(product.id);
+    animValue.setValue(0);
+    
+    setSelectedItems((prev) => [
+      ...prev,
+      {
+        product_id: product.id,
+        product_name: product.name,
+        quantity: 1,
+        unit_price: product.price,
+      },
+    ]);
+    
+    // Animate in with ease-in-out
+    Animated.timing(animValue, {
+      toValue: 1,
+      duration: 200,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+    
+    // Set focus state and focus the input after render
+    setFocusedProductId(product.id);
+    setActiveInputId(product.id);
+    setTimeout(() => {
+      productInputRefs.current[product.id]?.focus();
+    }, 150);
+  };
+
+  // Handle removing item with animation
+  const handleRemoveItem = (productId: string) => {
+    const animValue = getAnimValue(productId);
+    
+    // Animate out with ease-in-out
+    Animated.timing(animValue, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: true,
+    }).start(() => {
+      setSelectedItems((prev) => prev.filter((item) => item.product_id !== productId));
+      setEditedProducts((prev) => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
+      setFocusedProductId(null);
+    });
+  };
+  
+  // Handle quantity input change - empty field with placeholder
+  const handleQuantityInput = (productId: string, text: string) => {
+    if (text === '') {
+      // User deleted everything, mark as not edited (will show placeholder)
+      setEditedProducts((prev) => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
+      handleQuantityChange(productId, 1); // Keep internal value at 1
+      return;
+    }
+    
+    const num = parseInt(text, 10);
+    if (!isNaN(num) && num > 0) {
+      setEditedProducts((prev) => new Set(prev).add(productId));
+      handleQuantityChange(productId, num);
+    }
+  };
+
+  // Handle quantity change
+  const handleQuantityChange = (productId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      setSelectedItems((prev) => prev.filter((item) => item.product_id !== productId));
+    } else {
+      setSelectedItems((prev) =>
+        prev.map((item) =>
+          item.product_id === productId ? { ...item, quantity: newQuantity } : item
+        )
+      );
+    }
+  };
+
+  // Get item quantity
+  const getItemQuantity = (productId: string): number => {
+    const item = selectedItems.find((i) => i.product_id === productId);
+    return item?.quantity || 0;
   };
 
   const toggleSectionExpanded = (section: keyof typeof expandedSections) => {
@@ -163,54 +342,6 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
     setLogoUri(uri);
   };
 
-  const handleAddLineItem = () => {
-    setLineItems(prev => [
-      ...prev,
-      {
-        id: `${prev.length + 1}`,
-        description: '',
-        quantity: 1,
-        unitPrice: 0,
-        discount: 0,
-        discountType: 'percentage',
-        taxRate: 0,
-        total: 0,
-      },
-    ]);
-  };
-
-  const handleRemoveLineItem = (id: string) => {
-    if (lineItems.length === 1) {
-      Alert.alert('Cannot remove', 'You need at least one line item');
-      return;
-    }
-    setLineItems(prev => prev.filter(item => item.id !== id));
-  };
-
-  const updateLineItem = (id: string, field: keyof InvoiceItemType, value: any) => {
-    setLineItems(prev => prev.map(item => {
-      if (item.id !== id) return item;
-      
-      const updatedItem = { ...item, [field]: value };
-      
-      let lineDiscount = 0;
-      if (updatedItem.discountType === 'percentage') {
-        lineDiscount = (updatedItem.quantity * updatedItem.unitPrice) * (updatedItem.discount / 100);
-      } else {
-        lineDiscount = updatedItem.discount;
-      }
-      
-      const lineSubtotal = (updatedItem.quantity * updatedItem.unitPrice) - lineDiscount;
-      const lineTax = lineSubtotal * (updatedItem.taxRate / 100);
-      const lineTotal = lineSubtotal + lineTax;
-      
-      return {
-        ...updatedItem,
-        total: lineTotal
-      };
-    }));
-  };
-
   const validateForm = (): boolean => {
     const newErrors: ValidationError[] = [];
     
@@ -218,40 +349,18 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
       newErrors.push({ field: 'client', message: 'Please select a client' });
     }
     
-    if (!issueDate) {
-      newErrors.push({ field: 'issueDate', message: 'Please enter an issue date' });
+    if (selectedItems.length === 0) {
+      newErrors.push({ field: 'items', message: 'Please add at least one item' });
     }
-    
-    if (!dueDate) {
-      newErrors.push({ field: 'dueDate', message: `Please enter a ${isInvoice ? 'due' : 'expiry'} date` });
-    }
-    
-    lineItems.forEach((item, index) => {
-      if (!item.description) {
-        newErrors.push({ field: `item-${index}-description`, message: `Item ${index + 1}: Description is required` });
-      }
-      if (item.quantity <= 0) {
-        newErrors.push({ field: `item-${index}-quantity`, message: `Item ${index + 1}: Quantity must be greater than 0` });
-      }
-      if (item.unitPrice < 0) {
-        newErrors.push({ field: `item-${index}-unitPrice`, message: `Item ${index + 1}: Unit price cannot be negative` });
-      }
-      if (item.discount < 0 || (item.discountType === 'percentage' && item.discount > 100)) {
-        newErrors.push({ field: `item-${index}-discount`, message: `Item ${index + 1}: Invalid discount` });
-      }
-      if (item.taxRate < 0 || item.taxRate > 100) {
-        newErrors.push({ field: `item-${index}-taxRate`, message: `Item ${index + 1}: Tax rate must be between 0% and 100%` });
-      }
-    });
     
     setErrors(newErrors);
     
     if (newErrors.length > 0) {
       const firstError = newErrors[0];
-      if (firstError.field.startsWith('client') || firstError.field.startsWith('issue') || firstError.field.startsWith('due')) {
+      if (firstError.field === 'client') {
         toggleSectionExpanded('clientDates');
         scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-      } else if (firstError.field.startsWith('item')) {
+      } else if (firstError.field === 'items') {
         toggleSectionExpanded('lineItems');
         scrollViewRef.current?.scrollTo({ y: 200, animated: true });
       }
@@ -324,32 +433,35 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
           >
             <AppTextField
               label="Client"
-              value={selectedClient}
+              value={selectedClient?.name || ''}
               onChangeText={() => {}}
               placeholder="Select a client"
-              multiSelect
-              selectedCount={selectedClient ? 1 : 0}
-              countLabelSingular="client"
-              onPress={() => Alert.alert('Select Client', 'Navigate to client selection')}
+              leftIcon="business-outline"
+              isDropdown
+              onPress={() => setShowClientModal(true)}
               error={errors.some(e => e.field === 'client')}
               containerStyle={styles.fieldMargin}
             />
 
             <AppTextField
               label="Issue Date"
-              value={issueDate}
-              onChangeText={setIssueDate}
-              placeholder="YYYY-MM-DD"
-              error={errors.some(e => e.field === 'issueDate')}
+              value={formatDateDisplay(issueDate)}
+              onChangeText={() => {}}
+              placeholder="Select issue date"
+              leftIcon="calendar-outline"
+              isDropdown
+              onPress={() => setShowIssueDateModal(true)}
               containerStyle={styles.fieldMargin}
             />
 
             <AppTextField
               label={isInvoice ? 'Due Date' : 'Expiry Date'}
-              value={dueDate}
-              onChangeText={setDueDate}
-              placeholder="YYYY-MM-DD"
-              error={errors.some(e => e.field === 'dueDate')}
+              value={formatDateDisplay(dueDate)}
+              onChangeText={() => {}}
+              placeholder="Select date"
+              leftIcon="calendar-outline"
+              isDropdown
+              onPress={() => setShowDueDateModal(true)}
               containerStyle={styles.fieldMargin}
             />
 
@@ -359,6 +471,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
               onChangeText={setReferenceNumber}
               placeholder="Enter reference number"
               containerStyle={styles.fieldMargin}
+              onFocus={handleReferenceFieldFocus}
             />
           </AccordionSection>
 
@@ -368,92 +481,42 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
             isExpanded={expandedSections.lineItems}
             onToggle={() => toggleSectionExpanded('lineItems')}
           >
-            {lineItems.map((item, index) => (
-              <View key={item.id} style={[styles.lineItemContainer, { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.borderColor }]}>
-                <View style={styles.lineItemHeader}>
-                  <Text style={[styles.lineItemTitle, { color: appTheme.colors.text }]}>Item {index + 1}</Text>
-                  <TouchableOpacity onPress={() => handleRemoveLineItem(item.id)}>
-                    <Icon name="trash-outline" size={20} color={appTheme.colors.error} />
-                  </TouchableOpacity>
-                </View>
-                
-                <AppTextField
-                  label="Description"
-                  value={item.description}
-                  onChangeText={(value) => updateLineItem(item.id, 'description', value)}
-                  placeholder="Enter description"
-                  error={errors.some(e => e.field === `item-${index}-description`)}
-                  containerStyle={styles.fieldMargin}
-                />
-                
-                <View style={styles.rowFields}>
-                  <View style={[styles.halfWidth, { marginRight: 8 }]}>
-                    <AppTextField
-                      label="Quantity"
-                      value={item.quantity.toString()}
-                      onChangeText={(value) => updateLineItem(item.id, 'quantity', parseFloat(value) || 0)}
-                      keyboardType="numeric"
-                      placeholder="0"
-                      error={errors.some(e => e.field === `item-${index}-quantity`)}
-                    />
+            {/* Selected Items Preview */}
+            {selectedItems.length > 0 && (
+              <View style={[styles.itemsPreview, { borderColor: appTheme.colors.borderColor }]}>
+                {selectedItems.slice(0, 3).map((item) => (
+                  <View key={item.product_id} style={styles.itemPreviewRow}>
+                    <Text style={[styles.itemPreviewName, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.regular }]} numberOfLines={1}>
+                      {item.product_name}
+                    </Text>
+                    <Text style={[styles.itemPreviewQty, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.medium }]}>
+                      x{item.quantity}
+                    </Text>
                   </View>
-                  <View style={styles.halfWidth}>
-                    <AppTextField
-                      label="Unit Price"
-                      value={item.unitPrice.toString()}
-                      onChangeText={(value) => updateLineItem(item.id, 'unitPrice', parseFloat(value) || 0)}
-                      keyboardType="numeric"
-                      placeholder="0.00"
-                      error={errors.some(e => e.field === `item-${index}-unitPrice`)}
-                    />
-                  </View>
-                </View>
-                
-                <View style={[styles.rowFields, { marginTop: 16 }]}>
-                  <View style={[styles.halfWidth, { marginRight: 8 }]}>
-                    <View style={styles.discountRow}>
-                      <AppTextField
-                        label="Discount"
-                        value={item.discount.toString()}
-                        onChangeText={(value) => updateLineItem(item.id, 'discount', parseFloat(value) || 0)}
-                        keyboardType="numeric"
-                        placeholder="0"
-                        error={errors.some(e => e.field === `item-${index}-discount`)}
-                        containerStyle={{ flex: 1 }}
-                      />
-                      <TouchableOpacity 
-                        style={[styles.discountTypeButton, { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.borderColor }]}
-                        onPress={() => updateLineItem(item.id, 'discountType', item.discountType === 'percentage' ? 'fixed' : 'percentage')}
-                      >
-                        <Text style={{ color: appTheme.colors.text }}>{item.discountType === 'percentage' ? '%' : '$'}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  <View style={styles.halfWidth}>
-                    <AppTextField
-                      label="Tax Rate (%)"
-                      value={item.taxRate.toString()}
-                      onChangeText={(value) => updateLineItem(item.id, 'taxRate', parseFloat(value) || 0)}
-                      keyboardType="numeric"
-                      placeholder="0"
-                      error={errors.some(e => e.field === `item-${index}-taxRate`)}
-                    />
-                  </View>
-                </View>
-                
-                <View style={[styles.lineTotal, { borderTopColor: appTheme.colors.borderColor }]}>
-                  <Text style={[styles.lineTotalLabel, { color: appTheme.colors.textLight }]}>Line Total:</Text>
-                  <Text style={[styles.lineTotalValue, { color: appTheme.colors.text }]}>${item.total.toFixed(2)}</Text>
+                ))}
+                {selectedItems.length > 3 && (
+                  <Text style={[styles.itemsMore, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
+                    +{selectedItems.length - 3} more items
+                  </Text>
+                )}
+                <View style={[styles.itemsTotal, { borderTopColor: appTheme.colors.borderColor }]}>
+                  <Text style={[styles.itemsTotalLabel, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.medium }]}>
+                    {totalItemsCount} items
+                  </Text>
+                  <Text style={[styles.itemsTotalValue, { color: appTheme.colors.primary, fontFamily: theme.fonts.primary.bold }]}>
+                    {formatCurrency(orderTotal)}
+                  </Text>
                 </View>
               </View>
-            ))}
+            )}
             
             <TouchableOpacity 
               style={[styles.addItemButton, { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.borderColor }]}
-              onPress={handleAddLineItem}
+              onPress={() => setShowItemsModal(true)}
             >
-              <Icon name="add-circle-outline" size={20} color={appTheme.colors.text} />
-              <Text style={[styles.addItemButtonText, { color: appTheme.colors.text }]}>Add Another Item</Text>
+              <Text style={[styles.addItemButtonText, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
+                {selectedItems.length === 0 ? 'Add an item' : 'Add another item'}
+              </Text>
             </TouchableOpacity>
           </AccordionSection>
 
@@ -646,9 +709,284 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
             onPress={handleSend}
             variant="primary"
             loading={isSending}
-            disabled={isSaving || isSending || errors.length > 0}
+            disabled={!isFormComplete || isSaving || isSending}
           />
         </View>
+
+        {/* Client Selection Modal */}
+        <AppBottomSheet
+          visible={showClientModal}
+          onClose={() => {
+            setShowClientModal(false);
+            setClientSearch('');
+          }}
+          title="Select Client"
+        >
+          <View style={styles.bottomSheetContent}>
+            <AppSearchBar
+              placeholder="Search clients..."
+              value={clientSearch}
+              onChangeText={setClientSearch}
+              onClear={() => setClientSearch('')}
+              containerStyle={styles.searchBarContainer}
+            />
+            <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
+              {filteredClients.map((client, index) => (
+                <ListItemCard
+                  key={client.id}
+                  avatar={{
+                    type: 'initials',
+                    userName: client.name,
+                    userId: client.id,
+                  }}
+                  title={client.name}
+                  subtitle={`${client.type} • ${client.address}`}
+                  onPress={() => {
+                    setSelectedClient(client);
+                    setShowClientModal(false);
+                    setClientSearch('');
+                  }}
+                  selected={selectedClient?.id === client.id}
+                  showCheckmark
+                  showDivider={index < filteredClients.length - 1}
+                />
+              ))}
+              {filteredClients.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Icon name="search-outline" size={40} color={appTheme.colors.textLight} />
+                  <Text style={[styles.emptyText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
+                    No clients found
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </AppBottomSheet>
+
+        {/* Issue Date Modal */}
+        <AppBottomSheet
+          visible={showIssueDateModal}
+          onClose={() => setShowIssueDateModal(false)}
+          title="Select Issue Date"
+        >
+          <View style={styles.dateModalContent}>
+            <DateSelector
+              value={issueDate}
+              onChange={(date) => {
+                setIssueDate(date);
+              }}
+              calendarHeight={340}
+            />
+            <View style={styles.dateModalActions}>
+              <TouchableOpacity
+                style={[styles.dateModalButton, styles.dateCancelButton, { borderColor: appTheme.colors.borderColor }]}
+                onPress={() => setShowIssueDateModal(false)}
+              >
+                <Text style={[styles.dateCancelText, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.medium }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dateModalButton, styles.dateConfirmButton, { backgroundColor: appTheme.colors.primary }]}
+                onPress={() => setShowIssueDateModal(false)}
+              >
+                <Text style={[styles.dateConfirmText, { fontFamily: theme.fonts.primary.bold }]}>
+                  Confirm
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </AppBottomSheet>
+
+        {/* Due/Expiry Date Modal */}
+        <AppBottomSheet
+          visible={showDueDateModal}
+          onClose={() => setShowDueDateModal(false)}
+          title={isInvoice ? 'Select Due Date' : 'Select Expiry Date'}
+        >
+          <View style={styles.dateModalContent}>
+            <DateSelector
+              value={dueDate}
+              onChange={(date) => {
+                setDueDate(date);
+              }}
+              minDate={issueDate}
+              calendarHeight={340}
+            />
+            <View style={styles.dateModalActions}>
+              <TouchableOpacity
+                style={[styles.dateModalButton, styles.dateCancelButton, { borderColor: appTheme.colors.borderColor }]}
+                onPress={() => setShowDueDateModal(false)}
+              >
+                <Text style={[styles.dateCancelText, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.medium }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dateModalButton, styles.dateConfirmButton, { backgroundColor: appTheme.colors.primary }]}
+                onPress={() => setShowDueDateModal(false)}
+              >
+                <Text style={[styles.dateConfirmText, { fontFamily: theme.fonts.primary.bold }]}>
+                  Confirm
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </AppBottomSheet>
+
+        {/* Items Selection Modal */}
+        <AppBottomSheet
+          visible={showItemsModal}
+          onClose={() => {
+            setShowItemsModal(false);
+            setItemSearch('');
+          }}
+          title="Select Items"
+          fullHeight
+        >
+          <View style={styles.bottomSheetContentFullHeight}>
+            {/* Summary Bar */}
+            {selectedItems.length > 0 && (
+              <View style={[styles.itemsSummaryBar, { backgroundColor: appTheme.colors.surface }]}>
+                <View style={styles.summaryInfo}>
+                  <Text style={[styles.summaryCount, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]}>
+                    {totalItemsCount} items
+                  </Text>
+                  <Text style={[styles.summaryTotal, { color: appTheme.colors.primary, fontFamily: theme.fonts.primary.bold }]}>
+                    {formatCurrency(orderTotal)}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.doneButton, { backgroundColor: appTheme.colors.primary }]}
+                  onPress={() => {
+                    setShowItemsModal(false);
+                    setItemSearch('');
+                  }}
+                >
+                  <Text style={[styles.doneButtonText, { fontFamily: theme.fonts.primary.bold }]}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            {/* Search Bar */}
+            <AppSearchBar
+              placeholder="Search products..."
+              value={itemSearch}
+              onChangeText={setItemSearch}
+              onClear={() => setItemSearch('')}
+              containerStyle={styles.searchBarContainer}
+            />
+            
+            <ScrollView 
+              style={styles.modalScrollListFullHeight} 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {filteredProducts.map((product, index) => {
+                const quantity = getItemQuantity(product.id);
+                const isSelected = quantity > 0;
+
+                return (
+                  <View key={product.id}>
+                    <View style={styles.productItem}>
+                      {/* Product Image */}
+                      <Image
+                        source={{ uri: product.imageUrl }}
+                        style={styles.productImage}
+                      />
+                      
+                      <View style={styles.productInfo}>
+                        <Text style={[styles.productBrand, { color: appTheme.colors.textMuted, fontFamily: theme.fonts.primary.medium }]}>
+                          {product.brandName}
+                        </Text>
+                        <Text style={[styles.productName, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.bold }]} numberOfLines={1}>
+                          {product.name}
+                        </Text>
+                        <Text style={[styles.productPrice, { color: appTheme.colors.textSecondary, fontFamily: theme.fonts.primary.semiBold }]}>
+                          {formatCurrency(product.price)}
+                        </Text>
+                      </View>
+
+                      {isSelected ? (
+                        <Animated.View 
+                          style={[
+                            styles.selectedItemControls,
+                            {
+                              opacity: getAnimValue(product.id),
+                              transform: [{
+                                scale: getAnimValue(product.id).interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [0.8, 1],
+                                }),
+                              }],
+                            }
+                          ]}
+                        >
+                          <View style={[
+                            styles.quantityInputContainer,
+                            { 
+                              backgroundColor: activeInputId === product.id ? appTheme.colors.cardBackground : appTheme.colors.surface,
+                              borderColor: activeInputId === product.id ? appTheme.colors.primary : appTheme.colors.borderColor,
+                            }
+                          ]}>
+                            <TextInput
+                              ref={(ref) => { productInputRefs.current[product.id] = ref; }}
+                              style={[
+                                styles.quantityInput,
+                                { 
+                                  color: appTheme.colors.primary, 
+                                  fontFamily: theme.fonts.primary.bold,
+                                }
+                              ]}
+                              value={editedProducts.has(product.id) ? String(quantity) : ''}
+                              placeholder="1"
+                              placeholderTextColor={appTheme.colors.textMuted}
+                              onChangeText={(text) => handleQuantityInput(product.id, text)}
+                              onFocus={() => setActiveInputId(product.id)}
+                              onBlur={() => {
+                                setActiveInputId(null);
+                                if (!editedProducts.has(product.id) || quantity === 0) {
+                                  handleRemoveItem(product.id);
+                                }
+                              }}
+                              keyboardType="number-pad"
+                              maxLength={5}
+                              selectionColor={appTheme.colors.primary}
+                            />
+                          </View>
+                          <TouchableOpacity
+                            style={[styles.removeItemButton, { backgroundColor: appTheme.colors.surface }]}
+                            onPress={() => handleRemoveItem(product.id)}
+                          >
+                            <Icon name="close" size={18} color={appTheme.colors.text} />
+                          </TouchableOpacity>
+                        </Animated.View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.addProductButton, { backgroundColor: appTheme.colors.primary }]}
+                          onPress={() => handleAddItem(product)}
+                        >
+                          <Icon name="add" size={18} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    {index < filteredProducts.length - 1 && (
+                      <View style={[styles.productDivider, { backgroundColor: appTheme.colors.surface }]} />
+                    )}
+                  </View>
+                );
+              })}
+              {filteredProducts.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Icon name="cube-outline" size={40} color={appTheme.colors.textLight} />
+                  <Text style={[styles.emptyText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
+                    No products found
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </AppBottomSheet>
 
         {/* Color Picker Modal */}
         {isColorPickerVisible && (
@@ -741,62 +1079,62 @@ const styles = StyleSheet.create({
   },
   discountTypeButton: {
     borderWidth: 1,
-    padding: 10,
     borderRadius: 8,
-    height: 40,
+    width: 52,
+    height: 52,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
   },
-  lineItemContainer: {
-    marginBottom: 24,
-    padding: 16,
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  lineItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  itemsPreview: {
     marginBottom: 16,
-  },
-  lineItemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: theme.fonts.primary.bold,
-  },
-  lineTotal: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-  },
-  lineTotalLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    fontFamily: theme.fonts.primary.medium,
-  },
-  lineTotalValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: theme.fonts.primary.bold,
-  },
-  addItemButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
     borderStyle: 'dashed',
   },
-  addItemButtonText: {
-    marginLeft: 8,
+  itemPreviewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  itemPreviewName: {
+    flex: 1,
     fontSize: 14,
-    fontWeight: '500',
-    fontFamily: theme.fonts.primary.medium,
+  },
+  itemPreviewQty: {
+    fontSize: 14,
+  },
+  itemsMore: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  itemsTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+  },
+  itemsTotalLabel: {
+    fontSize: 14,
+  },
+  itemsTotalValue: {
+    fontSize: 16,
+  },
+  addItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 52,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  addItemButtonText: {
+    fontSize: 16,
   },
   totalRow: {
     flexDirection: 'row',
@@ -888,5 +1226,211 @@ const styles = StyleSheet.create({
   },
   footerButtonHalf: {
     flex: 1,
+  },
+  // Bottom sheet content
+  bottomSheetContent: {
+    maxHeight: 500,
+  },
+  bottomSheetContentFullHeight: {
+    flex: 1,
+  },
+  searchBarContainer: {
+    marginHorizontal: 0,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+  },
+  modalScrollList: {
+    maxHeight: 400,
+  },
+  modalScrollListFullHeight: {
+    flex: 1,
+  },
+  // Items modal specific
+  itemsSummaryBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 12,
+    marginHorizontal: 12,
+  },
+  summaryInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  summaryCount: {
+    fontSize: 15,
+  },
+  summaryTotal: {
+    fontSize: 16,
+  },
+  doneButton: {
+    paddingHorizontal: 24,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  doneButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+  },
+  productItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  productImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: '#F0F0F0',
+  },
+  productInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  productBrand: {
+    fontSize: 12,
+    textTransform: 'uppercase',
+  },
+  productName: {
+    fontSize: 16,
+  },
+  productPrice: {
+    fontSize: 14,
+  },
+  productDivider: {
+    height: 1,
+    marginHorizontal: 12,
+  },
+  selectedItemControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  quantityInputContainer: {
+    width: 96,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityInput: {
+    width: '100%',
+    height: '100%',
+    fontSize: 15,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  removeItemButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addProductButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  // Client selection modal
+  clientItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    marginHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginBottom: 10,
+  },
+  clientAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  clientAvatarText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  clientContent: {
+    flex: 1,
+  },
+  clientName: {
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  clientMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  clientTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  clientTypeBadgeText: {
+    fontSize: 11,
+  },
+  clientAddress: {
+    fontSize: 13,
+  },
+  checkCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Date modal
+  dateModalContent: {
+    paddingHorizontal: 12,
+    paddingBottom: 16,
+  },
+  dateModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  dateModalButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dateCancelButton: {
+    borderWidth: 1,
+  },
+  dateCancelText: {
+    fontSize: 15,
+  },
+  dateConfirmButton: {},
+  dateConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 15,
   },
 });

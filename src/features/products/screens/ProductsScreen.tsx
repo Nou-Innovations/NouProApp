@@ -19,7 +19,7 @@ import FilterBar from '@/features/search/components/FilterBar';
 import BrandCard from '@/features/brands/components/BrandCard';
 import ProductCard from '@/features/products/components/ProductCard';
 import LocationDropdown from '@/features/company/components/LocationDropdown';
-import { AppBottomSheet } from '@/shared/components/ui';
+import { AppBottomSheet, ListItemCard } from '@/shared/components/ui';
 
 // DropdownItem type (kept for location items)
 interface DropdownItem {
@@ -445,36 +445,29 @@ const ProductsScreen: React.FC = () => {
         onClose={() => setShowLocationDropdown(false)}
         title="Locations"
       >
-        <ScrollView style={{ maxHeight: 300 }}>
-          {locationItems.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[
-                styles.locationItem,
-                { borderBottomColor: appTheme.colors.borderColor },
-                (selectedLocationId || 'all') === item.id && { backgroundColor: `${appTheme.colors.primary}15` }
-              ]}
-              onPress={() => {
-                handleLocationSelect(item);
-                setShowLocationDropdown(false);
-              }}
-            >
-              <Icon 
-                name={item.icon || 'map-pin'} 
-                size={20} 
-                color={(selectedLocationId || 'all') === item.id ? appTheme.colors.primary : appTheme.colors.iconColor} 
+        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+          {locationItems.map((item, index) => {
+            const isSelected = (selectedLocationId || 'all') === item.id;
+            return (
+              <ListItemCard
+                key={item.id}
+                avatar={{
+                  type: 'icon',
+                  icon: item.icon || 'location',
+                  iconColor: isSelected ? appTheme.colors.primary : appTheme.colors.iconMuted,
+                  backgroundColor: appTheme.colors.surface,
+                }}
+                title={item.title}
+                onPress={() => {
+                  handleLocationSelect(item);
+                  setShowLocationDropdown(false);
+                }}
+                selected={isSelected}
+                showCheckmark
+                showDivider={index < locationItems.length - 1}
               />
-              <Text style={[
-                styles.locationItemText,
-                { color: (selectedLocationId || 'all') === item.id ? appTheme.colors.primary : appTheme.colors.text }
-              ]}>
-                {item.title}
-              </Text>
-              {(selectedLocationId || 'all') === item.id && (
-                <Icon name="check" size={20} color={appTheme.colors.primary} />
-              )}
-            </TouchableOpacity>
-          ))}
+            );
+          })}
         </ScrollView>
       </AppBottomSheet>
 

@@ -51,8 +51,8 @@ export default function CreateAccountScreen({ navigation }: Props) {
 
     setError('');
     
-    // Navigate to phone verification
-    navigation.navigate('PhoneVerification', {
+    // Navigate directly to create password (OTP screens disabled for now)
+    navigation.navigate('CreatePassword', {
       userData: {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -60,7 +60,6 @@ export default function CreateAccountScreen({ navigation }: Props) {
         countryCode,
         email: email.trim() || undefined,
       },
-      verificationMethod: 'phone',
     });
   };
 

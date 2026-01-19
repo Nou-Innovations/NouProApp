@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,19 +17,21 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Invoice, InvoiceStatus, InvoiceItem, Payment, PaymentMethod } from '@/shared/data/mockInvoices';
 import { Icon } from '@/shared/utils/icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
 import { format, parseISO } from 'date-fns';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import mockInvoices from '@/shared/data/mockInvoices';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import ListItemCard from '@/shared/components/ui/ListItemCard';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { AppModal } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
+import invoicesService, { Invoice } from '../invoices.service';
+import { useProfileStore } from '@/shared/store/profileStore';
+import mockInvoicesData from '@/shared/data/mockInvoices';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InvoiceDetails'>;
 
@@ -59,13 +61,19 @@ const mockActivityLog = [
 
 export default function InvoiceDetailsScreen({ route, navigation }: Props) {
   const { invoiceId } = route.params;
-  const [loading, setLoading] = useState(false);
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
   const [paymentReference, setPaymentReference] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid'>('unpaid');
+  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid'>('paid');
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadComplete, setDownloadComplete] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showMoreOptions, setShowMoreOptions] = useState(false);
@@ -73,55 +81,118 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
   const { theme, isDarkMode } = useTheme();
   const { setInvoicesUnreadCount, markItemAsViewed } = useNotifications();
   
-  const invoice = mockInvoices.find((inv) => inv.id === invoiceId);
+  // Get company ID from profile store
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
+  const companyId = activeBusiness?.id;
+
+  // Fetch invoice from API
+  const fetchInvoice = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      if (companyId) {
+        // Try to fetch from API first
+        const data = await invoicesService.getInvoice(companyId, invoiceId);
+        setInvoice(data);
+      } else {
+        // No company - fall back to mock data
+        const mockInvoice = mockInvoicesData.find((inv) => inv.id === invoiceId);
+        if (mockInvoice) {
+          // Transform mock invoice to match API shape
+          setInvoice({
+            id: mockInvoice.id,
+            companyId: 'comp-1',
+            locationId: mockInvoice.locationId || 'loc-1',
+            clientName: mockInvoice.clientName,
+            clientEmail: mockInvoice.clientContact.email,
+            amount: mockInvoice.subtotal,
+            taxAmount: mockInvoice.taxTotal,
+            totalAmount: mockInvoice.total,
+            status: mockInvoice.status,
+            type: mockInvoice.type.toLowerCase() as 'invoice' | 'estimate',
+            issueDate: mockInvoice.date,
+            dueDate: mockInvoice.dueDate,
+            items: mockInvoice.items.map((item) => ({
+              productId: item.id,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.total,
+            })),
+            notes: mockInvoice.notes,
+            createdAt: mockInvoice.date,
+            updatedAt: mockInvoice.date,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[InvoiceDetails] API failed, trying mock data:', err);
+      // Fallback to mock data
+      const mockInvoice = mockInvoicesData.find((inv) => inv.id === invoiceId);
+      if (mockInvoice) {
+        setInvoice({
+          id: mockInvoice.id,
+          companyId: 'comp-1',
+          locationId: mockInvoice.locationId || 'loc-1',
+          clientName: mockInvoice.clientName,
+          clientEmail: mockInvoice.clientContact.email,
+          amount: mockInvoice.subtotal,
+          taxAmount: mockInvoice.taxTotal,
+          totalAmount: mockInvoice.total,
+          status: mockInvoice.status,
+          type: mockInvoice.type.toLowerCase() as 'invoice' | 'estimate',
+          issueDate: mockInvoice.date,
+          dueDate: mockInvoice.dueDate,
+          items: mockInvoice.items.map((item) => ({
+            productId: item.id,
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.total,
+          })),
+          notes: mockInvoice.notes,
+          createdAt: mockInvoice.date,
+          updatedAt: mockInvoice.date,
+        });
+      } else {
+        setError('Invoice not found');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId, invoiceId]);
+
+  // Fetch on mount
+  useEffect(() => {
+    fetchInvoice();
+  }, [fetchInvoice]);
   const isAdmin = true; // This would come from user context
   
-  // Mock data for demonstration
+  // Derived values from invoice data
   const clientName = invoice?.clientName || 'ABC Corporation';
-  const documentNumber = invoice?.number || invoice?.id || '#INV-2025-001';
+  const documentNumber = invoice?.id || '#INV-2025-001';
   const status = invoice?.status || 'sent';
-  const issueDate = invoice?.date || '2025-01-15';
+  const issueDate = invoice?.issueDate || '2025-01-15';
   const dueDate = invoice?.dueDate || '2025-02-14';
-  const purchaseOrder = invoice?.poReference || 'PO-2024-456';
-  const isEstimate = invoice?.type === 'Estimate';
+  const purchaseOrder = ''; // Not available in API type
+  const isEstimate = invoice?.type === 'estimate';
   
   // Line items with safe property access
   const lineItems = invoice?.items?.map(item => ({
-    ...item,
-    unitPrice: item.unitPrice || 0,
-    total: item.total || 0,
+    id: item.productId,
+    description: item.description,
     quantity: item.quantity || 0,
-  })) || [
-    {
-      id: '1',
-      description: 'Website Development',
-      quantity: 1,
-      unitPrice: 2500.00,
-      lineTotal: 2500.00,
-      total: 2500.00,
-      discount: 0,
-      taxAmount: 0,
-      taxRate: 0,
-    },
-    {
-      id: '2',
-      description: 'SEO Optimization',
-      quantity: 3,
-      unitPrice: 150.00,
-      lineTotal: 450.00,
-      total: 450.00,
-      discount: 0,
-      taxAmount: 0,
-      taxRate: 0,
-    },
-  ];
+    unitPrice: item.unitPrice || 0,
+    total: item.totalPrice || 0,
+  })) || [];
 
   // Totals with safe defaults
-  const subtotal = Number(invoice?.subtotal) || 2950.00;
-  const globalDiscount = Number(invoice?.discount) || 0;
-  const totalTax = Number(invoice?.taxTotal) || 280.00;
-  const shippingCost = Number(invoice?.shipping) || 50.00;
-  const grandTotal = Number(invoice?.total) || 3130.00;
+  const subtotal = Number(invoice?.amount) || 0;
+  const globalDiscount = 0; // Not available in API type
+  const totalTax = Number(invoice?.taxAmount) || 0;
+  const shippingCost = 0; // Not available in API type
+  const grandTotal = Number(invoice?.totalAmount) || 0;
 
   // Notes & Terms
   const notes = invoice?.notes || 'Thank you for your business. Please ensure timely payment to avoid any service interruptions.';
@@ -164,8 +235,60 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
     setShowSuccessDialog(true);
   };
 
-  const downloadPDF = () => {
-    Alert.alert('Download', 'PDF download started...');
+  const downloadPDF = async () => {
+    setShowDownloadModal(true);
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    setDownloadComplete(false);
+    
+    // Simulate download progress
+    const progressInterval = setInterval(() => {
+      setDownloadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 200);
+    
+    // Simulate download completion after 2 seconds
+    setTimeout(() => {
+      clearInterval(progressInterval);
+      setDownloadProgress(100);
+      setIsDownloading(false);
+      setDownloadComplete(true);
+      // TODO: Implement actual PDF download using expo-file-system or similar
+      // const fileUri = FileSystem.documentDirectory + `${documentNumber}.pdf`;
+    }, 2000);
+  };
+
+  const handleDownloadComplete = () => {
+    setShowDownloadModal(false);
+    setDownloadProgress(0);
+    setDownloadComplete(false);
+    setSuccessMessage(`${isEstimate ? 'Estimate' : 'Invoice'} PDF saved to your device!`);
+    setShowSuccessDialog(true);
+  };
+
+  const shareDocument = async () => {
+    try {
+      const documentType = isEstimate ? 'Estimate' : 'Invoice';
+      const result = await Share.share({
+        title: `${documentType} ${documentNumber}`,
+        message: `${documentType} ${documentNumber}\n\nClient: ${clientName}\nTotal: ${formatCurrency(grandTotal)}\nDue Date: ${formatDate(dueDate)}\n\nView details in NouPro app.`,
+        // url: invoice?.pdfUrl, // Uncomment when PDF URL is available
+      });
+      
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          // Shared with specific activity type
+          console.log('Shared via:', result.activityType);
+        }
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to share document. Please try again.');
+    }
   };
 
   const goBack = () => {
@@ -177,8 +300,58 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
     Alert.alert('Client Profile', 'Navigate to client profile functionality would be implemented here');
   };
 
-  const togglePaymentStatus = () => {
-    setPaymentStatus(prev => prev === 'paid' ? 'unpaid' : 'paid');
+  // Check if current user is the invoice creator (can modify payment status)
+  const isInvoiceOwner = invoice?.companyId === companyId;
+
+  const handlePaymentButtonPress = () => {
+    if (!isInvoiceOwner) {
+      Alert.alert('Permission Denied', 'Only the business that created this invoice can change the payment status.');
+      return;
+    }
+    // Only show options if invoice is unpaid
+    if (paymentStatus === 'unpaid') {
+      setShowPaymentOptions(true);
+    }
+  };
+
+  const handleMarkFullyPaid = () => {
+    setPaymentStatus('paid');
+    setShowPaymentOptions(false);
+    setSuccessMessage('Invoice marked as fully paid!');
+    setShowSuccessDialog(true);
+  };
+
+  const handleAddPartialPayment = () => {
+    setShowPaymentOptions(false);
+    // Navigate to ReceivedPayments screen
+    (navigation as any).navigate('ReceivedPayments', { 
+      invoiceId,
+      totalAmount: grandTotal,
+      paidAmount: 0, // TODO: Get from invoice data
+    });
+  };
+
+  const handleConvertToInvoice = () => {
+    if (!isInvoiceOwner) {
+      Alert.alert('Permission Denied', 'Only the business that created this estimate can convert it to an invoice.');
+      return;
+    }
+    // TODO: Implement convert to invoice logic
+    Alert.alert(
+      'Convert to Invoice',
+      'Are you sure you want to convert this estimate to an invoice?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Convert',
+          onPress: () => {
+            setSuccessMessage('Estimate converted to invoice successfully!');
+            setShowSuccessDialog(true);
+            // TODO: API call to convert estimate to invoice
+          },
+        },
+      ]
+    );
   };
 
   // Status color mapping
@@ -245,31 +418,49 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
     );
   }
 
-  // More options menu items
+  // More options menu items - dynamically built based on document type and ownership
   const moreOptionsItems = [
+    // Send option - only for owner and for estimates or draft invoices
+    ...(isInvoiceOwner && (isEstimate || status === 'draft') ? [{
+      id: 'send',
+      title: isEstimate ? 'Send Estimate' : 'Send Invoice',
+      description: `Send ${isEstimate ? 'estimate' : 'invoice'} to client`,
+      icon: 'send',
+    }] : []),
+    // Download PDF - always available
+    {
+      id: 'download',
+      title: 'Download PDF',
+      description: `Download ${isEstimate ? 'estimate' : 'invoice'} as PDF`,
+      icon: 'download',
+    },
     {
       id: 'share',
       title: 'Share',
-      description: 'Share invoice details',
+      description: `Share ${isEstimate ? 'estimate' : 'invoice'} details`,
       icon: 'share',
     },
-    {
+    // Delete - only for owner
+    ...(isInvoiceOwner ? [{
       id: 'delete',
       title: 'Delete',
-      description: 'Delete this invoice',
+      description: `Delete this ${isEstimate ? 'estimate' : 'invoice'}`,
       icon: 'trash-2',
-    },
+    }] : []),
   ];
 
   const handleMoreOptionSelect = (item: { id: string }) => {
-    if (item.id === 'share') {
-      // Handle share action
-      Alert.alert('Share', `Share invoice ${documentNumber}`);
+    if (item.id === 'send') {
+      sendDocument();
+    } else if (item.id === 'download') {
+      downloadPDF();
+    } else if (item.id === 'share') {
+      shareDocument();
     } else if (item.id === 'delete') {
       // Handle delete action with confirmation
       Alert.alert(
-        'Delete Invoice',
-        `Are you sure you want to delete invoice ${documentNumber}?`,
+        `Delete ${isEstimate ? 'Estimate' : 'Invoice'}`,
+        `Are you sure you want to delete ${isEstimate ? 'estimate' : 'invoice'} ${documentNumber}?`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -277,7 +468,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
             style: 'destructive',
             onPress: () => {
               // Handle delete logic here
-              Alert.alert('Deleted', 'Invoice has been deleted');
+              Alert.alert('Deleted', `${isEstimate ? 'Estimate' : 'Invoice'} has been deleted`);
               navigation.goBack();
             },
           },
@@ -339,18 +530,22 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
             )}
           </View>
           
-          {/* Payment Status Toggle Button */}
-          <TouchableOpacity 
-            style={[
-              styles.paymentToggleButton,
-              { backgroundColor: paymentStatus === 'paid' ? theme.colors.success : theme.colors.error }
-            ]}
-            onPress={togglePaymentStatus}
-          >
-            <Text style={styles.paymentToggleText}>
-              {paymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
-            </Text>
-          </TouchableOpacity>
+          {/* Payment Status Button - Only for invoices, not estimates */}
+          {!isEstimate && (
+            <TouchableOpacity 
+              style={[
+                styles.paymentToggleButton,
+                { backgroundColor: paymentStatus === 'paid' ? theme.colors.success : theme.colors.error },
+                !isInvoiceOwner && { opacity: 0.7 }
+              ]}
+              onPress={handlePaymentButtonPress}
+              disabled={paymentStatus === 'paid'}
+            >
+              <Text style={styles.paymentToggleText}>
+                {paymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* 3. Line Items Table */}
@@ -464,33 +659,44 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
 
       {/* 7. Sticky Bottom Action Bar */}
       <View style={[styles.actionBar, { backgroundColor: theme.colors.background, borderTopColor: theme.colors.borderColor }]}>
-        {isAdmin && status !== 'paid' && (
-          <TouchableOpacity
-            onPress={recordPayment}
-            style={[styles.actionButton, { backgroundColor: theme.colors.success }]}
-          >
-            <Text style={styles.actionButtonText}>Record Payment</Text>
-          </TouchableOpacity>
-        )}
-        {isAdmin && (status === 'draft' || isEstimate) && (
-          <TouchableOpacity
-            onPress={sendDocument}
-            style={[styles.actionButton, { backgroundColor: '#EA5A5A' }]}
-          >
-            <Text style={styles.actionButtonText}>
-              Send {isEstimate ? 'Estimate' : 'Invoice'}
-            </Text>
-          </TouchableOpacity>
-        )}
-        {(isAdmin || !isEstimate) && (
-          <TouchableOpacity
-            onPress={downloadPDF}
-            style={[styles.actionButton, { backgroundColor: theme.colors.surface }]}
-          >
-            <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>
-              Download PDF
-            </Text>
-          </TouchableOpacity>
+        {isEstimate ? (
+          // Estimate: Only show "Convert to Invoice" for owner
+          isInvoiceOwner && (
+            <TouchableOpacity
+              onPress={handleConvertToInvoice}
+              style={[styles.actionButton, { backgroundColor: theme.colors.primary, flex: 1 }]}
+            >
+              <Text style={styles.actionButtonText}>Convert to Invoice</Text>
+            </TouchableOpacity>
+          )
+        ) : (
+          // Invoice: Show Record Payment and Download PDF
+          <>
+            {isAdmin && status !== 'paid' && (
+              <TouchableOpacity
+                onPress={recordPayment}
+                style={[styles.actionButton, { backgroundColor: theme.colors.success }]}
+              >
+                <Text style={styles.actionButtonText}>Record Payment</Text>
+              </TouchableOpacity>
+            )}
+            {isAdmin && status === 'draft' && (
+              <TouchableOpacity
+                onPress={sendDocument}
+                style={[styles.actionButton, { backgroundColor: '#EA5A5A' }]}
+              >
+                <Text style={styles.actionButtonText}>Send Invoice</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={downloadPDF}
+              style={[styles.actionButton, { backgroundColor: theme.colors.surface }]}
+            >
+              <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>
+                Download PDF
+              </Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
 
@@ -593,53 +799,124 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
         onPrimaryAction={() => setShowSuccessDialog(false)}
       />
 
+      {/* Download PDF Modal */}
+      <Modal
+        visible={showDownloadModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !isDownloading && setShowDownloadModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.downloadModalContent, { backgroundColor: theme.colors.cardBackground }]}>
+            {!downloadComplete ? (
+              <>
+                <View style={[styles.downloadIconContainer, { backgroundColor: theme.colors.primary + '20' }]}>
+                  <Icon name="download" size={32} color={theme.colors.primary} />
+                </View>
+                <Text style={[styles.downloadTitle, { color: theme.colors.text }]}>
+                  Downloading PDF
+                </Text>
+                <Text style={[styles.downloadSubtitle, { color: theme.colors.textSecondary }]}>
+                  {isEstimate ? 'Estimate' : 'Invoice'} {documentNumber}
+                </Text>
+                
+                {/* Progress Bar */}
+                <View style={[styles.progressBarContainer, { backgroundColor: theme.colors.surface }]}>
+                  <View 
+                    style={[
+                      styles.progressBar, 
+                      { 
+                        backgroundColor: theme.colors.primary,
+                        width: `${downloadProgress}%` 
+                      }
+                    ]} 
+                  />
+                </View>
+                <Text style={[styles.progressText, { color: theme.colors.textSecondary }]}>
+                  {downloadProgress}%
+                </Text>
+              </>
+            ) : (
+              <>
+                <View style={[styles.downloadIconContainer, { backgroundColor: theme.colors.success + '20' }]}>
+                  <Icon name="checkmark-circle" size={32} color={theme.colors.success} />
+                </View>
+                <Text style={[styles.downloadTitle, { color: theme.colors.text }]}>
+                  Download Complete
+                </Text>
+                <Text style={[styles.downloadSubtitle, { color: theme.colors.textSecondary }]}>
+                  {isEstimate ? 'Estimate' : 'Invoice'} {documentNumber}.pdf
+                </Text>
+                
+                <AppButton
+                  title="Done"
+                  onPress={handleDownloadComplete}
+                  variant="primary"
+                  size="large"
+                  fullWidth
+                />
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* More Options Bottom Sheet */}
       <AppBottomSheet
         visible={showMoreOptions}
         onClose={() => setShowMoreOptions(false)}
         title="Options"
       >
-        <View style={{ gap: 12 }}>
-          {moreOptionsItems.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                padding: 16,
-                borderRadius: 12,
-                backgroundColor: theme.colors.cardBackground,
-                borderWidth: 1,
-                borderColor: theme.colors.borderColor,
-              }}
-              onPress={() => {
-                handleMoreOptionSelect(item);
-                setShowMoreOptions(false);
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={{
-                width: 48,
-                height: 48,
-                borderRadius: 12,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: theme.colors.surface,
-                marginRight: 16,
-              }}>
-                <Icon name={item.icon} size={24} color={theme.colors.text} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '500', color: theme.colors.text, marginBottom: 4 }}>
-                  {item.title}
-                </Text>
-                <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>
-                  {item.description}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {moreOptionsItems.map((item, index) => (
+          <ListItemCard
+            key={item.id}
+            avatar={{
+              type: 'icon',
+              icon: item.icon,
+              iconColor: theme.colors.text,
+              backgroundColor: theme.colors.surface,
+            }}
+            title={item.title}
+            subtitle={item.description}
+            onPress={() => {
+              handleMoreOptionSelect(item);
+              setShowMoreOptions(false);
+            }}
+            showDivider={index < moreOptionsItems.length - 1}
+          />
+        ))}
+      </AppBottomSheet>
+
+      {/* Payment Options Bottom Sheet */}
+      <AppBottomSheet
+        visible={showPaymentOptions}
+        onClose={() => setShowPaymentOptions(false)}
+        title="Payment Options"
+      >
+        <ListItemCard
+          avatar={{
+            type: 'icon',
+            icon: 'add-circle-outline',
+            iconColor: theme.colors.text,
+            backgroundColor: theme.colors.surface,
+          }}
+          title="Add Partial Payment"
+          subtitle="Record a partial payment received"
+          onPress={handleAddPartialPayment}
+          showDivider
+        />
+        <ListItemCard
+          avatar={{
+            type: 'icon',
+            icon: 'checkmark-circle',
+            iconColor: '#FFFFFF',
+            backgroundColor: theme.colors.success,
+          }}
+          title="Mark as Fully Paid"
+          subtitle="Mark invoice as completely paid"
+          onPress={handleMarkFullyPaid}
+          showDivider={false}
+        />
       </AppBottomSheet>
     </SafeAreaView>
   );
@@ -947,5 +1224,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
+  },
+  
+  // Download Modal Styles
+  downloadModalContent: {
+    width: '85%',
+    maxWidth: 320,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  downloadIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  downloadTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  downloadSubtitle: {
+    fontSize: 14,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  progressBarContainer: {
+    width: '100%',
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 }); 

@@ -47,7 +47,6 @@ export default function InvoiceActionsModal({
 const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 12,
-    paddingBottom: 40,
     gap: 8,
   },
 });

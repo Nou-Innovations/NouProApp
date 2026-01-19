@@ -205,6 +205,11 @@ export const authAPI = {
     email: string;
     password: string;
     businessName?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    countryCode?: string;
+    profilePicture?: string | null;
   }) => {
     const response = await apiClient.post('/auth/register', userData);
     return response.data;

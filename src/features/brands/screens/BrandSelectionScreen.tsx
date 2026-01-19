@@ -20,7 +20,9 @@ interface Brand {
 
 const BrandSelectionScreen: React.FC<Props> = ({ navigation, route }) => {
   const { theme: appTheme } = useTheme();
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+  // Get the initially selected brand from route params
+  const initialSelectedBrand = route.params?.selectedBrand || null;
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(initialSelectedBrand);
 
   // Process products to get unique brands with product counts
   const brands = useMemo(() => {
@@ -50,6 +52,7 @@ const BrandSelectionScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const renderBrandItem = ({ item, index }: { item: Brand; index: number }) => {
+    const isSelected = selectedBrand === item.name;
     return (
       <ListItemCard
         avatar={{
@@ -62,6 +65,8 @@ const BrandSelectionScreen: React.FC<Props> = ({ navigation, route }) => {
         subtitle={`${item.productCount} product${item.productCount !== 1 ? 's' : ''}`}
         onPress={() => handleBrandSelect(item)}
         showDivider={index < brands.length - 1}
+        selected={isSelected}
+        showCheckmark={isSelected}
       />
     );
   };
@@ -112,7 +117,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContainer: {
-    paddingBottom: 20,
   },
 });
 

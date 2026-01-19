@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.medium,
   },
   roleOptions: {
-    gap: 4,
+    gap: 8,
   },
   roleOptionButton: {
     height: 48,

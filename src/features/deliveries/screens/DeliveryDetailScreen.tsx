@@ -25,6 +25,8 @@ import { RouteProp, useNavigation, useRoute, ParamListBase, NavigationProp, useF
 import { Icon } from '@/shared/utils/icons';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import ListItemCard from '@/shared/components/ui/ListItemCard';
+import AssignStaffModal from '@/features/team/components/AssignStaffModal';
 import Pill from '@/shared/components/ui/Pill';
 import theme from '@/shared/theme';
 import mockDeliveries, { 
@@ -87,7 +89,6 @@ const DeliveryDetailScreen = () => {
     assignedRole: 'driver' | 'teamLeader' | 'staff';
   }
   const [selectedStaffList, setSelectedStaffList] = useState<SelectedStaffMember[]>([]);
-  const [tempSelectedStaffList, setTempSelectedStaffList] = useState<SelectedStaffMember[]>([]);
   const [driverStaff, setDriverStaff] = useState<SelectedStaffMember | null>(null);
   const [teamLeaderStaff, setTeamLeaderStaff] = useState<SelectedStaffMember | null>(null);
   const [selectedTransport, setSelectedTransport] = useState<any>(
@@ -146,16 +147,8 @@ const DeliveryDetailScreen = () => {
   const [orderStatusContentAnimation] = useState(new Animated.Value(0));
   const [paymentStatusOverlayAnimation] = useState(new Animated.Value(0));
   const [paymentStatusContentAnimation] = useState(new Animated.Value(0));
-  const [staffOverlayAnimation] = useState(new Animated.Value(0));
-  const [staffContentAnimation] = useState(new Animated.Value(0));
   const [transportOverlayAnimation] = useState(new Animated.Value(0));
   const [transportContentAnimation] = useState(new Animated.Value(0));
-  
-  // Animation for role buttons slide down
-  const [buttonAnimations] = useState<{[key: string]: Animated.Value}>({});
-  
-  // Animation for confirmation section
-  const [confirmationAnimation] = useState(new Animated.Value(0));
   
   // Add a new state variable for scheduling modal animation
   const [schedulingOverlayAnimation] = useState(new Animated.Value(0));
@@ -193,23 +186,6 @@ const DeliveryDetailScreen = () => {
   
   // Check if user is admin
   const isUserAdmin = true;
-
-  // Animate confirmation section when staff selection changes
-  useEffect(() => {
-    if (tempSelectedStaffList.length > 0) {
-      Animated.timing(confirmationAnimation, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(confirmationAnimation, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [tempSelectedStaffList.length, confirmationAnimation]);
 
   // Helper function to format dates
   const formatDate = (date: Date) => {
@@ -346,105 +322,6 @@ const DeliveryDetailScreen = () => {
     Alert.alert('Staff Assigned', `${staff.name} has been assigned to delivery ${delivery.id}. A notification has been sent to their device.`);
   };
 
-  // Enhanced staff selection handlers
-  const toggleStaffSelection = (staff: Staff) => {
-    console.log('=== TOGGLE STAFF SELECTION ===');
-    console.log('Staff:', staff.name, staff.id);
-    console.log('Current tempSelectedStaffList:', tempSelectedStaffList);
-    
-    const existingIndex = tempSelectedStaffList.findIndex(s => s.id === staff.id);
-    console.log('Existing index:', existingIndex);
-    
-    if (existingIndex >= 0) {
-      // Remove staff
-      console.log('Removing staff');
-      // Animate out first, then remove from list
-      if (buttonAnimations[staff.id]) {
-        Animated.timing(buttonAnimations[staff.id], {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }).start(() => {
-          // Reset animation value after animation completes
-          buttonAnimations[staff.id].setValue(0);
-        });
-      }
-      setTempSelectedStaffList(prev => {
-        const newList = prev.filter(s => s.id !== staff.id);
-        console.log('New list after removal:', newList);
-        return newList;
-      });
-    } else {
-      // Add staff with default role
-      console.log('Adding staff');
-      const newStaffMember: SelectedStaffMember = {
-        id: staff.id,
-        name: staff.name,
-        role: staff.role,
-        avatar: staff.avatar,
-        assignedRole: 'staff'
-      };
-      console.log('New staff member:', newStaffMember);
-      
-      // Initialize animation - always start from 0
-      if (!buttonAnimations[staff.id]) {
-        buttonAnimations[staff.id] = new Animated.Value(0);
-      } else {
-        // Reset to 0 if it already exists
-        buttonAnimations[staff.id].setValue(0);
-      }
-      
-      setTempSelectedStaffList(prev => {
-        const newList = [...prev, newStaffMember];
-        console.log('New list after addition:', newList);
-        return newList;
-      });
-      
-      // Animate in with a slight delay to ensure the component is rendered
-      setTimeout(() => {
-        Animated.timing(buttonAnimations[staff.id], {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
-      }, 50);
-    }
-  };
-
-  const assignRoleToStaff = (staffId: string, role: 'driver' | 'teamLeader') => {
-    setTempSelectedStaffList(prev => prev.map(staff => {
-      if (staff.id === staffId) {
-        return { ...staff, assignedRole: role };
-      }
-      // If assigning driver role, remove driver role from others
-      if (role === 'driver' && staff.assignedRole === 'driver') {
-        return { ...staff, assignedRole: 'staff' };
-      }
-      // If assigning team leader role, remove team leader role from others
-      if (role === 'teamLeader' && staff.assignedRole === 'teamLeader') {
-        return { ...staff, assignedRole: 'staff' };
-      }
-      return staff;
-    }));
-  };
-
-  const confirmStaffSelection = () => {
-    setSelectedStaffList([...tempSelectedStaffList]);
-    
-    // Set driver and team leader
-    const driver = tempSelectedStaffList.find(s => s.assignedRole === 'driver');
-    const teamLeader = tempSelectedStaffList.find(s => s.assignedRole === 'teamLeader');
-    
-    setDriverStaff(driver || null);
-    setTeamLeaderStaff(teamLeader || null);
-    
-    setShowStaffModal(false);
-    
-    // Show confirmation
-    const staffCount = tempSelectedStaffList.length;
-    Alert.alert('Staff Assigned', `${staffCount} staff member${staffCount > 1 ? 's' : ''} assigned to delivery ${delivery.id}.`);
-  };
-
   const getStaffDisplayText = () => {
     if (selectedStaffList.length === 0) {
       return selectedStaff ? selectedStaff.name : 'Assign Staff';
@@ -514,18 +391,11 @@ const DeliveryDetailScreen = () => {
   };
 
   const [searchTransport, setSearchTransport] = useState('');
-  const [searchStaff, setSearchStaff] = useState('');
   
   // Filter transports based on search
   const filteredTransports = mockTransports.filter(transport => 
     transport.name.toLowerCase().includes(searchTransport.toLowerCase()) ||
     transport.type.toLowerCase().includes(searchTransport.toLowerCase())
-  );
-
-  // Filter staff based on search
-  const filteredStaff = mockStaff.filter(staff => 
-    staff.name.toLowerCase().includes(searchStaff.toLowerCase()) ||
-    staff.role.toLowerCase().includes(searchStaff.toLowerCase())
   );
 
   // Animation constants for consistent speeds
@@ -583,27 +453,9 @@ const DeliveryDetailScreen = () => {
     animateContentOut(transportContentAnimation, () => setShowTransportModal(false));
   };
 
-  // Show staff modal with animation
+  // Show staff modal
   const handleShowStaffModal = () => {
-    // Initialize temp selection with current selection
-    setTempSelectedStaffList([...selectedStaffList]);
-    
-    // Initialize button animations for already selected staff
-    selectedStaffList.forEach(staff => {
-      if (!buttonAnimations[staff.id]) {
-        buttonAnimations[staff.id] = new Animated.Value(1);
-      }
-    });
-    
     setShowStaffModal(true);
-    animateOverlayIn(staffOverlayAnimation);
-    animateContentIn(staffContentAnimation);
-  };
-
-  // Hide staff modal with animation
-  const handleHideStaffModal = () => {
-    animateOverlayOut(staffOverlayAnimation);
-    animateContentOut(staffContentAnimation, () => setShowStaffModal(false));
   };
 
   // Show order status modal with animation
@@ -1070,254 +922,6 @@ const DeliveryDetailScreen = () => {
       </Animated.View>
     </Modal>
   );
-
-  // Enhanced Staff Selection Modal
-  const renderStaffModal = () => {
-    // Separate selected and unselected staff
-    const selectedStaffIds = tempSelectedStaffList.map(s => s.id);
-    const selectedStaff = filteredStaff.filter(staff => selectedStaffIds.includes(staff.id));
-    const unselectedStaff = filteredStaff.filter(staff => !selectedStaffIds.includes(staff.id));
-    
-    // Sort selected staff: Team leader first, then driver, then others
-    const sortedSelectedStaff = selectedStaff.sort((a, b) => {
-      const aRole = tempSelectedStaffList.find(s => s.id === a.id)?.assignedRole || 'staff';
-      const bRole = tempSelectedStaffList.find(s => s.id === b.id)?.assignedRole || 'staff';
-      
-      // Team leader comes first
-      if (aRole === 'teamLeader' && bRole !== 'teamLeader') return -1;
-      if (bRole === 'teamLeader' && aRole !== 'teamLeader') return 1;
-      
-      // Driver comes second
-      if (aRole === 'driver' && bRole === 'staff') return -1;
-      if (bRole === 'driver' && aRole === 'staff') return 1;
-      
-      // If same role, sort by name descending
-      return b.name.localeCompare(a.name);
-    });
-    
-    // Sort unselected staff by name descending
-    const sortedUnselectedStaff = unselectedStaff.sort((a, b) => b.name.localeCompare(a.name));
-    
-    // Combine: selected staff first, then unselected
-    const sortedStaff = [...sortedSelectedStaff, ...sortedUnselectedStaff];
-    
-    // DEBUG: Log the state
-    console.log('=== STAFF MODAL DEBUG ===');
-    console.log('tempSelectedStaffList:', tempSelectedStaffList);
-    console.log('selectedStaffIds:', selectedStaffIds);
-    console.log('filteredStaff length:', filteredStaff.length);
-    
-    const getStaffCardStyle = (staff: Staff) => {
-      const selectedStaffMember = tempSelectedStaffList.find(s => s.id === staff.id);
-      if (!selectedStaffMember) return styles.modalItem;
-      
-      let backgroundColor = '#F9FAFB'; // Light gray for selected
-      if (selectedStaffMember.assignedRole === 'driver') {
-        backgroundColor = '#0500FF1A'; // 10% opacity of blue
-      } else if (selectedStaffMember.assignedRole === 'teamLeader') {
-        backgroundColor = '#F59E0B1A'; // 10% opacity of warning color
-      }
-      
-      return [styles.modalItem, { backgroundColor }];
-    };
-
-    return (
-      <Modal
-        visible={showStaffModal}
-        transparent={true}
-        animationType="none"
-        onRequestClose={handleHideStaffModal}
-      >
-        <Animated.View 
-          style={[
-            styles.staffModalContainer,
-            {
-              opacity: staffOverlayAnimation,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            }
-          ]}
-        >
-          <Animated.View 
-            style={[
-              styles.staffModalContent,
-              {
-                transform: [{
-                  translateY: staffContentAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [500, 0]
-                  })
-                }]
-              }
-            ]}
-          >
-            <SafeAreaView style={{ flex: 0 }} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Assign Staff</Text>
-              <TouchableOpacity onPress={handleHideStaffModal}>
-                <Icon name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.searchContainer}>
-              <Icon name="search" size={20} color="#6B7280" />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search staff..."
-                value={searchStaff}
-                onChangeText={setSearchStaff}
-              />
-              {searchStaff.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchStaff('')}>
-                  <Icon name="close-circle" size={20} color="#6B7280" />
-                </TouchableOpacity>
-              )}
-            </View>
-            
-            <ScrollView style={styles.staffScrollView}>
-              {sortedStaff.map(staff => {
-                // Use a simpler approach - check if staff exists in tempSelectedStaffList
-                const selectedStaffMember = tempSelectedStaffList.find(s => s.id === staff.id);
-                const isSelected = !!selectedStaffMember; // Convert to boolean
-                
-                return (
-                  <View key={staff.id}>
-                    {/* Main staff row */}
-                    <View style={getStaffCardStyle(staff)}>
-                      <TouchableOpacity 
-                        style={styles.staffRow}
-                        onPress={() => toggleStaffSelection(staff)}
-                      >
-                        {/* Role Icon */}
-                        {selectedStaffMember?.assignedRole === 'driver' && (
-                          <View style={styles.roleIcon}>
-                            <Icon name="car" size={20} color="#0500FF" />
-                          </View>
-                        )}
-                        {selectedStaffMember?.assignedRole === 'teamLeader' && (
-                          <View style={styles.roleIcon}>
-                            <Icon name="star" size={20} color="#F59E0B" />
-                          </View>
-                        )}
-                        
-                        {/* Avatar */}
-                        {staff.avatar ? (
-                          <Image source={{ uri: staff.avatar }} style={styles.modalItemAvatar} />
-                        ) : (
-                          <View style={styles.modalItemAvatarPlaceholder}>
-                            <Icon name="person" size={24} color="#6B7280" />
-                          </View>
-                        )}
-                        
-                        {/* Staff info */}
-                        <View style={styles.modalItemInfo}>
-                          <Text style={styles.modalItemName}>{staff.name}</Text>
-                          <Text style={styles.modalItemDetails}>{staff.role}</Text>
-                        </View>
-                        
-                        {/* Checkbox - using unified checkbox styles */}
-                        <TouchableOpacity 
-                          style={styles.staffCheckboxContainer}
-                          onPress={() => toggleStaffSelection(staff)}
-                        >
-                          {isSelected ? (
-                            <View style={styles.checkboxChecked}>
-                              <Icon name="checkmark" size={18} color="white" />
-                            </View>
-                          ) : (
-                            <View style={styles.checkboxUnchecked} />
-                          )}
-                        </TouchableOpacity>
-                      </TouchableOpacity>
-                    </View>
-                    
-                    {/* Role assignment buttons - Only show when staff is selected */}
-                    {isSelected && (
-                      <Animated.View 
-                        style={[
-                          styles.roleAssignmentContainer,
-                          selectedStaffMember?.assignedRole === 'driver' && styles.driverSelectedBackground,
-                          selectedStaffMember?.assignedRole === 'teamLeader' && styles.teamLeaderSelectedBackground,
-                          {
-                            opacity: buttonAnimations[staff.id] || 1,
-                            transform: [{
-                              translateY: buttonAnimations[staff.id] ? 
-                                buttonAnimations[staff.id].interpolate({
-                                  inputRange: [0, 1],
-                                  outputRange: [-20, 0]
-                                }) : 0
-                            }]
-                          }
-                        ]}
-                      >
-                        <TouchableOpacity 
-                          style={[
-                            styles.roleAssignmentButton, 
-                            styles.driverAssignmentButton,
-                            selectedStaffMember?.assignedRole === 'driver' && styles.driverButtonActive,
-                            selectedStaffMember?.assignedRole === 'teamLeader' && styles.dimmedButton
-                          ]}
-                          onPress={() => assignRoleToStaff(staff.id, 'driver')}
-                        >
-                          <Icon name="car" size={16} color="white" />
-                          <Text style={styles.roleButtonText}>Driver</Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity 
-                          style={[
-                            styles.roleAssignmentButton, 
-                            styles.teamLeaderAssignmentButton,
-                            selectedStaffMember?.assignedRole === 'teamLeader' && styles.teamLeaderButtonActive,
-                            selectedStaffMember?.assignedRole === 'driver' && styles.dimmedButton
-                          ]}
-                          onPress={() => assignRoleToStaff(staff.id, 'teamLeader')}
-                        >
-                          <Icon name="star" size={16} color="white" />
-                          <Text style={styles.roleButtonText}>Team Leader</Text>
-                        </TouchableOpacity>
-                      </Animated.View>
-                    )}
-                  </View>
-                );
-              })}
-              
-              {filteredStaff.length === 0 && (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No staff found matching "{searchStaff}"</Text>
-                </View>
-              )}
-            </ScrollView>
-            
-            {/* Confirm button - only show if staff selected */}
-            {tempSelectedStaffList.length > 0 && (
-              <Animated.View 
-                style={[
-                  styles.confirmButtonContainer,
-                  {
-                    opacity: confirmationAnimation,
-                    transform: [{
-                      translateY: confirmationAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [50, 0]
-                      })
-                    }]
-                  }
-                ]}
-              >
-                <TouchableOpacity 
-                  style={styles.confirmButton}
-                  onPress={confirmStaffSelection}
-                >
-                  <Text style={styles.confirmButtonText}>
-                    Confirm ({tempSelectedStaffList.length} staff selected)
-                  </Text>
-                </TouchableOpacity>
-              </Animated.View>
-            )}
-          </Animated.View>
-        </Animated.View>
-      </Modal>
-    );
-  };
 
   // Filter warehouses based on search (using businessStore locations)
   const [searchWarehouse, setSearchWarehouse] = useState('');
@@ -2080,7 +1684,20 @@ const DeliveryDetailScreen = () => {
       </ScrollView>
       
       {/* Modals */}
-      {renderStaffModal()}
+      <AssignStaffModal
+        visible={showStaffModal}
+        onClose={() => setShowStaffModal(false)}
+        staff={mockStaff}
+        selectedStaff={selectedStaffList}
+        onConfirm={(selected) => {
+          setSelectedStaffList(selected as SelectedStaffMember[]);
+          const driver = selected.find(s => s.assignedRole === 'driver');
+          const teamLeader = selected.find(s => s.assignedRole === 'teamLeader');
+          setDriverStaff(driver as SelectedStaffMember || null);
+          setTeamLeaderStaff(teamLeader as SelectedStaffMember || null);
+        }}
+        title="Assign Staff"
+      />
       {renderTransportModal()}
       {renderOrderStatusModal()}
       {renderPaymentStatusModal()}
@@ -2283,47 +1900,24 @@ const DeliveryDetailScreen = () => {
         onClose={() => setShowMoreOptions(false)}
         title="Options"
       >
-        <View style={{ gap: 12 }}>
-          {moreOptionsItems.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                padding: 16,
-                borderRadius: 12,
-                backgroundColor: theme.colors.cardBackground,
-                borderWidth: 1,
-                borderColor: theme.colors.borderColor,
-              }}
-              onPress={() => {
-                handleMoreOptionSelect(item);
-                setShowMoreOptions(false);
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={{
-                width: 48,
-                height: 48,
-                borderRadius: 12,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: theme.colors.surface,
-                marginRight: 16,
-              }}>
-                <Icon name={item.icon} size={24} color={theme.colors.text} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '500', color: theme.colors.text, marginBottom: 4 }}>
-                  {item.title}
-                </Text>
-                <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>
-                  {item.description}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {moreOptionsItems.map((item, index) => (
+          <ListItemCard
+            key={item.id}
+            avatar={{
+              type: 'icon',
+              icon: item.icon,
+              iconColor: theme.colors.text,
+              backgroundColor: theme.colors.surface,
+            }}
+            title={item.title}
+            subtitle={item.description}
+            onPress={() => {
+              handleMoreOptionSelect(item);
+              setShowMoreOptions(false);
+            }}
+            showDivider={index < moreOptionsItems.length - 1}
+          />
+        ))}
       </AppBottomSheet>
     </SafeAreaView>
   );
@@ -3013,10 +2607,8 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   paymentStatusList: {
-    paddingBottom: 40,
   },
   orderStatusList: {
-    paddingBottom: 40,
   },
   customFieldContainer: {
     flexDirection: 'row',

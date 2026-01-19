@@ -45,8 +45,11 @@ export default function LoginScreen({ navigation }: Props) {
     setError('');
 
     try {
+      // Debug: Log what we're sending
+      console.log('[Login] Attempting login with:', { email: email.trim(), passwordLength: password.length });
+      
       // Call API and get response
-      const response = await authAPI.login(email, password);
+      const response = await authAPI.login(email.trim(), password);
       
       // Use profileStore.login() to set user + tokens + businesses
       login(
@@ -56,6 +59,8 @@ export default function LoginScreen({ navigation }: Props) {
         response.data?.businesses // optional: user's businesses
       );
     } catch (err: any) {
+      console.log('[Login] Error:', err);
+      console.log('[Login] Error response:', err.response?.data);
       setError(err.response?.data?.message || err.message || 'Failed to login');
     } finally {
       setLoading(false);

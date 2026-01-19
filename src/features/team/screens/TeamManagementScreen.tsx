@@ -568,18 +568,21 @@ export default function TeamManagementScreen() {
         }}
         title="Options"
       >
-        <TouchableOpacity
-          style={[styles.bottomSheetAction, { borderColor: appTheme.colors.error }]}
+        <ListItemCard
+          avatar={{
+            type: 'icon',
+            icon: 'flag',
+            iconColor: appTheme.colors.error,
+            backgroundColor: `${appTheme.colors.error}15`,
+          }}
+          title="Report User"
           onPress={() => {
             Alert.alert('Report', 'Report functionality coming soon');
             setShowJoinRequestOptions(false);
             setSelectedJoinRequest(null);
           }}
-        >
-          <Text style={[styles.bottomSheetActionText, { color: appTheme.colors.error }]}>
-            Report User
-          </Text>
-        </TouchableOpacity>
+          showDivider={false}
+        />
       </AppBottomSheet>
 
       {/* Pending Invite Options Bottom Sheet */}
@@ -591,8 +594,14 @@ export default function TeamManagementScreen() {
         }}
         title="Options"
       >
-        <TouchableOpacity
-          style={[styles.bottomSheetAction, { borderColor: appTheme.colors.error }]}
+        <ListItemCard
+          avatar={{
+            type: 'icon',
+            icon: 'close-circle',
+            iconColor: appTheme.colors.error,
+            backgroundColor: `${appTheme.colors.error}15`,
+          }}
+          title="Cancel Invite"
           onPress={() => {
             if (selectedPendingInvite) {
               handleCancelInvite(selectedPendingInvite);
@@ -600,11 +609,8 @@ export default function TeamManagementScreen() {
             setShowPendingInviteOptions(false);
             setSelectedPendingInvite(null);
           }}
-        >
-          <Text style={[styles.bottomSheetActionText, { color: appTheme.colors.error }]}>
-            Cancel Invite
-          </Text>
-        </TouchableOpacity>
+          showDivider={false}
+        />
       </AppBottomSheet>
     </SafeAreaView>
   );
@@ -622,10 +628,11 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   sectionsContainer: {
-    // padding handled by ListItemCard
+    width: '100%',
   },
   section: {
     marginBottom: 16,
+    width: '100%',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -633,6 +640,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     paddingTop: 12,
     paddingBottom: 16, // 16px gap before first card
+    paddingHorizontal: 12,
     gap: 8,
   },
   sectionTitle: {
@@ -640,6 +648,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
   },
   sectionContent: {
+    width: '100%',
   },
   sectionEmptyState: {
     alignItems: 'center',
@@ -756,12 +765,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   // Bottom sheet action styles
+  bottomSheetContent: {
+    paddingHorizontal: 12,
+    gap: 8,
+  },
   bottomSheetAction: {
     borderWidth: 1,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
-    marginBottom: 8,
   },
   bottomSheetActionText: {
     fontSize: 16,

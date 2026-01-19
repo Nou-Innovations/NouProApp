@@ -27,6 +27,7 @@ import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import ListItemCard from '@/shared/components/ui/ListItemCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -442,54 +443,23 @@ export default function AddLocationScreen() {
         onClose={() => setShowTypeSheet(false)}
         title="Select Location Type"
       >
-        <View style={styles.typeOptionsContainer}>
-          {LOCATION_TYPE_OPTIONS.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.typeOption,
-                {
-                  backgroundColor: locationType === option.value 
-                    ? `${appTheme.colors.primary}15` 
-                    : 'transparent',
-                  borderColor: locationType === option.value 
-                    ? appTheme.colors.primary 
-                    : appTheme.colors.borderColor,
-                }
-              ]}
-              onPress={() => handleSelectType(option.value)}
-              activeOpacity={0.7}
-            >
-              <View style={[
-                styles.typeOptionIcon,
-                { backgroundColor: appTheme.colors.surface }
-              ]}>
-                <Icon 
-                  name={option.icon as any} 
-                  size={24} 
-                  color={locationType === option.value ? appTheme.colors.primary : appTheme.colors.textSecondary} 
-                />
-              </View>
-              <View style={styles.typeOptionTextContainer}>
-                <Text style={[
-                  styles.typeOptionLabel,
-                  { 
-                    color: locationType === option.value ? appTheme.colors.primary : appTheme.colors.text,
-                    fontFamily: locationType === option.value ? theme.fonts.primary.semiBold : theme.fonts.primary.regular,
-                  }
-                ]}>
-                  {option.label}
-                </Text>
-                <Text style={[styles.typeOptionDescription, { color: appTheme.colors.textMuted }]}>
-                  {option.description}
-                </Text>
-              </View>
-              {locationType === option.value && (
-                <Icon name="checkmark" size={20} color={appTheme.colors.primary} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
+        {LOCATION_TYPE_OPTIONS.map((option, index) => (
+          <ListItemCard
+            key={option.value}
+            avatar={{
+              type: 'icon',
+              icon: option.icon,
+              iconColor: appTheme.colors.text,
+              backgroundColor: appTheme.colors.surface,
+            }}
+            title={option.label}
+            subtitle={option.description}
+            onPress={() => handleSelectType(option.value)}
+            selected={locationType === option.value}
+            showCheckmark
+            showDivider={index < LOCATION_TYPE_OPTIONS.length - 1}
+          />
+        ))}
       </AppBottomSheet>
 
       {/* Map Modal for Address Selection */}

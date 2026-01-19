@@ -68,7 +68,8 @@ export default function ProductCreateModal({
 
 const styles = StyleSheet.create({
   content: {
-    gap: 12,
+    paddingHorizontal: 12,
+    gap: 8,
   },
   actionButton: {
     borderWidth: 1,

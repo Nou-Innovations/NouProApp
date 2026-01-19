@@ -44,7 +44,7 @@ export default function BusinessLocationScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
-  const { businessData, fromProfileSwitcher } = route.params;
+  const { businessData, fromProfileSwitcher, pendingAuth } = route.params;
   
   // State
   const [selectedLocation, setSelectedLocation] = useState<SelectedLocation | null>(null);
@@ -187,6 +187,7 @@ export default function BusinessLocationScreen({ navigation, route }: Props) {
       businessData,
       location: selectedLocation,
       fromProfileSwitcher,
+      pendingAuth,
     });
   };
 

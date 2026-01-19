@@ -22,6 +22,7 @@ import { Text } from '@/shared/components/ui/Typography';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import AppButton from '@/shared/components/ui/AppButton';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import ListItemCard from '@/shared/components/ui/ListItemCard';
 import PhoneNumberField from '@/shared/components/ui/PhoneNumberField';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'BusinessBasicInfo'>;
@@ -49,6 +50,7 @@ export default function BusinessBasicInfoScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const fromProfileSwitcher = route.params?.fromProfileSwitcher ?? false;
+  const pendingAuth = route.params?.pendingAuth;
   
   // Form state
   const [businessName, setBusinessName] = useState('');
@@ -79,6 +81,7 @@ export default function BusinessBasicInfoScreen({ navigation, route }: Props) {
         website: website.trim() || undefined,
       },
       fromProfileSwitcher,
+      pendingAuth,
     });
   };
 
@@ -207,37 +210,21 @@ export default function BusinessBasicInfoScreen({ navigation, route }: Props) {
         title="Select Business Type"
       >
         <ScrollView style={styles.typeListContainer} showsVerticalScrollIndicator={false}>
-          {BUSINESS_TYPES.map((type) => (
-            <TouchableOpacity
+          {BUSINESS_TYPES.map((type, index) => (
+            <ListItemCard
               key={type}
-              style={[
-                styles.typeOption,
-                {
-                  backgroundColor: businessType === type 
-                    ? `${appTheme.colors.primary}10`
-                    : 'transparent',
-                }
-              ]}
+              avatar={{
+                type: 'icon',
+                icon: 'business-outline',
+                iconColor: appTheme.colors.text,
+                backgroundColor: appTheme.colors.surface,
+              }}
+              title={type}
               onPress={() => handleSelectType(type)}
-              activeOpacity={0.7}
-            >
-              <Text style={[
-                styles.typeOptionText,
-                { 
-                  color: businessType === type 
-                    ? appTheme.colors.primary 
-                    : appTheme.colors.text,
-                  fontFamily: businessType === type 
-                    ? theme.fonts.primary.semiBold 
-                    : theme.fonts.primary.regular,
-                }
-              ]}>
-                {type}
-              </Text>
-              {businessType === type && (
-                <Icon name="checkmark" size={20} color={appTheme.colors.primary} />
-              )}
-            </TouchableOpacity>
+              selected={businessType === type}
+              showCheckmark
+              showDivider={index < BUSINESS_TYPES.length - 1}
+            />
           ))}
         </ScrollView>
       </AppBottomSheet>

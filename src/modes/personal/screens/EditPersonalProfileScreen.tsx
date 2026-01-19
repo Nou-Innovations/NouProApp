@@ -20,6 +20,7 @@ import Avatar from '@/shared/components/ui/Avatar';
 import { AppModal } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import ImageUploadField from '@/shared/components/ui/ImageUploadField';
 import { imageService } from '@/shared/services/imageService';
 import { authService } from '@/shared/services/authService';
 import { UserPrivacySettings } from '@/shared/types/user';
@@ -146,86 +147,40 @@ export default function EditPersonalProfileScreen() {
     navigation.goBack();
   };
 
-  const handleChangeAvatar = () => {
-    const handleCamera = async () => {
-      setIsUploadingAvatar(true);
-      try {
-        const cameraResult = await imageService.openCamera();
-        if (cameraResult.success && cameraResult.imageUri) {
-          const uploadResult = await imageService.uploadProfilePicture({
-            userId: currentUser?.id || '1',
-            imageUri: cameraResult.imageUri,
-            imageType: 'profile',
-          });
+  const handleAvatarSelected = async (imageUri: string) => {
+    setIsUploadingAvatar(true);
+    try {
+      const uploadResult = await imageService.uploadProfilePicture({
+        userId: currentUser?.id || '1',
+        imageUri: imageUri,
+        imageType: 'profile',
+      });
 
-          if (uploadResult.success && uploadResult.imageUri) {
-            updateCurrentUser({ avatar_url: uploadResult.imageUri });
+      if (uploadResult.success && uploadResult.imageUri) {
+        updateCurrentUser({ avatar_url: uploadResult.imageUri });
 
-            const backendResult = await authService.updateProfilePicture(
-              currentUser?.id || '1',
-              uploadResult.imageUri
-            );
-            if (backendResult.success) {
-              setSuccessMessage('Profile picture updated successfully!');
-              setShowSuccessDialog(true);
-            } else {
-              Alert.alert(
-                'Warning',
-                'Profile picture updated locally but failed to sync with server.'
-              );
-            }
-          } else {
-            Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
-          }
+        const backendResult = await authService.updateProfilePicture(
+          currentUser?.id || '1',
+          uploadResult.imageUri
+        );
+        if (backendResult.success) {
+          setSuccessMessage('Profile picture updated successfully!');
+          setShowSuccessDialog(true);
+        } else {
+          Alert.alert(
+            'Warning',
+            'Profile picture updated locally but failed to sync with server.'
+          );
         }
-      } catch (error) {
-        console.error('Camera error:', error);
-        Alert.alert('Error', 'An error occurred while taking the photo.');
-      } finally {
-        setIsUploadingAvatar(false);
+      } else {
+        Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
       }
-    };
-
-    const handleGallery = async () => {
-      setIsUploadingAvatar(true);
-      try {
-        const galleryResult = await imageService.openGallery();
-        if (galleryResult.success && galleryResult.imageUri) {
-          const uploadResult = await imageService.uploadProfilePicture({
-            userId: currentUser?.id || '1',
-            imageUri: galleryResult.imageUri,
-            imageType: 'profile',
-          });
-
-          if (uploadResult.success && uploadResult.imageUri) {
-            updateCurrentUser({ avatar_url: uploadResult.imageUri });
-
-            const backendResult = await authService.updateProfilePicture(
-              currentUser?.id || '1',
-              uploadResult.imageUri
-            );
-            if (backendResult.success) {
-              setSuccessMessage('Profile picture updated successfully!');
-              setShowSuccessDialog(true);
-            } else {
-              Alert.alert(
-                'Warning',
-                'Profile picture updated locally but failed to sync with server.'
-              );
-            }
-          } else {
-            Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
-          }
-        }
-      } catch (error) {
-        console.error('Gallery error:', error);
-        Alert.alert('Error', 'An error occurred while selecting the photo.');
-      } finally {
-        setIsUploadingAvatar(false);
-      }
-    };
-
-    imageService.showImagePickerOptions(handleCamera, handleGallery);
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      Alert.alert('Error', 'An error occurred while uploading the photo.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   // Format date for experience
@@ -256,30 +211,14 @@ export default function EditPersonalProfileScreen() {
   const renderProfileHeader = () => {
     return (
       <View style={styles.profileHeader}>
-        <TouchableOpacity
-          onPress={handleChangeAvatar}
-          style={styles.avatarContainer}
-          disabled={isUploadingAvatar}
-        >
-          <Avatar
-            userId={currentUser?.id || '1'}
-            userName={currentUser?.name || 'User'}
-            imageUri={currentUser?.avatar_url}
-            size={120}
-            style={styles.avatar}
-            textStyle={{ fontSize: 48 }}
-          />
-          {isUploadingAvatar && (
-            <View style={styles.uploadingOverlay}>
-              <ActivityIndicator size="small" color="white" />
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleChangeAvatar} disabled={isUploadingAvatar}>
-          <Text style={[styles.changePictureText, { color: appTheme.colors.primary }]}>
-            Change picture
-          </Text>
-        </TouchableOpacity>
+        <ImageUploadField
+          imageUri={currentUser?.avatar_url}
+          onImageSelected={handleAvatarSelected}
+          placeholder="Add Profile picture"
+          changeText="Change picture"
+          size={200}
+          isLoading={isUploadingAvatar}
+        />
       </View>
     );
   };
@@ -670,28 +609,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 24,
     paddingHorizontal: 12,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 8,
-  },
-  avatar: {
-    borderRadius: 8,
-  },
-  uploadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  changePictureText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.bold,
   },
   section: {
     paddingHorizontal: 12,

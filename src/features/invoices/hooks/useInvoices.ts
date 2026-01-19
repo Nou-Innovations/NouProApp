@@ -49,7 +49,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
   const { locationId, autoFetch = true } = options;
   
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMockData, setIsMockData] = useState(false);
   
@@ -65,6 +65,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
       }
       setInvoices(transformMockInvoices(mockInvoicesData));
       setIsMockData(true);
+      setLoading(false);
       return;
     }
 

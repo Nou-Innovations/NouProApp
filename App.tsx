@@ -41,8 +41,9 @@ import { userAvatarService } from '@/shared/services/userAvatarService';
 import LoginScreen from '@/features/auth/screens/LoginScreen';
 import RegisterScreen from '@/features/auth/screens/RegisterScreen';
 import CreateAccountScreen from '@/features/auth/screens/CreateAccountScreen';
-import PhoneVerificationScreen from '@/features/auth/screens/PhoneVerificationScreen';
-import EmailVerificationScreen from '@/features/auth/screens/EmailVerificationScreen';
+// OTP screens disabled for now - keeping code but not linking to navigation
+// import PhoneVerificationScreen from '@/features/auth/screens/PhoneVerificationScreen';
+// import EmailVerificationScreen from '@/features/auth/screens/EmailVerificationScreen';
 import CreatePasswordScreen from '@/features/auth/screens/CreatePasswordScreen';
 import UploadProfilePictureScreen from '@/features/auth/screens/UploadProfilePictureScreen';
 import ChoosePathScreen from '@/features/auth/screens/ChoosePathScreen';
@@ -60,6 +61,7 @@ import InboxOverlayScreen from '@/features/inbox/screens/InboxOverlayScreen';
 // Screens - Invoices
 import CreateInvoiceScreen from '@/features/invoices/screens/CreateInvoiceScreen';
 import InvoiceDetailsScreen from '@/features/invoices/screens/InvoiceDetailsScreen';
+import ReceivedPaymentsScreen from '@/features/invoices/screens/ReceivedPaymentsScreen';
 
 // Screens - Profile
 import BusinessProfileScreen from '@/features/profile/screens/BusinessProfileScreen';
@@ -68,6 +70,7 @@ import UserProfileScreen from '@/features/profile/screens/UserProfileScreen';
 // Screens - Brands
 import CreateBrandScreen from '@/features/brands/screens/CreateBrandScreen';
 import BrandSelectionScreen from '@/features/brands/screens/BrandSelectionScreen';
+import SelectProductsForBrandScreen from '@/features/brands/screens/SelectProductsForBrandScreen';
 
 // Screens - Products
 import CreateProductScreen from '@/features/products/screens/CreateProductScreen';
@@ -200,8 +203,9 @@ function AuthNavigator() {
       
       {/* Personal Registration Flow */}
       <AuthStack.Screen name="CreateAccount" component={CreateAccountScreen} />
-      <AuthStack.Screen name="PhoneVerification" component={PhoneVerificationScreen} />
-      <AuthStack.Screen name="EmailVerification" component={EmailVerificationScreen} />
+      {/* OTP screens disabled for now - code kept but not linked to navigation */}
+      {/* <AuthStack.Screen name="PhoneVerification" component={PhoneVerificationScreen} /> */}
+      {/* <AuthStack.Screen name="EmailVerification" component={EmailVerificationScreen} /> */}
       <AuthStack.Screen name="CreatePassword" component={CreatePasswordScreen} />
       <AuthStack.Screen name="UploadProfilePicture" component={UploadProfilePictureScreen} />
       <AuthStack.Screen name="ChoosePath" component={ChoosePathScreen} />
@@ -285,12 +289,14 @@ function AppNavigator() {
         {/* Invoice Screens */}
         <RootStack.Screen name="CreateInvoice" component={CreateInvoiceScreen} />
         <RootStack.Screen name="InvoiceDetails" component={InvoiceDetailsScreen} />
+        <RootStack.Screen name="ReceivedPayments" component={ReceivedPaymentsScreen} />
         
         {/* Product Screens */}
         <RootStack.Screen name="CreateBrand" component={CreateBrandScreen} />
         <RootStack.Screen name="CreateProduct" component={CreateProductScreen} />
         <RootStack.Screen name="ProductDetail" component={ProductDetailScreen} />
         <RootStack.Screen name="BrandSelection" component={BrandSelectionScreen} />
+        <RootStack.Screen name="SelectProductsForBrand" component={SelectProductsForBrandScreen} />
         
         {/* Search Screens */}
         <RootStack.Screen name="CompanySearch" component={CompanySearchScreen} />
@@ -341,6 +347,9 @@ function AppNavigator() {
         <RootStack.Screen name="BusinessLocation" component={BusinessLocationScreen} />
         <RootStack.Screen name="BusinessHours" component={BusinessHoursScreen} />
         <RootStack.Screen name="UploadBusinessLogo" component={UploadBusinessLogoScreen} />
+        
+        {/* Join Company (for onboarding from main app) */}
+        <RootStack.Screen name="SelectCompany" component={SelectCompanyScreen} />
       </RootStack.Navigator>
       <StatusBar style={isDarkMode ? "light" : "dark"} />
     </NavigationContainer>

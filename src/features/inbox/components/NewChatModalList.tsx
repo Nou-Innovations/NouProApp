@@ -344,7 +344,6 @@ const styles = StyleSheet.create({
     maxHeight: 450,
   },
   scrollContent: {
-    paddingBottom: 40,
   },
   emptyState: {
     flex: 1,

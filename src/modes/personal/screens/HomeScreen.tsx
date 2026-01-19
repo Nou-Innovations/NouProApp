@@ -13,7 +13,7 @@
  * - Infinite scroll
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -43,7 +43,19 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
   const currentUser = useProfileStore((state) => state.currentUser);
+  const isNewUser = useProfileStore((state) => state.isNewUser);
+  const clearNewUserFlag = useProfileStore((state) => state.clearNewUserFlag);
   const { unreadCount, inboxUnreadCount } = useNotifications();
+  
+  // Clear new user flag after showing welcome message (after a delay)
+  useEffect(() => {
+    if (isNewUser) {
+      const timer = setTimeout(() => {
+        clearNewUserFlag();
+      }, 5000); // Clear after 5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [isNewUser, clearNewUserFlag]);
   
   // ========================================================================
   // ARCHITECTURE: Data comes from useFeed hook (API → Service → Hook → Screen)
@@ -91,16 +103,18 @@ export default function HomeScreen() {
     console.log('Connect/Disconnect:', companyId, isConnected);
   };
 
-  // Get dynamic greeting based on time of day
+  // Get dynamic greeting based on time of day or new user status
   const getGreeting = () => {
+    if (isNewUser) return 'Welcome';
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) return 'Good morning';
     if (hour >= 12 && hour < 17) return 'Good afternoon';
     return 'Good evening';
   };
 
-  // Get emoji based on time of day
+  // Get emoji based on time of day or new user status
   const getGreetingEmoji = () => {
+    if (isNewUser) return '👋';
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 17) return '☀️';
     return '👋';
@@ -118,7 +132,7 @@ export default function HomeScreen() {
     return (
       <View style={styles.badge}>
         <Text style={styles.badgeText}>
-          {count > 99 ? '99+' : count.toString()}
+          {count > 9 ? '9+' : count.toString()}
         </Text>
       </View>
     );
@@ -168,7 +182,7 @@ export default function HomeScreen() {
       </Text>
       <View style={styles.userNameRow}>
         <Text style={[styles.userName, { color: appTheme.colors.text }]}>
-          {getUserFirstName()}
+          {getUserFirstName()}{isNewUser ? '!' : ''}
         </Text>
         <Text style={styles.greetingEmoji}>{getGreetingEmoji()}</Text>
       </View>
@@ -340,7 +354,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 2,
     right: 2,
-    backgroundColor: '#D23030',
+    backgroundColor: theme.colors.accent,
     borderRadius: 10,
     minWidth: 18,
     height: 18,
@@ -349,7 +363,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: theme.colors.textInverse,
     fontSize: 10,
     fontFamily: theme.fonts.primary.bold,
   },

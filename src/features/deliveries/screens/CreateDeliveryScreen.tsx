@@ -6,7 +6,7 @@
  * Transfer fields: Destination Location, Transfer ID, Select Items, Schedule for, Transport, Staff, Notes
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,10 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
-  FlatList,
+  Image,
+  TextInput,
+  Animated,
+  Easing,
 } from 'react-native';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,7 +31,95 @@ import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import { RootStackParamList } from '@/shared/types/navigation';
-import { mockStaff, mockTransportModes, Staff, TransportMode } from '@/shared/data/mockDeliveries';
+import { mockStaff, Staff } from '@/shared/data/mockDeliveries';
+
+// Business vehicle types and interface
+type VehicleType = 'bicycle' | 'motorcycle' | 'scooter' | 'car' | 'van' | 'pickup' | 'truck' | 'lorry' | 'other';
+type VehicleStatus = 'available' | 'in_use' | 'maintenance' | 'inactive';
+
+interface BusinessVehicle {
+  id: string;
+  name: string;
+  vehicle_type: VehicleType;
+  license_plate?: string;
+  status: VehicleStatus;
+}
+
+// Get icon for vehicle type
+const getVehicleIcon = (type: VehicleType): string => {
+  switch (type) {
+    case 'bicycle': return 'bicycle';
+    case 'motorcycle': return 'bicycle';
+    case 'scooter': return 'bicycle';
+    case 'car': return 'car';
+    case 'van': return 'bus';
+    case 'pickup': return 'truck';
+    case 'truck': return 'truck';
+    case 'lorry': return 'truck';
+    default: return 'car';
+  }
+};
+
+// Get status color for vehicle
+const getVehicleStatusColor = (status: VehicleStatus): string => {
+  switch (status) {
+    case 'available': return '#10B981'; // success green
+    case 'in_use': return '#3B82F6'; // info blue
+    case 'maintenance': return '#F59E0B'; // warning orange
+    case 'inactive': return '#9CA3AF'; // gray
+    default: return '#9CA3AF';
+  }
+};
+
+// Get status label for vehicle
+const getVehicleStatusLabel = (status: VehicleStatus): string => {
+  switch (status) {
+    case 'available': return 'Available';
+    case 'in_use': return 'In Use';
+    case 'maintenance': return 'Maintenance';
+    case 'inactive': return 'Inactive';
+    default: return status;
+  }
+};
+
+// Mock business vehicles (same as TransportsScreen)
+const mockBusinessVehicles: BusinessVehicle[] = [
+  {
+    id: 'trans-1',
+    name: 'Delivery Van 01',
+    vehicle_type: 'van',
+    license_plate: 'MU-1234',
+    status: 'available',
+  },
+  {
+    id: 'trans-2',
+    name: 'Cargo Truck',
+    vehicle_type: 'truck',
+    license_plate: 'MU-5678',
+    status: 'available',
+  },
+  {
+    id: 'trans-3',
+    name: 'Express Bike',
+    vehicle_type: 'motorcycle',
+    license_plate: 'MU-9012',
+    status: 'available',
+  },
+  {
+    id: 'trans-4',
+    name: 'Delivery Van 02',
+    vehicle_type: 'van',
+    license_plate: 'MU-3456',
+    status: 'maintenance',
+  },
+  {
+    id: 'trans-5',
+    name: 'City Car',
+    vehicle_type: 'car',
+    license_plate: 'MU-7890',
+    status: 'available',
+  },
+];
 import { mockBrands } from '@/shared/data/businessProfile';
 import { formatCurrency } from '@/shared/data/mockOrders';
 import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, TimeSelector, ListItemCard } from '@/shared/components/ui';
@@ -88,7 +179,7 @@ export default function CreateDeliveryScreen() {
   const [documentId, setDocumentId] = useState(generateId(isTransfer ? 'TRF-' : 'ORD-'));
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [scheduledDate, setScheduledDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000));
-  const [selectedTransport, setSelectedTransport] = useState<TransportMode | null>(null);
+  const [selectedTransport, setSelectedTransport] = useState<BusinessVehicle | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [notes, setNotes] = useState('');
   
@@ -106,6 +197,13 @@ export default function CreateDeliveryScreen() {
   const [clientSearch, setClientSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
   const [staffSearch, setStaffSearch] = useState('');
+  
+  // Track which product input should be focused and if user has edited
+  const [focusedProductId, setFocusedProductId] = useState<string | null>(null);
+  const [activeInputId, setActiveInputId] = useState<string | null>(null);
+  const [editedProducts, setEditedProducts] = useState<Set<string>>(new Set());
+  const inputRefs = useRef<{ [key: string]: TextInput | null }>({});
+  const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
   
   // Get all products from mock data
   const allProducts = useMemo(() => {
@@ -170,22 +268,84 @@ export default function CreateDeliveryScreen() {
     }
   };
 
-  // Handle item toggle
-  const handleToggleItem = (product: any) => {
-    const existingIndex = selectedItems.findIndex((item) => item.product_id === product.id);
+  // Get or create animation value for a product
+  const getAnimValue = (productId: string) => {
+    if (!animationRefs.current[productId]) {
+      animationRefs.current[productId] = new Animated.Value(0);
+    }
+    return animationRefs.current[productId];
+  };
+
+  // Handle adding item and focus input with animation
+  const handleAddItem = (product: any) => {
+    // Initialize animation value
+    const animValue = getAnimValue(product.id);
+    animValue.setValue(0);
     
-    if (existingIndex >= 0) {
-      setSelectedItems((prev) => prev.filter((item) => item.product_id !== product.id));
-    } else {
-      setSelectedItems((prev) => [
-        ...prev,
-        {
-          product_id: product.id,
-          product_name: product.name,
-          quantity: 1,
-          unit_price: product.price,
-        },
-      ]);
+    setSelectedItems((prev) => [
+      ...prev,
+      {
+        product_id: product.id,
+        product_name: product.name,
+        quantity: 1,
+        unit_price: product.price,
+      },
+    ]);
+    
+    // Animate in with ease-in-out
+    Animated.timing(animValue, {
+      toValue: 1,
+      duration: 200,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+    
+    // Set focus state and focus the input after render
+    setFocusedProductId(product.id);
+    setActiveInputId(product.id);
+    setTimeout(() => {
+      inputRefs.current[product.id]?.focus();
+    }, 150);
+  };
+
+  // Handle removing item with animation
+  const handleRemoveItem = (productId: string) => {
+    const animValue = getAnimValue(productId);
+    
+    // Animate out with ease-in-out
+    Animated.timing(animValue, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: true,
+    }).start(() => {
+      setSelectedItems((prev) => prev.filter((item) => item.product_id !== productId));
+      setEditedProducts((prev) => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
+      setFocusedProductId(null);
+    });
+  };
+  
+  // Handle quantity input change - empty field with placeholder
+  const handleQuantityInput = (productId: string, text: string) => {
+    if (text === '') {
+      // User deleted everything, mark as not edited (will show placeholder)
+      setEditedProducts((prev) => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
+      handleQuantityChange(productId, 1); // Keep internal value at 1
+      return;
+    }
+    
+    const num = parseInt(text, 10);
+    if (!isNaN(num) && num > 0) {
+      setEditedProducts((prev) => new Set(prev).add(productId));
+      handleQuantityChange(productId, num);
     }
   };
 
@@ -499,7 +659,6 @@ export default function CreateDeliveryScreen() {
                 </Text>
               </View>
             )}
-            <View style={{ height: 20 }} />
           </ScrollView>
         </View>
       </AppBottomSheet>
@@ -540,7 +699,6 @@ export default function CreateDeliveryScreen() {
                 </Text>
               </View>
             )}
-            <View style={{ height: 20 }} />
           </ScrollView>
         </View>
       </AppBottomSheet>
@@ -553,8 +711,9 @@ export default function CreateDeliveryScreen() {
           setItemSearch('');
         }}
         title="Select Items"
+        fullHeight
       >
-        <View style={styles.bottomSheetContent}>
+        <View style={styles.bottomSheetContentFullHeight}>
           {/* Summary Bar */}
           {selectedItems.length > 0 && (
             <View style={[styles.itemsSummaryBar, { backgroundColor: appTheme.colors.surface }]}>
@@ -587,59 +746,101 @@ export default function CreateDeliveryScreen() {
             containerStyle={styles.searchBarContainer}
           />
           
-          <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
-            {filteredProducts.map((product) => {
+          <ScrollView 
+            style={styles.modalScrollListFullHeight} 
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {filteredProducts.map((product, index) => {
               const quantity = getItemQuantity(product.id);
               const isSelected = quantity > 0;
 
               return (
-                <View
-                  key={product.id}
-                  style={[
-                    styles.productItem,
-                    { 
-                      backgroundColor: appTheme.colors.cardBackground, 
-                      borderColor: isSelected ? appTheme.colors.primary : appTheme.colors.borderColor,
-                    },
-                  ]}
-                >
-                  <View style={styles.productInfo}>
-                    <Text style={[styles.productBrand, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.medium }]}>
-                      {product.brandName}
-                    </Text>
-                    <Text style={[styles.productName, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.semiBold }]} numberOfLines={1}>
-                      {product.name}
-                    </Text>
-                    <Text style={[styles.productPrice, { color: appTheme.colors.primary, fontFamily: theme.fonts.primary.bold }]}>
-                      {formatCurrency(product.price)}
-                    </Text>
-                  </View>
-
-                  {isSelected ? (
-                    <View style={styles.quantityControls}>
-                      <TouchableOpacity
-                        style={[styles.quantityButton, { backgroundColor: appTheme.colors.surface }]}
-                        onPress={() => handleQuantityChange(product.id, quantity - 1)}
-                      >
-                        <Icon name="remove" size={18} color={appTheme.colors.primary} />
-                      </TouchableOpacity>
-                      <Text style={[styles.quantityText, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.bold }]}>
-                        {quantity}
+                <View key={product.id}>
+                  <View style={styles.productItem}>
+                    {/* Product Image */}
+                    <Image
+                      source={{ uri: product.imageUrl }}
+                      style={styles.productImage}
+                    />
+                    
+                    <View style={styles.productInfo}>
+                      <Text style={[styles.productBrand, { color: appTheme.colors.textMuted, fontFamily: theme.fonts.primary.medium }]}>
+                        {product.brandName}
                       </Text>
-                      <TouchableOpacity
-                        style={[styles.quantityButton, { backgroundColor: appTheme.colors.surface }]}
-                        onPress={() => handleQuantityChange(product.id, quantity + 1)}
-                      >
-                        <Icon name="add" size={18} color={appTheme.colors.primary} />
-                      </TouchableOpacity>
+                      <Text style={[styles.productName, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.bold }]} numberOfLines={1}>
+                        {product.name}
+                      </Text>
+                      <Text style={[styles.productPrice, { color: appTheme.colors.textSecondary, fontFamily: theme.fonts.primary.semiBold }]}>
+                        {formatCurrency(product.price)}
+                      </Text>
                     </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={[styles.addItemButton, { backgroundColor: appTheme.colors.primary }]}
-                      onPress={() => handleToggleItem(product)}
-                    >
-                      <Icon name="add" size={20} color="#FFFFFF" />
-                    </TouchableOpacity>
+
+                    {isSelected ? (
+                      <Animated.View 
+                        style={[
+                          styles.selectedItemControls,
+                          {
+                            opacity: getAnimValue(product.id),
+                            transform: [{
+                              scale: getAnimValue(product.id).interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [0.8, 1],
+                              }),
+                            }],
+                          }
+                        ]}
+                      >
+                        <View style={[
+                          styles.quantityInputContainer,
+                          { 
+                            backgroundColor: activeInputId === product.id ? appTheme.colors.cardBackground : appTheme.colors.surface,
+                            borderColor: activeInputId === product.id ? appTheme.colors.primary : appTheme.colors.borderColor,
+                          }
+                        ]}>
+                          <TextInput
+                            ref={(ref) => { inputRefs.current[product.id] = ref; }}
+                            style={[
+                              styles.quantityInput,
+                              { 
+                                color: appTheme.colors.primary, 
+                                fontFamily: theme.fonts.primary.bold,
+                              }
+                            ]}
+                            value={editedProducts.has(product.id) ? String(quantity) : ''}
+                            placeholder="1"
+                            placeholderTextColor={appTheme.colors.textMuted}
+                            onChangeText={(text) => handleQuantityInput(product.id, text)}
+                            onFocus={() => setActiveInputId(product.id)}
+                            onBlur={() => {
+                              setActiveInputId(null);
+                              if (!editedProducts.has(product.id) || quantity === 0) {
+                                handleRemoveItem(product.id);
+                              }
+                            }}
+                            keyboardType="number-pad"
+                            maxLength={5}
+                            selectionColor={appTheme.colors.primary}
+                          />
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.removeItemButton, { backgroundColor: appTheme.colors.surface }]}
+                          onPress={() => handleRemoveItem(product.id)}
+                        >
+                          <Icon name="close" size={18} color={appTheme.colors.text} />
+                        </TouchableOpacity>
+                      </Animated.View>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.addItemButton, { backgroundColor: appTheme.colors.primary }]}
+                        onPress={() => handleAddItem(product)}
+                      >
+                        <Icon name="add" size={18} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {index < filteredProducts.length - 1 && (
+                    <View style={[styles.productDivider, { backgroundColor: appTheme.colors.surface }]} />
                   )}
                 </View>
               );
@@ -652,7 +853,6 @@ export default function CreateDeliveryScreen() {
                 </Text>
               </View>
             )}
-            <View style={{ height: 40 }} />
           </ScrollView>
         </View>
       </AppBottomSheet>
@@ -717,30 +917,48 @@ export default function CreateDeliveryScreen() {
       <AppBottomSheet
         visible={showTransportModal}
         onClose={() => setShowTransportModal(false)}
-        title="Select Transport"
+        title="Select Vehicle"
       >
         <View style={styles.bottomSheetContent}>
           <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
-            {mockTransportModes.map((item, index) => (
-              <ListItemCard
-                key={item.id}
-                avatar={{
-                  type: 'icon',
-                  icon: item.icon,
-                  iconColor: '#FFFFFF',
-                  backgroundColor: appTheme.colors.info,
-                }}
-                title={item.name}
-                onPress={() => {
-                  setSelectedTransport(item);
-                  setShowTransportModal(false);
-                }}
-                selected={selectedTransport?.id === item.id}
-                showCheckmark
-                showDivider={index < mockTransportModes.length - 1}
-              />
-            ))}
-            <View style={{ height: 20 }} />
+            {mockBusinessVehicles
+              .filter(v => v.status !== 'inactive') // Hide inactive vehicles
+              .map((item, index, arr) => {
+                const isAvailable = item.status === 'available';
+                return (
+                  <ListItemCard
+                    key={item.id}
+                    avatar={{
+                      type: 'icon',
+                      icon: getVehicleIcon(item.vehicle_type),
+                      iconColor: appTheme.colors.primary,
+                      backgroundColor: appTheme.colors.surface,
+                    }}
+                    title={item.name}
+                    subtitle={item.license_plate ? `${item.vehicle_type.charAt(0).toUpperCase() + item.vehicle_type.slice(1)} • ${item.license_plate}` : item.vehicle_type.charAt(0).toUpperCase() + item.vehicle_type.slice(1)}
+                    onPress={isAvailable ? () => {
+                      setSelectedTransport(item);
+                      setShowTransportModal(false);
+                    } : undefined}
+                    selected={selectedTransport?.id === item.id}
+                    showCheckmark
+                    statusPill={{
+                      text: getVehicleStatusLabel(item.status),
+                      color: getVehicleStatusColor(item.status),
+                    }}
+                    showDivider={index < arr.length - 1}
+                    disabled={!isAvailable}
+                  />
+                );
+            })}
+            {mockBusinessVehicles.filter(v => v.status !== 'inactive').length === 0 && (
+              <View style={styles.emptyState}>
+                <Icon name="car-outline" size={40} color={appTheme.colors.textLight} />
+                <Text style={[styles.emptyText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
+                  No vehicles available
+                </Text>
+              </View>
+            )}
           </ScrollView>
         </View>
       </AppBottomSheet>
@@ -791,7 +1009,6 @@ export default function CreateDeliveryScreen() {
                 </Text>
               </View>
             )}
-            <View style={{ height: 20 }} />
           </ScrollView>
         </View>
       </AppBottomSheet>
@@ -903,12 +1120,18 @@ const styles = StyleSheet.create({
   bottomSheetContent: {
     maxHeight: 500,
   },
+  bottomSheetContentFullHeight: {
+    flex: 1,
+  },
   searchBarContainer: {
     marginHorizontal: 12,
     marginBottom: 12,
   },
   modalScrollList: {
     maxHeight: 400,
+  },
+  modalScrollListFullHeight: {
+    flex: 1,
   },
   // Empty state for selection modals
   emptyState: {
@@ -926,24 +1149,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 8,
   },
   summaryInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   summaryCount: {
-    fontSize: 15,
+    fontSize: 14,
   },
   summaryTotal: {
-    fontSize: 16,
+    fontSize: 15,
   },
   doneButton: {
-    paddingHorizontal: 24,
-    height: 40,
+    paddingHorizontal: 20,
+    height: 36,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -955,47 +1180,65 @@ const styles = StyleSheet.create({
   productItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  productImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: '#F0F0F0',
   },
   productInfo: {
     flex: 1,
+    gap: 2,
   },
   productBrand: {
-    fontSize: 11,
-    marginBottom: 2,
+    fontSize: 12,
     textTransform: 'uppercase',
   },
   productName: {
-    fontSize: 15,
-    marginBottom: 4,
+    fontSize: 16,
   },
   productPrice: {
     fontSize: 14,
   },
-  quantityControls: {
+  productDivider: {
+    height: 1,
+    marginHorizontal: 12,
+  },
+  selectedItemControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
-  quantityButton: {
+  quantityInputContainer: {
+    width: 96,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityInput: {
+    width: '100%',
+    height: '100%',
+    fontSize: 15,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  addItemButton: {
     width: 36,
     height: 36,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  quantityText: {
-    fontSize: 16,
-    minWidth: 24,
-    textAlign: 'center',
-  },
-  addItemButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  removeItemButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },

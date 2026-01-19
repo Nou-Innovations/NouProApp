@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
-import AppButton from '@/shared/components/ui/AppButton';
+import { useTheme } from '@/shared/theme/ThemeProvider';
 
 interface DeliveryCreateModalProps {
   visible: boolean;
@@ -16,29 +16,43 @@ export default function DeliveryCreateModal({
   onCreateDelivery,
   onCreateTransfer,
 }: DeliveryCreateModalProps) {
-  const handleCreateDelivery = () => {
-    onCreateDelivery();
+  const { theme } = useTheme();
+
+  const handleActionPress = (action: 'delivery' | 'transfer') => {
+    if (action === 'delivery') {
+      onCreateDelivery();
+    } else {
+      onCreateTransfer();
+    }
     onClose();
   };
 
-  const handleCreateTransfer = () => {
-    onCreateTransfer();
-    onClose();
-  };
+  const actionItems = [
+    { id: 'delivery', title: 'Create new Delivery' },
+    { id: 'transfer', title: 'Create new Transfer' },
+  ];
 
   return (
     <AppBottomSheet visible={visible} onClose={onClose} title="Actions">
       <View style={styles.content}>
-        <AppButton
-          title="Create a new Delivery"
-          onPress={handleCreateDelivery}
-          variant="outline"
-        />
-        <AppButton
-          title="Create a new Transfer"
-          onPress={handleCreateTransfer}
-          variant="outline"
-        />
+        {actionItems.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={[
+              styles.actionButton, 
+              { 
+                backgroundColor: theme.colors.cardBackground, 
+                borderColor: theme.colors.borderColor 
+              }
+            ]}
+            onPress={() => handleActionPress(item.id as 'delivery' | 'transfer')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>
+              {item.title}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </AppBottomSheet>
   );
@@ -47,7 +61,18 @@ export default function DeliveryCreateModal({
 const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 12,
-    paddingBottom: 40,
     gap: 8,
+  },
+  actionButton: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });

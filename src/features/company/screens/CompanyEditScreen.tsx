@@ -18,10 +18,11 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNavigation } from '@react-navigation/native';
 import { useBusinessStore } from '@/shared/store/businessStore';
-import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AppButton from '@/shared/components/ui/AppButton';
-import { AppBottomSheet, AppModal } from '@/shared/components/ui';
+import { AppBottomSheet, AppModal, ListItemCard } from '@/shared/components/ui';
+import ImageUploadField from '@/shared/components/ui/ImageUploadField';
+import { imageService } from '@/shared/services/imageService';
 
 // DropdownItem type (kept for selection items)
 interface DropdownItem {
@@ -206,48 +207,36 @@ export default function CompanyEditScreen() {
     setHasChanges(hasChanges);
   }, [coverImage, profileImage, companyName, businessDescription, businessType, email, website, countryCode, phoneNumber, address, businessHours, currency, taxRate, invoicePrefix, allowPartialPayments, autoGenerateInvoices]);
 
-  const handleImagePicker = async (type: 'cover' | 'profile') => {
-    try {
+  const handleCoverImagePicker = () => {
+    const handleCamera = async () => {
       setIsUploadingImage(true);
-      const { status } = await ImagePicker.getMediaLibraryPermissionsAsync();
-      
-      if (status !== 'granted') {
-        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        
-        if (permissionResult.granted === false) {
-          Alert.alert(
-            'Permission Required',
-            'Permission to access camera roll is required to change images. Please enable it in your device settings.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Settings', onPress: () => console.log('Open settings') }
-            ]
-          );
-          setIsUploadingImage(false);
-          return;
+      try {
+        const result = await imageService.openCamera();
+        if (result.success && result.imageUri) {
+          setCoverImage(result.imageUri);
         }
+      } finally {
+        setIsUploadingImage(false);
       }
+    };
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: type === 'cover' ? [3, 4] : [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled) {
-        if (type === 'cover') {
-          setCoverImage(result.assets[0].uri);
-        } else {
-          setProfileImage(result.assets[0].uri);
+    const handleGallery = async () => {
+      setIsUploadingImage(true);
+      try {
+        const result = await imageService.openGallery();
+        if (result.success && result.imageUri) {
+          setCoverImage(result.imageUri);
         }
+      } finally {
+        setIsUploadingImage(false);
       }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
-    } finally {
-      setIsUploadingImage(false);
-    }
+    };
+
+    imageService.showImagePickerOptions(handleCamera, handleGallery);
+  };
+
+  const handleProfileImageSelected = (uri: string) => {
+    setProfileImage(uri);
   };
 
   const handleToggleDay = (dayIndex: number, isOpen: boolean) => {
@@ -431,7 +420,7 @@ export default function CompanyEditScreen() {
     <View style={styles.coverSection}>
       <TouchableOpacity 
         style={styles.coverImageWrapper}
-        onPress={() => handleImagePicker('cover')}
+        onPress={handleCoverImagePicker}
         disabled={isUploadingImage}
       >
         <Image
@@ -445,7 +434,7 @@ export default function CompanyEditScreen() {
           </View>
         )}
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => handleImagePicker('cover')} disabled={isUploadingImage}>
+      <TouchableOpacity onPress={handleCoverImagePicker} disabled={isUploadingImage}>
         <Text style={[styles.changePictureText, { color: appTheme.colors.primary }]}>
           Change cover picture
         </Text>
@@ -455,30 +444,14 @@ export default function CompanyEditScreen() {
 
   const renderProfileSection = () => (
     <View style={styles.profileSection}>
-      <TouchableOpacity 
-        style={styles.avatarContainer}
-        onPress={() => handleImagePicker('profile')}
+      <ImageUploadField
+        imageUri={profileImage}
+        onImageSelected={handleProfileImageSelected}
+        placeholder="Add Logo picture"
+        changeText="Change logo"
+        size={200}
         disabled={isUploadingImage}
-      >
-        <Avatar
-          userId={currentCompany?.id || 'company'}
-          userName={companyName || 'Business'}
-          imageUri={profileImage}
-          size={120}
-          style={styles.avatar}
-          textStyle={{ fontSize: 48 }}
-        />
-        {isUploadingImage && (
-          <View style={styles.uploadingOverlay}>
-            <ActivityIndicator size="small" color="white" />
-          </View>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => handleImagePicker('profile')} disabled={isUploadingImage}>
-        <Text style={[styles.changePictureText, { color: appTheme.colors.primary }]}>
-          Change profile picture
-        </Text>
-      </TouchableOpacity>
+      />
     </View>
   );
 
@@ -986,30 +959,25 @@ export default function CompanyEditScreen() {
         onClose={() => setShowBusinessTypeModal(false)}
         title="Select Business Type"
       >
-        <ScrollView style={{ maxHeight: 300 }}>
-          {businessTypes.map((item) => (
-            <TouchableOpacity
+        <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+          {businessTypes.map((item, index) => (
+            <ListItemCard
               key={item.id}
-              style={[
-                styles.bottomSheetItem,
-                { borderBottomColor: appTheme.colors.borderColor },
-                businessType === item.id && { backgroundColor: `${appTheme.colors.primary}15` }
-              ]}
+              avatar={{
+                type: 'icon',
+                icon: item.icon || 'business-outline',
+                iconColor: appTheme.colors.text,
+                backgroundColor: appTheme.colors.surface,
+              }}
+              title={item.title}
               onPress={() => {
                 setBusinessType(item.id);
                 setShowBusinessTypeModal(false);
               }}
-            >
-              <Text style={[
-                styles.bottomSheetItemText,
-                { color: businessType === item.id ? appTheme.colors.primary : appTheme.colors.text }
-              ]}>
-                {item.title}
-              </Text>
-              {businessType === item.id && (
-                <Icon name="check" size={20} color={appTheme.colors.primary} />
-              )}
-            </TouchableOpacity>
+              selected={businessType === item.id}
+              showCheckmark
+              showDivider={index < businessTypes.length - 1}
+            />
           ))}
         </ScrollView>
       </AppBottomSheet>
@@ -1020,30 +988,25 @@ export default function CompanyEditScreen() {
         onClose={() => setShowCountryCodeModal(false)}
         title="Select Country Code"
       >
-        <ScrollView style={{ maxHeight: 400 }}>
-          {countryCodes.map((cc) => (
-            <TouchableOpacity
+        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+          {countryCodes.map((cc, index) => (
+            <ListItemCard
               key={cc.code}
-              style={[
-                styles.bottomSheetItem,
-                { borderBottomColor: appTheme.colors.borderColor },
-                countryCode === cc.code && { backgroundColor: `${appTheme.colors.primary}15` }
-              ]}
+              avatar={{
+                type: 'initials',
+                userName: cc.flag,
+                userId: cc.code,
+              }}
+              title={cc.country}
+              subtitle={cc.code}
               onPress={() => {
                 setCountryCode(cc.code);
                 setShowCountryCodeModal(false);
               }}
-            >
-              <Text style={[
-                styles.bottomSheetItemText,
-                { color: countryCode === cc.code ? appTheme.colors.primary : appTheme.colors.text }
-              ]}>
-                {`${cc.flag} ${cc.country} ${cc.code}`}
-              </Text>
-              {countryCode === cc.code && (
-                <Icon name="check" size={20} color={appTheme.colors.primary} />
-              )}
-            </TouchableOpacity>
+              selected={countryCode === cc.code}
+              showCheckmark
+              showDivider={index < countryCodes.length - 1}
+            />
           ))}
         </ScrollView>
       </AppBottomSheet>
@@ -1096,13 +1059,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 24,
     paddingHorizontal: 12,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 8,
-  },
-  avatar: {
-    borderRadius: 8,
   },
   uploadingOverlay: {
     position: 'absolute',

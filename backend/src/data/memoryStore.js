@@ -195,6 +195,34 @@ let locations = [
     isPublic: false,
     createdAt: '2024-06-01T00:00:00Z',
     updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'loc-6',
+    companyId: 'comp-3',
+    name: 'Branch Store - Curepipe',
+    address: '25 Royal Road, Curepipe, Mauritius',
+    phone: '+230-5999-5678',
+    email: 'curepipe@local.mu',
+    latitude: -20.3162,
+    longitude: 57.5166,
+    operatingMode: LOCATION_MODES.DEPENDENT,
+    isPublic: false,
+    createdAt: '2024-06-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
+  },
+  {
+    id: 'loc-7',
+    companyId: 'comp-3',
+    name: 'Warehouse',
+    address: '100 Industrial Zone, Phoenix, Mauritius',
+    phone: '+230-5999-9999',
+    email: 'warehouse@local.mu',
+    latitude: -20.2890,
+    longitude: 57.4940,
+    operatingMode: LOCATION_MODES.INDEPENDENT,
+    isPublic: false,
+    createdAt: '2024-06-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
   }
 ];
 

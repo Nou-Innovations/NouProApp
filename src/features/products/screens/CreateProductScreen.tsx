@@ -5,9 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  TouchableOpacity,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from 'App';
@@ -16,8 +14,10 @@ import AppButton from '@/shared/components/ui/AppButton';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import { ProductStatus } from '@/shared/data/mockProducts';
 import ImagePlaceholder from '@/shared/components/ui/ImagePlaceholder';
-import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import ListItemCard from '@/shared/components/ui/ListItemCard';
+import theme from '@/shared/theme';
 
 const availableStatuses: ProductStatus[] = ['Available', 'Out of Stock', 'In Production', 'Inactive', 'Discontinued'];
 
@@ -39,8 +39,21 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
   const [taxRate, setTaxRate] = useState('');
   const [supplier, setSupplier] = useState('');
   const [isListed, setIsListed] = useState(true);
-  const [productImage, setProductImage] = useState<string | null>(null);
+  const [productImages, setProductImages] = useState<string[]>([]);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   const { theme: appTheme } = useTheme();
+
+  // Status color helper
+  const getStatusColor = (statusValue: ProductStatus) => {
+    switch (statusValue.toLowerCase()) {
+      case 'available': return theme.colors.success;
+      case 'out of stock': return theme.colors.error;
+      case 'in production': return theme.colors.info;
+      case 'inactive': return theme.colors.neutral;
+      case 'discontinued': return theme.colors.warning;
+      default: return theme.colors.neutral;
+    }
+  };
 
   // Check if we're editing an existing product
   const editingProduct = (route.params as any)?.product;
@@ -70,7 +83,9 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
     setBarcode(p.barcode ?? '');
     setTaxRate(p.tax_rate != null ? String(p.tax_rate) : (p.taxRate != null ? String(p.taxRate) : ''));
     setSupplier(p.supplier ?? '');
-    setProductImage(p.image_url ?? p.productImage ?? p.images?.[0] ?? '');
+    // Handle multiple images
+    const existingImages = p.images || (p.image_url ? [p.image_url] : (p.productImage ? [p.productImage] : []));
+    setProductImages(existingImages);
     setIsListed(Boolean(p.is_listed ?? p.isListed ?? true));
   }, [editingProduct]);
 
@@ -104,14 +119,19 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
       taxRate: taxRate.trim() ? parseFloat(taxRate) : undefined,
       supplier: supplier.trim() || undefined,
       is_listed: isListed,
-      productImage,
+      images: productImages,
     };
     console.log(isEditMode ? 'Updating Product:' : 'Creating Product:', productData);
     navigation.goBack();
   };
 
-  const handleSelectImage = (imageUri: string) => {
-    setProductImage(imageUri);
+  const handleAddImage = (imageUri: string) => {
+    setProductImages(prev => [...prev, imageUri]);
+  };
+
+  const handleSelectStatus = (newStatus: ProductStatus) => {
+    setStatus(newStatus);
+    setShowStatusModal(false);
   };
 
   return (
@@ -122,14 +142,30 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
       />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContentContainer}>
         <View style={styles.fieldGroup}>
-          <Text style={[styles.label, { color: appTheme.colors.text }]}>Product Picture</Text>
-          <ImagePlaceholder 
-            text="Tap to add picture"
-            onPress={handleSelectImage}
-            imageUri={productImage}
-            style={styles.picturePlaceholder}
-            iconName="camera-outline"
-          />
+          <Text style={[styles.label, { color: appTheme.colors.text }]}>Product Pictures</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.imagesScrollContainer}
+          >
+            {productImages.map((uri, index) => (
+              <ImagePlaceholder 
+                key={`image-${index}`}
+                text=""
+                onPress={() => {}} 
+                imageUri={uri}
+                style={styles.productImageItem}
+                iconName="camera-outline"
+              />
+            ))}
+            <ImagePlaceholder 
+              text="Add picture"
+              onPress={handleAddImage}
+              imageUri={null}
+              style={styles.productImageItem}
+              iconName="camera-outline"
+            />
+          </ScrollView>
         </View>
 
         <View style={{ marginTop: 16 }}>
@@ -142,30 +178,15 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
             error={!productName.trim() && productName !== ''}
           />
 
-          <View style={styles.fieldGroup}>
-            <TouchableOpacity 
-              style={[
-                styles.brandSelector, 
-                {
-                  backgroundColor: appTheme.colors.inputBackground,
-                  borderColor: brand ? appTheme.colors.textFieldBorderDefault : appTheme.colors.textFieldBorderDefault,
-                }
-              ]} 
-              onPress={() => navigation.navigate('BrandSelection')}
-            >
-              <View style={styles.brandContent}>
-                {brand ? (
-                  <>
-                    <Text style={[styles.brandLabel, { color: appTheme.colors.textFieldLabelDefault }]}>Brand</Text>
-                    <Text style={[styles.brandText, { color: appTheme.colors.textFieldText }]}>{brand}</Text>
-                  </>
-                ) : (
-                  <Text style={[styles.brandPlaceholder, { color: appTheme.colors.textFieldLabelDefault }]}>Brand</Text>
-                )}
-              </View>
-              <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
-            </TouchableOpacity>
-          </View>
+          <AppTextField
+            label="Brand"
+            value={brand}
+            onChangeText={() => {}}
+            placeholder="Select brand"
+            isDropdown
+            onPress={() => navigation.navigate('BrandSelection', { selectedBrand: brand || undefined })}
+            containerStyle={styles.textField}
+          />
           
           <AppTextField
             label="Category"
@@ -262,44 +283,31 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
             containerStyle={styles.textField}
           />
           
-          <View style={styles.fieldGroup}>
-            <Text style={[styles.label, { color: appTheme.colors.text }]}>Status</Text>
-            <View style={[
-              styles.pickerContainer,
-              {
-                backgroundColor: appTheme.colors.inputBackground,
-                borderColor: appTheme.colors.textFieldBorderDefault
-              }
-            ]}>
-               <Picker
-                   selectedValue={status}
-                   onValueChange={(itemValue) => setStatus(itemValue)}
-                   style={styles.picker}
-                   dropdownIconColor={appTheme.colors.text}
-                   itemStyle={{ color: appTheme.colors.text }}
-               >
-                   {availableStatuses.map(s => (
-                     <Picker.Item 
-                       key={s} 
-                       label={s} 
-                       value={s} 
-                       color={appTheme.colors.text}
-                     />
-                   ))}
-               </Picker>
-            </View>
-          </View>
+          <AppTextField
+            label="Status"
+            value={status}
+            onChangeText={() => {}}
+            placeholder="Select status"
+            isDropdown
+            onPress={() => setShowStatusModal(true)}
+            containerStyle={styles.textField}
+          />
 
-          <View style={[styles.listedSectionEditing, styles.fieldGroup]}>
-              <Text style={[styles.isListedLabel, { color: appTheme.colors.text }]}>Listed</Text>
-              <Switch
-                  trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
-                  thumbColor="#FFFFFF"
-                  ios_backgroundColor="#E9E9EA"
-                  onValueChange={setIsListed}
-                  value={isListed}
-                  style={styles.switchControl}
-              />
+          <View style={[styles.publishSection, styles.fieldGroup]}>
+            <Text style={[
+              styles.publishLabel, 
+              { color: isListed ? appTheme.colors.success : appTheme.colors.textMuted }
+            ]}>
+              {isListed ? 'Public' : 'Private'}
+            </Text>
+            <Switch
+              trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+              thumbColor="#FFFFFF"
+              ios_backgroundColor="#E9E9EA"
+              onValueChange={setIsListed}
+              value={isListed}
+              style={styles.switchControl}
+            />
           </View>
         </View>
 
@@ -310,6 +318,32 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
           disabled={!isFormValid}
         />
       </ScrollView>
+
+      {/* Status Selection Modal */}
+      <AppBottomSheet
+        visible={showStatusModal}
+        onClose={() => setShowStatusModal(false)}
+        title="Select Status"
+      >
+        {availableStatuses.map((statusOption, index) => {
+          const isSelected = status === statusOption;
+          return (
+            <ListItemCard
+              key={statusOption}
+              avatar={{
+                type: 'icon',
+                icon: '',
+                backgroundColor: getStatusColor(statusOption),
+              }}
+              title={statusOption}
+              onPress={() => handleSelectStatus(statusOption)}
+              selected={isSelected}
+              showCheckmark
+              showDivider={index < availableStatuses.length - 1}
+            />
+          );
+        })}
+      </AppBottomSheet>
     </SafeAreaView>
   );
 };
@@ -354,59 +388,31 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 4,
   },
-  pickerContainer: {
-    borderWidth: 1,
-    borderRadius: 8,
-    justifyContent: 'center',
-  },
-  picker: {
-    height: 50,
-  },
-  listedSectionEditing: {
+  publishSection: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
   },
-  isListedLabel: {
+  publishLabel: {
     fontSize: 16,
-    color: '#333',
     fontWeight: '500',
     marginRight: 8,
+    fontFamily: theme.fonts.primary.medium,
   },
   switchControl: {
     transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }]
   },
-  picturePlaceholder: {
-    alignSelf: 'center',
-    marginBottom: 16,
+  imagesScrollContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingRight: 16,
+  },
+  productImageItem: {
+    width: 100,
+    height: 100,
   },
   saveButton: {
     marginTop: 16,
-  },
-  brandSelector: {
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    justifyContent: 'space-between',
-  },
-  brandContent: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  brandLabel: {
-    fontSize: 8,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  brandText: {
-    fontSize: 14,
-  },
-  brandPlaceholder: {
-    fontSize: 14,
-    fontWeight: '500',
   },
 });
 

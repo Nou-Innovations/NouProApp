@@ -147,7 +147,7 @@ export const PLAN_INFO: Record<SubscriptionPlan, PlanInfo> = {
     price: 0,
     period: '',
     description: 'Get started with basic features',
-    targetUser: 'Very small / testing businesses',
+    targetUser: 'Small businesses',
     highlights: [
       'Create a business profile',
       'Create products (private only)',
@@ -160,7 +160,7 @@ export const PLAN_INFO: Record<SubscriptionPlan, PlanInfo> = {
     price: 799,
     period: '/month',
     description: 'For small teams getting serious',
-    targetUser: 'Small teams',
+    targetUser: 'Startups',
     highlights: [
       'All Free features',
       'Full product management',
@@ -191,7 +191,7 @@ export const PLAN_INFO: Record<SubscriptionPlan, PlanInfo> = {
     price: 3999,
     period: '/month',
     description: 'For large operations',
-    targetUser: 'Large teams',
+    targetUser: 'Large organizations',
     highlights: [
       'All Business features',
       'Full analytics (real-time + history)',

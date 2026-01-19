@@ -107,7 +107,6 @@ export default function DeliveryActionsModal({
 const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 12,
-    paddingBottom: 20,
     gap: 12,
   },
   selectionItem: {

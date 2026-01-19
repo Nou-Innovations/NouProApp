@@ -7,6 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -14,6 +15,7 @@ import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/features/search/components/FilterBar';
 import DeliveryCard from '@/features/deliveries/components/DeliveryCard';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import { ListItemCard } from '@/shared/components/ui';
 import SimpleHeader, { AnimatedFlatList } from '@/shared/components/layout/headers/SimpleHeader';
 import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
 import DeliveryActionsModal from '@/features/deliveries/components/DeliveryActionsModal';
@@ -44,7 +46,7 @@ export default function DeliveryScreen() {
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const { theme: appTheme } = useTheme();
-  const { setDeliveriesUnreadCount } = useNotifications();
+  const { setDeliveriesUnreadCount, isItemViewed } = useNotifications();
   const { currentCompany, currentLocation, locations, setLocation } = useBusinessStore();
   
   // Profile store for RBAC (single source of truth)
@@ -85,10 +87,15 @@ export default function DeliveryScreen() {
   const filter = statusFilter;
   const setFilter = (value: string) => setStatusFilter(value as DeliveryStatus | 'all');
 
+  // Calculate unread count based on items not yet viewed
+  const unviewedDeliveriesCount = useMemo(() => {
+    return filteredDeliveries.filter(d => !isItemViewed(d.id)).length;
+  }, [filteredDeliveries, isItemViewed]);
+
   // Update the deliveries unread count when component mounts or data changes
   useEffect(() => {
-    setDeliveriesUnreadCount(newDeliveriesCount);
-  }, [newDeliveriesCount, setDeliveriesUnreadCount]);
+    setDeliveriesUnreadCount(unviewedDeliveriesCount);
+  }, [unviewedDeliveriesCount, setDeliveriesUnreadCount]);
 
   const handleLocationSelect = (item: { id: string }) => {
     const locationId = item.id === 'all' ? null : item.id;
@@ -248,7 +255,7 @@ export default function DeliveryScreen() {
         }
       >
         <AnimatedFlatList
-          data={filteredDeliveries}
+          data={loading ? [] : filteredDeliveries}
           keyExtractor={(item: unknown) => (item as Delivery).id}
           refreshControl={
             <RefreshControl
@@ -260,16 +267,9 @@ export default function DeliveryScreen() {
           ListHeaderComponent={
             <>
               {/* Dev mode mock data indicator */}
-              {__DEV__ && isMockData && (
+              {__DEV__ && isMockData && !loading && (
                 <View style={[styles.mockDataBanner, { backgroundColor: '#FEF3C7' }]}>
                   <Text style={{ color: '#92400E', fontSize: 12 }}>Using mock data (API unavailable)</Text>
-                </View>
-              )}
-              
-              {/* Loading state */}
-              {loading && (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={appTheme.colors.primary} />
                 </View>
               )}
               
@@ -293,18 +293,29 @@ export default function DeliveryScreen() {
           )}
           ListEmptyComponent={() => (
             <View style={styles.emptyListContainer}>
-              <Icon 
-                name={activeTab === 'incoming' ? 'arrow-down-circle-outline' : activeTab === 'outgoing' ? 'arrow-up-circle-outline' : 'car-outline'} 
-                size={48} 
-                color={appTheme.colors.textLight} 
-              />
-              <Text style={[styles.emptyListText, { color: appTheme.colors.textLight }]}>
-                No {activeTab === 'all' ? 'deliveries' : activeTab === 'transfers' ? 'transfers' : `${activeTab} deliveries`} found
-              </Text>
-              {selectedLocationId && (
-                <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textLight }]}>
-                  Try selecting "All Locations" to see more
-                </Text>
+              {loading ? (
+                <>
+                  <ActivityIndicator size="large" color={appTheme.colors.primary} />
+                  <Text style={[styles.emptyListText, { color: appTheme.colors.textLight, marginTop: 16 }]}>
+                    Loading deliveries...
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Icon 
+                    name={activeTab === 'incoming' ? 'arrow-down-circle-outline' : activeTab === 'outgoing' ? 'arrow-up-circle-outline' : 'car-outline'} 
+                    size={48} 
+                    color={appTheme.colors.textLight} 
+                  />
+                  <Text style={[styles.emptyListText, { color: appTheme.colors.textLight }]}>
+                    No {activeTab === 'all' ? 'deliveries' : activeTab === 'transfers' ? 'transfers' : `${activeTab} deliveries`} found
+                  </Text>
+                  {selectedLocationId && (
+                    <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textLight }]}>
+                      Try selecting "All Locations" to see more
+                    </Text>
+                  )}
+                </>
               )}
             </View>
           )}
@@ -327,53 +338,27 @@ export default function DeliveryScreen() {
         onClose={() => setShowLocationDropdown(false)}
         title="Locations"
       >
-        <View style={{ gap: 8 }}>
-          {locationItems.map((item) => {
+        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+          {locationItems.map((item, index) => {
             const isSelected = (selectedLocationId || 'all') === item.id;
             return (
-              <TouchableOpacity
+              <ListItemCard
                 key={item.id}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  height: 60,
-                  paddingHorizontal: 8,
-                  borderBottomWidth: 0.5,
-                  borderBottomColor: appTheme.colors.borderColor,
+                avatar={{
+                  type: 'icon',
+                  icon: item.icon,
+                  iconColor: isSelected ? appTheme.colors.primary : appTheme.colors.iconMuted,
+                  backgroundColor: appTheme.colors.surface,
                 }}
+                title={item.title}
                 onPress={() => handleLocationSelect(item)}
-              >
-                <View style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  backgroundColor: appTheme.colors.inputBackgroundAlt,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginRight: 12,
-                }}>
-                  <Icon
-                    name={item.icon}
-                    size={24}
-                    color={isSelected ? appTheme.colors.primary : appTheme.colors.iconMuted}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{
-                    fontSize: 16,
-                    fontWeight: '600',
-                    color: isSelected ? appTheme.colors.primary : appTheme.colors.text,
-                  }}>
-                    {item.title}
-                  </Text>
-                </View>
-                {isSelected && (
-                  <Icon name="checkmark" size={20} color={appTheme.colors.primary} />
-                )}
-              </TouchableOpacity>
+                selected={isSelected}
+                showCheckmark
+                showDivider={index < locationItems.length - 1}
+              />
             );
           })}
-        </View>
+        </ScrollView>
       </AppBottomSheet>
 
       {/* Create Actions Bottom Sheet Modal (+ button) */}
