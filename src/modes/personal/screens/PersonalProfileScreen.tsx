@@ -25,6 +25,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import Avatar from '@/shared/components/ui/Avatar';
 import { AppModal } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
@@ -41,6 +42,7 @@ export default function PersonalProfileScreen() {
   const userBusinesses = useProfileStore((state) => state.userBusinesses);
   const updateCurrentUser = useProfileStore((state) => state.updateCurrentUser);
   const switchToBusiness = useProfileStore((state) => state.switchToBusiness);
+  const setLocation = useBusinessStore((state) => state.setLocation);
 
   // Local state
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -210,8 +212,21 @@ export default function PersonalProfileScreen() {
       setSelectedLocationId(locationId);
       await switchToBusiness(businessId);
       closeProfileSwitcher();
-      // TODO: Set active location in store
-      console.log(`Selected location ${locationId} for business ${businessId}`);
+      const selectedLocation = mockBusinessLocations[businessId]?.find(
+        (location) => location.id === locationId
+      );
+      if (selectedLocation) {
+        setLocation({
+          id: selectedLocation.id,
+          companyId: businessId,
+          name: selectedLocation.name,
+          address: selectedLocation.address,
+          phone: undefined,
+          email: undefined,
+          latitude: undefined,
+          longitude: undefined,
+        });
+      }
     } catch (error) {
       console.error('Error switching to location:', error);
     }

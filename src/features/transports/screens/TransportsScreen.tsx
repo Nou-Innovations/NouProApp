@@ -23,6 +23,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { AppSearchBar, Avatar, AppButton } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import { deleteTransport, getTransports } from '@/features/transports/transports.service';
 
 // Transport/Vehicle type
 export type VehicleType = 'bicycle' | 'motorcycle' | 'scooter' | 'car' | 'van' | 'pickup' | 'truck' | 'lorry' | 'other';
@@ -231,91 +232,11 @@ export default function TransportsScreen() {
     
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const response = await get<Transport[]>(`/businesses/${activeBusiness.id}/transports`);
-      // setTransports(response);
-      
-      // Mock data for development
-      const mockTransports: Transport[] = [
-        {
-          id: 'trans-1',
-          business_id: activeBusiness.id,
-          name: 'Delivery Van 01',
-          vehicle_type: 'van',
-          license_plate: 'MU-1234',
-          capacity: '500 kg',
-          status: 'in_use',
-          assigned_staff_id: 'user-2',
-          assigned_staff_name: 'Jane Smith',
-          assigned_staff_avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
-          current_location_name: 'Route - Curepipe',
-          created_at: '2024-01-01T00:00:00Z',
-        },
-        {
-          id: 'trans-2',
-          business_id: activeBusiness.id,
-          name: 'Cargo Truck',
-          vehicle_type: 'truck',
-          license_plate: 'MU-5678',
-          capacity: '2 tons',
-          status: 'available',
-          current_location_name: 'Main Warehouse',
-          created_at: '2024-01-15T00:00:00Z',
-        },
-        {
-          id: 'trans-3',
-          business_id: activeBusiness.id,
-          name: 'Express Bike',
-          vehicle_type: 'motorcycle',
-          license_plate: 'MU-9012',
-          capacity: '20 kg',
-          status: 'in_use',
-          assigned_staff_id: 'user-3',
-          assigned_staff_name: 'Mike Jones',
-          assigned_staff_avatar: 'https://randomuser.me/api/portraits/men/2.jpg',
-          current_location_name: 'Port Louis Area',
-          created_at: '2024-02-01T00:00:00Z',
-        },
-        {
-          id: 'trans-4',
-          business_id: activeBusiness.id,
-          name: 'Delivery Van 02',
-          vehicle_type: 'van',
-          license_plate: 'MU-3456',
-          capacity: '500 kg',
-          status: 'maintenance',
-          notes: 'Scheduled maintenance until Jan 20',
-          current_location_name: 'Service Center',
-          created_at: '2024-02-15T00:00:00Z',
-        },
-        {
-          id: 'trans-5',
-          business_id: activeBusiness.id,
-          name: 'City Car',
-          vehicle_type: 'car',
-          license_plate: 'MU-7890',
-          capacity: '100 kg',
-          status: 'available',
-          current_location_name: 'City Center Shop',
-          created_at: '2024-03-01T00:00:00Z',
-        },
-        {
-          id: 'trans-6',
-          business_id: activeBusiness.id,
-          name: 'Old Scooter',
-          vehicle_type: 'motorcycle',
-          license_plate: 'MU-0000',
-          capacity: '15 kg',
-          status: 'inactive',
-          notes: 'Retired from active fleet',
-          created_at: '2023-06-01T00:00:00Z',
-        },
-      ];
-      
-      setTransports(mockTransports);
+      const response = await getTransports(activeBusiness.id);
+      setTransports(response);
     } catch (error) {
       console.error('Error fetching transports:', error);
-      Alert.alert('Error', 'Failed to load vehicles');
+      Alert.alert('Error', 'Failed to load vehicles. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -333,13 +254,11 @@ export default function TransportsScreen() {
 
   const handleAssignStaff = (transport: Transport) => {
     handleCloseSheet();
-    // TODO: Open staff assignment modal
-    Alert.alert('Assign Staff', `Assign staff to ${transport.name}`);
+    Alert.alert('Assign Staff', 'Staff assignment is not available yet.');
   };
 
   const handleEditTransport = (transport: Transport) => {
-    // TODO: Navigate to edit transport screen
-    Alert.alert('Edit Vehicle', `Edit ${transport.name}`);
+    Alert.alert('Edit Vehicle', 'Vehicle editing is not available yet.');
   };
 
   const handleDeleteTransport = (transport: Transport) => {
@@ -352,8 +271,14 @@ export default function TransportsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            // TODO: Call API to delete transport
-            setTransports(prev => prev.filter(t => t.id !== transport.id));
+            if (!activeBusiness?.id) return;
+            try {
+              await deleteTransport(activeBusiness.id, transport.id);
+              setTransports(prev => prev.filter(t => t.id !== transport.id));
+            } catch (error) {
+              console.error('Error deleting transport:', error);
+              Alert.alert('Error', 'Failed to delete transport. Please try again.');
+            }
           },
         },
       ]

@@ -29,6 +29,7 @@ import MapView, { Marker } from 'react-native-maps';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import Avatar from '@/shared/components/ui/Avatar';
 import BrandCard from '@/features/brands/components/BrandCard';
 import ProductCard from '@/features/products/components/ProductCard';
@@ -108,6 +109,7 @@ export default function BusinessProfileOwnScreen() {
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
   const userBusinesses = useProfileStore((state) => state.userBusinesses);
   const switchToBusiness = useProfileStore((state) => state.switchToBusiness);
+  const setLocation = useBusinessStore((state) => state.setLocation);
   const switchToPersonal = useProfileStore((state) => state.switchToPersonal);
   const currentUser = useProfileStore((state) => state.currentUser);
 
@@ -259,8 +261,21 @@ export default function BusinessProfileOwnScreen() {
       setSelectedLocationId(locationId);
       await switchToBusiness(businessId);
       closeProfileSwitcher();
-      // TODO: Set active location in store
-      console.log(`Selected location ${locationId} for business ${businessId}`);
+      const selectedLocation = mockBusinessLocations[businessId]?.find(
+        (location) => location.id === locationId
+      );
+      if (selectedLocation) {
+        setLocation({
+          id: selectedLocation.id,
+          companyId: businessId,
+          name: selectedLocation.name,
+          address: selectedLocation.address,
+          phone: undefined,
+          email: undefined,
+          latitude: undefined,
+          longitude: undefined,
+        });
+      }
     } catch (error) {
       console.error('Error switching to location:', error);
     }

@@ -12,9 +12,11 @@ import { Icon } from '@/shared/utils/icons';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
+import { useNavigation } from '@react-navigation/native';
 
 export default function CompanyDropdown() {
   const [isOpen, setIsOpen] = useState(false);
+  const navigation = useNavigation();
   const { 
     companies, 
     currentCompany, 
@@ -148,7 +150,7 @@ export default function CompanyDropdown() {
                 { borderTopColor: appTheme.colors.borderColor }
               ]}
               onPress={() => {
-                // TODO: Navigate to personal profile
+                navigation.navigate('PersonalProfile' as never);
                 setIsOpen(false);
               }}
             >

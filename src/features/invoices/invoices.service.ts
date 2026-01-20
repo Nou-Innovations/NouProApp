@@ -71,6 +71,41 @@ export async function updateInvoiceStatus(
   return patch<Invoice>(`/companies/${companyId}/invoices/${invoiceId}`, { status });
 }
 
+/**
+ * Get a temporary URL to download the invoice PDF
+ */
+export async function getInvoicePdfUrl(companyId: string, invoiceId: string): Promise<string> {
+  const response = await get<{ url: string }>(`/companies/${companyId}/invoices/${invoiceId}/pdf`);
+  return response.url;
+}
+
+/**
+ * Convert an estimate to an invoice
+ */
+export async function convertEstimateToInvoice(companyId: string, invoiceId: string): Promise<Invoice> {
+  return post<Invoice>(`/companies/${companyId}/invoices/${invoiceId}/convert`, {});
+}
+
+export interface InvoicePayment {
+  amount: number;
+  date: string;
+}
+
+/**
+ * Record invoice payments
+ */
+export async function recordInvoicePayments(
+  companyId: string,
+  invoiceId: string,
+  payments: InvoicePayment[],
+  isFullyPaid: boolean
+): Promise<void> {
+  await post(`/companies/${companyId}/invoices/${invoiceId}/payments`, {
+    payments,
+    isFullyPaid,
+  });
+}
+
 // ============================================================================
 // Export as namespace for clean imports
 // ============================================================================
@@ -80,6 +115,9 @@ const invoicesService = {
   getInvoice,
   createInvoice,
   updateInvoiceStatus,
+  getInvoicePdfUrl,
+  convertEstimateToInvoice,
+  recordInvoicePayments,
 };
 
 export default invoicesService;

@@ -40,6 +40,7 @@ export interface Invoice {
   amount: number;
   taxAmount: number;
   totalAmount: number;
+  paidAmount?: number;
   status: InvoiceStatus;
   type: InvoiceType;
   issueDate: string;
@@ -47,6 +48,7 @@ export interface Invoice {
   items: InvoiceItem[];
   deliveryId?: string;
   notes?: string;
+  pdfUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

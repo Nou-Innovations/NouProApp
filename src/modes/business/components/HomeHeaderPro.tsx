@@ -1,6 +1,6 @@
 /**
- * HomeHeaderPro - Business Mode Home Header
- * Title with Notifications and Inbox icons (with unread badges)
+ * InboxHeaderPro - Business Mode Inbox Header
+ * Title with Notifications and Explore icons (with unread badges)
  * Supports optional company selector for multi-company users
  */
 
@@ -15,27 +15,25 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 
-interface HomeHeaderProProps {
+interface InboxHeaderProProps {
   title?: string;
   notificationCount?: number;
-  inboxUnreadCount?: number;
   onNotificationsPress: () => void;
-  onInboxPress: () => void;
+  onExplorePress: () => void;
   onCompanySelectorPress?: () => void;
   companyName?: string;
   showCompanySelector?: boolean;
 }
 
-export function HomeHeaderPro({
-  title = 'Home',
+export function InboxHeaderPro({
+  title = 'Inbox',
   notificationCount = 0,
-  inboxUnreadCount = 0,
   onNotificationsPress,
-  onInboxPress,
+  onExplorePress,
   onCompanySelectorPress,
   companyName,
   showCompanySelector = false,
-}: HomeHeaderProProps) {
+}: InboxHeaderProProps) {
   const { theme: appTheme } = useTheme();
 
   const renderBadge = (count: number) => {
@@ -94,19 +92,18 @@ export function HomeHeaderPro({
           {renderBadge(notificationCount)}
         </TouchableOpacity>
         
-        {/* Inbox Button */}
+        {/* Explore Button */}
         <TouchableOpacity
           style={styles.iconButton}
-          onPress={onInboxPress}
+          onPress={onExplorePress}
           activeOpacity={0.7}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Icon 
-            name="mail-outline" 
+            name="globe-outline" 
             size={24} 
             color={appTheme.colors.text} 
           />
-          {renderBadge(inboxUnreadCount)}
         </TouchableOpacity>
       </View>
     </View>
@@ -173,5 +170,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HomeHeaderPro;
+// Keep HomeHeaderPro as alias for backward compatibility
+export { InboxHeaderPro as HomeHeaderPro };
+export default InboxHeaderPro;
 

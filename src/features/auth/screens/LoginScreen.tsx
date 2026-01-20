@@ -68,13 +68,11 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   const handleGoogleSignIn = async () => {
-    // TODO: Implement Google Sign In
-    console.log('Google Sign In pressed');
+    Alert.alert('Google Sign In', 'Google Sign In is not available yet.');
   };
 
   const handleAppleSignIn = async () => {
-    // TODO: Implement Apple Sign In
-    console.log('Apple Sign In pressed');
+    Alert.alert('Apple Sign In', 'Apple Sign In is not available yet.');
   };
 
   return (

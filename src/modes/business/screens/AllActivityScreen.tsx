@@ -223,7 +223,8 @@ export default function AllActivityScreen() {
         navigation.navigate('ProductDetail', { productId: item.relatedId });
         break;
       case 'message_received':
-        navigation.navigate('InboxOverlay');
+        // Navigate back to BusinessInbox tab (first tab in business mode)
+        navigation.navigate('BusinessInbox' as never);
         break;
       default:
         console.log('Activity pressed:', item.id);

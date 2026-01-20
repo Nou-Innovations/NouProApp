@@ -226,7 +226,9 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         
         // Fetch related products for buyer mode
         if (!productDTO.viewerContext.isOwner) {
-          // TODO: Fetch from API
+          setSameBrandProducts(createMockSameBrandProducts());
+          setSameCompanyProducts(createMockSameCompanyProducts());
+          setSameCategoryProducts(createMockSameCategoryProducts());
         }
       } else {
         throw new Error('Product not found');

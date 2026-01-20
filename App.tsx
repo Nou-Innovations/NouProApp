@@ -104,8 +104,8 @@ import PersonalProfileSettingsScreen from '@/features/settings/screens/PersonalP
 import TwoFactorAuthScreen from '@/features/settings/screens/TwoFactorAuthScreen';
 import BiometricLoginScreen from '@/features/settings/screens/BiometricLoginScreen';
 
-// Screens - Business Activity
-import { AllActivityScreen } from '@/modes/business/screens';
+// Screens - Business Activity & Explore
+import { AllActivityScreen, BusinessExploreScreen } from '@/modes/business/screens';
 
 // Screens - Subscription
 import { SubscriptionPlansScreen } from '@/features/subscription';
@@ -261,6 +261,16 @@ function AppNavigator() {
         <RootStack.Screen 
           name="InboxOverlay" 
           component={InboxOverlayScreen} 
+          options={{ 
+            headerShown: false,
+            animation: 'slide_from_right',
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+          }}
+        />
+        <RootStack.Screen 
+          name="ExploreOverlay" 
+          component={BusinessExploreScreen} 
           options={{ 
             headerShown: false,
             animation: 'slide_from_right',

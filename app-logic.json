@@ -1190,7 +1190,7 @@
           "Cannot issue own invoices",
           "No public storefront"
         ],
-        "availableTo": ["FREE", "PRO", "BUSINESS", "ENTERPRISE"]
+        "availableTo": ["free", "pro", "business", "enterprise"]
       },
       "INDEPENDENT": {
         "description": "Location operates as semi-autonomous entity with its own public page and order creation.",
@@ -1201,13 +1201,13 @@
           "Manages local stock",
           "Uses Parent Product Master (can override price/tax if allowed)"
         ],
-        "availableTo": ["ENTERPRISE"],
-        "requirement": "Only available with ENTERPRISE tier subscription"
+        "availableTo": ["enterprise"],
+        "requirement": "Only available with enterprise tier subscription"
       }
     },
 
     "subscriptionTierCapabilities": {
-      "FREE": {
+      "free": {
         "maxLocations": 1,
         "maxStaff": 0,
         "canChooseLocationMode": false,
@@ -1218,7 +1218,7 @@
         "canPublishBusinessPage": false,
         "canHaveStaff": false
       },
-      "PRO": {
+      "pro": {
         "maxLocations": 3,
         "maxStaff": 3,
         "canChooseLocationMode": false,
@@ -1229,7 +1229,7 @@
         "canPublishBusinessPage": true,
         "canHaveStaff": true
       },
-      "BUSINESS": {
+      "business": {
         "maxLocations": 10,
         "maxStaff": 20,
         "canChooseLocationMode": false,
@@ -1240,7 +1240,7 @@
         "canPublishBusinessPage": true,
         "canHaveStaff": true
       },
-      "ENTERPRISE": {
+      "enterprise": {
         "maxLocations": 999,
         "maxStaff": 999,
         "canChooseLocationMode": true,
@@ -1254,7 +1254,7 @@
     },
 
     "downgradePolicy": {
-      "description": "How the system handles tier downgrades (e.g., ENTERPRISE → BUSINESS)",
+      "description": "How the system handles tier downgrades (e.g., enterprise → business)",
       "principle": "Preserve data, block capabilities at runtime",
       "rules": {
         "dataPreservation": [
@@ -1337,9 +1337,8 @@
         "statuses": ["pending", "accepted", "rejected", "locked"]
       },
       "locationMembers": {
-        "description": "User ↔ Location role mapping with specific permissions",
+        "description": "User ↔ Location role mapping",
         "roles": ["super_admin", "admin", "staff"],
-        "permissions": ["orders", "stock", "deliveries", "invoices"],
         "statuses": ["pending", "accepted", "rejected", "locked"]
       }
     },
@@ -1540,8 +1539,8 @@
         "banner_url": { "type": "String", "description": "Public profile banner" },
         "subscriptionTier": { 
           "type": "Enum", 
-          "values": ["FREE", "PRO", "BUSINESS"], 
-          "default": "FREE",
+          "values": ["free", "pro", "business", "enterprise"], 
+          "default": "free",
           "description": "Determines capabilities via deriveCapabilities()"
         },
         "is_published": { "type": "Boolean", "default": false, "description": "Public page visible or not" },
@@ -1593,32 +1592,38 @@
           "default": false, 
           "description": "Has public storefront (only for INDEPENDENT)" 
         },
+        "is_primary": { 
+          "type": "Boolean", 
+          "default": false,
+          "description": "Primary business location"
+        },
         "created_at": { "type": "Timestamp", "required": true },
         "updated_at": { "type": "Timestamp" }
       }
     },
     "businessMember": {
       "tableName": "BusinessMember",
-      "description": "Links users to businesses with roles",
+      "description": "Links users to businesses with roles and permissions",
       "fields": {
         "id": { "type": "UUID", "required": true },
         "business_id": { "type": "UUID", "foreignKey": "Business", "required": true },
         "user_id": { "type": "UUID", "foreignKey": "User", "required": true },
         "role": { "type": "Enum", "values": ["staff", "admin", "super_admin"], "required": true },
+        "role_type": { "type": "Enum", "values": ["delivery", "sales", "inventory", "custom"], "required": false },
+        "permissions": { "type": "Array", "items": "String", "description": "['orders', 'stock', 'deliveries', 'invoices']" },
         "status": { "type": "Enum", "values": ["pending", "accepted", "rejected", "locked"], "default": "pending" },
         "created_at": { "type": "Timestamp", "required": true }
       }
     },
     "locationMember": {
       "tableName": "LocationMember",
-      "description": "Links users to specific locations with role and permissions",
+      "description": "Links users to specific locations",
       "fields": {
         "id": { "type": "UUID", "required": true },
         "location_id": { "type": "UUID", "foreignKey": "Location", "required": true },
         "business_id": { "type": "UUID", "foreignKey": "Business", "required": true },
         "user_id": { "type": "UUID", "foreignKey": "User", "required": true },
         "role": { "type": "Enum", "values": ["staff", "admin", "super_admin"], "required": true },
-        "permissions": { "type": "Array", "items": "String", "description": "['orders', 'stock', 'deliveries', 'invoices']" },
         "status": { "type": "Enum", "values": ["pending", "accepted", "rejected", "locked"], "default": "pending" },
         "created_at": { "type": "Timestamp", "required": true }
       }
@@ -1754,7 +1759,7 @@
         "id": { "type": "UUID", "required": true },
         "order_id": { "type": "UUID", "foreignKey": "Order", "required": true },
         "assigned_to": { "type": "UUID", "foreignKey": "User", "description": "Delivery staff" },
-        "status": { "type": "Enum", "values": ["pending", "on_the_way", "done"], "default": "pending" },
+        "status": { "type": "Enum", "values": ["new", "pending", "ongoing", "delivered", "canceled"], "default": "new" },
         "created_at": { "type": "Timestamp", "required": true }
       }
     },
@@ -1861,23 +1866,26 @@
       },
       "descriptions": {
         "DEPENDENT": "Fulfills parent orders only, no own orders/invoices",
-        "INDEPENDENT": "Own orders, invoices, and public storefront (BUSINESS tier only)"
+        "INDEPENDENT": "Own orders, invoices, and public storefront (enterprise tier only)"
       }
     },
     "subscriptionTier": {
-      "values": ["FREE", "PRO", "BUSINESS"],
+      "values": ["free", "pro", "business", "enterprise"],
       "colors": {
-        "FREE": "#6B7280",
-        "PRO": "#0EA5E9",
-        "BUSINESS": "#8B5CF6"
+        "free": "#6B7280",
+        "pro": "#0EA5E9",
+        "business": "#8B5CF6",
+        "enterprise": "#111827"
       }
     },
     "deliveryStatus": {
-      "values": ["pending", "on_the_way", "done"],
+      "values": ["new", "pending", "ongoing", "delivered", "canceled"],
       "colors": {
-        "pending": "#F59E0B",
-        "on_the_way": "#0EA5E9",
-        "done": "#22C55E"
+        "new": "#6E0000",
+        "pending": "#FFB600",
+        "ongoing": "#0075FF",
+        "delivered": "#2ACF01",
+        "canceled": "#A4AAB8"
       }
     },
     "invoiceStatus": {
@@ -2063,7 +2071,7 @@
           "iconColor": "#DC2626",
           "titleColor": "#DC2626"
         },
-        "appliesTo": ["PersonalSettingsScreen", "CompanySettingsScreen", "SecuritySettingsScreen", "ModalList", "DropdownModal"]
+        "appliesTo": ["PersonalSettingsScreen", "CompanySettingsScreen", "SecuritySettingsScreen", "AppBottomSheet"]
       },
       "modalLists": {
         "pattern": "modalListItem from design.json",
@@ -2093,7 +2101,7 @@
       "Track subscription plan for paywall logic"
     ],
     "confirmationDialogs": {
-      "description": "Use ConfirmationDialog component instead of Alert.alert for all confirmation and success feedback",
+      "description": "Use AppModal component instead of Alert.alert for all confirmation and success feedback",
       "variants": {
         "delete": {
           "when": "Destructive actions that cannot be undone",
@@ -2116,7 +2124,7 @@
         }
       },
       "rules": [
-        "NEVER use native Alert.alert for success messages - use ConfirmationDialog with 'success' variant",
+        "NEVER use native Alert.alert for success messages - use AppModal with 'success' variant",
         "NEVER show checkmark icon when ASKING for confirmation - only when showing SUCCESS",
         "Use 'delete' variant for any destructive action confirmation",
         "Use 'confirm' variant when asking 'Would you like to...?' questions",
@@ -2172,7 +2180,7 @@
             {
               "name": "inbox",
               "description": "Messaging and chat functionality (V1 Light: text messages and PDFs from invoices only, no attachments/voice)",
-              "screens": ["InboxScreen", "ChatScreen", "InboxOverlayScreen"],
+              "screens": ["ChatScreen", "InboxOverlayScreen"],
               "components": ["MessageCard", "NewChatModal", "NewChatModalList"],
               "chatScreen": {
                 "description": "Full chat interface with message bubbles, input, and special message types",
@@ -2205,7 +2213,7 @@
                     },
                     "order": {
                       "description": "Order card with status, payment info, and action buttons",
-                      "tapAction": "Navigate to OrderDetailScreen",
+                      "tapAction": "Navigate to Order Details",
                       "deleteOnLongPress": true,
                       "statuses": ["New", "Ongoing", "Pending", "Done", "Cancel"],
                       "borderColorByStatus": true,
@@ -2397,7 +2405,7 @@
             {
               "name": "products",
               "description": "Product catalog management",
-              "screens": ["ProductsScreen", "ProductDetailOwnScreen", "ProductDetailPublicScreen", "ProductsSearchScreen", "CreateProductScreen"],
+              "screens": ["ProductsScreen", "ProductDetailScreen", "ProductsSearchScreen", "CreateProductScreen"],
               "components": ["ProductActionsModal", "ProductCard", "ProductCardOtherCompany", "ProductCreateModal", "ProductSearchResultsList"]
             },
             {
@@ -2409,7 +2417,7 @@
             {
               "name": "orders",
               "description": "Order processing and tracking",
-              "screens": ["OrderDetailScreen"],
+              "screens": [],
               "components": ["OrderCard", "OrderOptionCard", "OrderOptionsList"]
             },
             {
@@ -2421,7 +2429,7 @@
             {
               "name": "notifications",
               "description": "Notification system",
-              "screens": ["NotificationScreen", "NotificationsOverlayScreen"],
+              "screens": ["NotificationsScreen"],
               "components": ["NotificationBell"]
             },
             {
@@ -2485,18 +2493,17 @@
                 "note": "Headers and search composites moved to layout/ and features/search/",
                 "components": [
                   "AccordionSection",
-                  "ActionBottomSheet",
                   "ActionButton",
+                  "AppBottomSheet",
                   "AppButton",
+                  "AppModal",
                   "AppSearchBar",
                   "AppTextField",
                   "Avatar",
                   "ColorPicker",
-                  "DropdownModal",
                   "IconButton",
                   "ImagePlaceholder",
                   "ImageViewerModal",
-                  "ModalList",
                   "Pill",
                   "SplashScreen",
                   "Typography"
@@ -2516,11 +2523,11 @@
             },
             "services": {
               "description": "API and external service integrations",
-              "files": ["api.ts", "apiService.ts", "authService.ts", "chat.ts", "imageService.ts", "orders.ts", "products.ts", "userAvatarService.ts"]
+              "files": ["api.ts", "authService.ts", "chat.ts", "imageService.ts", "orders.ts", "products.ts", "userAvatarService.ts"]
             },
             "store": {
               "description": "Zustand state management",
-              "files": ["index.ts", "businessStore.ts", "companyStore.ts", "orderStore.ts", "profileStore.ts"]
+              "files": ["index.ts", "businessStore.ts", "orderStore.ts", "profileStore.ts"]
             },
             "types": {
               "description": "TypeScript type definitions",
@@ -2555,7 +2562,7 @@
         "dev": {
           "path": "src/dev/",
           "description": "Development and testing screens",
-          "screens": ["HeroiconTestScreen", "ModalListExampleScreen"]
+          "screens": ["HeroiconTestScreen"]
         }
       }
     },
@@ -2607,7 +2614,7 @@
         "uiPrimitives": {
           "location": "src/shared/components/ui/",
           "criteria": ["Stateless or minimal state", "No domain knowledge", "Highly reusable", "Design system atoms"],
-          "examples": ["AppButton", "AppTextField", "Avatar", "Pill", "ModalList", "Typography"]
+          "examples": ["AppButton", "AppTextField", "Avatar", "Pill", "Typography"]
         },
         "layoutComponents": {
           "location": "src/shared/components/layout/",
@@ -2653,7 +2660,7 @@
         },
         "overlays": {
           "description": "Screens that slide from right and hide the tab bar",
-          "screens": ["InboxOverlay", "NotificationsOverlay"],
+          "screens": ["InboxOverlayScreen", "NotificationsScreen"],
           "animation": "slide_from_right",
           "accessedVia": "Home header icons or swipe left gesture"
         },

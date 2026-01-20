@@ -3,20 +3,20 @@
  * Navigation for Business Profile mode
  * 
  * Updated navigation structure:
- * - Home: Dashboard with KPIs, Quick Actions, Priority Queue, Activity
+ * - Inbox: Dashboard with Activity Timeline and Chat list
  * - Deliveries: Assign, track, create deliveries and transfers
  * - Products: Product catalog management, stock
  * - Invoices: Invoices, estimates (paid plans only)
  * - Business: Business profile, settings, staff, subscription
  * 
- * Note: Inbox is now accessed via overlay from Home header (not a tab)
+ * Note: Explore (feed) is now accessed via overlay from Inbox header (not a tab)
  */
 
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { 
-  Home, 
+  Mail, 
   Car, 
   Package,
   FileText, 
@@ -33,8 +33,8 @@ import ProductsScreen from '@/features/products/screens/ProductsScreen';
 import InvoicesScreen from '@/features/invoices/screens/InvoicesScreen';
 // Import business profile from modes
 import BusinessProfileOwnScreen from '@/modes/business/screens/BusinessProfileOwnScreen';
-// Import Business Home Screen
-import BusinessHomeScreen from '@/modes/business/screens/BusinessHomeScreen';
+// Import Business Inbox Screen
+import BusinessInboxScreen from '@/modes/business/screens/BusinessInboxScreen';
 
 const Tab = createBottomTabNavigator<BusinessTabParamList>();
 
@@ -85,10 +85,10 @@ export function BusinessTabNavigator() {
         },
       }}
     >
-      {/* Home Tab - Dashboard */}
+      {/* Inbox Tab - Dashboard with Activity + Chats */}
       <Tab.Screen
-        name="BusinessHome"
-        component={BusinessHomeScreen}
+        name="BusinessInbox"
+        component={BusinessInboxScreen}
         options={{
           tabBarLabel: ({ focused, color }) => (
             <Text style={{
@@ -96,11 +96,11 @@ export function BusinessTabNavigator() {
               fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
               color: color,
             }}>
-              Home
+              Inbox
             </Text>
           ),
           tabBarIcon: ({ color, focused }) => (
-            <Home size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+            <Mail size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />

@@ -1,14 +1,13 @@
 import { useAppStore } from '../store';
 import { Product, ProductVariant } from '@/shared/types/store';
+import { get, post, patch, del } from '@/shared/services/api';
 
 class ProductService {
   private store = useAppStore;
 
   async fetchProducts(locationId: string) {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/products?locationId=${locationId}`);
-      const products: Product[] = await response.json();
+      const products = await get<Product[]>('/products', { locationId });
       this.store.getState().setProducts(products);
       return products;
     } catch (error) {
@@ -19,15 +18,7 @@ class ProductService {
 
   async createProduct(product: Omit<Product, 'id'>) {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(product),
-      });
-      const newProduct: Product = await response.json();
+      const newProduct = await post<Product>('/products', product);
       
       const store = this.store.getState();
       store.setProducts([...store.products, newProduct]);
@@ -40,15 +31,7 @@ class ProductService {
 
   async updateProduct(productId: string, updates: Partial<Product>) {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/products/${productId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updates),
-      });
-      const updatedProduct: Product = await response.json();
+      const updatedProduct = await patch<Product>(`/products/${productId}`, updates);
       
       this.store.getState().updateProduct(productId, updatedProduct);
       return updatedProduct;
@@ -60,10 +43,7 @@ class ProductService {
 
   async deleteProduct(productId: string) {
     try {
-      // TODO: Replace with actual API call
-      await fetch(`/api/products/${productId}`, {
-        method: 'DELETE',
-      });
+      await del(`/products/${productId}`);
       
       const store = this.store.getState();
       store.setProducts(store.products.filter(p => p.id !== productId));
@@ -75,15 +55,10 @@ class ProductService {
 
   async updateStock(productId: string, variantId: string, quantity: number) {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/products/${productId}/stock`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ variantId, quantity }),
+      const updatedProduct = await patch<Product>(`/products/${productId}/stock`, {
+        variantId,
+        quantity,
       });
-      const updatedProduct: Product = await response.json();
       
       this.store.getState().updateProduct(productId, updatedProduct);
       return updatedProduct;

@@ -25,6 +25,7 @@ import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
 import { VehicleType } from './TransportsScreen';
+import { createTransport } from '@/features/transports/transports.service';
 
 // Vehicle type options with labels and icons
 const VEHICLE_TYPE_OPTIONS: { value: VehicleType; label: string; icon: string }[] = [
@@ -78,16 +79,11 @@ export default function AddTransportScreen() {
     setIsSubmitting(true);
 
     try {
-      // TODO: Replace with actual API call
-      // await post(`/businesses/${activeBusiness.id}/transports`, {
-      //   name: transportModel.trim(),
-      //   vehicle_type: vehicleType,
-      //   license_plate: licensePlate.trim() || undefined,
-      //   status: 'available',
-      // });
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await createTransport(activeBusiness.id, {
+        name: transportModel.trim(),
+        vehicle_type: vehicleType,
+        license_plate: licensePlate.trim() || undefined,
+      });
 
       Alert.alert(
         'Success',

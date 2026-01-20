@@ -24,6 +24,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { AppSearchBar, AppButton, ListItemCard } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import { deleteLocation, getLocations } from '@/features/locations/locations.service';
 
 // Location type based on app-logic.json and Prisma schema
 interface Location {
@@ -134,75 +135,11 @@ export default function LocationsScreen() {
     
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const response = await get<Location[]>(`/businesses/${activeBusiness.id}/locations`);
-      // setLocations(response);
-      
-      // Mock data for development
-      const mockLocations: Location[] = [
-        {
-          id: 'loc-1',
-          business_id: activeBusiness.id,
-          name: 'Main Warehouse',
-          address: '123 Industrial Ave, Port Louis, Mauritius',
-          phone: '+230 123 4567',
-          email: 'warehouse@business.com',
-          latitude: -20.162,
-          longitude: 57.502,
-          operating_mode: 'DEPENDENT',
-          is_public: false,
-          is_primary: true,
-          staff_count: 8,
-          created_at: '2024-01-01T00:00:00Z',
-        },
-        {
-          id: 'loc-2',
-          business_id: activeBusiness.id,
-          name: 'City Center Shop',
-          address: '45 Main Street, Curepipe, Mauritius',
-          phone: '+230 234 5678',
-          email: 'curepipe@business.com',
-          latitude: -20.318,
-          longitude: 57.528,
-          operating_mode: 'INDEPENDENT',
-          is_public: true,
-          is_primary: false,
-          staff_count: 4,
-          created_at: '2024-02-15T00:00:00Z',
-        },
-        {
-          id: 'loc-3',
-          business_id: activeBusiness.id,
-          name: 'Beach Resort Outlet',
-          address: 'Grand Baie Coastal Road, Grand Baie, Mauritius',
-          phone: '+230 345 6789',
-          operating_mode: 'DEPENDENT',
-          is_public: false,
-          is_primary: false,
-          staff_count: 3,
-          created_at: '2024-03-20T00:00:00Z',
-        },
-        {
-          id: 'loc-4',
-          business_id: activeBusiness.id,
-          name: 'South Distribution Center',
-          address: 'Zone Industrielle, Mahebourg, Mauritius',
-          phone: '+230 456 7890',
-          email: 'south@business.com',
-          latitude: -20.408,
-          longitude: 57.700,
-          operating_mode: 'DEPENDENT',
-          is_public: false,
-          is_primary: false,
-          staff_count: 5,
-          created_at: '2024-04-10T00:00:00Z',
-        },
-      ];
-      
-      setLocations(mockLocations);
+      const response = await getLocations(activeBusiness.id);
+      setLocations(response);
     } catch (error) {
       console.error('Error fetching locations:', error);
-      Alert.alert('Error', 'Failed to load locations');
+      Alert.alert('Error', 'Failed to load locations. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -219,14 +156,12 @@ export default function LocationsScreen() {
   };
 
   const handleSwitchProfile = () => {
-    // TODO: Implement switch profile logic
     handleCloseSheet();
-    Alert.alert('Switch Profile', `Switching to ${selectedLocation?.name}`);
+    Alert.alert('Switch Profile', 'Switching profiles is not available for locations yet.');
   };
 
   const handleEditLocation = (location: Location) => {
-    // TODO: Navigate to edit location screen
-    Alert.alert('Edit Location', `Edit ${location.name}`);
+    Alert.alert('Edit Location', 'Location editing is not available yet.');
   };
 
   const handleDeleteLocation = (location: Location) => {
@@ -244,8 +179,14 @@ export default function LocationsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            // TODO: Call API to delete location
-            setLocations(prev => prev.filter(l => l.id !== location.id));
+            if (!activeBusiness?.id) return;
+            try {
+              await deleteLocation(activeBusiness.id, location.id);
+              setLocations(prev => prev.filter(l => l.id !== location.id));
+            } catch (error) {
+              console.error('Error deleting location:', error);
+              Alert.alert('Error', 'Failed to delete location. Please try again.');
+            }
           },
         },
       ]

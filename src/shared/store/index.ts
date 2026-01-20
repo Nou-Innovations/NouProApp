@@ -74,7 +74,7 @@ export { useOrderStore } from './orderStore';
 export interface CartItem {
   productId: string;
   quantity: number;
-  product: any; // Store product data for easy access
+  product: Product; // Store product data for easy access
 }
 
 

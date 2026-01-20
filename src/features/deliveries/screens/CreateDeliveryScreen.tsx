@@ -125,6 +125,7 @@ import { formatCurrency } from '@/shared/data/mockOrders';
 import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, TimeSelector, ListItemCard } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { createDelivery } from '@/features/deliveries/deliveries.service';
 
 type CreateDeliveryRouteProp = RouteProp<RootStackParamList, 'CreateDelivery'>;
 
@@ -406,21 +407,38 @@ export default function CreateDeliveryScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Create',
-          onPress: () => {
-            // TODO: Save to store
-            console.log('Creating:', {
-              type: isTransfer ? 'transfer' : 'delivery',
-              id: documentId,
-              client: selectedClient,
-              location: selectedLocation,
-              items: selectedItems,
-              scheduledDate,
-              transport: selectedTransport,
-              staff: selectedStaff,
-              notes,
-            });
-            setSuccessMessage(`${isTransfer ? 'Transfer' : 'Delivery'} created successfully!`);
-            setShowSuccessDialog(true);
+          onPress: async () => {
+            if (!activeBusiness?.id) {
+              Alert.alert('Error', 'No active business selected');
+              return;
+            }
+            try {
+              await createDelivery(activeBusiness.id, {
+                clientCompanyName: isTransfer
+                  ? selectedLocation?.name ?? 'Internal Transfer'
+                  : selectedClient?.name ?? 'Unknown Client',
+                clientAddress: isTransfer
+                  ? selectedLocation?.address ?? ''
+                  : selectedClient?.address ?? '',
+                expectedDeliveryDateTime: scheduledDate.toISOString(),
+                items: selectedItems.map((item) => ({
+                  productId: item.product_id,
+                  name: item.product_name,
+                  image: '',
+                  price: item.unit_price,
+                  quantityOrdered: item.quantity,
+                  status: 'Available',
+                })),
+                transportMode: selectedTransport?.name,
+                assignedStaffId: selectedStaff?.id,
+                clientNotes: notes || undefined,
+              });
+              setSuccessMessage(`${isTransfer ? 'Transfer' : 'Delivery'} created successfully!`);
+              setShowSuccessDialog(true);
+            } catch (error) {
+              console.error('Error creating delivery:', error);
+              Alert.alert('Error', 'Failed to create delivery. Please try again.');
+            }
           },
         },
       ]

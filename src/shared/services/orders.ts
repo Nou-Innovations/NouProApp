@@ -1,14 +1,13 @@
 import { useAppStore } from '../store';
 import { Order, OrderItem } from '@/shared/types/store';
+import { get, post, patch } from '@/shared/services/api';
 
 class OrderService {
   private store = useAppStore;
 
   async fetchOrders(locationId: string) {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/orders?locationId=${locationId}`);
-      const orders: Order[] = await response.json();
+      const orders = await get<Order[]>('/orders', { locationId });
       this.store.getState().setOrders(orders);
       return orders;
     } catch (error) {
@@ -19,15 +18,7 @@ class OrderService {
 
   async createOrder(order: Omit<Order, 'id'>) {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(order),
-      });
-      const newOrder: Order = await response.json();
+      const newOrder = await post<Order>('/orders', order);
       
       const store = this.store.getState();
       store.setOrders([...store.orders, newOrder]);
@@ -40,15 +31,7 @@ class OrderService {
 
   async updateOrderStatus(orderId: string, status: Order['status']) {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      });
-      const updatedOrder: Order = await response.json();
+      const updatedOrder = await patch<Order>(`/orders/${orderId}/status`, { status });
       
       this.store.getState().updateOrder(orderId, updatedOrder);
       return updatedOrder;
@@ -60,15 +43,7 @@ class OrderService {
 
   async updatePaymentStatus(orderId: string, paymentStatus: Order['paymentStatus']) {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/orders/${orderId}/payment`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ paymentStatus }),
-      });
-      const updatedOrder: Order = await response.json();
+      const updatedOrder = await patch<Order>(`/orders/${orderId}/payment`, { paymentStatus });
       
       this.store.getState().updateOrder(orderId, updatedOrder);
       return updatedOrder;
@@ -80,15 +55,7 @@ class OrderService {
 
   async assignOrder(orderId: string, staffId: string) {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/orders/${orderId}/assign`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ staffId }),
-      });
-      const updatedOrder: Order = await response.json();
+      const updatedOrder = await patch<Order>(`/orders/${orderId}/assign`, { staffId });
       
       this.store.getState().updateOrder(orderId, updatedOrder);
       return updatedOrder;
@@ -103,15 +70,7 @@ class OrderService {
     deliveryTime?: string;
   }) {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/orders/${orderId}/delivery`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(details),
-      });
-      const updatedOrder: Order = await response.json();
+      const updatedOrder = await patch<Order>(`/orders/${orderId}/delivery`, details);
       
       this.store.getState().updateOrder(orderId, updatedOrder);
       return updatedOrder;

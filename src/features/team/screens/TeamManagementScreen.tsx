@@ -13,11 +13,19 @@ import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { get, del } from '@/shared/services/api';
 import { AppSearchBar, StaffCard, StaffMember, StaffRole as StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import {
+  acceptJoinRequest,
+  cancelInvite,
+  getTeamMembers,
+  rejectJoinRequest,
+  removeTeamMember,
+  resendInvite,
+  updateTeamMemberRole,
+} from '@/features/team/team.service';
 
 // User type for team management
 interface User {
@@ -132,7 +140,7 @@ export default function TeamManagementScreen() {
     
     setIsLoading(true);
     try {
-      const users = await get<User[]>(`/companies/${activeBusiness.id}/users`);
+      const users = await getTeamMembers(activeBusiness.id);
       setUsers(users);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -194,10 +202,16 @@ export default function TeamManagementScreen() {
         { 
           text: 'Change', 
           onPress: async () => {
-            // TODO: Call API to change role
-            setSuccessMessage(`${staff.name}'s role has been updated`);
-            setShowSuccessDialog(true);
-            fetchUsers();
+            if (!activeBusiness?.id) return;
+            try {
+              await updateTeamMemberRole(activeBusiness.id, staff.id, newRole);
+              setSuccessMessage(`${staff.name}'s role has been updated`);
+              setShowSuccessDialog(true);
+              fetchUsers();
+            } catch (error) {
+              console.error('Error updating role:', error);
+              Alert.alert('Error', 'Failed to update role. Please try again.');
+            }
           }
         }
       ]
@@ -223,8 +237,7 @@ export default function TeamManagementScreen() {
           text: 'Report', 
           style: 'destructive',
           onPress: () => {
-            // TODO: Open report flow
-            Alert.alert('Report', 'Report functionality coming soon');
+            Alert.alert('Report', 'Report functionality is not available yet.');
           }
         }
       ]
@@ -244,7 +257,7 @@ export default function TeamManagementScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await del(`/companies/${activeBusiness.id}/users/${user.id}`);
+              await removeTeamMember(activeBusiness.id, user.id);
               setSuccessMessage('User removed successfully');
               setShowSuccessDialog(true);
               fetchUsers(); // Refresh the list
@@ -279,11 +292,17 @@ export default function TeamManagementScreen() {
         { 
           text: 'Accept', 
           onPress: async () => {
-            // TODO: Call API to accept request
-            // For now, remove from join requests and show success
-            setJoinRequests(prev => prev.filter(r => r.id !== request.id));
-            setSuccessMessage(`${request.userName} has been added to the team`);
-            setShowSuccessDialog(true);
+            if (!activeBusiness?.id) return;
+            try {
+              await acceptJoinRequest(activeBusiness.id, request.id);
+              setJoinRequests(prev => prev.filter(r => r.id !== request.id));
+              setSuccessMessage(`${request.userName} has been added to the team`);
+              setShowSuccessDialog(true);
+              fetchUsers();
+            } catch (error) {
+              console.error('Error accepting request:', error);
+              Alert.alert('Error', 'Failed to accept request. Please try again.');
+            }
           }
         }
       ]
@@ -301,9 +320,16 @@ export default function TeamManagementScreen() {
           text: 'Reject', 
           style: 'destructive',
           onPress: async () => {
-            // TODO: Call API to reject request
-            // For now, remove from join requests
-            setJoinRequests(prev => prev.filter(r => r.id !== request.id));
+            if (!activeBusiness?.id) return;
+            try {
+              await rejectJoinRequest(activeBusiness.id, request.id);
+              setJoinRequests(prev => prev.filter(r => r.id !== request.id));
+              setSuccessMessage('Join request rejected');
+              setShowSuccessDialog(true);
+            } catch (error) {
+              console.error('Error rejecting request:', error);
+              Alert.alert('Error', 'Failed to reject request. Please try again.');
+            }
           }
         }
       ]
@@ -321,10 +347,16 @@ export default function TeamManagementScreen() {
           text: 'Yes, Cancel', 
           style: 'destructive',
           onPress: async () => {
-            // TODO: Call API to cancel invite
-            setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
-            setSuccessMessage('Invitation cancelled');
-            setShowSuccessDialog(true);
+            if (!activeBusiness?.id) return;
+            try {
+              await cancelInvite(activeBusiness.id, invite.id);
+              setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
+              setSuccessMessage('Invitation cancelled');
+              setShowSuccessDialog(true);
+            } catch (error) {
+              console.error('Error cancelling invite:', error);
+              Alert.alert('Error', 'Failed to cancel invite. Please try again.');
+            }
           }
         }
       ]
@@ -341,9 +373,15 @@ export default function TeamManagementScreen() {
         { 
           text: 'Resend', 
           onPress: async () => {
-            // TODO: Call API to resend invite
-            setSuccessMessage(`Invitation resent to ${invite.email}`);
-            setShowSuccessDialog(true);
+            if (!activeBusiness?.id) return;
+            try {
+              await resendInvite(activeBusiness.id, invite.id);
+              setSuccessMessage(`Invitation resent to ${invite.email}`);
+              setShowSuccessDialog(true);
+            } catch (error) {
+              console.error('Error resending invite:', error);
+              Alert.alert('Error', 'Failed to resend invite. Please try again.');
+            }
           }
         }
       ]

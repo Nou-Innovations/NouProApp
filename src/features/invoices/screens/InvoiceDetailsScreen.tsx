@@ -29,9 +29,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { AppModal } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
-import invoicesService, { Invoice } from '../invoices.service';
+import invoicesService, { Invoice, convertEstimateToInvoice, getInvoicePdfUrl } from '../invoices.service';
 import { useProfileStore } from '@/shared/store/profileStore';
 import mockInvoicesData from '@/shared/data/mockInvoices';
+import * as FileSystem from 'expo-file-system';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InvoiceDetails'>;
 
@@ -236,31 +237,44 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
   };
 
   const downloadPDF = async () => {
+    if (!companyId) {
+      Alert.alert('Error', 'No active business selected');
+      return;
+    }
+
     setShowDownloadModal(true);
     setIsDownloading(true);
     setDownloadProgress(0);
     setDownloadComplete(false);
-    
-    // Simulate download progress
-    const progressInterval = setInterval(() => {
-      setDownloadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
+
+    try {
+      const pdfUrl = invoice?.pdfUrl ?? await getInvoicePdfUrl(companyId, invoiceId);
+      const fileName = `${documentNumber}.pdf`;
+      const directory = FileSystem.documentDirectory ?? '';
+      const fileUri = `${directory}${fileName}`;
+
+      const downloadResumable = FileSystem.createDownloadResumable(
+        pdfUrl,
+        fileUri,
+        {},
+        (progress) => {
+          const total = progress.totalBytesExpectedToWrite;
+          if (total > 0) {
+            const percent = Math.round((progress.totalBytesWritten / total) * 100);
+            setDownloadProgress(percent);
+          }
         }
-        return prev + 10;
-      });
-    }, 200);
-    
-    // Simulate download completion after 2 seconds
-    setTimeout(() => {
-      clearInterval(progressInterval);
-      setDownloadProgress(100);
+      );
+
+      await downloadResumable.downloadAsync();
       setIsDownloading(false);
       setDownloadComplete(true);
-      // TODO: Implement actual PDF download using expo-file-system or similar
-      // const fileUri = FileSystem.documentDirectory + `${documentNumber}.pdf`;
-    }, 2000);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      setIsDownloading(false);
+      setShowDownloadModal(false);
+      Alert.alert('Error', 'Failed to download PDF. Please try again.');
+    }
   };
 
   const handleDownloadComplete = () => {
@@ -327,7 +341,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
     (navigation as any).navigate('ReceivedPayments', { 
       invoiceId,
       totalAmount: grandTotal,
-      paidAmount: 0, // TODO: Get from invoice data
+      paidAmount: invoice?.paidAmount ?? 0,
     });
   };
 
@@ -336,7 +350,6 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
       Alert.alert('Permission Denied', 'Only the business that created this estimate can convert it to an invoice.');
       return;
     }
-    // TODO: Implement convert to invoice logic
     Alert.alert(
       'Convert to Invoice',
       'Are you sure you want to convert this estimate to an invoice?',
@@ -344,10 +357,20 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Convert',
-          onPress: () => {
-            setSuccessMessage('Estimate converted to invoice successfully!');
-            setShowSuccessDialog(true);
-            // TODO: API call to convert estimate to invoice
+          onPress: async () => {
+            if (!companyId) {
+              Alert.alert('Error', 'No active business selected');
+              return;
+            }
+            try {
+              const updatedInvoice = await convertEstimateToInvoice(companyId, invoiceId);
+              setInvoice(updatedInvoice);
+              setSuccessMessage('Estimate converted to invoice successfully!');
+              setShowSuccessDialog(true);
+            } catch (error) {
+              console.error('Error converting estimate:', error);
+              Alert.alert('Error', 'Failed to convert estimate. Please try again.');
+            }
           },
         },
       ]

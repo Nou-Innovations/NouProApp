@@ -16,6 +16,8 @@ import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { Icon } from '@/shared/utils/icons';
 import { format } from 'date-fns';
 import AppButton from '@/shared/components/ui/AppButton';
+import { recordInvoicePayments } from '../invoices.service';
+import { useProfileStore } from '@/shared/store/profileStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ReceivedPayments'>;
 
@@ -28,6 +30,7 @@ interface PartialPayment {
 export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
   const { invoiceId, totalAmount, paidAmount: initialPaidAmount } = route.params;
   const { theme } = useTheme();
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
   
   // State
   const [payments, setPayments] = useState<PartialPayment[]>([]);
@@ -87,9 +90,18 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
     setIsFullyPaid(!isFullyPaid);
   };
 
-  const handleDone = () => {
-    // TODO: Save payments to backend
-    navigation.goBack();
+  const handleDone = async () => {
+    if (!activeBusiness?.id) {
+      Alert.alert('Error', 'No active business selected');
+      return;
+    }
+    try {
+      await recordInvoicePayments(activeBusiness.id, invoiceId, payments, isFullyPaid);
+      navigation.goBack();
+    } catch (error) {
+      console.error('Error saving payments:', error);
+      Alert.alert('Error', 'Failed to save payments. Please try again.');
+    }
   };
 
   const goBack = () => {

@@ -3,6 +3,7 @@
  * Centralized icon exports and mapping for the app
  */
 import React from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
 import {
   // Navigation
   ChevronLeft,
@@ -602,11 +603,12 @@ interface IconProps {
   size?: number;
   color?: string;
   strokeWidth?: number;
+  style?: StyleProp<ViewStyle>;
 }
 
-export function Icon({ name, size = 24, color = '#000', strokeWidth = 2 }: IconProps) {
+export function Icon({ name, size = 24, color = '#000', strokeWidth = 2, style }: IconProps) {
   const IconComponent = getIcon(name);
-  return <IconComponent size={size} color={color} strokeWidth={strokeWidth} />;
+  return <IconComponent size={size} color={color} strokeWidth={strokeWidth} style={style} />;
 }
 
 export default Icon;

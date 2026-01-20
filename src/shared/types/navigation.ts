@@ -3,8 +3,8 @@
  * Based on app-logic.json navigation structure
  * 
  * Two navigation modes:
- * - Personal Mode: Home, Explore, Inbox, Activity, Profile
- * - Business Mode: Inbox, Deliveries, Products, Invoices, Business
+ * - Personal Mode: Home, Explore, Activity, Profile (Inbox via overlay)
+ * - Business Mode: Inbox, Deliveries, Products, Invoices, Profile (Explore via overlay)
  */
 
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -86,10 +86,10 @@ export type PersonalTabParamList = {
 /**
  * Business mode tabs (Pro Mode)
  * For businesses performing operational tasks
- * Note: Inbox is now an overlay accessed from Home header, not a tab
+ * Note: Explore (feed) is now an overlay accessed from Inbox header, not a tab
  */
 export type BusinessTabParamList = {
-  BusinessHome: undefined; // NEW - Business dashboard
+  BusinessInbox: undefined; // Business inbox with activity timeline and chats
   Deliveries: undefined;
   Products: undefined;
   Invoices: undefined;
@@ -109,7 +109,8 @@ export type RootStackParamList = {
   MainTabs: undefined;
   
   // Overlay Screens (slide from right, no tab bar)
-  InboxOverlay: undefined;
+  InboxOverlay: undefined; // Personal mode: chat list
+  ExploreOverlay: undefined; // Business mode: feed/explore content
   Notifications: undefined;
   
   // Chat screens

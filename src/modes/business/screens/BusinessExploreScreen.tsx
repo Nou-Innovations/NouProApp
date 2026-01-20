@@ -1,42 +1,20 @@
 /**
- * BusinessHomeScreen - Pro Mode Home
- * Business-operating dashboard with:
- * - Header with title and Inbox/Notifications icons (FIXED)
- * - Activity Timeline (FIXED - feed scrolls over it)
- * - Posts section (SCROLLABLE - scrolls under header, over activity)
- * - Swipe from right edge to reveal InboxOverlay
+ * BusinessExploreScreen - Pro Mode Explore/Feed Overlay
+ * Slides in from right, sits above tabs
+ * Displays the feed with brand presentations, company presentations, and new products
  */
 
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View,
-  Text,
   StyleSheet,
+  FlatList,
   RefreshControl,
-  Dimensions,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  interpolateColor,
-  withTiming,
-  Easing,
-  runOnJS,
-} from 'react-native-reanimated';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { useNotifications } from '@/shared/context/NotificationContext';
-import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
-
-// Pro Home Components
-import {
-  ProActivityTimeline,
-  type ActivityItem,
-} from '../components';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 
 // Feed Post Components (reuse from Personal mode)
 import {
@@ -44,13 +22,6 @@ import {
   CompanyPresentationPost,
   NewProductPost,
 } from '@/modes/personal/components';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-// Edge swipe threshold (pixels from right edge)
-const EDGE_SWIPE_THRESHOLD = 40;
-// Minimum swipe distance to trigger navigation
-const MIN_SWIPE_DISTANCE = 100;
 
 // Feed post types
 type FeedPostType = 'brand_presentation' | 'company_presentation' | 'new_products';
@@ -457,102 +428,17 @@ const mockFeedPosts: FeedPost[] = [
   },
 ];
 
-export default function BusinessHomeScreen() {
+export default function BusinessExploreScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
-  const { unreadCount, inboxUnreadCount } = useNotifications();
-  const insets = useSafeAreaInsets();
   
   // State
   const [refreshing, setRefreshing] = useState(false);
-  const [activitySectionHeight, setActivitySectionHeight] = useState(0);
-  
-  // Ref for bottom sheet
-  const bottomSheetRef = useRef<BottomSheet>(null);
-  
-  // Calculate header height (safe area + header)
-  const headerHeight = insets.top + 56; // 56 is approximate header height
-  
-  // Measure activity section height
-  const onActivitySectionLayout = useCallback((event: { nativeEvent: { layout: { height: number } } }) => {
-    setActivitySectionHeight(event.nativeEvent.layout.height);
-  }, []);
-  
-  // Track if feed is in sticky mode (expanded to top) - 0 = collapsed, 1 = expanded
-  const expandProgress = useSharedValue(0);
-  
-  // Timing config for smooth ease-in-out animation
-  const timingConfig = {
-    duration: 100,
-    easing: Easing.inOut(Easing.ease),
-  };
   
   // Navigation handlers
-  const navigateToInbox = useCallback(() => {
-    // @ts-ignore
-    navigation.navigate('InboxOverlay');
-  }, [navigation]);
-  
-  const navigateToNotifications = useCallback(() => {
-    // @ts-ignore
-    navigation.navigate('Notifications');
-  }, [navigation]);
-
-  // Bottom sheet snap points - showing peek of feed, then expanded to top
-  const snapPoints = useMemo(() => {
-    // Calculate remaining space below activity section (with 16px gap)
-    // Total used space = headerHeight + activitySectionHeight + 8px (marginTop) + 16px (gap)
-    const usedSpace = headerHeight + activitySectionHeight + 96;
-    const peekHeight = Math.max(SCREEN_HEIGHT - usedSpace, 150); // Minimum 150px peek
-    const expandedHeight = SCREEN_HEIGHT - headerHeight;
-    return [peekHeight, expandedHeight];
-  }, [headerHeight, activitySectionHeight]);
-  
-  // Handle bottom sheet changes - animate with ease-in-out
-  const handleSheetChange = useCallback((index: number) => {
-    expandProgress.value = withTiming(index === 1 ? 1 : 0, timingConfig);
-  }, [expandProgress, timingConfig]);
-  
-  // Animated header background style - becomes white when feed is sticky
-  const animatedHeaderStyle = useAnimatedStyle(() => {
-    return {
-      backgroundColor: interpolateColor(
-        expandProgress.value,
-        [0, 1],
-        [appTheme.colors.surface, appTheme.colors.background]
-      ),
-    };
-  });
-  
-  // Animated bottom sheet background style - border radius transitions with ease-in-out
-  const animatedSheetStyle = useAnimatedStyle(() => {
-    const radius = 20 * (1 - expandProgress.value); // 20 when collapsed, 0 when expanded
-    return {
-      borderTopLeftRadius: radius,
-      borderTopRightRadius: radius,
-    };
-  });
-  
-  // Animated handle container style - padding above handle transitions with ease-in-out
-  const animatedHandleStyle = useAnimatedStyle(() => {
-    const padding = 12 * (1 - expandProgress.value); // 12 when collapsed, 0 when expanded
-    return {
-      paddingTop: padding,
-      paddingBottom: 8,
-    };
-  });
-  
-  // Edge pan gesture for swipe to inbox - triggered from the edge swipe area
-  const edgeSwipeGesture = Gesture.Pan()
-    .activeOffsetX(-10) // Activate after 10px left movement
-    .failOffsetX(20) // Fail if moving right
-    .failOffsetY([-30, 30]) // Fail if moving too much vertically
-    .onEnd((event) => {
-      // Navigate to inbox if swiped left enough
-      if (event.translationX < -MIN_SWIPE_DISTANCE) {
-        runOnJS(navigateToInbox)();
-      }
-    });
+  const handleBack = () => {
+    navigation.goBack();
+  };
   
   // Refresh handler
   const onRefresh = useCallback(() => {
@@ -583,64 +469,8 @@ export default function BusinessHomeScreen() {
     console.log('Connect/Disconnect:', companyId, isConnected);
   };
 
-  // Activity Timeline data
-  const activityItems: ActivityItem[] = [
-    {
-      id: 'act-1',
-      type: 'order_created',
-      title: 'Order #1235 created',
-      description: 'Global Distributors - Rs 8,500',
-      timestamp: '5 min ago',
-      onPress: () => navigation.navigate('DeliveryDetail' as never, { deliveryId: 'DEL-001' } as never),
-    },
-    {
-      id: 'act-2',
-      type: 'delivery_completed',
-      title: 'Delivery #455 completed',
-      description: 'Premium Foods Ltd',
-      timestamp: '25 min ago',
-      onPress: () => navigation.navigate('DeliveryDetail' as never, { deliveryId: '455' } as never),
-    },
-    {
-      id: 'act-3',
-      type: 'invoice_sent',
-      title: 'Invoice #INV-790 sent',
-      description: 'ABC Corporation - Rs 12,000',
-      timestamp: '1 hour ago',
-      onPress: () => navigation.navigate('InvoiceDetails' as never, { invoiceId: '790' } as never),
-    },
-    {
-      id: 'act-4',
-      type: 'product_added',
-      title: 'New product added',
-      description: 'Coconut Water 500ml',
-      timestamp: '2 hours ago',
-      onPress: () => navigation.navigate('ProductDetail' as never, { productId: 'cw-500' } as never),
-    },
-    {
-      id: 'act-5',
-      type: 'delivery_started',
-      title: 'Delivery #457 started',
-      description: 'Fresh Farms - Route A',
-      timestamp: '3 hours ago',
-      onPress: () => navigation.navigate('DeliveryDetail' as never, { deliveryId: '457' } as never),
-    },
-  ];
-
-  // Render custom header using PrimaryHeader
-  const renderHeader = () => (
-    <PrimaryHeader
-      title="Home"
-      transparent
-      actions={[
-        { icon: 'bell', onPress: navigateToNotifications, badge: unreadCount, accessibilityLabel: 'Notifications' },
-        { icon: 'mail', onPress: navigateToInbox, badge: inboxUnreadCount, accessibilityLabel: 'Inbox' },
-      ]}
-    />
-  );
-
   // Render feed post
-  const renderFeedPost = (item: FeedPost) => {
+  const renderFeedPost = ({ item }: { item: FeedPost }) => {
     switch (item.type) {
       case 'brand_presentation':
         return (
@@ -704,148 +534,41 @@ export default function BusinessHomeScreen() {
   };
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={[styles.container, { backgroundColor: appTheme.colors.surface }]}>
-        {/* Safe area for top - animated background */}
-        <Animated.View style={[{ height: insets.top }, animatedHeaderStyle]} />
-          
-          {/* Fixed Header - Always visible at top */}
-          <Animated.View style={[styles.fixedHeader, animatedHeaderStyle]}>
-                {renderHeader()}
-          </Animated.View>
-          
-          {/* Main content area */}
-          <View style={styles.mainContent}>
-            {/* Activity Section - FULLY INTERACTIVE background content */}
-            <View 
-              style={[styles.activitySection, { backgroundColor: appTheme.colors.surface }]}
-              onLayout={onActivitySectionLayout}
-            >
-              {/* Activity Timeline */}
-              <ProActivityTimeline
-                items={activityItems}
-                maxItems={5}
-                onSeeAll={() => navigation.navigate('AllActivity' as never)}
-              />
-            </View>
-            
-            {/* Bottom Sheet - Feed section that slides over Activity */}
-            <BottomSheet
-              ref={bottomSheetRef}
-              index={0}
-              snapPoints={snapPoints}
-              onChange={handleSheetChange}
-              backgroundComponent={({ style }) => (
-                <Animated.View 
-                  style={[
-                    style, 
-                    styles.bottomSheetBackground, 
-                    { backgroundColor: appTheme.colors.background },
-                    animatedSheetStyle
-                  ]} 
-                />
-              )}
-              handleComponent={() => (
-                <Animated.View style={[styles.handleContainer, animatedHandleStyle]}>
-                  <View style={styles.bottomSheetHandle} />
-                </Animated.View>
-              )}
-              enablePanDownToClose={false}
-            >
-              <BottomSheetScrollView
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                  <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
-                    tintColor={appTheme.colors.primary}
-                  />
-                }
-                contentContainerStyle={styles.scrollContent}
-              >
-                {/* Posts Section */}
-                <View style={[
-                  styles.postsSection, 
-                  { backgroundColor: appTheme.colors.background }
-                ]}>
-                  <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
-                    Feed
-                  </Text>
-                  {mockFeedPosts.map(post => renderFeedPost(post))}
-                </View>
-                
-                {/* Bottom spacing for tab bar */}
-                <View style={{ height: theme.spacing.xl + 40 }} />
-              </BottomSheetScrollView>
-            </BottomSheet>
-          </View>
-          
-          {/* Edge swipe area - invisible touch area on right edge for swipe to inbox */}
-          <GestureDetector gesture={edgeSwipeGesture}>
-            <View style={styles.edgeSwipeArea} />
-          </GestureDetector>
-        </View>
-    </GestureHandlerRootView>
+    <SafeAreaView 
+      style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} 
+      edges={['top']}
+    >
+      {/* Header */}
+      <SecondaryHeader
+        title="Explore"
+        leftAction={{ icon: 'chevron-left', onPress: handleBack }}
+      />
+
+      {/* Feed List */}
+      <FlatList
+        data={mockFeedPosts}
+        keyExtractor={(item) => item.id}
+        renderItem={renderFeedPost}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={appTheme.colors.primary}
+          />
+        }
+        contentContainerStyle={styles.listContent}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
   },
-  fixedHeader: {
-    zIndex: 10,
-  },
-  mainContent: {
-    flex: 1,
-    position: 'relative',
-  },
-  activitySection: {
-    // Normal flow - takes its natural height
-    // Fully interactive as background content
-    marginTop: 8,
-    paddingBottom: theme.spacing.md,
-  },
-  bottomSheetBackground: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    // Shadow to create depth illusion
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 10,
-  },
-  handleContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bottomSheetHandle: {
-    backgroundColor: '#CCCCCC',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-  },
-  scrollContent: {
-    paddingBottom: theme.spacing.md,
-  },
-  postsSection: {
-    paddingHorizontal: 0,
-    minHeight: SCREEN_HEIGHT,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.primary.bold,
-    paddingHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-  },
-  edgeSwipeArea: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: EDGE_SWIPE_THRESHOLD,
-    zIndex: 100, // Above everything else
-    // backgroundColor: 'rgba(255,0,0,0.1)', // Uncomment for debugging
+  listContent: {
+    paddingBottom: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
   },
 });

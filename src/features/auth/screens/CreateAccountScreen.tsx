@@ -64,13 +64,11 @@ export default function CreateAccountScreen({ navigation }: Props) {
   };
 
   const handleGoogleSignUp = async () => {
-    // TODO: Implement Google Sign Up
-    console.log('Google Sign Up pressed');
+    Alert.alert('Google Sign Up', 'Google Sign Up is not available yet.');
   };
 
   const handleAppleSignUp = async () => {
-    // TODO: Implement Apple Sign Up
-    console.log('Apple Sign Up pressed');
+    Alert.alert('Apple Sign Up', 'Apple Sign Up is not available yet.');
   };
 
   return (

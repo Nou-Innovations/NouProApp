@@ -42,9 +42,8 @@ export default function UploadBusinessLogoScreen({ navigation, route }: Props) {
 
   const handleDone = async () => {
     setIsCreating(true);
-    
-    // TODO: Actually create the business with all the data
-    // For now, simulate API call
+
+    // Simulate API call until business creation endpoint is available
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     setIsCreating(false);
@@ -53,8 +52,8 @@ export default function UploadBusinessLogoScreen({ navigation, route }: Props) {
 
   const handleLater = async () => {
     setIsCreating(true);
-    
-    // TODO: Actually create the business without logo
+
+    // Simulate API call until business creation endpoint is available
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     setIsCreating(false);

@@ -28,6 +28,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
+import { createLocation } from '@/features/locations/locations.service';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -234,20 +235,16 @@ export default function AddLocationScreen() {
     setIsSubmitting(true);
 
     try {
-      // TODO: Replace with actual API call
-      // await post(`/businesses/${activeBusiness.id}/locations`, {
-      //   name: locationName.trim(),
-      //   location_type: locationType,
-      //   address: selectedAddress?.address,
-      //   latitude: selectedAddress?.latitude,
-      //   longitude: selectedAddress?.longitude,
-      //   operating_mode: 'DEPENDENT',
-      //   is_public: false,
-      //   is_primary: false,
-      // });
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await createLocation(activeBusiness.id, {
+        name: locationName.trim(),
+        location_type: locationType,
+        address: selectedAddress?.address,
+        latitude: selectedAddress?.latitude,
+        longitude: selectedAddress?.longitude,
+        operating_mode: 'DEPENDENT',
+        is_public: false,
+        is_primary: false,
+      });
 
       Alert.alert(
         'Success',
