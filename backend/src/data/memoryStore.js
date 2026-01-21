@@ -57,9 +57,9 @@ const MEMBER_STATUS = {
 
 let companies = [
   {
-    id: 'comp-1',
+    id: 'biz-001',
     name: 'NouPro Distribution Inc.',
-    logoUrl: 'https://picsum.photos/seed/comp1/100/100',
+    logoUrl: 'https://picsum.photos/seed/biz001/100/100',
     description: 'Leading distribution company serving multiple locations',
     phone: '+1-555-123-4567',
     email: 'info@noupro.com',
@@ -78,9 +78,9 @@ let companies = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'comp-2',
+    id: 'biz-002',
     name: 'Global Supply Co.',
-    logoUrl: 'https://picsum.photos/seed/comp2/100/100',
+    logoUrl: 'https://picsum.photos/seed/biz002/100/100',
     description: 'Global supply chain management specialists',
     phone: '+1-555-987-6543',
     email: 'contact@globalsupply.com',
@@ -99,9 +99,9 @@ let companies = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'comp-3',
+    id: 'biz-003',
     name: 'Small Retail Shop',
-    logoUrl: 'https://picsum.photos/seed/comp3/100/100',
+    logoUrl: 'https://picsum.photos/seed/biz003/100/100',
     description: 'Local corner shop',
     phone: '+230-5999-1234',
     email: 'shop@local.mu',
@@ -127,8 +127,8 @@ let companies = [
 
 let locations = [
   {
-    id: 'loc-1',
-    companyId: 'comp-1',
+    id: 'loc-001',
+    companyId: 'biz-001',
     name: 'Warehouse A - Port Louis',
     address: '123 Royal Road, Port Louis, Mauritius',
     phone: '+230-5123-4567',
@@ -141,8 +141,8 @@ let locations = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'loc-2',
-    companyId: 'comp-1',
+    id: 'loc-002',
+    companyId: 'biz-001',
     name: 'Warehouse B - Curepipe',
     address: '456 Industrial Zone, Curepipe, Mauritius',
     phone: '+230-5987-6543',
@@ -155,8 +155,8 @@ let locations = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'loc-3',
-    companyId: 'comp-1',
+    id: 'loc-003',
+    companyId: 'biz-001',
     name: 'Distribution Center - Ebene',
     address: '789 Cyber Tower, Ebene, Mauritius',
     phone: '+230-5555-0123',
@@ -169,8 +169,8 @@ let locations = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'loc-4',
-    companyId: 'comp-2',
+    id: 'loc-004',
+    companyId: 'biz-002',
     name: 'Global Hub - Quatre Bornes',
     address: '321 Business Park, Quatre Bornes, Mauritius',
     phone: '+230-5999-8888',
@@ -183,8 +183,8 @@ let locations = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'loc-5',
-    companyId: 'comp-3',
+    id: 'loc-005',
+    companyId: 'biz-003',
     name: 'Main Shop',
     address: '10 Market Street, Rose Hill, Mauritius',
     phone: '+230-5999-1234',
@@ -197,8 +197,8 @@ let locations = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'loc-6',
-    companyId: 'comp-3',
+    id: 'loc-006',
+    companyId: 'biz-003',
     name: 'Branch Store - Curepipe',
     address: '25 Royal Road, Curepipe, Mauritius',
     phone: '+230-5999-5678',
@@ -211,8 +211,8 @@ let locations = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'loc-7',
-    companyId: 'comp-3',
+    id: 'loc-007',
+    companyId: 'biz-003',
     name: 'Warehouse',
     address: '100 Industrial Zone, Phoenix, Mauritius',
     phone: '+230-5999-9999',
@@ -232,12 +232,12 @@ let locations = [
 
 let products = [
   {
-    id: 'PRD-001',
-    companyId: 'comp-1',
+    id: 'prd-001',
+    companyId: 'biz-001',
     name: 'Coca-Cola 0.5L x10',
     brand: 'Coca-Cola',
     brandLogo: 'https://picsum.photos/seed/cocacola/40/40',
-    productPicture: 'https://picsum.photos/seed/PRD-001/80/80',
+    productPicture: 'https://picsum.photos/seed/prd-001/80/80',
     price: 25.99,
     category: 'Beverages',
     status: 'Available',
@@ -251,12 +251,12 @@ let products = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'PRD-002',
-    companyId: 'comp-1',
+    id: 'prd-002',
+    companyId: 'biz-001',
     name: 'Fanta Orange 1L x6',
     brand: 'Fanta',
     brandLogo: 'https://picsum.photos/seed/fanta/40/40',
-    productPicture: 'https://picsum.photos/seed/PRD-002/80/80',
+    productPicture: 'https://picsum.photos/seed/prd-002/80/80',
     price: 19.50,
     category: 'Beverages',
     status: 'Available',
@@ -270,12 +270,12 @@ let products = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'PRD-003',
-    companyId: 'comp-1',
+    id: 'prd-003',
+    companyId: 'biz-001',
     name: 'Sprite 2L x4',
     brand: 'Sprite',
     brandLogo: 'https://picsum.photos/seed/sprite/40/40',
-    productPicture: 'https://picsum.photos/seed/PRD-003/80/80',
+    productPicture: 'https://picsum.photos/seed/prd-003/80/80',
     price: 16.75,
     category: 'Beverages',
     status: 'Out of Stock',
@@ -288,12 +288,12 @@ let products = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'PRD-004',
-    companyId: 'comp-1',
+    id: 'prd-004',
+    companyId: 'biz-001',
     name: 'Rice Premium 5kg',
     brand: 'Island Grains',
     brandLogo: 'https://picsum.photos/seed/islandgrains/40/40',
-    productPicture: 'https://picsum.photos/seed/PRD-004/80/80',
+    productPicture: 'https://picsum.photos/seed/prd-004/80/80',
     price: 45.00,
     category: 'Groceries',
     status: 'Available',
@@ -307,12 +307,12 @@ let products = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'PRD-005',
-    companyId: 'comp-1',
+    id: 'prd-005',
+    companyId: 'biz-001',
     name: 'Cooking Oil 1L',
     brand: 'Golden Sun',
     brandLogo: 'https://picsum.photos/seed/goldensun/40/40',
-    productPicture: 'https://picsum.photos/seed/PRD-005/80/80',
+    productPicture: 'https://picsum.photos/seed/prd-005/80/80',
     price: 12.99,
     category: 'Groceries',
     status: 'In Production',
@@ -324,12 +324,12 @@ let products = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'PRD-006',
-    companyId: 'comp-1',
+    id: 'prd-006',
+    companyId: 'biz-001',
     name: 'Flour All-Purpose 2kg',
     brand: 'Island Grains',
     brandLogo: 'https://picsum.photos/seed/islandgrains/40/40',
-    productPicture: 'https://picsum.photos/seed/PRD-006/80/80',
+    productPicture: 'https://picsum.photos/seed/prd-006/80/80',
     price: 8.50,
     category: 'Groceries',
     status: 'Available',
@@ -342,12 +342,12 @@ let products = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'PRD-007',
-    companyId: 'comp-1',
+    id: 'prd-007',
+    companyId: 'biz-001',
     name: 'Fresh Milk 1L',
     brand: 'DairyBest',
     brandLogo: 'https://picsum.photos/seed/dairybest/40/40',
-    productPicture: 'https://picsum.photos/seed/PRD-007/80/80',
+    productPicture: 'https://picsum.photos/seed/prd-007/80/80',
     price: 4.99,
     category: 'Dairy',
     status: 'Available',
@@ -361,12 +361,12 @@ let products = [
     updatedAt: '2025-01-15T00:00:00Z'
   },
   {
-    id: 'PRD-008',
-    companyId: 'comp-1',
+    id: 'prd-008',
+    companyId: 'biz-001',
     name: 'Cheese Cheddar 250g',
     brand: 'DairyBest',
     brandLogo: 'https://picsum.photos/seed/dairybest/40/40',
-    productPicture: 'https://picsum.photos/seed/PRD-008/80/80',
+    productPicture: 'https://picsum.photos/seed/prd-008/80/80',
     price: 9.99,
     category: 'Dairy',
     status: 'Inactive',
@@ -385,20 +385,20 @@ let products = [
 
 let locationProducts = [
   {
-    id: 'lp-1',
-    businessId: 'comp-1',
-    locationId: 'loc-1',
-    productId: 'PRD-001',
+    id: 'lp-001',
+    businessId: 'biz-001',
+    locationId: 'loc-001',
+    productId: 'prd-001',
     priceOverride: 27.99,
     taxOverride: null,
     isActive: true,
     createdAt: '2024-01-01T00:00:00Z'
   },
   {
-    id: 'lp-2',
-    businessId: 'comp-1',
-    locationId: 'loc-3',
-    productId: 'PRD-001',
+    id: 'lp-002',
+    businessId: 'biz-001',
+    locationId: 'loc-003',
+    productId: 'prd-001',
     priceOverride: 24.99,
     taxOverride: 0.10,
     isActive: true,
@@ -411,13 +411,13 @@ let locationProducts = [
 // ============================================================================
 
 let stocks = [
-  { id: 'stk-1', businessId: 'comp-1', locationId: 'loc-1', productId: 'PRD-001', qtyOnHand: 500 },
-  { id: 'stk-2', businessId: 'comp-1', locationId: 'loc-1', productId: 'PRD-002', qtyOnHand: 300 },
-  { id: 'stk-3', businessId: 'comp-1', locationId: 'loc-1', productId: 'PRD-004', qtyOnHand: 1000 },
-  { id: 'stk-4', businessId: 'comp-1', locationId: 'loc-2', productId: 'PRD-001', qtyOnHand: 400 },
-  { id: 'stk-5', businessId: 'comp-1', locationId: 'loc-2', productId: 'PRD-002', qtyOnHand: 200 },
-  { id: 'stk-6', businessId: 'comp-1', locationId: 'loc-3', productId: 'PRD-001', qtyOnHand: 600 },
-  { id: 'stk-7', businessId: 'comp-1', locationId: 'loc-3', productId: 'PRD-004', qtyOnHand: 1500 }
+  { id: 'stk-001', businessId: 'biz-001', locationId: 'loc-001', productId: 'prd-001', qtyOnHand: 500 },
+  { id: 'stk-002', businessId: 'biz-001', locationId: 'loc-001', productId: 'prd-002', qtyOnHand: 300 },
+  { id: 'stk-003', businessId: 'biz-001', locationId: 'loc-001', productId: 'prd-004', qtyOnHand: 1000 },
+  { id: 'stk-004', businessId: 'biz-001', locationId: 'loc-002', productId: 'prd-001', qtyOnHand: 400 },
+  { id: 'stk-005', businessId: 'biz-001', locationId: 'loc-002', productId: 'prd-002', qtyOnHand: 200 },
+  { id: 'stk-006', businessId: 'biz-001', locationId: 'loc-003', productId: 'prd-001', qtyOnHand: 600 },
+  { id: 'stk-007', businessId: 'biz-001', locationId: 'loc-003', productId: 'prd-004', qtyOnHand: 1500 }
 ];
 
 // ============================================================================
@@ -426,18 +426,18 @@ let stocks = [
 
 let orders = [
   {
-    id: 'ORD-001',
-    businessId: 'comp-1',
+    id: 'ord-001',
+    businessId: 'biz-001',
     soldByScope: ORDER_SCOPE.PARENT,
     soldByLocationId: null,
-    fulfillmentLocationId: 'loc-1',
-    customerId: 'client-1',
+    fulfillmentLocationId: 'loc-001',
+    customerId: 'client-001',
     customerName: 'Grocery Mart Ltd',
     customerAddress: '123 Main Street, Port Louis',
     customerPhone: '+230 5123 4567',
     items: [
-      { productId: 'PRD-001', name: 'Coca-Cola 0.5L x10', quantity: 3, unitPrice: 25.99, subtotal: 77.97 },
-      { productId: 'PRD-002', name: 'Fanta Orange 1L x6', quantity: 2, unitPrice: 19.50, subtotal: 39.00 }
+      { productId: 'prd-001', name: 'Coca-Cola 0.5L x10', quantity: 3, unitPrice: 25.99, subtotal: 77.97 },
+      { productId: 'prd-002', name: 'Fanta Orange 1L x6', quantity: 2, unitPrice: 19.50, subtotal: 39.00 }
     ],
     totalAmount: 116.97,
     status: ORDER_STATUS.ASSIGNED,
@@ -447,17 +447,17 @@ let orders = [
     updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
   },
   {
-    id: 'ORD-002',
-    businessId: 'comp-1',
+    id: 'ord-002',
+    businessId: 'biz-001',
     soldByScope: ORDER_SCOPE.LOCATION,
-    soldByLocationId: 'loc-1',
-    fulfillmentLocationId: 'loc-1',
-    customerId: 'client-2',
+    soldByLocationId: 'loc-001',
+    fulfillmentLocationId: 'loc-001',
+    customerId: 'client-002',
     customerName: 'Super Store Express',
     customerAddress: '456 Commerce Ave, Curepipe',
     customerPhone: '+230 5234 5678',
     items: [
-      { productId: 'PRD-004', name: 'Rice Premium 5kg', quantity: 10, unitPrice: 45.00, subtotal: 450.00 }
+      { productId: 'prd-004', name: 'Rice Premium 5kg', quantity: 10, unitPrice: 45.00, subtotal: 450.00 }
     ],
     totalAmount: 450.00,
     status: ORDER_STATUS.OUT_FOR_DELIVERY,
@@ -467,18 +467,18 @@ let orders = [
     updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
   },
   {
-    id: 'ORD-003',
-    businessId: 'comp-1',
+    id: 'ord-003',
+    businessId: 'biz-001',
     soldByScope: ORDER_SCOPE.PARENT,
     soldByLocationId: null,
     fulfillmentLocationId: null,
-    customerId: 'client-3',
+    customerId: 'client-003',
     customerName: 'Mini Mart Plus',
     customerAddress: '789 Industrial Rd, Vacoas',
     customerPhone: '+230 5345 6789',
     items: [
-      { productId: 'PRD-001', name: 'Coca-Cola 0.5L x10', quantity: 5, unitPrice: 25.99, subtotal: 129.95 },
-      { productId: 'PRD-006', name: 'Flour All-Purpose 2kg', quantity: 20, unitPrice: 8.50, subtotal: 170.00 }
+      { productId: 'prd-001', name: 'Coca-Cola 0.5L x10', quantity: 5, unitPrice: 25.99, subtotal: 129.95 },
+      { productId: 'prd-006', name: 'Flour All-Purpose 2kg', quantity: 20, unitPrice: 8.50, subtotal: 170.00 }
     ],
     totalAmount: 299.95,
     status: ORDER_STATUS.NEW,
@@ -488,17 +488,17 @@ let orders = [
     updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
   },
   {
-    id: 'ORD-004',
-    businessId: 'comp-1',
+    id: 'ord-004',
+    businessId: 'biz-001',
     soldByScope: ORDER_SCOPE.LOCATION,
-    soldByLocationId: 'loc-3',
-    fulfillmentLocationId: 'loc-3',
-    customerId: 'client-4',
+    soldByLocationId: 'loc-003',
+    fulfillmentLocationId: 'loc-003',
+    customerId: 'client-004',
     customerName: 'Fresh Mart Central',
     customerAddress: '321 Market Street, Quatre Bornes',
     customerPhone: '+230 5567 8901',
     items: [
-      { productId: 'PRD-007', name: 'Fresh Milk 1L', quantity: 50, unitPrice: 4.99, subtotal: 249.50 }
+      { productId: 'prd-007', name: 'Fresh Milk 1L', quantity: 50, unitPrice: 4.99, subtotal: 249.50 }
     ],
     totalAmount: 249.50,
     status: ORDER_STATUS.DELIVERED,
@@ -515,25 +515,25 @@ let orders = [
 
 let businessMembers = [
   {
-    id: 'bm-1',
-    businessId: 'comp-1',
-    userId: 'user-1',
+    id: 'bm-001',
+    businessId: 'biz-001',
+    userId: 'usr-001',
     role: MEMBER_ROLES.SUPER_ADMIN,
     status: MEMBER_STATUS.ACCEPTED,
     createdAt: '2024-01-01T00:00:00Z'
   },
   {
-    id: 'bm-2',
-    businessId: 'comp-1',
-    userId: 'user-2',
+    id: 'bm-002',
+    businessId: 'biz-001',
+    userId: 'usr-002',
     role: MEMBER_ROLES.ADMIN,
     status: MEMBER_STATUS.ACCEPTED,
     createdAt: '2024-03-01T00:00:00Z'
   },
   {
-    id: 'bm-3',
-    businessId: 'comp-2',
-    userId: 'user-3',
+    id: 'bm-003',
+    businessId: 'biz-002',
+    userId: 'usr-003',
     role: MEMBER_ROLES.SUPER_ADMIN,
     status: MEMBER_STATUS.ACCEPTED,
     createdAt: '2024-01-01T00:00:00Z'
@@ -546,40 +546,40 @@ let businessMembers = [
 
 let locationMembers = [
   {
-    id: 'lm-1',
-    locationId: 'loc-1',
-    businessId: 'comp-1',
-    userId: 'user-1',
+    id: 'lm-001',
+    locationId: 'loc-001',
+    businessId: 'biz-001',
+    userId: 'usr-001',
     role: MEMBER_ROLES.SUPER_ADMIN,
     status: MEMBER_STATUS.ACCEPTED,
     permissions: ['orders', 'stock', 'deliveries', 'invoices'],
     createdAt: '2024-01-01T00:00:00Z'
   },
   {
-    id: 'lm-2',
-    locationId: 'loc-1',
-    businessId: 'comp-1',
-    userId: 'user-4',
+    id: 'lm-002',
+    locationId: 'loc-001',
+    businessId: 'biz-001',
+    userId: 'usr-004',
     role: MEMBER_ROLES.STAFF,
     status: MEMBER_STATUS.ACCEPTED,
     permissions: ['deliveries'],
     createdAt: '2024-06-01T00:00:00Z'
   },
   {
-    id: 'lm-3',
-    locationId: 'loc-2',
-    businessId: 'comp-1',
-    userId: 'user-1',
+    id: 'lm-003',
+    locationId: 'loc-002',
+    businessId: 'biz-001',
+    userId: 'usr-001',
     role: MEMBER_ROLES.ADMIN,
     status: MEMBER_STATUS.ACCEPTED,
     permissions: ['orders', 'stock', 'deliveries'],
     createdAt: '2024-01-01T00:00:00Z'
   },
   {
-    id: 'lm-4',
-    locationId: 'loc-3',
-    businessId: 'comp-1',
-    userId: 'user-1',
+    id: 'lm-004',
+    locationId: 'loc-003',
+    businessId: 'biz-001',
+    userId: 'usr-001',
     role: MEMBER_ROLES.SUPER_ADMIN,
     status: MEMBER_STATUS.ACCEPTED,
     permissions: ['orders', 'stock', 'deliveries', 'invoices'],
@@ -593,12 +593,12 @@ let locationMembers = [
 
 let deliveries = [
   {
-    id: 'DEL-001',
-    companyId: 'comp-1',
+    id: 'del-001',
+    companyId: 'biz-001',
     type: 'delivery',
     direction: 'outgoing',
-    locationId: 'loc-1',
-    clientId: 'client-1',
+    locationId: 'loc-001',
+    clientId: 'client-001',
     clientCompanyLogo: 'https://picsum.photos/seed/grocerymart/100/100',
     clientCompanyName: 'Grocery Mart Ltd',
     clientAddress: '123 Main Street, Port Louis',
@@ -610,8 +610,8 @@ let deliveries = [
     expectedDeliveryDateTime: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
     itemCount: 5,
     items: [
-      { id: 'I001', productId: 'P001', name: 'Coca-Cola 0.5L x10', image: 'https://picsum.photos/seed/product1/100/100', price: 25.99, quantityOrdered: 3, isLoaded: false, status: 'In Stock' },
-      { id: 'I002', productId: 'P002', name: 'Fanta Orange 1L x6', image: 'https://picsum.photos/seed/product2/100/100', price: 19.50, quantityOrdered: 2, isLoaded: false, status: 'Available' }
+      { id: 'itm-001', productId: 'prd-001', name: 'Coca-Cola 0.5L x10', image: 'https://picsum.photos/seed/product1/100/100', price: 25.99, quantityOrdered: 3, isLoaded: false, status: 'In Stock' },
+      { id: 'itm-002', productId: 'prd-002', name: 'Fanta Orange 1L x6', image: 'https://picsum.photos/seed/product2/100/100', price: 19.50, quantityOrdered: 2, isLoaded: false, status: 'Available' }
     ],
     totalAmount: 116.97,
     trackingNumber: 'TRK-001-2025',
@@ -624,12 +624,12 @@ let deliveries = [
     updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
   },
   {
-    id: 'DEL-002',
-    companyId: 'comp-1',
+    id: 'del-002',
+    companyId: 'biz-001',
     type: 'delivery',
     direction: 'outgoing',
-    locationId: 'loc-1',
-    clientId: 'client-2',
+    locationId: 'loc-001',
+    clientId: 'client-002',
     clientCompanyLogo: 'https://picsum.photos/seed/superstore/100/100',
     clientCompanyName: 'Super Store Express',
     clientAddress: '456 Commerce Ave, Curepipe',
@@ -641,26 +641,26 @@ let deliveries = [
     expectedDeliveryDateTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
     itemCount: 8,
     items: [
-      { id: 'I003', productId: 'P003', name: 'Sprite 2L x4', image: 'https://picsum.photos/seed/product3/100/100', price: 16.75, quantityOrdered: 4, isLoaded: true, status: 'Available' },
-      { id: 'I004', productId: 'P004', name: 'Juice Box x12', image: 'https://picsum.photos/seed/product4/100/100', price: 35.00, quantityOrdered: 4, isLoaded: true, status: 'In Stock' }
+      { id: 'itm-003', productId: 'prd-003', name: 'Sprite 2L x4', image: 'https://picsum.photos/seed/product3/100/100', price: 16.75, quantityOrdered: 4, isLoaded: true, status: 'Available' },
+      { id: 'itm-004', productId: 'prd-004', name: 'Juice Box x12', image: 'https://picsum.photos/seed/product4/100/100', price: 35.00, quantityOrdered: 4, isLoaded: true, status: 'In Stock' }
     ],
     totalAmount: 207.00,
     trackingNumber: 'TRK-002-2025',
     deliveryStatus: 'ongoing',
     paymentStatus: 'Paid',
-    assignedStaffId: 'S001',
+    assignedStaffId: 'stf-001',
     assignedTo: 'John Doe',
     transportMode: 'Truck',
     createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
     updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
   },
   {
-    id: 'DEL-003',
-    companyId: 'comp-1',
+    id: 'del-003',
+    companyId: 'biz-001',
     type: 'delivery',
     direction: 'outgoing',
-    locationId: 'loc-2',
-    clientId: 'client-3',
+    locationId: 'loc-002',
+    clientId: 'client-003',
     clientCompanyLogo: 'https://picsum.photos/seed/minimart/100/100',
     clientCompanyName: 'Mini Mart Plus',
     clientAddress: '789 Industrial Rd, Vacoas',
@@ -675,19 +675,19 @@ let deliveries = [
     trackingNumber: 'TRK-003-2025',
     deliveryStatus: 'delivered',
     paymentStatus: 'Paid',
-    assignedStaffId: 'S002',
+    assignedStaffId: 'stf-002',
     assignedTo: 'Jane Smith',
     transportMode: 'Van',
     createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
     updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
   },
   {
-    id: 'DEL-004',
-    companyId: 'comp-1',
+    id: 'del-004',
+    companyId: 'biz-001',
     type: 'delivery',
     direction: 'incoming',
-    locationId: 'loc-1',
-    clientId: 'supplier-1',
+    locationId: 'loc-001',
+    clientId: 'supplier-001',
     clientCompanyLogo: 'https://picsum.photos/seed/supplier/100/100',
     clientCompanyName: 'Phoenix Beverages Ltd',
     clientAddress: 'Industrial Zone, Phoenix',
@@ -709,11 +709,11 @@ let deliveries = [
     updatedAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
   },
   {
-    id: 'DEL-005',
-    companyId: 'comp-1',
+    id: 'del-005',
+    companyId: 'biz-001',
     type: 'transfer',
     direction: 'outgoing',
-    locationId: 'loc-1',
+    locationId: 'loc-001',
     fromLocation: 'Warehouse A - Port Louis',
     toLocation: 'Warehouse B - Curepipe',
     clientCompanyName: 'Internal Transfer',
@@ -726,19 +726,19 @@ let deliveries = [
     totalAmount: 0,
     deliveryStatus: 'pending',
     paymentStatus: 'Paid',
-    assignedStaffId: 'S003',
+    assignedStaffId: 'stf-003',
     assignedTo: 'Bob Johnson',
     transportMode: 'Truck',
     createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
     updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
   },
   {
-    id: 'DEL-006',
-    companyId: 'comp-1',
+    id: 'del-006',
+    companyId: 'biz-001',
     type: 'delivery',
     direction: 'outgoing',
-    locationId: 'loc-2',
-    clientId: 'client-4',
+    locationId: 'loc-002',
+    clientId: 'client-004',
     clientCompanyLogo: 'https://picsum.photos/seed/freshmart/100/100',
     clientCompanyName: 'Fresh Mart Central',
     clientAddress: '321 Market Street, Quatre Bornes',
@@ -767,11 +767,11 @@ let deliveries = [
 
 let invoices = [
   {
-    id: 'inv-1',
-    businessId: 'comp-1',
+    id: 'inv-001',
+    businessId: 'biz-001',
     issuedByScope: INVOICE_SCOPE.PARENT,
     issuedByLocationId: null,
-    orderId: 'ORD-001',
+    orderId: 'ord-001',
     invoiceNumber: 'INV-2025-001',
     clientName: 'Grocery Mart Ltd',
     clientEmail: 'orders@grocerymart.mu',
@@ -783,19 +783,19 @@ let invoices = [
     issueDate: '2025-01-15',
     dueDate: '2025-02-14',
     items: [
-      { productId: 'PRD-001', description: 'Coca-Cola 0.5L x10', quantity: 3, unitPrice: 25.99, totalPrice: 77.97 },
-      { productId: 'PRD-002', description: 'Fanta Orange 1L x6', quantity: 2, unitPrice: 19.50, totalPrice: 39.00 }
+      { productId: 'prd-001', description: 'Coca-Cola 0.5L x10', quantity: 3, unitPrice: 25.99, totalPrice: 77.97 },
+      { productId: 'prd-002', description: 'Fanta Orange 1L x6', quantity: 2, unitPrice: 19.50, totalPrice: 39.00 }
     ],
     notes: 'Payment terms: Net 30',
     createdAt: '2025-01-15T09:00:00Z',
     updatedAt: '2025-01-15T09:00:00Z'
   },
   {
-    id: 'inv-2',
-    businessId: 'comp-1',
+    id: 'inv-002',
+    businessId: 'biz-001',
     issuedByScope: INVOICE_SCOPE.LOCATION,
-    issuedByLocationId: 'loc-1',
-    orderId: 'ORD-002',
+    issuedByLocationId: 'loc-001',
+    orderId: 'ord-002',
     invoiceNumber: 'WHA-2025-001',
     clientName: 'Super Store Express',
     clientEmail: 'purchasing@superstore.mu',
@@ -807,18 +807,18 @@ let invoices = [
     issueDate: '2025-01-14',
     dueDate: '2025-02-13',
     items: [
-      { productId: 'PRD-004', description: 'Rice Premium 5kg', quantity: 10, unitPrice: 45.00, totalPrice: 450.00 }
+      { productId: 'prd-004', description: 'Rice Premium 5kg', quantity: 10, unitPrice: 45.00, totalPrice: 450.00 }
     ],
     notes: '',
     createdAt: '2025-01-14T10:00:00Z',
     updatedAt: '2025-01-14T14:00:00Z'
   },
   {
-    id: 'inv-3',
-    businessId: 'comp-1',
+    id: 'inv-003',
+    businessId: 'biz-001',
     issuedByScope: INVOICE_SCOPE.LOCATION,
-    issuedByLocationId: 'loc-3',
-    orderId: 'ORD-004',
+    issuedByLocationId: 'loc-003',
+    orderId: 'ord-004',
     invoiceNumber: 'DIS-2025-001',
     clientName: 'Fresh Mart Central',
     clientEmail: 'supply@freshmart.mu',
@@ -830,7 +830,7 @@ let invoices = [
     issueDate: '2025-01-06',
     dueDate: '2025-02-05',
     items: [
-      { productId: 'PRD-007', description: 'Fresh Milk 1L', quantity: 50, unitPrice: 4.99, totalPrice: 249.50 }
+      { productId: 'prd-007', description: 'Fresh Milk 1L', quantity: 50, unitPrice: 4.99, totalPrice: 249.50 }
     ],
     notes: '',
     createdAt: '2025-01-06T08:00:00Z',
@@ -844,17 +844,17 @@ let invoices = [
 
 let chats = [
   {
-    id: 'chat-1',
-    companyId: 'comp-1',
+    id: 'chat-001',
+    companyId: 'biz-001',
     locationId: null,
     type: 'client',
     name: '📋 Message Types Showcase',
-    participants: ['user-1', 'demo-1'],
+    participants: ['usr-001', 'demo-001'],
     lastMessage: {
       id: 'msg-showcase',
       content: 'View all chat bubble types here',
       type: 'text',
-      senderId: 'demo-1',
+      senderId: 'demo-001',
       senderName: 'Demo Contact',
       timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
       isRead: false,
@@ -867,17 +867,17 @@ let chats = [
     updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
   },
   {
-    id: 'chat-2',
-    companyId: 'comp-1',
+    id: 'chat-002',
+    companyId: 'biz-001',
     locationId: null,
     type: 'client',
     name: 'Sarah Johnson',
-    participants: ['user-1', 'sarah-1'],
+    participants: ['usr-001', 'sarah-001'],
     lastMessage: {
       id: 'msg-sarah',
       content: 'Photo',
       type: 'photo',
-      senderId: 'sarah-1',
+      senderId: 'sarah-001',
       senderName: 'Sarah Johnson',
       timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
       isRead: false,
@@ -890,17 +890,17 @@ let chats = [
     updatedAt: new Date(Date.now() - 45 * 60 * 1000).toISOString()
   },
   {
-    id: 'chat-3',
-    companyId: 'comp-1',
+    id: 'chat-003',
+    companyId: 'biz-001',
     locationId: null,
     type: 'supplier',
     name: 'XYZ Suppliers',
-    participants: ['user-1', 'xyz-1'],
+    participants: ['usr-001', 'xyz-001'],
     lastMessage: {
       id: 'msg-xyz',
       content: 'New_Products_Catalog.pdf',
       type: 'pdf',
-      senderId: 'xyz-1',
+      senderId: 'xyz-001',
       senderName: 'XYZ Suppliers',
       timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
       isRead: false,
@@ -913,17 +913,17 @@ let chats = [
     updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
   },
   {
-    id: 'chat-4',
-    companyId: 'comp-1',
+    id: 'chat-004',
+    companyId: 'biz-001',
     locationId: null,
     type: 'client',
     name: 'Mike Chen',
-    participants: ['user-1', 'mike-1'],
+    participants: ['usr-001', 'mike-001'],
     lastMessage: {
       id: 'msg-mike',
       content: 'Video call ended (15 min)',
       type: 'video_call',
-      senderId: 'user-1',
+      senderId: 'usr-001',
       senderName: 'You',
       timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
       isRead: true,
@@ -936,17 +936,17 @@ let chats = [
     updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
   },
   {
-    id: 'chat-5',
-    companyId: 'comp-1',
-    locationId: 'loc-1',
+    id: 'chat-005',
+    companyId: 'biz-001',
+    locationId: 'loc-001',
     type: 'internal',
     name: 'Warehouse A Team',
-    participants: ['user-1', 'john-1', 'maria-1'],
+    participants: ['usr-001', 'john-001', 'maria-001'],
     lastMessage: {
       id: 'msg-warehouse',
       content: 'Inventory_Report_Jan2025.pdf',
       type: 'pdf',
-      senderId: 'user-1',
+      senderId: 'usr-001',
       senderName: 'You',
       timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
       isRead: true,
@@ -965,10 +965,10 @@ let chats = [
 // ============================================================================
 
 let messages = {
-  'chat-1': [
+  'chat-001': [
     {
-      id: 'msg-1-1',
-      chatId: 'chat-1',
+      id: 'msg-001-001',
+      chatId: 'chat-001',
       type: 'event',
       event: 'Conversation started',
       isOutgoing: false,
@@ -976,44 +976,44 @@ let messages = {
       timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
     },
     {
-      id: 'msg-1-2',
-      chatId: 'chat-1',
+      id: 'msg-001-002',
+      chatId: 'chat-001',
       type: 'text',
       text: '📝 TEXT MESSAGE (Incoming)\nThis is a regular text message received from another user.',
       isOutgoing: false,
-      sender: { id: 'demo-1', name: 'Demo Contact', avatar: 'https://picsum.photos/seed/demo/40/40', role: 'client' },
+      sender: { id: 'demo-001', name: 'Demo Contact', avatar: 'https://picsum.photos/seed/demo/40/40', role: 'client' },
       timestamp: new Date(Date.now() - 90 * 60 * 1000).toISOString()
     },
     {
-      id: 'msg-1-3',
-      chatId: 'chat-1',
+      id: 'msg-001-003',
+      chatId: 'chat-001',
       type: 'text',
       text: '📝 TEXT MESSAGE (Outgoing)\nThis is a text message you sent.',
       isOutgoing: true,
-      sender: { id: 'user-1', name: 'You', avatar: '', role: 'business' },
+      sender: { id: 'usr-001', name: 'You', avatar: '', role: 'business' },
       timestamp: new Date(Date.now() - 85 * 60 * 1000).toISOString(),
       status: 'read'
     }
   ],
-  'chat-2': [
+  'chat-002': [
     {
-      id: 'msg-2-1',
-      chatId: 'chat-2',
+      id: 'msg-002-001',
+      chatId: 'chat-002',
       type: 'text',
       text: 'Hi! I wanted to share some photos of the product issue.',
       isOutgoing: false,
-      sender: { id: 'sarah-1', name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'client' },
+      sender: { id: 'sarah-001', name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'client' },
       timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString()
     }
   ],
-  'chat-3': [
+  'chat-003': [
     {
-      id: 'msg-3-1',
-      chatId: 'chat-3',
+      id: 'msg-003-001',
+      chatId: 'chat-003',
       type: 'text',
       text: 'Hi! We have new products available for order.',
       isOutgoing: false,
-      sender: { id: 'xyz-1', name: 'XYZ Suppliers', avatar: 'https://picsum.photos/seed/xyz/40/40', role: 'supplier' },
+      sender: { id: 'xyz-001', name: 'XYZ Suppliers', avatar: 'https://picsum.photos/seed/xyz/40/40', role: 'supplier' },
       timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
     }
   ]
@@ -1025,7 +1025,7 @@ let messages = {
 
 let users = [
   {
-    id: 'user-1',
+    id: 'usr-001',
     email: 'admin@noupro.com',
     name: 'Admin User',
     avatar: 'https://picsum.photos/seed/admin/100/100',
@@ -1034,7 +1034,7 @@ let users = [
     lastLoginAt: '2025-01-15T08:00:00Z'
   },
   {
-    id: 'user-2',
+    id: 'usr-002',
     email: 'manager@noupro.com',
     name: 'Marie Manager',
     avatar: 'https://picsum.photos/seed/marie/100/100',
@@ -1043,7 +1043,7 @@ let users = [
     lastLoginAt: '2025-01-14T09:00:00Z'
   },
   {
-    id: 'user-3',
+    id: 'usr-003',
     email: 'owner@globalsupply.mu',
     name: 'Global Owner',
     avatar: 'https://picsum.photos/seed/global/100/100',
@@ -1052,7 +1052,7 @@ let users = [
     lastLoginAt: '2025-01-15T07:00:00Z'
   },
   {
-    id: 'user-4',
+    id: 'usr-004',
     email: 'driver@noupro.com',
     name: 'John Driver',
     avatar: 'https://picsum.photos/seed/driver/100/100',
@@ -1068,7 +1068,7 @@ let users = [
 
 let feedPosts = [
   {
-    id: 'post-1',
+    id: 'post-001',
     type: 'brand_presentation',
     timestamp: '2h ago',
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
@@ -1077,20 +1077,20 @@ let feedPosts = [
       brandName: 'Tropicana',
       brandLogo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Tropicana_Logo.svg/512px-Tropicana_Logo.svg.png',
       distributorName: 'NouPro Distribution',
-      distributorId: 'comp-1',
+      distributorId: 'biz-001',
       products: [
-        { id: 'prod-1', name: 'Premium Orange Juice', unit: '1L', price: 125.00, image: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=400', isNew: true },
-        { id: 'prod-2', name: 'Tropical Mango Smoothie', unit: '500ml', price: 145.00, image: 'https://images.unsplash.com/photo-1623065422902-30a2d299bbe4?w=400', isNew: false }
+        { id: 'prd-feed-001', name: 'Premium Orange Juice', unit: '1L', price: 125.00, image: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=400', isNew: true },
+        { id: 'prd-feed-002', name: 'Tropical Mango Smoothie', unit: '500ml', price: 145.00, image: 'https://images.unsplash.com/photo-1623065422902-30a2d299bbe4?w=400', isNew: false }
       ]
     }
   },
   {
-    id: 'post-2',
+    id: 'post-002',
     type: 'company_presentation',
     timestamp: '4h ago',
     createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
     data: {
-      companyId: 'comp-2',
+      companyId: 'biz-002',
       companyName: 'Phoenix Beverages',
       companyLogo: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/Phoenix_Beverages_Limited_logo.svg/512px-Phoenix_Beverages_Limited_logo.svg.png',
       location: 'Port Louis, Mauritius',

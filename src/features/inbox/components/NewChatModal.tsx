@@ -28,35 +28,35 @@ interface NewChatModalProps {
 // Mock data for companies
 const MOCK_COMPANIES = [
   {
-    id: 'comp-1',
+    id: 'biz-001',
     name: 'ABC Corporation',
     logo: 'https://picsum.photos/seed/abc/40/40',
     location: 'New York, NY',
     type: 'company' as const,
   },
   {
-    id: 'comp-2',
+    id: 'biz-002',
     name: 'XYZ Suppliers',
     logo: 'https://picsum.photos/seed/xyz/40/40',
     location: 'Los Angeles, CA',
     type: 'company' as const,
   },
   {
-    id: 'comp-3',
+    id: 'biz-003',
     name: 'Tech Solutions Ltd',
     logo: 'https://picsum.photos/seed/tech/40/40',
     location: 'San Francisco, CA',
     type: 'company' as const,
   },
   {
-    id: 'comp-4',
+    id: 'biz-004',
     name: 'Global Industries',
     logo: 'https://picsum.photos/seed/global/40/40',
     location: 'Chicago, IL',
     type: 'company' as const,
   },
   {
-    id: 'comp-5',
+    id: 'biz-005',
     name: 'Best Suppliers Inc',
     logo: 'https://picsum.photos/seed/best/40/40',
     location: 'Miami, FL',
@@ -67,7 +67,7 @@ const MOCK_COMPANIES = [
 // Mock data for users/contacts
 const MOCK_CONTACTS = [
   {
-    id: 'user-1',
+    id: 'usr-001',
     name: 'Sarah Johnson',
     avatar: 'https://picsum.photos/seed/sarah/40/40',
     role: 'Account Manager',
@@ -75,7 +75,7 @@ const MOCK_CONTACTS = [
     type: 'contact' as const,
   },
   {
-    id: 'user-2',
+    id: 'usr-002',
     name: 'Mike Chen',
     avatar: 'https://picsum.photos/seed/mike/40/40',
     role: 'Sales Director',
@@ -83,7 +83,7 @@ const MOCK_CONTACTS = [
     type: 'contact' as const,
   },
   {
-    id: 'user-3',
+    id: 'usr-003',
     name: 'Emma Davis',
     avatar: 'https://picsum.photos/seed/emma/40/40',
     role: 'Project Manager',
@@ -91,7 +91,7 @@ const MOCK_CONTACTS = [
     type: 'contact' as const,
   },
   {
-    id: 'user-4',
+    id: 'usr-004',
     name: 'James Wilson',
     avatar: 'https://picsum.photos/seed/james/40/40',
     role: 'Operations Lead',
@@ -99,7 +99,7 @@ const MOCK_CONTACTS = [
     type: 'contact' as const,
   },
   {
-    id: 'user-5',
+    id: 'usr-005',
     name: 'Lisa Martinez',
     avatar: 'https://picsum.photos/seed/lisa/40/40',
     role: 'Business Development',

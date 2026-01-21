@@ -129,14 +129,14 @@ export default function BusinessProfileOwnScreen() {
 
   // Mock locations data - in real app this would come from the store/API
   const mockBusinessLocations: Record<string, Array<{ id: string; name: string; address: string; is_primary: boolean }>> = {
-    'comp-1': [
-      { id: 'loc-1', name: 'Main Warehouse', address: 'Port Louis', is_primary: true },
-      { id: 'loc-2', name: 'Rose Hill Branch', address: 'Rose Hill', is_primary: false },
-      { id: 'loc-3', name: 'Curepipe Store', address: 'Curepipe', is_primary: false },
+    'biz-001': [
+      { id: 'loc-001', name: 'Main Warehouse', address: 'Port Louis', is_primary: true },
+      { id: 'loc-002', name: 'Rose Hill Branch', address: 'Rose Hill', is_primary: false },
+      { id: 'loc-003', name: 'Curepipe Store', address: 'Curepipe', is_primary: false },
     ],
-    'comp-2': [
-      { id: 'loc-4', name: 'Head Office', address: 'Ebene', is_primary: true },
-      { id: 'loc-5', name: 'Quatre Bornes', address: 'Quatre Bornes', is_primary: false },
+    'biz-002': [
+      { id: 'loc-004', name: 'Head Office', address: 'Ebene', is_primary: true },
+      { id: 'loc-005', name: 'Quatre Bornes', address: 'Quatre Bornes', is_primary: false },
     ],
   };
 

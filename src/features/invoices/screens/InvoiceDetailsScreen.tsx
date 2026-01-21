@@ -103,8 +103,8 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
           // Transform mock invoice to match API shape
           setInvoice({
             id: mockInvoice.id,
-            companyId: 'comp-1',
-            locationId: mockInvoice.locationId || 'loc-1',
+            companyId: 'biz-001',
+            locationId: mockInvoice.locationId || 'loc-001',
             clientName: mockInvoice.clientName,
             clientEmail: mockInvoice.clientContact.email,
             amount: mockInvoice.subtotal,
@@ -134,8 +134,8 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
       if (mockInvoice) {
         setInvoice({
           id: mockInvoice.id,
-          companyId: 'comp-1',
-          locationId: mockInvoice.locationId || 'loc-1',
+          companyId: 'biz-001',
+          locationId: mockInvoice.locationId || 'loc-001',
           clientName: mockInvoice.clientName,
           clientEmail: mockInvoice.clientContact.email,
           amount: mockInvoice.subtotal,

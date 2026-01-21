@@ -19,7 +19,7 @@ import {
   Mail, 
   Car, 
   Package,
-  FileText, 
+  ReceiptText, 
 } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
@@ -170,7 +170,7 @@ export function BusinessTabNavigator() {
           ),
           tabBarIcon: ({ color, focused }) => (
             <View style={{ position: 'relative' }}>
-              <FileText size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+              <ReceiptText size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
               {invoicesUnreadCount > 0 && (
                 <View style={styles.notificationBadge}>
                   <Text style={styles.notificationBadgeText}>

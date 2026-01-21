@@ -75,8 +75,8 @@ export interface ListItemCardProps {
   // === LEFT CONTENT ===
   /** Title text (Row 1) - 16px bold primary */
   title: string;
-  /** Subtitle text (Row 2) - 14px semiBold textSecondary */
-  subtitle?: string;
+  /** Subtitle text or element (Row 2) - 14px semiBold textSecondary */
+  subtitle?: string | React.ReactNode;
   /** Extra info text (Row 3) - 14px medium textMuted */
   extraInfo?: string;
 
@@ -319,12 +319,8 @@ export function ListItemCard({
   // Check if we have right content for each row
   const hasRightRow1Content = rightRow1?.statusPill || rightRow1?.timestamp;
   
-  // Check if there are any right elements (far right buttons or right row content)
-  const hasRightElements = showCheckmark || showOptionsButton || showChevron || rightRow1 || rightRow2 || rightRow3;
-  
-  // Determine gap size: 4px when right elements present or only title+subtitle, 2px when extraInfo without right elements
-  const hasOnlyTwoLines = subtitle && !extraInfo;
-  const lineGap = hasRightElements || hasOnlyTwoLines ? 4 : 2;
+  // Use fixed gap between title and subtitle from tokens
+  const lineGap = LIST_ITEM_CARD.titleSubtitleGap;
 
   // Determine if this is optionList variant
   const isOptionList = selectionVariant === 'optionList';
@@ -396,16 +392,20 @@ export function ListItemCard({
                     {title}
                   </Text>
                   {subtitle && (
-                    <Text
-                      style={[
-                        styles.subtitle, 
-                        { color: isOptionList && selected ? appTheme.colors.textMuted : appTheme.colors.textSecondary },
-                        { marginTop: lineGap }
-                      ]}
-                      numberOfLines={2}
-                    >
-                      {subtitle}
-                    </Text>
+                    typeof subtitle === 'string' ? (
+                      <Text
+                        style={[
+                          styles.subtitle, 
+                          { color: isOptionList && selected ? appTheme.colors.textMuted : appTheme.colors.textSecondary },
+                          { marginTop: lineGap }
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {subtitle}
+                      </Text>
+                    ) : (
+                      <View style={{ marginTop: lineGap }}>{subtitle}</View>
+                    )
                   )}
                   {extraInfo && (
                     <Text
@@ -457,15 +457,19 @@ export function ListItemCard({
                 {(subtitle || rightRow2) && (
                   <View style={[styles.contentRow, { marginTop: lineGap }]}>
                     {subtitle && (
-                      <Text
-                        style={[
-                          styles.subtitle, 
-                          { color: isOptionList && selected ? appTheme.colors.textMuted : appTheme.colors.textSecondary }
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {subtitle}
-                      </Text>
+                      typeof subtitle === 'string' ? (
+                        <Text
+                          style={[
+                            styles.subtitle, 
+                            { color: isOptionList && selected ? appTheme.colors.textMuted : appTheme.colors.textSecondary }
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {subtitle}
+                        </Text>
+                      ) : (
+                        <View style={{ flex: 1 }}>{subtitle}</View>
+                      )
                     )}
                     {rightRow2 && <View style={styles.rightRowContent}>{rightRow2}</View>}
                   </View>
@@ -534,7 +538,7 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'center', // Vertically center all elements with avatar
+    alignItems: 'flex-start', // Align content to top of avatar
   },
   avatarContainer: {
     marginRight: LIST_ITEM_CARD.avatar.marginRight,

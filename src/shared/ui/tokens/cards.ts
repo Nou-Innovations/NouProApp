@@ -14,6 +14,9 @@ export const LIST_ITEM_CARD = {
   paddingHorizontal: 12,
   paddingVertical: 12,
   
+  // Gap between title and subtitle
+  titleSubtitleGap: 4,
+  
   // Avatar
   avatar: {
     size: 48,

@@ -12,7 +12,7 @@ export const businessModeConfig = {
     { name: 'BusinessInbox', icon: 'mail', label: 'Inbox' },
     { name: 'Deliveries', icon: 'car' },
     { name: 'Products', icon: 'cube' },
-    { name: 'Invoices', icon: 'document-text' },
+    { name: 'Invoices', icon: 'receipt-text' },
     { name: 'BusinessProfile', icon: 'business', label: 'Business' },
   ],
   // Screens accessible in business mode (stack screens)

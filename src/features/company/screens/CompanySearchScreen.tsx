@@ -17,32 +17,32 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 // Mock data for companies - should be the same data as in SearchResultsList
 const MOCK_COMPANIES = [
   {
-    id: 'comp-1',
+    id: 'biz-001',
     name: 'Acme Corporation',
     logo: 'https://ui-avatars.com/api/?name=Acme+Corp&background=0D8ABC&color=fff',
   },
   {
-    id: 'comp-2',
+    id: 'biz-002',
     name: 'The Burning Distributor',
     logo: 'https://placehold.co/80x80/orange/white?text=🔥',
   },
   {
-    id: 'comp-3',
+    id: 'biz-003',
     name: 'Global Industries',
     logo: 'https://ui-avatars.com/api/?name=Global+Industries&background=27AE60&color=fff',
   },
   {
-    id: 'comp-4',
+    id: 'biz-004',
     name: 'Best Suppliers Ltd',
     logo: 'https://ui-avatars.com/api/?name=Best+Suppliers&background=8E44AD&color=fff',
   },
   {
-    id: 'comp-5',
+    id: 'biz-005',
     name: 'Tech Solutions',
     logo: 'https://ui-avatars.com/api/?name=Tech+Solutions&background=E74C3C&color=fff',
   },
   {
-    id: 'comp-6',
+    id: 'biz-006',
     name: 'Craft Wholesalers',
     logo: 'https://ui-avatars.com/api/?name=Craft+Wholesalers&background=F39C12&color=fff',
   },

@@ -16,32 +16,32 @@ import theme from '@/shared/theme';
 // Mock data for users - should be the same data as in SearchResultsList
 const MOCK_USERS = [
   {
-    id: 'user-1',
+    id: 'usr-001',
     name: 'Alice Johnson',
     avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
   },
   {
-    id: 'user-2',
+    id: 'usr-002',
     name: 'Bob Smith',
     avatar: 'https://randomuser.me/api/portraits/men/2.jpg',
   },
   {
-    id: 'user-3',
+    id: 'usr-003',
     name: 'Carol Williams',
     avatar: 'https://randomuser.me/api/portraits/women/3.jpg',
   },
   {
-    id: 'user-4',
+    id: 'usr-004',
     name: 'David Brown',
     avatar: 'https://randomuser.me/api/portraits/men/4.jpg',
   },
   {
-    id: 'user-5',
+    id: 'usr-005',
     name: 'Eva Miller',
     avatar: 'https://randomuser.me/api/portraits/women/5.jpg',
   },
   {
-    id: 'user-6',
+    id: 'usr-006',
     name: 'Frank Davis',
     avatar: 'https://randomuser.me/api/portraits/men/6.jpg',
   },

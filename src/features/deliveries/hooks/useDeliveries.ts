@@ -70,7 +70,7 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
   
   // Use canonical source: useProfileStore.activeBusiness for company context
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
-  const companyId = activeBusiness?.id || 'comp-1';
+  const companyId = activeBusiness?.id || 'biz-001';
   // Location data comes from businessStore - persisted across sessions
   const { currentLocation, setLocation } = useBusinessStore();
   

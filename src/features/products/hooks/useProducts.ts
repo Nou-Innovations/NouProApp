@@ -129,7 +129,7 @@ export function useProducts(options: UseProductsOptions = {}): UseProductsResult
   
   // Use canonical source: useProfileStore.activeBusiness
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
-  const companyId = activeBusiness?.id || 'comp-1';
+  const companyId = activeBusiness?.id || 'biz-001';
   
   const [products, setProducts] = useState<UIProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,7 +172,7 @@ export function useProducts(options: UseProductsOptions = {}): UseProductsResult
       // Convert mock products to UIProduct format
       const mockData = mockProducts.map(p => ({
         ...p,
-        companyId: 'comp-1',
+        companyId: 'biz-001',
       })) as UIProduct[];
       setProducts(mockData);
       setIsMockData(true);

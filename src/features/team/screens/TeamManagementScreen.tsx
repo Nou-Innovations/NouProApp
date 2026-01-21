@@ -96,21 +96,21 @@ export default function TeamManagementScreen() {
   }
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([
     {
-      id: 'inv-1',
+      id: 'inv-001',
       email: 'alex.wilson@company.com',
       name: 'Alex Wilson',
       role: 'admin',
       invitedAt: '2025-01-05T10:00:00Z',
     },
     {
-      id: 'inv-2',
+      id: 'inv-002',
       email: 'emma.davis@gmail.com',
       name: 'Emma Davis',
       role: 'staff',
       invitedAt: '2025-01-04T16:45:00Z',
     },
     {
-      id: 'inv-3',
+      id: 'inv-003',
       email: 'james.taylor@outlook.com',
       role: 'staff',
       invitedAt: '2025-01-03T11:20:00Z',
@@ -149,36 +149,36 @@ export default function TeamManagementScreen() {
       console.log('API not available, falling back to mock user data for demo purposes');
       const mockUsers: User[] = [
         {
-          id: 'user-1',
+          id: 'usr-001',
           email: 'admin@noupro.com',
           name: 'John Admin',
           role: 'admin',
           companyId: activeBusiness.id,
-          locationIds: ['loc-1', 'loc-2', 'loc-3'],
+          locationIds: ['loc-001', 'loc-002', 'loc-003'],
           avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
           phone: '+1-555-123-4567',
           createdAt: '2024-01-01T00:00:00Z',
           lastLoginAt: '2025-01-15T10:30:00Z'
         },
         {
-          id: 'user-2',
+          id: 'usr-002',
           email: 'jane.smith@noupro.com',
           name: 'Jane Smith',
           role: 'staff',
           companyId: activeBusiness.id,
-          locationIds: ['loc-1'],
+          locationIds: ['loc-001'],
           avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
           phone: '+1-555-987-6543',
           createdAt: '2024-02-01T00:00:00Z',
           lastLoginAt: '2025-01-15T09:15:00Z'
         },
         {
-          id: 'user-3',
+          id: 'usr-003',
           email: 'mike.jones@noupro.com',
           name: 'Mike Jones',
           role: 'staff',
           companyId: activeBusiness.id,
-          locationIds: ['loc-2', 'loc-3'],
+          locationIds: ['loc-002', 'loc-003'],
           avatar: 'https://randomuser.me/api/portraits/men/2.jpg',
           phone: '+1-555-246-8135',
           createdAt: '2024-03-01T00:00:00Z',

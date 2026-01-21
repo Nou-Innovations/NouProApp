@@ -355,7 +355,7 @@ export default function InvoicesScreen() {
         title="Document Type"
       >
         {[
-          { id: 'invoices', title: 'Invoices', icon: 'file-text' },
+          { id: 'invoices', title: 'Invoices', icon: 'receipt-text' },
           { id: 'estimates', title: 'Estimates', icon: 'clipboard' },
         ].map((item) => (
           <TouchableOpacity

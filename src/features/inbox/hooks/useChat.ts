@@ -61,7 +61,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
   const currentUser = useProfileStore((state) => state.currentUser);
   const activeMode = useProfileStore((state) => state.activeMode);
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
-  const companyId = activeBusiness?.id || 'comp-1';
+  const companyId = activeBusiness?.id || 'biz-001';
   
   // Derive sender role from actual profile state (not just business vs personal)
   const getSenderRole = useCallback(() => {

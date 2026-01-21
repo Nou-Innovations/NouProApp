@@ -47,7 +47,7 @@ const TYPE_CONFIG: Record<PriorityItemType, { icon: keyof typeof Icon.glyphMap; 
   order_pending: { icon: 'cart-outline', color: '#0075FF', label: 'Order' },
   delivery_pending: { icon: 'car-outline', color: '#FFB600', label: 'Delivery' },
   stock_alert: { icon: 'cube-outline', color: '#FF7A00', label: 'Stock' },
-  invoice_overdue: { icon: 'document-text-outline', color: '#FF2400', label: 'Invoice' },
+  invoice_overdue: { icon: 'receipt-text-outline', color: '#FF2400', label: 'Invoice' },
   message_urgent: { icon: 'mail-outline', color: '#A76AF0', label: 'Message' },
 };
 

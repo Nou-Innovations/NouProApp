@@ -1,38 +1,42 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import theme from '@/shared/theme';
 import { Text } from '@/shared/components/ui/Typography';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { userAvatarService } from '@/shared/services/userAvatarService';
-import { ListItemCard } from '@/shared/components/ui';
+import Avatar from '@/shared/components/ui/Avatar';
 
 export type MessageType = 
   | 'text'
   | 'photo'
   | 'video'
-  | 'voice_call'
-  | 'missed_voice_call'
-  | 'video_call'
-  | 'missed_video_call'
-  | 'in_call'
-  | 'in_video_call'
-  | 'invoice'
   | 'pdf'
-  | 'delivery'
-  | 'location'
-  | 'voice_note'
-  | 'contact';
+  | 'invoice'
+  | 'estimate'
+  | 'order'
+  | 'transfer';
 
-export type DeliveryStatus = 
+export type OrderStatus = 
   | 'new_order_sent'
+  | 'new_order_received'
   | 'order_ongoing'
   | 'order_done'
   | 'order_under_review'
   | 'order_pending'
-  | 'order_cancel'
-  | 'new_order_received';
+  | 'order_cancel';
+
+export type TransferStatus = 
+  | 'new_transfer_received'
+  | 'transfer_ongoing'
+  | 'transfer_done'
+  | 'transfer_under_review'
+  | 'transfer_pending'
+  | 'transfer_cancel';
+
+export type TransferDirection = 'incoming' | 'outgoing';
 
 interface MessageCardProps {
   chatId: string;
@@ -44,10 +48,54 @@ interface MessageCardProps {
   time: string;
   status: 'sending' | 'sent' | 'delivered' | 'seen' | 'failed';
   unreadCount?: number;
-  deliveryStatus?: DeliveryStatus;
+  orderStatus?: OrderStatus;
+  transferStatus?: TransferStatus;
+  transferDirection?: TransferDirection;
   isOutgoing?: boolean;
   onPress?: () => void;
 }
+
+// ============================================================================
+// DESIGN TOKENS (specific to MessageCard)
+// ============================================================================
+const MESSAGE_CARD = {
+  padding: {
+    horizontal: 12,
+    vertical: 12,
+  },
+  avatar: {
+    size: 56,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  typography: {
+    name: {
+      fontSize: 16,
+      fontFamily: theme.fonts.primary.bold,
+    },
+    message: {
+      fontSize: 14,
+      lineHeight: 20,
+      fontFamily: theme.fonts.primary.medium,
+    },
+    timestamp: {
+      fontSize: 14,
+      fontFamily: theme.fonts.primary.medium,
+    },
+  },
+  gap: {
+    nameToMessage: 0,
+    nameToSpecialMessage: 8,
+    rightColumnItems: 4,
+  },
+  statusIndicator: {
+    height: 20,
+  },
+  divider: {
+    height: 1,
+    marginHorizontal: 8,
+  },
+} as const;
 
 export default function MessageCard({
   chatId,
@@ -59,7 +107,9 @@ export default function MessageCard({
   time,
   status,
   unreadCount,
-  deliveryStatus,
+  orderStatus,
+  transferStatus,
+  transferDirection,
   isOutgoing,
   onPress,
 }: MessageCardProps) {
@@ -83,52 +133,58 @@ export default function MessageCard({
 
   const getStatusIcon = () => {
     const iconColor = appTheme.colors.textSecondary;
-    const errorColor = appTheme.colors.error;
     
     switch (type) {
       case 'photo':
         return <Icon name="image-outline" size={20} color={iconColor} />;
       case 'video':
         return <Icon name="videocam-outline" size={20} color={iconColor} />;
-      case 'voice_call':
-      case 'missed_voice_call':
-      case 'in_call':
-        return <Icon name="call-outline" size={20} color={type === 'missed_voice_call' ? errorColor : iconColor} />;
-      case 'video_call':
-      case 'missed_video_call':
-      case 'in_video_call':
-        return <Icon name="videocam-outline" size={20} color={type === 'missed_video_call' ? errorColor : iconColor} />;
-      case 'invoice':
-        return <Icon name="document-text-outline" size={20} color={iconColor} />;
       case 'pdf':
         return <Icon name="document-outline" size={20} color={iconColor} />;
-      case 'delivery':
+      case 'invoice':
+        return <Icon name="receipt-text-outline" size={20} color={iconColor} />;
+      case 'estimate':
+        return <Icon name="clipboard-outline" size={20} color={iconColor} />;
+      case 'order':
         return <Icon name="cube-outline" size={20} color={iconColor} />;
-      case 'location':
-        return <Icon name="location-outline" size={20} color={iconColor} />;
-      case 'voice_note':
-        return <Icon name="mic-outline" size={20} color={iconColor} />;
-      case 'contact':
-        return <Icon name="person-outline" size={20} color={iconColor} />;
+      case 'transfer':
+        return transferDirection === 'incoming' 
+          ? <Icon name="arrow-down" size={20} color={iconColor} />
+          : <Icon name="arrow-up" size={20} color={iconColor} />;
       default:
         return null;
     }
   };
 
-  const getDeliveryStatusText = () => {
-    if (!deliveryStatus) return '';
+  const getOrderStatusText = () => {
+    if (!orderStatus) return '';
     
-    const statusMap: Record<DeliveryStatus, string> = {
+    const statusMap: Record<OrderStatus, string> = {
       new_order_sent: 'New order sent',
+      new_order_received: 'New order received',
       order_ongoing: 'Order ongoing',
       order_done: 'Order done',
       order_under_review: 'Order under review',
       order_pending: 'Order pending',
       order_cancel: 'Order cancelled',
-      new_order_received: 'New order received'
     };
     
-    return statusMap[deliveryStatus];
+    return statusMap[orderStatus];
+  };
+
+  const getTransferStatusText = () => {
+    if (!transferStatus) return '';
+    
+    const statusMap: Record<TransferStatus, string> = {
+      new_transfer_received: 'New Transfer received',
+      transfer_ongoing: 'Transfer ongoing',
+      transfer_done: 'Transfer done',
+      transfer_under_review: 'Transfer under review',
+      transfer_pending: 'Transfer pending',
+      transfer_cancel: 'Transfer cancel',
+    };
+    
+    return statusMap[transferStatus];
   };
 
   const getStatusIndicator = () => {
@@ -147,96 +203,143 @@ export default function MessageCard({
     }
 
     const iconColor = appTheme.colors.textSecondary;
-    const redColor = appTheme.colors.error; // Red color for read status
+    const iconMuted = appTheme.colors.textMuted;
+    const redColor = appTheme.colors.accent;
     const errorColor = appTheme.colors.error;
 
     switch (status) {
       case 'sending':
-        return <Icon name="time-outline" size={24} color={iconColor} />;
+        return <Icon name="time-outline" size={18} color={iconColor} />;
       case 'sent':
-        return <Icon name="checkmark" size={24} color={iconColor} />; // 1 tick
+        return <Icon name="checkmark" size={18} color={iconMuted} />;
       case 'delivered':
-        return <Icon name="checkmark-done" size={24} color={iconColor} />; // 2 ticks
+        return <MaterialCommunityIcons name="check-all" size={18} color={iconColor} />;
       case 'seen':
-        return <Icon name="checkmark-done" size={24} color={redColor} />; // Red ticks for read
+        return <MaterialCommunityIcons name="check-all" size={18} color={redColor} />;
       case 'failed':
-        return <Icon name="alert-circle" size={24} color={errorColor} />;
+        return <Icon name="alert-circle" size={16} color={errorColor} />;
       default:
         return null;
     }
   };
 
   // Build message preview with optional type icon
-  const messagePreview = type === 'delivery' ? getDeliveryStatusText() : message;
+  const getMessagePreview = () => {
+    if (type === 'order') return getOrderStatusText();
+    if (type === 'transfer') return getTransferStatusText();
+    return message;
+  };
+  const messagePreview = getMessagePreview();
   const statusIcon = type !== 'text' ? getStatusIcon() : null;
 
-  // Build subtitle content with icon prefix if needed
-  const subtitleContent = statusIcon ? (
-    <View style={styles.messageRow}>
-      <View style={styles.statusIconContainer}>
-        {statusIcon}
-      </View>
-      <Text style={[styles.message, { color: appTheme.colors.textSecondary }]} numberOfLines={2}>
-        {messagePreview}
-      </Text>
-    </View>
-  ) : messagePreview;
-
-  // Build right column with timestamp on top and status indicator below
-  const rightColumnContent = (
-    <View style={styles.rightColumn}>
-      <Text style={[styles.timestamp, { color: appTheme.colors.textMuted }]}>{time}</Text>
-      <View style={styles.statusIndicatorContainer}>
-        {getStatusIndicator()}
-      </View>
-    </View>
-  );
+  const CardWrapper = onPress ? TouchableOpacity : View;
+  const cardProps = onPress ? { onPress, activeOpacity: 0.7 } : {};
 
   return (
-    <ListItemCard
-      avatar={{
-        type: avatar ? 'image' : 'initials',
-        userId: userId,
-        userName: name,
-        imageUri: avatar,
-      }}
-      title={name}
-      subtitle={typeof subtitleContent === 'string' ? subtitleContent : undefined}
-      rightColumn={rightColumnContent}
-      bottomElement={typeof subtitleContent !== 'string' ? subtitleContent : undefined}
-      onPress={onPress}
-      showDivider
-      style={hasUnreadMessages ? { backgroundColor: appTheme.colors.highlightedRow } : undefined}
-    />
+    <>
+      <CardWrapper
+        style={[
+          styles.container,
+          { backgroundColor: hasUnreadMessages ? appTheme.colors.highlightedRow : appTheme.colors.cardBackground }
+        ]}
+        {...cardProps}
+      >
+        {/* Avatar */}
+        <View style={styles.avatarContainer}>
+          <Avatar
+            userId={userId}
+            userName={name}
+            imageUri={avatar}
+            size={MESSAGE_CARD.avatar.size}
+            borderRadius={MESSAGE_CARD.avatar.borderRadius}
+          />
+        </View>
+
+        {/* Left Content (Name + Message) */}
+        <View style={styles.leftContent}>
+          <Text
+            style={[styles.name, { color: appTheme.colors.text }]}
+            numberOfLines={1}
+          >
+            {name}
+          </Text>
+          <View style={[
+            styles.messageRow,
+            { marginTop: statusIcon ? MESSAGE_CARD.gap.nameToSpecialMessage : MESSAGE_CARD.gap.nameToMessage }
+          ]}>
+            {statusIcon && (
+              <View style={styles.statusIconContainer}>
+                {statusIcon}
+              </View>
+            )}
+            <Text
+              style={[styles.message, { color: appTheme.colors.textSecondary }]}
+              numberOfLines={2}
+            >
+              {messagePreview}
+            </Text>
+          </View>
+        </View>
+
+        {/* Right Column (Timestamp + Status) */}
+        <View style={styles.rightColumn}>
+          <Text style={[styles.timestamp, { color: appTheme.colors.textMuted }]}>
+            {time}
+          </Text>
+          <View style={styles.statusIndicatorContainer}>
+            {getStatusIndicator()}
+          </View>
+        </View>
+      </CardWrapper>
+
+      {/* Divider */}
+      <View style={[styles.divider, { backgroundColor: appTheme.colors.surface }]} />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: MESSAGE_CARD.padding.horizontal,
+    paddingVertical: MESSAGE_CARD.padding.vertical,
+  },
+  avatarContainer: {
+    marginRight: MESSAGE_CARD.avatar.marginRight,
+  },
+  leftContent: {
+    flex: 1,
+  },
+  name: {
+    fontSize: MESSAGE_CARD.typography.name.fontSize,
+    fontFamily: MESSAGE_CARD.typography.name.fontFamily,
+  },
   messageRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: -4,
   },
   statusIconContainer: {
     marginRight: theme.spacing.sm,
   },
   message: {
     flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: theme.fonts.primary.medium,
+    fontSize: MESSAGE_CARD.typography.message.fontSize,
+    lineHeight: MESSAGE_CARD.typography.message.lineHeight,
+    fontFamily: MESSAGE_CARD.typography.message.fontFamily,
   },
   rightColumn: {
     alignItems: 'flex-end',
-    gap: 4,
+    marginLeft: 8,
   },
   timestamp: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
+    fontSize: MESSAGE_CARD.typography.timestamp.fontSize,
+    fontFamily: MESSAGE_CARD.typography.timestamp.fontFamily,
   },
   statusIndicatorContainer: {
-    minHeight: 24,
+    height: MESSAGE_CARD.statusIndicator.height,
     justifyContent: 'center',
+    marginTop: MESSAGE_CARD.gap.rightColumnItems,
   },
   unreadBadge: {
     backgroundColor: theme.colors.badgeBackground,
@@ -256,5 +359,9 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
     includeFontPadding: false,
     lineHeight: theme.lineHeight.xs,
+  },
+  divider: {
+    height: MESSAGE_CARD.divider.height,
+    marginHorizontal: MESSAGE_CARD.divider.marginHorizontal,
   },
 });

@@ -43,7 +43,7 @@ const mockFeedPosts: FeedPost[] = [
     timestamp: '4h ago',
     createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
     data: {
-      companyId: 'comp-001',
+      companyId: 'biz-001',
       companyName: 'Phoenix Beverages',
       companyLogo: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/Phoenix_Beverages_Limited_logo.svg/512px-Phoenix_Beverages_Limited_logo.svg.png',
       location: 'Port Louis, Mauritius',
@@ -81,7 +81,7 @@ const newUserFeedPosts: FeedPost[] = [
     timestamp: 'Just now',
     createdAt: new Date().toISOString(),
     data: {
-      companyId: 'comp-welcome-1',
+      companyId: 'biz-welcome-001',
       companyName: 'Island Fresh Distributors',
       companyLogo: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200',
       location: 'Grand Baie, Mauritius',
@@ -135,7 +135,7 @@ const newUserFeedPosts: FeedPost[] = [
     timestamp: '1h ago',
     createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     data: {
-      companyId: 'comp-welcome-2',
+      companyId: 'biz-welcome-002',
       companyName: 'TechMart Solutions',
       companyLogo: 'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=200',
       location: 'Ebene, Mauritius',
@@ -189,7 +189,7 @@ const newUserFeedPosts: FeedPost[] = [
     timestamp: '4h ago',
     createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
     data: {
-      companyId: 'comp-welcome-3',
+      companyId: 'biz-welcome-003',
       companyName: 'MedPlus Pharmacy Wholesale',
       companyLogo: 'https://images.unsplash.com/photo-1576602976047-174e57a47881?w=200',
       location: 'Quatre Bornes, Mauritius',
@@ -243,7 +243,7 @@ const newUserFeedPosts: FeedPost[] = [
     timestamp: '8h ago',
     createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
     data: {
-      companyId: 'comp-welcome-4',
+      companyId: 'biz-welcome-004',
       companyName: 'Office Pro Mauritius',
       companyLogo: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=200',
       location: 'Rose Hill, Mauritius',

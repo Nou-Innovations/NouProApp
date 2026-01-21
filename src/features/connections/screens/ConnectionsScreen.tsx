@@ -60,7 +60,7 @@ type Connection = UserConnection | CompanyConnection;
 // Mock user connections data
 const mockUserConnections: UserConnection[] = [
   {
-    id: 'user-101',
+    id: 'usr-101',
     name: 'Sarah Johnson',
     job_title: 'Sales Manager',
     company: 'NouPro Distribution',
@@ -68,7 +68,7 @@ const mockUserConnections: UserConnection[] = [
     type: 'user',
   },
   {
-    id: 'user-102',
+    id: 'usr-102',
     name: 'Michael Chen',
     job_title: 'Operations Director',
     company: 'Global Supply Co.',
@@ -76,7 +76,7 @@ const mockUserConnections: UserConnection[] = [
     type: 'user',
   },
   {
-    id: 'user-103',
+    id: 'usr-103',
     name: 'Emily Williams',
     job_title: 'Marketing Lead',
     company: 'Fresh Foods Ltd.',
@@ -84,7 +84,7 @@ const mockUserConnections: UserConnection[] = [
     type: 'user',
   },
   {
-    id: 'user-104',
+    id: 'usr-104',
     name: 'David Brown',
     job_title: 'Logistics Coordinator',
     company: 'Quick Delivery Services',
@@ -92,7 +92,7 @@ const mockUserConnections: UserConnection[] = [
     type: 'user',
   },
   {
-    id: 'user-105',
+    id: 'usr-105',
     name: 'Lisa Anderson',
     job_title: 'Procurement Manager',
     company: 'Island Retailers',

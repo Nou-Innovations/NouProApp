@@ -27,12 +27,12 @@ import { useInboxStore } from '../inbox.store';
 const mockChats: Chat[] = [
   {
     id: '1',
-    companyId: 'comp-1',
+    companyId: 'biz-001',
     locationId: null,
     type: 'client',
     name: '📋 Message Types Showcase',
     avatar: 'https://picsum.photos/seed/showcase/40/40',
-    participants: ['user-1', 'demo-1'],
+    participants: ['usr-001', 'demo-001'],
     lastMessage: {
       id: 'msg-1',
       content: 'View all chat bubble types here',
@@ -50,12 +50,12 @@ const mockChats: Chat[] = [
   },
   {
     id: '2',
-    companyId: 'comp-1',
+    companyId: 'biz-001',
     locationId: null,
     type: 'client',
     name: 'Sarah Johnson',
     avatar: 'https://picsum.photos/seed/sarah/40/40',
-    participants: ['user-1', 'sarah-1'],
+    participants: ['usr-001', 'sarah-001'],
     lastMessage: {
       id: 'msg-2',
       content: 'Photo',
@@ -73,12 +73,12 @@ const mockChats: Chat[] = [
   },
   {
     id: '3',
-    companyId: 'comp-1',
+    companyId: 'biz-001',
     locationId: null,
     type: 'supplier',
     name: 'XYZ Suppliers',
     avatar: 'https://picsum.photos/seed/xyz/40/40',
-    participants: ['user-1', 'xyz-1'],
+    participants: ['usr-001', 'xyz-001'],
     lastMessage: {
       id: 'msg-3',
       content: 'New_Products_Catalog.pdf',

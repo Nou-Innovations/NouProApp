@@ -14,7 +14,7 @@ import { UserBusiness, Business, BusinessStaff } from '@/shared/types/business';
  * Default mock user for development
  */
 export const mockUser: User = {
-  id: 'user-001',
+  id: 'usr-001',
   name: 'John Doe',
   email: 'john@noupro.com',
   phone: '+230 5123 4567',
@@ -34,12 +34,12 @@ export const mockUser: User = {
 export const mockBusinesses: UserBusiness[] = [
   {
     business: {
-      id: 'comp-1',  // Matches backend server.js
-      owner_id: 'user-001',
+      id: 'biz-001',  // Matches backend server.js
+      owner_id: 'usr-001',
       name: 'NouPro Distribution Inc.',
       industry: 'food_beverage',
       description: 'Leading distribution company serving multiple locations',
-      logo_url: 'https://picsum.photos/seed/comp1/100/100',
+      logo_url: 'https://picsum.photos/seed/biz001/100/100',
       plan: 'pro',
       is_published: true,
       subscription_status: 'active',
@@ -47,8 +47,8 @@ export const mockBusinesses: UserBusiness[] = [
     } as Business,
     staff_entry: {
       id: 'staff-001',
-      business_id: 'comp-1',
-      user_id: 'user-001',
+      business_id: 'biz-001',
+      user_id: 'usr-001',
       role: 'super_admin',
       status: 'accepted',
       created_at: new Date().toISOString(),
@@ -58,12 +58,12 @@ export const mockBusinesses: UserBusiness[] = [
   },
   {
     business: {
-      id: 'comp-2',  // Matches backend server.js
-      owner_id: 'user-002',
+      id: 'biz-002',  // Matches backend server.js
+      owner_id: 'usr-002',
       name: 'Global Supply Co.',
       industry: 'general_retail',
       description: 'Global supply chain management specialists',
-      logo_url: 'https://picsum.photos/seed/comp2/100/100',
+      logo_url: 'https://picsum.photos/seed/biz002/100/100',
       plan: 'business',
       is_published: true,
       subscription_status: 'active',
@@ -71,8 +71,8 @@ export const mockBusinesses: UserBusiness[] = [
     } as Business,
     staff_entry: {
       id: 'staff-002',
-      business_id: 'comp-2',
-      user_id: 'user-001',
+      business_id: 'biz-002',
+      user_id: 'usr-001',
       role: 'admin',
       status: 'accepted',
       created_at: new Date().toISOString(),

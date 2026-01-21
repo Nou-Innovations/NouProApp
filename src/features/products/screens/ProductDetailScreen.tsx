@@ -933,9 +933,9 @@ function createMockSameBrandProducts(): RelatedProduct[] {
 
 function createMockSameCompanyProducts(): RelatedProduct[] {
   return [
-    { id: 'comp-1', name: 'Smart Watch Pro', image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=200', price: 249.99, currency: DEFAULT_CURRENCY },
-    { id: 'comp-2', name: 'Wireless Keyboard', image: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=200', price: 89.99, currency: DEFAULT_CURRENCY },
-    { id: 'comp-3', name: 'USB-C Hub', image: 'https://images.unsplash.com/photo-1625842268584-8f3296236761?w=200', price: 59.99, currency: DEFAULT_CURRENCY },
+    { id: 'prd-comp-001', name: 'Smart Watch Pro', image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=200', price: 249.99, currency: DEFAULT_CURRENCY },
+    { id: 'prd-comp-002', name: 'Wireless Keyboard', image: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=200', price: 89.99, currency: DEFAULT_CURRENCY },
+    { id: 'prd-comp-003', name: 'USB-C Hub', image: 'https://images.unsplash.com/photo-1625842268584-8f3296236761?w=200', price: 59.99, currency: DEFAULT_CURRENCY },
   ];
 }
 

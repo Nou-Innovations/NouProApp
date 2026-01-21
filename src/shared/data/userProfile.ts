@@ -1,7 +1,7 @@
 import { User, Business } from '@/shared/types/store';
 
 export const mockUser: User = {
-  id: 'user-001',
+  id: 'usr-001',
   name: 'Jane Doe',
   email: 'jane.doe@email.com',
   role: 'staff',

@@ -22,8 +22,8 @@ export const mockBusiness: Business = {
 
 // Feed Companies Database - Real companies from the feed
 export const feedCompanies: Record<string, Business & { description: string; website?: string; businessHours?: any[] }> = {
-  'comp-2': {
-    id: 'comp-2',
+  'biz-002': {
+    id: 'biz-002',
     name: 'Phoenix Beverages',
     logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/Phoenix_Beverages_Limited_logo.svg/512px-Phoenix_Beverages_Limited_logo.svg.png',
     locations: [
@@ -48,8 +48,8 @@ export const feedCompanies: Record<string, Business & { description: string; web
       { day: 'Sunday', open: 'Closed', close: '' },
     ],
   },
-  'comp-3': {
-    id: 'comp-3',
+  'biz-003': {
+    id: 'biz-003',
     name: 'Innodis Ltd',
     logo: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200',
     locations: [
@@ -65,8 +65,8 @@ export const feedCompanies: Record<string, Business & { description: string; web
     description: 'Innodis Ltd is a leading Mauritian company specializing in FMCG distribution, household products, and cleaning supplies.',
     website: 'innodis.com',
   },
-  'comp-4': {
-    id: 'comp-4',
+  'biz-004': {
+    id: 'biz-004',
     name: 'Snack Masters Ltd',
     logo: 'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=200',
     locations: [
@@ -82,8 +82,8 @@ export const feedCompanies: Record<string, Business & { description: string; web
     description: 'Snack Masters Ltd is the premier snack food distributor in Mauritius, bringing the world\'s favorite snack brands to local stores.',
     website: 'snackmasters.mu',
   },
-  'comp-1': {
-    id: 'comp-1',
+  'biz-001': {
+    id: 'biz-001',
     name: 'NouPro Distribution',
     logo: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200',
     locations: [
@@ -103,7 +103,7 @@ export const feedCompanies: Record<string, Business & { description: string; web
 
 // Brands for each feed company
 export const feedCompanyBrands: Record<string, any[]> = {
-  'comp-2': [
+  'biz-002': [
     {
       id: 'brand-101',
       name: 'Phoenix Beer',
@@ -163,7 +163,7 @@ export const feedCompanyBrands: Record<string, any[]> = {
       ],
     },
   ],
-  'comp-3': [
+  'biz-003': [
     {
       id: 'brand-201',
       name: 'Fairy',
@@ -198,7 +198,7 @@ export const feedCompanyBrands: Record<string, any[]> = {
       ],
     },
   ],
-  'comp-4': [
+  'biz-004': [
     {
       id: 'brand-lays',
       name: "Lay's",
@@ -245,7 +245,7 @@ export const feedCompanyBrands: Record<string, any[]> = {
       ],
     },
   ],
-  'comp-1': [
+  'biz-001': [
     {
       id: 'brand-tropicana',
       name: 'Tropicana',

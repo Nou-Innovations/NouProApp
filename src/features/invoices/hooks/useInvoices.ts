@@ -154,8 +154,8 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
 function transformMockInvoices(mockData: typeof mockInvoicesData): Invoice[] {
   return mockData.map((mock) => ({
     id: mock.id,
-    companyId: 'comp-1', // Default for mock
-    locationId: mock.locationId || 'loc-1',
+    companyId: 'biz-001', // Default for mock
+    locationId: mock.locationId || 'loc-001',
     clientName: mock.clientName,
     clientEmail: mock.clientContact.email,
     amount: mock.subtotal,

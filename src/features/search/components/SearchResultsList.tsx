@@ -16,32 +16,32 @@ import MessageCard from '@/features/inbox/components/MessageCard';
 // Mock data for companies
 const MOCK_COMPANIES = [
   {
-    id: 'comp-1',
+    id: 'biz-001',
     name: 'Acme Corporation',
     logo: 'https://ui-avatars.com/api/?name=Acme+Corp&background=0D8ABC&color=fff',
   },
   {
-    id: 'comp-2',
+    id: 'biz-002',
     name: 'The Burning Distributor',
     logo: 'https://placehold.co/80x80/orange/white?text=🔥',
   },
   {
-    id: 'comp-3',
+    id: 'biz-003',
     name: 'Global Industries',
     logo: 'https://ui-avatars.com/api/?name=Global+Industries&background=27AE60&color=fff',
   },
   {
-    id: 'comp-4',
+    id: 'biz-004',
     name: 'Best Suppliers Ltd',
     logo: 'https://ui-avatars.com/api/?name=Best+Suppliers&background=8E44AD&color=fff',
   },
   {
-    id: 'comp-5',
+    id: 'biz-005',
     name: 'Tech Solutions',
     logo: 'https://ui-avatars.com/api/?name=Tech+Solutions&background=E74C3C&color=fff',
   },
   {
-    id: 'comp-6',
+    id: 'biz-006',
     name: 'Craft Wholesalers',
     logo: 'https://ui-avatars.com/api/?name=Craft+Wholesalers&background=F39C12&color=fff',
   },
@@ -50,32 +50,32 @@ const MOCK_COMPANIES = [
 // Mock data for users
 const MOCK_USERS = [
   {
-    id: 'user-1',
+    id: 'usr-001',
     name: 'Alice Johnson',
     avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
   },
   {
-    id: 'user-2',
+    id: 'usr-002',
     name: 'Bob Smith',
     avatar: 'https://randomuser.me/api/portraits/men/2.jpg',
   },
   {
-    id: 'user-3',
+    id: 'usr-003',
     name: 'Carol Williams',
     avatar: 'https://randomuser.me/api/portraits/women/3.jpg',
   },
   {
-    id: 'user-4',
+    id: 'usr-004',
     name: 'David Brown',
     avatar: 'https://randomuser.me/api/portraits/men/4.jpg',
   },
   {
-    id: 'user-5',
+    id: 'usr-005',
     name: 'Eva Miller',
     avatar: 'https://randomuser.me/api/portraits/women/5.jpg',
   },
   {
-    id: 'user-6',
+    id: 'usr-006',
     name: 'Frank Davis',
     avatar: 'https://randomuser.me/api/portraits/men/6.jpg',
   },

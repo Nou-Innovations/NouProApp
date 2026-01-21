@@ -76,7 +76,7 @@ const mockFeedPosts: FeedPost[] = [
     type: 'company_presentation',
     timestamp: '4h ago',
     data: {
-      companyId: 'comp-001',
+      companyId: 'biz-001',
       companyName: 'Phoenix Beverages',
       companyLogo: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/Phoenix_Beverages_Limited_logo.svg/512px-Phoenix_Beverages_Limited_logo.svg.png',
       location: 'Port Louis, Mauritius',
@@ -173,7 +173,7 @@ const mockFeedPosts: FeedPost[] = [
     type: 'company_presentation',
     timestamp: '10h ago',
     data: {
-      companyId: 'comp-002',
+      companyId: 'biz-002',
       companyName: 'Innodis Ltd',
       companyLogo: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200',
       location: 'Curepipe, Mauritius',
@@ -265,7 +265,7 @@ const mockFeedPosts: FeedPost[] = [
     type: 'company_presentation',
     timestamp: '1d ago',
     data: {
-      companyId: 'comp-003',
+      companyId: 'biz-003',
       companyName: 'Asia Foods Mauritius',
       companyLogo: 'https://images.unsplash.com/photo-1526318896980-cf78c088247c?w=200',
       location: 'Quatre Bornes, Mauritius',
@@ -370,7 +370,7 @@ const mockFeedPosts: FeedPost[] = [
     type: 'company_presentation',
     timestamp: '3d ago',
     data: {
-      companyId: 'comp-004',
+      companyId: 'biz-004',
       companyName: 'Euro Foods International',
       companyLogo: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200',
       location: 'Grand Baie, Mauritius',

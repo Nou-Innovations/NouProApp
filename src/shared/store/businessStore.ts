@@ -145,9 +145,9 @@ export const useBusinessStore = create<BusinessStoreState>()(
       
       const mockBusinesses: LegacyCompany[] = [
         {
-          id: 'comp-1',
+          id: 'biz-001',
           name: 'NouPro Distribution Inc.',
-          logoUrl: 'https://picsum.photos/seed/comp1/100/100',
+          logoUrl: 'https://picsum.photos/seed/biz001/100/100',
           description: 'Leading distribution company serving multiple locations',
           phone: '+230-555-1234',
           email: 'info@noupro.com',
@@ -159,9 +159,9 @@ export const useBusinessStore = create<BusinessStoreState>()(
           },
         },
         {
-          id: 'comp-2', 
+          id: 'biz-002', 
           name: 'Global Supply Co.',
-          logoUrl: 'https://picsum.photos/seed/comp2/100/100',
+          logoUrl: 'https://picsum.photos/seed/biz002/100/100',
           description: 'Global supply chain management specialists',
           phone: '+230-555-5678',
           email: 'contact@globalsupply.com',
@@ -222,7 +222,7 @@ export const useBusinessStore = create<BusinessStoreState>()(
       
       const mockLocations: LegacyLocation[] = [
         {
-          id: 'loc-1',
+          id: 'loc-001',
           companyId: businessId,
           name: 'Main Warehouse',
           address: '123 Industrial Ave, Port Louis, Mauritius',
@@ -232,7 +232,7 @@ export const useBusinessStore = create<BusinessStoreState>()(
           longitude: 57.502,
         },
         {
-          id: 'loc-2',
+          id: 'loc-002',
           companyId: businessId,
           name: 'City Center Shop',
           address: '45 Main Street, Curepipe, Mauritius',
@@ -242,7 +242,7 @@ export const useBusinessStore = create<BusinessStoreState>()(
           longitude: 57.528,
         },
         {
-          id: 'loc-3',
+          id: 'loc-003',
           companyId: businessId,
           name: 'Beach Resort Outlet',
           address: 'Grand Baie Coastal Road, Grand Baie, Mauritius',
@@ -251,7 +251,7 @@ export const useBusinessStore = create<BusinessStoreState>()(
           longitude: 57.58,
         },
         {
-          id: 'loc-4',
+          id: 'loc-004',
           companyId: businessId,
           name: 'South Distribution Center',
           address: 'Zone Industrielle, Mahebourg, Mauritius',

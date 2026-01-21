@@ -185,7 +185,7 @@ function getPublicDisabledReason(business, location) {
 // Get user from request (mock auth via header)
 // In production, replace with JWT verification
 function getUserFromRequest(req) {
-  const userId = req.headers['x-user-id'] || 'user-1'; // Default to user-1 for testing
+  const userId = req.headers['x-user-id'] || 'usr-001'; // Default to usr-001 for testing
   return users.find(u => u.id === userId);
 }
 

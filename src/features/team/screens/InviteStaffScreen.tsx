@@ -22,18 +22,18 @@ import { AppSearchBar, Avatar } from '@/shared/components/ui';
 
 // Mock users for demonstration - in real app, fetch from API
 const MOCK_CONNECTED_USERS = [
-  { id: 'user-1', name: 'Alice Johnson', username: 'alicej', avatar: 'https://randomuser.me/api/portraits/women/1.jpg', isConnected: true },
-  { id: 'user-2', name: 'Bob Smith', username: 'bobsmith', avatar: 'https://randomuser.me/api/portraits/men/2.jpg', isConnected: true },
-  { id: 'user-3', name: 'Carol Williams', username: 'carolw', avatar: 'https://randomuser.me/api/portraits/women/3.jpg', isConnected: true },
+  { id: 'usr-001', name: 'Alice Johnson', username: 'alicej', avatar: 'https://randomuser.me/api/portraits/women/1.jpg', isConnected: true },
+  { id: 'usr-002', name: 'Bob Smith', username: 'bobsmith', avatar: 'https://randomuser.me/api/portraits/men/2.jpg', isConnected: true },
+  { id: 'usr-003', name: 'Carol Williams', username: 'carolw', avatar: 'https://randomuser.me/api/portraits/women/3.jpg', isConnected: true },
 ];
 
 const MOCK_ALL_USERS = [
   ...MOCK_CONNECTED_USERS,
-  { id: 'user-4', name: 'David Brown', username: 'davidb', avatar: 'https://randomuser.me/api/portraits/men/4.jpg', isConnected: false },
-  { id: 'user-5', name: 'Eva Miller', username: 'evam', avatar: 'https://randomuser.me/api/portraits/women/5.jpg', isConnected: false },
-  { id: 'user-6', name: 'Frank Davis', username: 'frankd', avatar: 'https://randomuser.me/api/portraits/men/6.jpg', isConnected: false },
-  { id: 'user-7', name: 'Grace Lee', username: 'gracel', avatar: 'https://randomuser.me/api/portraits/women/7.jpg', isConnected: false },
-  { id: 'user-8', name: 'Henry Wilson', username: 'henryw', avatar: 'https://randomuser.me/api/portraits/men/8.jpg', isConnected: false },
+  { id: 'usr-004', name: 'David Brown', username: 'davidb', avatar: 'https://randomuser.me/api/portraits/men/4.jpg', isConnected: false },
+  { id: 'usr-005', name: 'Eva Miller', username: 'evam', avatar: 'https://randomuser.me/api/portraits/women/5.jpg', isConnected: false },
+  { id: 'usr-006', name: 'Frank Davis', username: 'frankd', avatar: 'https://randomuser.me/api/portraits/men/6.jpg', isConnected: false },
+  { id: 'usr-007', name: 'Grace Lee', username: 'gracel', avatar: 'https://randomuser.me/api/portraits/women/7.jpg', isConnected: false },
+  { id: 'usr-008', name: 'Henry Wilson', username: 'henryw', avatar: 'https://randomuser.me/api/portraits/men/8.jpg', isConnected: false },
 ];
 
 interface User {
