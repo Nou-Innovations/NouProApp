@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
   logoText: {
     color: COLORS.text,
     fontSize: LOGO_INITIAL_SIZE,
-    fontFamily: theme.fonts?.primary?.extraBold || 'Inter-ExtraBold',
+    fontFamily: theme.fonts?.primary?.extraBold || 'InterCustom-ExtraBold',
     letterSpacing: 2,
   },
   
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     fontSize: 80,
     lineHeight: 74,
     textAlign: 'center',
-    fontFamily: theme.fonts?.primary?.extraBold || 'Inter-ExtraBold',
+    fontFamily: theme.fonts?.primary?.extraBold || 'InterCustom-ExtraBold',
   },
   
   // Bottom actions
@@ -514,7 +514,7 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: COLORS.background,
     fontSize: 18,
-    fontFamily: theme.fonts?.primary?.bold || 'Inter-Bold',
+    fontFamily: theme.fonts?.primary?.bold || 'InterCustom-Bold',
   },
   
   // Sign In Row
@@ -527,12 +527,12 @@ const styles = StyleSheet.create({
   signInText: {
     color: COLORS.textMuted,
     fontSize: 16,
-    fontFamily: theme.fonts?.primary?.regular || 'Inter-Regular',
+    fontFamily: theme.fonts?.primary?.regular || 'InterCustom-Regular',
   },
   signInLink: {
     color: COLORS.accent,
     fontSize: 16,
-    fontFamily: theme.fonts?.primary?.bold || 'Inter-Bold',
+    fontFamily: theme.fonts?.primary?.bold || 'InterCustom-Bold',
   },
   
   // Progress Bar

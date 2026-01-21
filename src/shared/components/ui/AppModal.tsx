@@ -241,6 +241,6 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
 });

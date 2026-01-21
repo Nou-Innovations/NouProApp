@@ -874,7 +874,7 @@ const styles = StyleSheet.create({
   },
   orderButtonText: {
     color: '#fff',
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
     fontSize: 16,
   },
   emptyListComponent: {

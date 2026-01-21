@@ -485,14 +485,14 @@ const AppWithTheme = () => {
         // Initialize user avatar service
         await userAvatarService.initialize();
         
-        // Pre-load fonts
+        // Pre-load fonts (using InterCustom- prefix to avoid iOS CTFontManager conflicts)
         await Font.loadAsync({
           ...Ionicons.font,
-          'Inter-Regular': require('./assets/fonts/Inter-Regular.ttf'),
-          'Inter-Medium': require('./assets/fonts/Inter-Medium.ttf'),
-          'Inter-SemiBold': require('./assets/fonts/Inter-SemiBold.ttf'),
-          'Inter-Bold': require('./assets/fonts/Inter-Bold.ttf'),
-          'Inter-ExtraBold': require('./assets/fonts/Inter-ExtraBold.ttf'),
+          'InterCustom-Regular': require('./assets/fonts/Inter-Regular.ttf'),
+          'InterCustom-Medium': require('./assets/fonts/Inter-Medium.ttf'),
+          'InterCustom-SemiBold': require('./assets/fonts/Inter-SemiBold.ttf'),
+          'InterCustom-Bold': require('./assets/fonts/Inter-Bold.ttf'),
+          'InterCustom-ExtraBold': require('./assets/fonts/Inter-ExtraBold.ttf'),
         });
 
         // Pre-load critical images

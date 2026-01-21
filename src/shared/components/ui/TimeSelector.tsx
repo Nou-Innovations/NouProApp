@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#111827',
     marginVertical: 8,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
     minWidth: 36,
     textAlign: 'center',
   },

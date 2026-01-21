@@ -1,15 +1,14 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Modal,
   ScrollView,
-  Animated,
   Switch,
   RefreshControl,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -35,8 +34,7 @@ import { Icon } from '@/shared/utils/icons';
 import AppButton from '@/shared/components/ui/AppButton';
 import IconButton from '@/shared/components/ui/IconButton';
 import { AppModal } from '@/shared/components/ui';
-import SimpleHeader, { AnimatedFlatList, HEADER_HEIGHT } from '@/shared/components/layout/headers/SimpleHeader';
-import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
+import { PrimaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { useBusinessStore } from '@/shared/store/businessStore';
@@ -315,121 +313,114 @@ const ProductsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <SimpleHeader
-        headerComponent={
-          <PrimaryHeader
-            title={currentViewTitle}
-            onTitlePress={toggleViewDropdown}
-            actions={[
-              { icon: 'plus', onPress: handleOpenCreateOptions, accessibilityLabel: 'Create product' },
-              ...((isEditing || isAdmin()) ? [{
-                icon: isEditing ? 'save' : 'pencil',
-                onPress: toggleEditMode,
-                accessibilityLabel: isEditing ? 'Save changes' : 'Edit products',
-                iconColor: isEditing && hasEditedProducts ? appTheme.colors.success : undefined,
-              }] : []),
-            ]}
-          />
-        }
-        searchComponent={
-          <View style={{ backgroundColor: appTheme.colors.background }}>
-            {/* Location Selector Section */}
-            <View style={styles.locationSection}>
-              <TouchableOpacity 
-                style={[styles.locationDropdown, { 
-                  borderColor: appTheme.colors.borderColor,
-                  backgroundColor: appTheme.colors.background
-                }]}
-                onPress={() => !hasSingleLocation && setShowLocationDropdown(true)}
-                disabled={hasSingleLocation}
-                activeOpacity={hasSingleLocation ? 1 : 0.7}
-              >
-                <Text style={[styles.locationText, { 
-                  color: appTheme.colors.textSecondary 
-                }]}>
-                  {hasSingleLocation && primaryLocation
-                    ? primaryLocation.name
-                    : selectedLocationId 
-                      ? safeLocations.find(l => l.id === selectedLocationId)?.name || 'All Locations' 
-                      : 'All Locations'}
-                </Text>
-                {!hasSingleLocation && (
-                  <Icon name="chevron-down" size={16} color={appTheme.colors.textSecondary} />
-                )}
-              </TouchableOpacity>
-            </View>
-            
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
-              <AppSearchBar
-                placeholder="Search brands…" 
-                value={searchTerm}
-                onChangeText={setSearchTerm}
-                onClear={() => setSearchTerm('')}
-                containerStyle={styles.searchBarContainer}
-              />
-            </View>
-          </View>
-        }
-        stickyComponent={
-          <FilterBar 
-            statuses={UI_PRODUCT_STATUSES}
-            selectedStatus={selectedStatus}
-            onSelectStatus={handleStatusChange}
-            containerStyle={{ flexGrow: 0 }}
-          />
-        }
-      >
-        <AnimatedFlatList
-          data={listData}
-          renderItem={renderListItem as any}
-          keyExtractor={keyExtractor as any}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={refresh}
-              tintColor={appTheme.colors.primary}
-            />
-          }
-          ListHeaderComponent={
-            <>
-              {/* Dev mode mock data indicator */}
-              {__DEV__ && isMockData && (
-                <View style={[styles.mockDataBanner, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={{ color: '#92400E', fontSize: 12 }}>Using mock data (API unavailable)</Text>
-                </View>
-              )}
-              
-              {/* Loading state */}
-              {loading && (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={appTheme.colors.primary} />
-                </View>
-              )}
-              
-              {/* Error state */}
-              {error && !loading && (
-                <View style={styles.errorContainer}>
-                  <Text style={[styles.errorText, { color: appTheme.colors.error }]}>{error}</Text>
-                  <TouchableOpacity onPress={refresh} style={[styles.retryButton, { backgroundColor: appTheme.colors.primary }]}>
-                    <Text style={{ color: 'white' }}>Retry</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </>
-          }
-          ListEmptyComponent={() => (
-            <View style={styles.emptyListComponent}>
-              <Text style={styles.emptyListText}>No brands or products found</Text>
-            </View>
+      {/* Primary Header */}
+      <PrimaryHeader
+        title={currentViewTitle}
+        onTitlePress={toggleViewDropdown}
+        actions={[
+          { icon: 'plus', onPress: handleOpenCreateOptions, accessibilityLabel: 'Create product' },
+          ...((isEditing || isAdmin()) ? [{
+            icon: isEditing ? 'save' : 'pencil',
+            onPress: toggleEditMode,
+            accessibilityLabel: isEditing ? 'Save changes' : 'Edit products',
+            iconColor: isEditing && hasEditedProducts ? appTheme.colors.success : undefined,
+          }] : []),
+        ]}
+      />
+
+      {/* Location Selector Section */}
+      <View style={[styles.locationSection, { backgroundColor: appTheme.colors.background }]}>
+        <TouchableOpacity 
+          style={[styles.locationDropdown, { 
+            borderColor: appTheme.colors.borderColor,
+            backgroundColor: appTheme.colors.background
+          }]}
+          onPress={() => !hasSingleLocation && setShowLocationDropdown(true)}
+          disabled={hasSingleLocation}
+          activeOpacity={hasSingleLocation ? 1 : 0.7}
+        >
+          <Text style={[styles.locationText, { 
+            color: appTheme.colors.textSecondary 
+          }]}>
+            {hasSingleLocation && primaryLocation
+              ? primaryLocation.name
+              : selectedLocationId 
+                ? safeLocations.find(l => l.id === selectedLocationId)?.name || 'All Locations' 
+                : 'All Locations'}
+          </Text>
+          {!hasSingleLocation && (
+            <Icon name="chevron-down" size={16} color={appTheme.colors.textSecondary} />
           )}
-          contentContainerStyle={{
-            // paddingTop: HEADER_HEIGHT, // Removed - SimpleHeader handles this automatically
-          }}
-          style={{ flex: 1 }}
-          extraData={{ editMode: isEditing, expandedBrand: expandedBrandName, edits: editedProducts, currentView: currentViewTitle }}
+        </TouchableOpacity>
+      </View>
+      
+      {/* Search Bar */}
+      <View style={[styles.searchContainer, { backgroundColor: appTheme.colors.background }]}>
+        <AppSearchBar
+          placeholder="Search brands…" 
+          value={searchTerm}
+          onChangeText={setSearchTerm}
+          onClear={() => setSearchTerm('')}
+          containerStyle={styles.searchBarContainer}
         />
-      </SimpleHeader>
+      </View>
+
+      {/* Filter Bar */}
+      <FilterBar 
+        statuses={UI_PRODUCT_STATUSES}
+        selectedStatus={selectedStatus}
+        onSelectStatus={handleStatusChange}
+        containerStyle={{ flexGrow: 0 }}
+      />
+
+      {/* Product List */}
+      <FlatList
+        data={listData}
+        renderItem={renderListItem as any}
+        keyExtractor={keyExtractor as any}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            tintColor={appTheme.colors.primary}
+          />
+        }
+        ListHeaderComponent={
+          <>
+            {/* Dev mode mock data indicator */}
+            {__DEV__ && isMockData && (
+              <View style={[styles.mockDataBanner, { backgroundColor: '#FEF3C7' }]}>
+                <Text style={{ color: '#92400E', fontSize: 12 }}>Using mock data (API unavailable)</Text>
+              </View>
+            )}
+            
+            {/* Loading state */}
+            {loading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={appTheme.colors.primary} />
+              </View>
+            )}
+            
+            {/* Error state */}
+            {error && !loading && (
+              <View style={styles.errorContainer}>
+                <Text style={[styles.errorText, { color: appTheme.colors.error }]}>{error}</Text>
+                <TouchableOpacity onPress={refresh} style={[styles.retryButton, { backgroundColor: appTheme.colors.primary }]}>
+                  <Text style={{ color: 'white' }}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        }
+        ListEmptyComponent={() => (
+          <View style={styles.emptyListComponent}>
+            <Text style={styles.emptyListText}>No brands or products found</Text>
+          </View>
+        )}
+        contentContainerStyle={{ flexGrow: 1 }}
+        style={{ flex: 1 }}
+        extraData={{ editMode: isEditing, expandedBrand: expandedBrandName, edits: editedProducts, currentView: currentViewTitle }}
+      />
 
       {/* View Selection Modal (View Dropdown) */}
       <ProductActionsModal

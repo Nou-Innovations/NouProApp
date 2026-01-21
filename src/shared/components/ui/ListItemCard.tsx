@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
   },
   statusPillText: {
     fontSize: 12,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
   },
   optionsButton: {
     width: LIST_ITEM_CARD.optionsButton.size,

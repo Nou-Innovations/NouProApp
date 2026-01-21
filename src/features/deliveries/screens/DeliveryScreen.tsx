@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -16,8 +17,7 @@ import FilterBar from '@/features/search/components/FilterBar';
 import DeliveryCard from '@/features/deliveries/components/DeliveryCard';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import { ListItemCard } from '@/shared/components/ui';
-import SimpleHeader, { AnimatedFlatList } from '@/shared/components/layout/headers/SimpleHeader';
-import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
+import { PrimaryHeader } from '@/shared/components/layout/headers';
 import DeliveryActionsModal from '@/features/deliveries/components/DeliveryActionsModal';
 import DeliveryCreateModal from '@/features/deliveries/components/DeliveryCreateModal';
 import PaywallModal from '@/features/subscription/components/PaywallModal';
@@ -195,134 +195,129 @@ export default function DeliveryScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <SimpleHeader
-        headerComponent={
-          <PrimaryHeader
-            title={getTabTitle()}
-            onTitlePress={toggleViewDropdown}
-            actions={[
-              { icon: 'plus', onPress: handleCreateNew, accessibilityLabel: 'Create delivery' },
-            ]}
-          />
-        }
-        searchComponent={
-          <View style={{ backgroundColor: appTheme.colors.background }}>
-            {/* Location Selector Section */}
-            <View style={styles.locationSection}>
-              <TouchableOpacity 
-                style={[styles.locationDropdown, { 
-                  borderColor: appTheme.colors.borderColor,
-                  backgroundColor: appTheme.colors.background
-                }]}
-                onPress={() => !hasSingleLocation && setShowLocationDropdown(true)}
-                disabled={hasSingleLocation}
-                activeOpacity={hasSingleLocation ? 1 : 0.7}
-              >
-                <Text style={[styles.locationText, { 
-                  color: appTheme.colors.textSecondary 
-                }]}>
-                  {hasSingleLocation && primaryLocation
-                    ? primaryLocation.name
-                    : selectedLocationId 
-                      ? safeLocations.find(l => l.id === selectedLocationId)?.name || 'All Locations' 
-                      : 'All Locations'}
-                </Text>
-                {!hasSingleLocation && (
-                  <Icon name="chevron-down" size={16} color={appTheme.colors.textSecondary} />
-                )}
-              </TouchableOpacity>
-            </View>
-            
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
-              <AppSearchBar
-                placeholder="Search by Company or Order ID…"
-                value={search}
-                onChangeText={setSearch}
-                onClear={() => setSearch('')}
-                containerStyle={styles.searchBarContainer}
-              />
-            </View>
-          </View>
-        }
-        stickyComponent={
-          <FilterBar 
-            statuses={DELIVERY_STATUSES}
-            selectedStatus={filter}
-            onSelectStatus={setFilter}
-            containerStyle={{ flexGrow: 0 }}
-          />
-        }
-      >
-        <AnimatedFlatList
-          data={loading ? [] : filteredDeliveries}
-          keyExtractor={(item: unknown) => (item as Delivery).id}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={refresh}
-              tintColor={appTheme.colors.primary}
-            />
-          }
-          ListHeaderComponent={
-            <>
-              {/* Dev mode mock data indicator */}
-              {__DEV__ && isMockData && !loading && (
-                <View style={[styles.mockDataBanner, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={{ color: '#92400E', fontSize: 12 }}>Using mock data (API unavailable)</Text>
-                </View>
-              )}
-              
-              {/* Error state */}
-              {error && !loading && (
-                <View style={styles.errorContainer}>
-                  <Text style={[styles.errorText, { color: appTheme.colors.error }]}>{error}</Text>
-                  <TouchableOpacity onPress={refresh} style={[styles.retryButton, { backgroundColor: appTheme.colors.primary }]}>
-                    <Text style={{ color: 'white' }}>Retry</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </>
-          }
-          renderItem={({ item }: { item: unknown }) => (
-            <DeliveryCard 
-              delivery={item as Delivery} 
-              isUserAdmin={hasManagePermission} 
-              onPress={() => (navigation as any).navigate('DeliveryDetail', { deliveryId: (item as Delivery).id })}
-            />
+      {/* Primary Header */}
+      <PrimaryHeader
+        title={getTabTitle()}
+        onTitlePress={toggleViewDropdown}
+        actions={[
+          { icon: 'plus', onPress: handleCreateNew, accessibilityLabel: 'Create delivery' },
+        ]}
+      />
+
+      {/* Location Selector Section */}
+      <View style={[styles.locationSection, { backgroundColor: appTheme.colors.background }]}>
+        <TouchableOpacity 
+          style={[styles.locationDropdown, { 
+            borderColor: appTheme.colors.borderColor,
+            backgroundColor: appTheme.colors.background
+          }]}
+          onPress={() => !hasSingleLocation && setShowLocationDropdown(true)}
+          disabled={hasSingleLocation}
+          activeOpacity={hasSingleLocation ? 1 : 0.7}
+        >
+          <Text style={[styles.locationText, { 
+            color: appTheme.colors.textSecondary 
+          }]}>
+            {hasSingleLocation && primaryLocation
+              ? primaryLocation.name
+              : selectedLocationId 
+                ? safeLocations.find(l => l.id === selectedLocationId)?.name || 'All Locations' 
+                : 'All Locations'}
+          </Text>
+          {!hasSingleLocation && (
+            <Icon name="chevron-down" size={16} color={appTheme.colors.textSecondary} />
           )}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyListContainer}>
-              {loading ? (
-                <>
-                  <ActivityIndicator size="large" color={appTheme.colors.primary} />
-                  <Text style={[styles.emptyListText, { color: appTheme.colors.textLight, marginTop: 16 }]}>
-                    Loading deliveries...
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Icon 
-                    name={activeTab === 'incoming' ? 'arrow-down-circle-outline' : activeTab === 'outgoing' ? 'arrow-up-circle-outline' : 'car-outline'} 
-                    size={48} 
-                    color={appTheme.colors.textLight} 
-                  />
-                  <Text style={[styles.emptyListText, { color: appTheme.colors.textLight }]}>
-                    No {activeTab === 'all' ? 'deliveries' : activeTab === 'transfers' ? 'transfers' : `${activeTab} deliveries`} found
-                  </Text>
-                  {selectedLocationId && (
-                    <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textLight }]}>
-                      Try selecting "All Locations" to see more
-                    </Text>
-                  )}
-                </>
-              )}
-            </View>
-          )}
-          contentContainerStyle={filteredDeliveries.length === 0 ? { flex: 1 } : {}}
-          style={{ flex: 1 }}
+        </TouchableOpacity>
+      </View>
+      
+      {/* Search Bar */}
+      <View style={[styles.searchContainer, { backgroundColor: appTheme.colors.background }]}>
+        <AppSearchBar
+          placeholder="Search by Company or Order ID…"
+          value={search}
+          onChangeText={setSearch}
+          onClear={() => setSearch('')}
+          containerStyle={styles.searchBarContainer}
         />
-      </SimpleHeader>
+      </View>
+
+      {/* Filter Bar */}
+      <FilterBar 
+        statuses={DELIVERY_STATUSES}
+        selectedStatus={filter}
+        onSelectStatus={setFilter}
+        containerStyle={{ flexGrow: 0 }}
+      />
+
+      {/* Delivery List */}
+      <FlatList
+        data={loading ? [] : filteredDeliveries}
+        keyExtractor={(item: unknown) => (item as Delivery).id}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            tintColor={appTheme.colors.primary}
+          />
+        }
+        ListHeaderComponent={
+          <>
+            {/* Dev mode mock data indicator */}
+            {__DEV__ && isMockData && !loading && (
+              <View style={[styles.mockDataBanner, { backgroundColor: '#FEF3C7' }]}>
+                <Text style={{ color: '#92400E', fontSize: 12 }}>Using mock data (API unavailable)</Text>
+              </View>
+            )}
+            
+            {/* Error state */}
+            {error && !loading && (
+              <View style={styles.errorContainer}>
+                <Text style={[styles.errorText, { color: appTheme.colors.error }]}>{error}</Text>
+                <TouchableOpacity onPress={refresh} style={[styles.retryButton, { backgroundColor: appTheme.colors.primary }]}>
+                  <Text style={{ color: 'white' }}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        }
+        renderItem={({ item }: { item: unknown }) => (
+          <DeliveryCard 
+            delivery={item as Delivery} 
+            isUserAdmin={hasManagePermission} 
+            onPress={() => (navigation as any).navigate('DeliveryDetail', { deliveryId: (item as Delivery).id })}
+          />
+        )}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyListContainer}>
+            {loading ? (
+              <>
+                <ActivityIndicator size="large" color={appTheme.colors.primary} />
+                <Text style={[styles.emptyListText, { color: appTheme.colors.textLight, marginTop: 16 }]}>
+                  Loading deliveries...
+                </Text>
+              </>
+            ) : (
+              <>
+                <Icon 
+                  name={activeTab === 'incoming' ? 'arrow-down-circle-outline' : activeTab === 'outgoing' ? 'arrow-up-circle-outline' : 'car-outline'} 
+                  size={48} 
+                  color={appTheme.colors.textLight} 
+                />
+                <Text style={[styles.emptyListText, { color: appTheme.colors.textLight }]}>
+                  No {activeTab === 'all' ? 'deliveries' : activeTab === 'transfers' ? 'transfers' : `${activeTab} deliveries`} found
+                </Text>
+                {selectedLocationId && (
+                  <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textLight }]}>
+                    Try selecting "All Locations" to see more
+                  </Text>
+                )}
+              </>
+            )}
+          </View>
+        )}
+        contentContainerStyle={filteredDeliveries.length === 0 ? { flex: 1 } : { flexGrow: 1 }}
+        style={{ flex: 1 }}
+      />
 
       {/* Delivery Type Selection Modal (View Dropdown) */}
       <DeliveryActionsModal

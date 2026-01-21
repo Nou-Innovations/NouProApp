@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'InterCustom-Bold',
   },
   sectionContent: {
     width: '100%',
@@ -695,11 +695,11 @@ const styles = StyleSheet.create({
   },
   sectionEmptyText: {
     fontSize: 14,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
   },
   sectionEmptySubtext: {
     fontSize: 12,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'InterCustom-Regular',
     textAlign: 'center',
   },
   // Request Card bottom buttons (used in ListItemCard bottomElement)
@@ -717,7 +717,7 @@ const styles = StyleSheet.create({
   },
   requestCardButtonPrimaryText: {
     fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
     color: '#FFFFFF',
   },
   requestCardButtonOutline: {
@@ -730,7 +730,7 @@ const styles = StyleSheet.create({
   },
   requestCardButtonOutlineText: {
     fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   // Pending Card button (used in ListItemCard rightRow2)
   pendingCardButton: {
@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
   },
   pendingCardButtonText: {
     fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   listDivider: {
     height: 1,

@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Animated,
   ActivityIndicator,
   ScrollView,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -24,8 +24,7 @@ interface DropdownItem {
   description?: string;
   icon?: string;
 }
-import SimpleHeader, { AnimatedFlatList, HEADER_HEIGHT } from '@/shared/components/layout/headers/SimpleHeader';
-import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
+import { PrimaryHeader } from '@/shared/components/layout/headers';
 import InvoiceActionsModal from '@/features/invoices/components/InvoiceActionsModal';
 import PaywallModal from '@/features/subscription/components/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -67,9 +66,6 @@ export default function InvoicesScreen() {
   const hasViewPermission = canViewInvoices(currentUserRole, activeBusiness?.plan || null);
   const hasManagePermission = canManageInvoices(currentUserRole, activeBusiness?.plan || null);
   const planAllowsInvoices = canGenerateInvoices(activeBusiness?.plan || null);
-  
-  // Create scrollY animated value for header animation
-  const scrollY = useRef(new Animated.Value(0)).current;
 
   // ========================================================================
   // ARCHITECTURE: Data comes from useInvoices hook (API → Service → Hook → Screen)
@@ -204,149 +200,142 @@ export default function InvoicesScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <SimpleHeader
-        headerComponent={
-          <PrimaryHeader
-            title={activeTab === 'invoices' ? 'Invoices' : 'Estimates'}
-            onTitlePress={toggleViewDropdown}
-            actions={[
-              { icon: 'plus', onPress: handleCreateNew, accessibilityLabel: 'Create invoice' },
-            ]}
-          />
-        }
-        searchComponent={
-          <View style={{ backgroundColor: appTheme.colors.background }}>
-            {/* Location Filter Section */}
-            <View style={styles.locationSection}>
-              <TouchableOpacity 
-                style={[styles.locationDropdown, { 
-                  borderColor: appTheme.colors.borderColor,
-                  backgroundColor: appTheme.colors.background
-                }]}
-                onPress={() => !hasSingleLocation && setShowLocationDropdown(true)}
-                disabled={hasSingleLocation}
-                activeOpacity={hasSingleLocation ? 1 : 0.7}
-              >
-                <Text style={[styles.locationText, { 
-                  color: appTheme.colors.textSecondary 
-                }]}>
-                  {hasSingleLocation && primaryLocation
-                    ? primaryLocation.name
-                    : selectedLocationId 
-                      ? safeLocations.find(l => l.id === selectedLocationId)?.name || 'All Locations' 
-                      : 'All Locations'}
-                </Text>
-                {!hasSingleLocation && (
-                  <Icon name="chevron-down" size={16} color={appTheme.colors.textSecondary} />
-                )}
-              </TouchableOpacity>
-            </View>
-            
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
-              <AppSearchBar
-                placeholder={`Search ${activeTab}...`}
-                value={search}
-                onChangeText={setSearch}
-                onClear={() => setSearch('')}
-                containerStyle={styles.searchBarContainer}
-              />
-            </View>
-          </View>
-        }
-        stickyComponent={
-          <FilterBar 
-            statuses={statuses}
-            selectedStatus={filter}
-            onSelectStatus={setFilter}
-            containerStyle={{ flexGrow: 0 }}
-          />
-        }
-      >
-        <AnimatedFlatList
-          data={loading ? [] : filteredDocuments}
-          keyExtractor={(item: any) => item.id}
-          renderItem={({ item }: { item: any }) => (
-            <InvoiceCard 
-              clientCompanyLogo={null}
-              clientName={item.clientName}
-              invoiceNumber={item.id}
-              totalAmount={item.totalAmount}
-              issueDate={item.issueDate}
-              dueDate={item.dueDate}
-              status={item.status}
-              isAdmin={hasManagePermission}
-              onPress={() => (navigation as any).navigate('InvoiceDetails', { invoiceId: item.id })}
-            />
+      {/* Primary Header */}
+      <PrimaryHeader
+        title={activeTab === 'invoices' ? 'Invoices' : 'Estimates'}
+        onTitlePress={toggleViewDropdown}
+        actions={[
+          { icon: 'plus', onPress: handleCreateNew, accessibilityLabel: 'Create invoice' },
+        ]}
+      />
+
+      {/* Location Filter Section */}
+      <View style={[styles.locationSection, { backgroundColor: appTheme.colors.background }]}>
+        <TouchableOpacity 
+          style={[styles.locationDropdown, { 
+            borderColor: appTheme.colors.borderColor,
+            backgroundColor: appTheme.colors.background
+          }]}
+          onPress={() => !hasSingleLocation && setShowLocationDropdown(true)}
+          disabled={hasSingleLocation}
+          activeOpacity={hasSingleLocation ? 1 : 0.7}
+        >
+          <Text style={[styles.locationText, { 
+            color: appTheme.colors.textSecondary 
+          }]}>
+            {hasSingleLocation && primaryLocation
+              ? primaryLocation.name
+              : selectedLocationId 
+                ? safeLocations.find(l => l.id === selectedLocationId)?.name || 'All Locations' 
+                : 'All Locations'}
+          </Text>
+          {!hasSingleLocation && (
+            <Icon name="chevron-down" size={16} color={appTheme.colors.textSecondary} />
           )}
-          ListHeaderComponent={
-            <>
-              {/* Mock Data Indicator (DEV only) */}
-              {__DEV__ && isMockData && !loading && (
-                <View style={[styles.mockDataBanner, { backgroundColor: appTheme.colors.warning }]}>
-                  <Text style={styles.mockDataText}>Using mock data (API unavailable)</Text>
-                </View>
-              )}
-            </>
-          }
-          ListEmptyComponent={() => (
-            <View style={styles.emptyListContainer}>
-              {/* Loading State */}
-              {loading ? (
-                <>
-                  <ActivityIndicator size="large" color={appTheme.colors.primary} />
-                  <Text style={[styles.loadingText, { color: appTheme.colors.textSecondary }]}>
-                    Loading {activeTab}...
-                  </Text>
-                </>
-              ) : error ? (
-                /* Error State */
-                <>
-                  <Icon name="alert-circle-outline" size={48} color={appTheme.colors.error} />
-                  <Text style={[styles.errorText, { color: appTheme.colors.error }]}>{error}</Text>
-                  <TouchableOpacity 
-                    style={[styles.retryButton, { backgroundColor: appTheme.colors.primary }]}
-                    onPress={refetch}
-                  >
-                    <Text style={styles.retryButtonText}>Retry</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                /* Empty State */
-                <>
-                  <Icon 
-                name={activeTab === 'invoices' ? 'document-text-outline' : 'clipboard-outline'} 
-                size={60} 
-                color={appTheme.colors.textLight} 
-              />
-              <Text style={[styles.emptyListText, { color: appTheme.colors.textLight }]}>
-                No {activeTab} found
-              </Text>
-              {selectedLocationId && (
-                <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textLight }]}>
-                  Try selecting "All Locations" to see more {activeTab}
-                </Text>
-              )}
-              {hasManagePermission && (
-                <TouchableOpacity 
-                  style={[styles.createButtonInline, { backgroundColor: appTheme.colors.primary }]}
-                  onPress={handleCreateNew}
-                >
-                  <Text style={styles.createButtonInlineText}>
-                    Create {activeTab === 'invoices' ? 'Invoice' : 'Estimate'}
-                  </Text>
-                </TouchableOpacity>
-                  )}
-                </>
-              )}
-            </View>
-          )}
-          contentContainerStyle={{
-            // paddingTop: HEADER_HEIGHT, // Removed - SimpleHeader handles this automatically
-          }}
-          style={{ flex: 1 }}
+        </TouchableOpacity>
+      </View>
+      
+      {/* Search Bar */}
+      <View style={[styles.searchContainer, { backgroundColor: appTheme.colors.background }]}>
+        <AppSearchBar
+          placeholder={`Search ${activeTab}...`}
+          value={search}
+          onChangeText={setSearch}
+          onClear={() => setSearch('')}
+          containerStyle={styles.searchBarContainer}
         />
-      </SimpleHeader>
+      </View>
+
+      {/* Filter Bar */}
+      <FilterBar 
+        statuses={statuses}
+        selectedStatus={filter}
+        onSelectStatus={setFilter}
+        containerStyle={{ flexGrow: 0 }}
+      />
+
+      {/* Invoice List */}
+      <FlatList
+        data={loading ? [] : filteredDocuments}
+        keyExtractor={(item: any) => item.id}
+        renderItem={({ item }: { item: any }) => (
+          <InvoiceCard 
+            clientCompanyLogo={null}
+            clientName={item.clientName}
+            invoiceNumber={item.id}
+            totalAmount={item.totalAmount}
+            issueDate={item.issueDate}
+            dueDate={item.dueDate}
+            status={item.status}
+            isAdmin={hasManagePermission}
+            onPress={() => (navigation as any).navigate('InvoiceDetails', { invoiceId: item.id })}
+          />
+        )}
+        ListHeaderComponent={
+          <>
+            {/* Mock Data Indicator (DEV only) */}
+            {__DEV__ && isMockData && !loading && (
+              <View style={[styles.mockDataBanner, { backgroundColor: appTheme.colors.warning }]}>
+                <Text style={styles.mockDataText}>Using mock data (API unavailable)</Text>
+              </View>
+            )}
+          </>
+        }
+        ListEmptyComponent={() => (
+          <View style={styles.emptyListContainer}>
+            {/* Loading State */}
+            {loading ? (
+              <>
+                <ActivityIndicator size="large" color={appTheme.colors.primary} />
+                <Text style={[styles.loadingText, { color: appTheme.colors.textSecondary }]}>
+                  Loading {activeTab}...
+                </Text>
+              </>
+            ) : error ? (
+              /* Error State */
+              <>
+                <Icon name="alert-circle-outline" size={48} color={appTheme.colors.error} />
+                <Text style={[styles.errorText, { color: appTheme.colors.error }]}>{error}</Text>
+                <TouchableOpacity 
+                  style={[styles.retryButton, { backgroundColor: appTheme.colors.primary }]}
+                  onPress={refetch}
+                >
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              /* Empty State */
+              <>
+                <Icon 
+                  name={activeTab === 'invoices' ? 'document-text-outline' : 'clipboard-outline'} 
+                  size={60} 
+                  color={appTheme.colors.textLight} 
+                />
+                <Text style={[styles.emptyListText, { color: appTheme.colors.textLight }]}>
+                  No {activeTab} found
+                </Text>
+                {selectedLocationId && (
+                  <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textLight }]}>
+                    Try selecting "All Locations" to see more {activeTab}
+                  </Text>
+                )}
+                {hasManagePermission && (
+                  <TouchableOpacity 
+                    style={[styles.createButtonInline, { backgroundColor: appTheme.colors.primary }]}
+                    onPress={handleCreateNew}
+                  >
+                    <Text style={styles.createButtonInlineText}>
+                      Create {activeTab === 'invoices' ? 'Invoice' : 'Estimate'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </View>
+        )}
+        contentContainerStyle={{ flexGrow: 1 }}
+        style={{ flex: 1 }}
+      />
 
       {/* Document Type Selection Modal */}
       <AppBottomSheet

@@ -1,13 +1,13 @@
 import { Platform } from 'react-native';
 
 export const fonts = {
-  // Font families
+  // Font families (using InterCustom- prefix to avoid iOS CTFontManager conflicts)
   primary: {
-    regular: 'Inter-Regular',
-    medium: 'Inter-Medium',
-    semiBold: 'Inter-SemiBold',
-    bold: 'Inter-Bold',
-    extraBold: 'Inter-ExtraBold',
+    regular: 'InterCustom-Regular',
+    medium: 'InterCustom-Medium',
+    semiBold: 'InterCustom-SemiBold',
+    bold: 'InterCustom-Bold',
+    extraBold: 'InterCustom-ExtraBold',
   },
   // Fallback system fonts
   system: {

@@ -2,7 +2,6 @@
  * ExploreScreen - Personal Mode
  * Discover businesses, browse categories, search functionality
  * Based on app-logic.json navigation.personalProfileTabs.Explore
- * Uses SimpleHeader for scrollable search bar (like Message screen)
  */
 
 import React, { useState, useRef, useCallback, useMemo } from 'react';
@@ -22,8 +21,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import AppSearchBar, { AppSearchBarRef } from '@/shared/components/ui/AppSearchBar';
 import BusinessListCard from '@/features/profile/components/BusinessListCard';
-import SimpleHeader, { AnimatedFlatList } from '@/shared/components/layout/headers/SimpleHeader';
-import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
+import { PrimaryHeader } from '@/shared/components/layout/headers';
 
 // Industry categories
 const CATEGORIES = [
@@ -267,46 +265,45 @@ export default function ExploreScreen() {
       style={[styles.container, { backgroundColor: appTheme.colors.background }]}
       edges={['top']}
     >
-      <SimpleHeader
-        headerComponent={
-          <PrimaryHeader title="Explore" />
-        }
-        searchComponent={
-          <View style={[styles.searchContainer, { backgroundColor: appTheme.colors.background }]}>
-            <AppSearchBar
-              ref={searchBarRef}
-              placeholder="Search businesses..."
-              value={search}
-              onChangeText={setSearch}
-              onClear={() => setSearch('')}
-              containerStyle={styles.searchBar}
-            />
-          </View>
-        }
-        stickyComponent={
-          <View style={{ backgroundColor: appTheme.colors.background }}>
-            {renderCategories()}
-          </View>
-        }
-      >
-        <AnimatedFlatList
-          data={filteredBusinesses}
-          keyExtractor={(item: any) => item.id}
-          renderItem={renderBusinessItem}
-          ListHeaderComponent={renderResultsHeader}
-          ListEmptyComponent={renderEmptyState}
-          onScrollBeginDrag={handleScroll}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={appTheme.colors.primary}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-          style={{ flex: 1 }}
+      {/* Primary Header */}
+      <PrimaryHeader title="Explore" />
+
+      {/* Search Bar */}
+      <View style={[styles.searchContainer, { backgroundColor: appTheme.colors.background }]}>
+        <AppSearchBar
+          ref={searchBarRef}
+          placeholder="Search businesses..."
+          value={search}
+          onChangeText={setSearch}
+          onClear={() => setSearch('')}
+          containerStyle={styles.searchBar}
         />
-      </SimpleHeader>
+      </View>
+
+      {/* Categories */}
+      <View style={{ backgroundColor: appTheme.colors.background }}>
+        {renderCategories()}
+      </View>
+
+      {/* Business List */}
+      <FlatList
+        data={filteredBusinesses}
+        keyExtractor={(item: any) => item.id}
+        renderItem={renderBusinessItem}
+        ListHeaderComponent={renderResultsHeader}
+        ListEmptyComponent={renderEmptyState}
+        onScrollBeginDrag={handleScroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={appTheme.colors.primary}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+        style={{ flex: 1 }}
+      />
     </SafeAreaView>
   );
 }

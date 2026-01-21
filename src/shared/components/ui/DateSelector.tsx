@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     color: '#111827',
     textAlign: 'center',
     marginBottom: 32,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   weekdayRow: {
     flexDirection: 'row',
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     width: 40,
     textAlign: 'center',
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'InterCustom-Regular',
   },
   calendarGrid: {
     flexDirection: 'column',
@@ -434,14 +434,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#111827',
     textAlign: 'center',
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'InterCustom-Regular',
   },
   dayToday: {
     backgroundColor: '#F3F4F6',
   },
   dayTodayText: {
     fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   daySelected: {
     backgroundColor: theme.colors.primary,
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
   daySelectedText: {
     color: 'white',
     fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   dayOtherMonth: {
     opacity: 0.3,

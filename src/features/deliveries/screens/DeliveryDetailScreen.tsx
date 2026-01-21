@@ -1967,14 +1967,14 @@ const styles = StyleSheet.create({
   },
   clientName: {
     fontSize: 18,
-    fontFamily: 'Inter-bold', 
+    fontFamily: 'InterCustom-Bold', 
     color: theme.colors.primary,
     marginBottom: 4,
   },
   clientAddress: {
     fontSize: 16,
     color: theme.colors.textSecondary,
-    fontFamily: 'Inter-mei',
+    fontFamily: 'InterCustom-Medium',
   },
 
   sectionContainer: {
@@ -2005,7 +2005,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#111827',
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   infoItem: {
     marginBottom: 20,
@@ -2015,7 +2015,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#374151',
     marginBottom: 8,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   infoValue: {
     fontSize: 14,
@@ -2061,7 +2061,7 @@ const styles = StyleSheet.create({
   selectedItemText: {
     fontSize: 16,
     color: '#111827',
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
     flex: 1,
   },
   placeholderText: {
@@ -2106,7 +2106,7 @@ const styles = StyleSheet.create({
   tableHeaderCell: {
     fontSize: 16,
     color: theme.colors.textSecondary,
-    fontFamily: 'Inter-semibold',
+    fontFamily: 'InterCustom-SemiBold',
     paddingHorizontal: 4,
     textAlign: 'center'
   },
@@ -2139,13 +2139,13 @@ const styles = StyleSheet.create({
   },
   productName: {
     fontSize: 18,
-    fontFamily: 'Inter-semiBold',
+    fontFamily: 'InterCustom-SemiBold',
     color: theme.colors.text,
   },
   unitInfo: {
     fontSize: 16,
     color: theme.colors.textSecondary,
-    fontFamily: 'Inter-medium',
+    fontFamily: 'InterCustom-Medium',
   },
   stockInfo: {
     fontSize: 12,
@@ -2153,12 +2153,12 @@ const styles = StyleSheet.create({
   },
   stockWarning: {
     fontSize: 14,
-    fontFamily: 'Inter-semibold',
+    fontFamily: 'InterCustom-SemiBold',
     color: theme.colors.error,
   },
   qtyText: {
     fontSize: 18,
-    fontFamily: 'Inter-semibold',
+    fontFamily: 'InterCustom-SemiBold',
     color: theme.colors.text,
     textAlign: 'center',
   },
@@ -2239,7 +2239,7 @@ const styles = StyleSheet.create({
     color: '#111827',
     minHeight: 100,
     textAlignVertical: 'top',
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'InterCustom-Regular',
   },
   modalContainer: {
     flex: 1,
@@ -2266,7 +2266,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#111827',
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   modalItem: {
     flexDirection: 'row',
@@ -2307,12 +2307,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#111827',
     marginBottom: 4,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
   },
   modalItemDetails: {
     fontSize: 14,
     color: '#6B7280',
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'InterCustom-Regular',
   },
   emptyContainer: {
     padding: 20,
@@ -2323,7 +2323,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
     textAlign: 'center',
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'InterCustom-Regular',
   },
   addressContainer: {
     flexDirection: 'row',
@@ -2391,13 +2391,13 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 16,
     color: '#111827',
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'InterCustom-Regular',
   },
   simpleInfoText: {
     fontSize: 16,
     color: '#111827',
     marginTop: 4,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'InterCustom-Regular',
   },
   modalOverlay: {
     flex: 1,
@@ -2424,7 +2424,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#111827',
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   schedulingSection: {
     padding: 0,
@@ -2459,7 +2459,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#374151',
     marginBottom: 0,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   schedulingTimeContainer: {
     flexDirection: 'row',
@@ -2475,7 +2475,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#111827',
     marginVertical: 8,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
   },
   schedulingTimeSeparator: {
     fontSize: 24,
@@ -2508,13 +2508,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#374151',
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
   },
   schedulingConfirmButtonText: {
     fontSize: 16,
     fontWeight: '500',
     color: 'white',
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
   },
   // Calendar Styles
   calendarContainer: {
@@ -2529,7 +2529,7 @@ const styles = StyleSheet.create({
     color: '#111827',
     textAlign: 'center',
     marginBottom: 32,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   calendarWeekdayRow: {
     flexDirection: 'row',
@@ -2544,7 +2544,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     width: 40,
     textAlign: 'center',
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'InterCustom-Regular',
   },
   calendarGrid: {
     flexDirection: 'column',
@@ -2567,14 +2567,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#111827',
     textAlign: 'center',
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'InterCustom-Regular',
   },
   calendarDayToday: {
     backgroundColor: '#F3F4F6',
   },
   calendarDayTodayText: {
     fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   calendarDaySelected: {
     backgroundColor: theme.colors.primary,
@@ -2582,7 +2582,7 @@ const styles = StyleSheet.create({
   calendarDaySelectedText: {
     color: 'white',
     fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   calendarDayDisabled: {
     opacity: 0.3,
@@ -2603,7 +2603,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
     textTransform: 'capitalize',
   },
   paymentStatusList: {
@@ -2632,7 +2632,7 @@ const styles = StyleSheet.create({
   customFieldText: {
     fontSize: 16,
     color: '#111827',
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
     flex: 1,
     marginRight: 12,
   },
@@ -2714,7 +2714,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   confirmButtonContainer: {
     padding: 16,
@@ -2733,7 +2733,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontSize: 16,
     fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
   // Staff modal specific styles
   staffModalContainer: {
@@ -2756,7 +2756,7 @@ const styles = StyleSheet.create({
   },
   notesDateHeader: {
     fontSize: 14,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
     color: theme.colors.textSecondary,
     marginBottom: 8,
     marginTop: 16,
@@ -2794,12 +2794,12 @@ const styles = StyleSheet.create({
   },
   noteAvatarText: {
     fontSize: 14,
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'InterCustom-Bold',
     color: '#FFFFFF',
   },
   noteBusinessName: {
     fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
     color: '#111827',
     flex: 1,
   },
@@ -2810,12 +2810,12 @@ const styles = StyleSheet.create({
   },
   noteTime: {
     fontSize: 14,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
     color: theme.colors.textSecondary,
   },
   noteContent: {
     fontSize: 14,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
     lineHeight: 20,
     color: '#111827',
     marginTop: 12,
@@ -2831,7 +2831,7 @@ const styles = StyleSheet.create({
     padding: 12,
     minHeight: 80,
     fontSize: 14,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
     color: '#111827',
     backgroundColor: '#F9FAFB',
     textAlignVertical: 'top',
@@ -2850,7 +2850,7 @@ const styles = StyleSheet.create({
   },
   sendNoteButtonText: {
     fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
     color: '#FFFFFF',
   },
   sendNoteButtonTextDisabled: {
@@ -2906,13 +2906,13 @@ const styles = StyleSheet.create({
   },
   timelineDate: {
     fontSize: 14,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'InterCustom-Medium',
     color: theme.colors.textSecondary,
     marginBottom: 2,
   },
   timelineStatus: {
     fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'InterCustom-SemiBold',
   },
 });
 

@@ -22,7 +22,7 @@ export const MODAL_TYPOGRAPHY = {
   },
   body: { 
     fontSize: 16, 
-    fontFamily: 'Inter-medium',
+    fontFamily: 'InterCustom-Medium',
     lineHeight: 24,
   },
 } as const;
