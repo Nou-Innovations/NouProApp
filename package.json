@@ -78,7 +78,7 @@
     "metro-config": "^0.82.2",
     "prettier": "^3.1.0",
     "prisma": "^6.19.2",
-    "react-native-asset": "^2.1.1",
+    "react-native-asset": "^2.2.8",
     "typescript": "~5.8.3"
   },
   "private": true
