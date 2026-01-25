@@ -21,11 +21,13 @@ const LOCATION_MODES = {
 
 const ORDER_STATUS = {
   NEW: 'NEW',
-  ASSIGNED: 'ASSIGNED',
-  PACKED: 'PACKED',
-  OUT_FOR_DELIVERY: 'OUT_FOR_DELIVERY',
-  DELIVERED: 'DELIVERED',
-  CANCELLED: 'CANCELLED'
+  ACCEPTED: 'ACCEPTED',
+  ONGOING: 'ONGOING',
+  PENDING: 'PENDING',
+  IN_REVIEW: 'IN_REVIEW',
+  DONE: 'DONE',
+  CANCELED: 'CANCELED',
+  REJECTED: 'REJECTED'
 };
 
 const ORDER_SCOPE = {
@@ -45,10 +47,9 @@ const MEMBER_ROLES = {
 };
 
 const MEMBER_STATUS = {
-  PENDING: 'pending',
+  INVITED: 'invited',
   ACCEPTED: 'accepted',
-  REJECTED: 'rejected',
-  LOCKED: 'locked'
+  SUSPENDED: 'suspended'
 };
 
 // ============================================================================
@@ -440,7 +441,7 @@ let orders = [
       { productId: 'prd-002', name: 'Fanta Orange 1L x6', quantity: 2, unitPrice: 19.50, subtotal: 39.00 }
     ],
     totalAmount: 116.97,
-    status: ORDER_STATUS.ASSIGNED,
+    status: ORDER_STATUS.ACCEPTED,
     paymentStatus: 'Unpaid',
     notes: 'Please call before delivery',
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
@@ -460,7 +461,7 @@ let orders = [
       { productId: 'prd-004', name: 'Rice Premium 5kg', quantity: 10, unitPrice: 45.00, subtotal: 450.00 }
     ],
     totalAmount: 450.00,
-    status: ORDER_STATUS.OUT_FOR_DELIVERY,
+    status: ORDER_STATUS.ONGOING,
     paymentStatus: 'Paid',
     notes: '',
     createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
@@ -501,7 +502,7 @@ let orders = [
       { productId: 'prd-007', name: 'Fresh Milk 1L', quantity: 50, unitPrice: 4.99, subtotal: 249.50 }
     ],
     totalAmount: 249.50,
-    status: ORDER_STATUS.DELIVERED,
+    status: ORDER_STATUS.DONE,
     paymentStatus: 'Paid',
     notes: '',
     createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
@@ -941,22 +942,22 @@ let chats = [
     locationId: 'loc-001',
     type: 'internal',
     name: 'Warehouse A Team',
-    participants: ['usr-001', 'john-001', 'maria-001'],
+    participants: ['usr-001', 'usr-002', 'sarah-001', 'mike-001'],
     lastMessage: {
-      id: 'msg-warehouse',
-      content: 'Inventory_Report_Jan2025.pdf',
-      type: 'pdf',
-      senderId: 'usr-001',
-      senderName: 'You',
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-      isRead: true,
-      isOutgoing: true,
-      status: 'sent'
+      id: 'msg-005-latest',
+      content: 'Great job on the quarterly targets!',
+      type: 'text',
+      senderId: 'usr-002',
+      senderName: 'Marie Manager',
+      timestamp: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+      isRead: false,
+      isOutgoing: false,
+      status: 'delivered'
     },
-    unreadCount: 0,
+    unreadCount: 5,
     avatar: null,
     createdAt: '2025-01-10T08:00:00Z',
-    updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+    updatedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString()
   }
 ];
 
@@ -1015,6 +1016,146 @@ let messages = {
       isOutgoing: false,
       sender: { id: 'xyz-001', name: 'XYZ Suppliers', avatar: 'https://picsum.photos/seed/xyz/40/40', role: 'supplier' },
       timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+    }
+  ],
+  'chat-005': [
+    {
+      id: 'msg-005-001',
+      chatId: 'chat-005',
+      type: 'event',
+      event: 'Marie Manager created this group',
+      isOutgoing: false,
+      sender: { id: 'system', name: 'System', avatar: '', role: 'system' },
+      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-005-002',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'Hey team! Let\'s use this group to coordinate our sales efforts.',
+      isOutgoing: false,
+      sender: { id: 'usr-002', name: 'Marie Manager', avatar: 'https://picsum.photos/seed/marie/40/40', role: 'admin' },
+      timestamp: new Date(Date.now() - 115 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-005-003',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'Sounds good!',
+      isOutgoing: false,
+      sender: { id: 'sarah-001', name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'staff' },
+      timestamp: new Date(Date.now() - 110 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-005-004',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'I\'m in!',
+      isOutgoing: false,
+      sender: { id: 'mike-001', name: 'Mike Chen', avatar: 'https://picsum.photos/seed/mike/40/40', role: 'staff' },
+      timestamp: new Date(Date.now() - 108 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-005-005',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'Let\'s start with reviewing last month\'s performance.',
+      isOutgoing: true,
+      sender: { id: 'usr-001', name: 'You', avatar: '', role: 'business' },
+      timestamp: new Date(Date.now() - 100 * 60 * 1000).toISOString(),
+      status: 'read'
+    },
+    {
+      id: 'msg-005-006',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'I\'ve prepared a summary of our Q4 results.',
+      isOutgoing: false,
+      sender: { id: 'usr-002', name: 'Marie Manager', avatar: 'https://picsum.photos/seed/marie/40/40', role: 'admin' },
+      timestamp: new Date(Date.now() - 95 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-005-007',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'We exceeded targets by 15%!',
+      isOutgoing: false,
+      sender: { id: 'usr-002', name: 'Marie Manager', avatar: 'https://picsum.photos/seed/marie/40/40', role: 'admin' },
+      timestamp: new Date(Date.now() - 94 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-005-008',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'That\'s amazing! 🎉',
+      isOutgoing: false,
+      sender: { id: 'sarah-001', name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'staff' },
+      timestamp: new Date(Date.now() - 90 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-005-009',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'Congrats everyone!',
+      isOutgoing: false,
+      sender: { id: 'mike-001', name: 'Mike Chen', avatar: 'https://picsum.photos/seed/mike/40/40', role: 'staff' },
+      timestamp: new Date(Date.now() - 85 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-005-010',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'Great work team!',
+      isOutgoing: true,
+      sender: { id: 'usr-001', name: 'You', avatar: '', role: 'business' },
+      timestamp: new Date(Date.now() - 80 * 60 * 1000).toISOString(),
+      status: 'read'
+    },
+    {
+      id: 'msg-005-011',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'Let\'s aim for 20% next quarter.',
+      isOutgoing: true,
+      sender: { id: 'usr-001', name: 'You', avatar: '', role: 'business' },
+      timestamp: new Date(Date.now() - 79 * 60 * 1000).toISOString(),
+      status: 'read'
+    },
+    {
+      id: 'msg-005-012',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'Challenge accepted!',
+      isOutgoing: false,
+      sender: { id: 'mike-001', name: 'Mike Chen', avatar: 'https://picsum.photos/seed/mike/40/40', role: 'staff' },
+      timestamp: new Date(Date.now() - 75 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-005-013',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'I have some ideas for new strategies.',
+      isOutgoing: false,
+      sender: { id: 'sarah-001', name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'staff' },
+      timestamp: new Date(Date.now() - 70 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-005-014',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'Let\'s discuss them in our meeting tomorrow.',
+      isOutgoing: false,
+      sender: { id: 'sarah-001', name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'staff' },
+      timestamp: new Date(Date.now() - 69 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'msg-005-015',
+      chatId: 'chat-005',
+      type: 'text',
+      text: 'Great job on the quarterly targets!',
+      isOutgoing: false,
+      sender: { id: 'usr-002', name: 'Marie Manager', avatar: 'https://picsum.photos/seed/marie/40/40', role: 'admin' },
+      timestamp: new Date(Date.now() - 20 * 60 * 1000).toISOString()
     }
   ]
 };

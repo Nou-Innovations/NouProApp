@@ -227,6 +227,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({
         onClose={() => setShowOptionsSheet(false)}
         title="Options"
         items={optionItems}
+        mode="buttons"
         onSelectItem={handleOptionSelect}
       />
     </>

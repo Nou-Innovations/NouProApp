@@ -159,3 +159,4 @@ logs/
 !.cursor/settings.json
 !.cursor/rules
 !.cursor/rules/*
+__MACOSX/

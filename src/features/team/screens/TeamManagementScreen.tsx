@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -15,30 +16,35 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { AppSearchBar, StaffCard, StaffMember, StaffRole as StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
+import LocationDropdown from '@/features/company/components/LocationDropdown';
 import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import {
-  acceptJoinRequest,
   cancelInvite,
   getTeamMembers,
-  rejectJoinRequest,
+  getLocationStaff,
+  getAccessibleLocations,
+  getCapabilities,
   removeTeamMember,
   resendInvite,
   updateTeamMemberRole,
+  type AccessibleLocation,
 } from '@/features/team/team.service';
 
-// User type for team management
+// User type for team management (matches backend /staff response)
 interface User {
   id: string;
   email: string;
   name: string;
-  role: 'superAdmin' | 'admin' | 'staff';
-  companyId: string;
-  locationIds: string[];
-  avatar?: string;
-  phone?: string;
-  createdAt: string;
-  lastLoginAt?: string;
+  role: 'super_admin' | 'admin' | 'staff';
+  status: 'invited' | 'accepted' | 'suspended';
+  scope: 'business' | 'location';
+  avatar?: string | null;
+  phone?: string | null;
+  locationId?: string | null;
+  locationIds?: string[];
+  locationName?: string | null;
+  joinedAt?: string | null;
 }
 
 export default function TeamManagementScreen() {
@@ -56,6 +62,13 @@ export default function TeamManagementScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  
+  // Tab state: All | Staff | Pending
+  const [activeTab, setActiveTab] = useState<'all' | 'staff' | 'pending'>('all');
+  
+  // Location filter state
+  const [locations, setLocations] = useState<AccessibleLocation[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   
   // Pending join requests state (users who sent request to join our business)
   interface JoinRequest {
@@ -128,19 +141,49 @@ export default function TeamManagementScreen() {
   // Check permissions using profileStore
   const isSuperAdmin = isSuperAdminRole();
   const isAdmin = isAdminRole();
+  const currentUserRole = useProfileStore((state) => state.currentUserRole);
+  
+  // Derive capabilities from business role (single source of truth)
+  const capabilities = currentUserRole ? getCapabilities(currentUserRole) : null;
+  const canManageTeam = capabilities?.canManageTeam ?? false;
 
   useEffect(() => {
-    if (activeBusiness?.id && isAdmin) {
+    if (activeBusiness?.id && canManageTeam) {
       fetchUsers();
     }
-  }, [activeBusiness?.id, isAdmin]);
+  }, [activeBusiness?.id, canManageTeam]);
+
+  // Fetch accessible locations for the location filter
+  useEffect(() => {
+    const fetchLocations = async () => {
+      if (!activeBusiness?.id || !currentUser?.id) return;
+      
+      try {
+        const result = await getAccessibleLocations(activeBusiness.id, currentUser.id);
+        setLocations(result.locations || []);
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+        // Fallback mock locations for demo
+        setLocations([
+          { id: 'loc-001', name: 'Downtown' },
+          { id: 'loc-002', name: 'Westside' },
+          { id: 'loc-003', name: 'Northgate' },
+        ]);
+      }
+    };
+    
+    if (activeBusiness?.id && currentUser?.id) {
+      fetchLocations();
+    }
+  }, [activeBusiness?.id, currentUser?.id]);
 
   const fetchUsers = async () => {
     if (!activeBusiness?.id) return;
     
     setIsLoading(true);
     try {
-      const users = await getTeamMembers(activeBusiness.id);
+      // Fetch all accepted staff (status filter handled by backend)
+      const users = await getTeamMembers(activeBusiness.id, 'accepted');
       setUsers(users);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -277,7 +320,7 @@ export default function TeamManagementScreen() {
   );
 
   const usersByRole = {
-    superAdmin: filteredUsers.filter(user => user.role === 'superAdmin'),
+    superAdmin: filteredUsers.filter(user => user.role === 'super_admin'),
     admin: filteredUsers.filter(user => user.role === 'admin'),
     staff: filteredUsers.filter(user => user.role === 'staff'),
   };
@@ -427,6 +470,55 @@ export default function TeamManagementScreen() {
         containerStyle={styles.searchBarContainer}
       />
 
+      {/* Tab Navigation: All | Staff | Pending (filterBar pattern from design.json) */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() => setActiveTab('all')}
+        >
+          <Text style={[
+            styles.tabText,
+            activeTab === 'all' ? styles.tabTextSelected : styles.tabTextUnselected
+          ]}>
+            All
+          </Text>
+          {activeTab === 'all' && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() => setActiveTab('staff')}
+        >
+          <Text style={[
+            styles.tabText,
+            activeTab === 'staff' ? styles.tabTextSelected : styles.tabTextUnselected
+          ]}>
+            Staff
+          </Text>
+          {activeTab === 'staff' && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() => setActiveTab('pending')}
+        >
+          <Text style={[
+            styles.tabText,
+            activeTab === 'pending' ? styles.tabTextSelected : styles.tabTextUnselected
+          ]}>
+            Pending
+          </Text>
+          {activeTab === 'pending' && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+      </View>
+
+      {/* Location Selector */}
+      <View style={styles.locationSection}>
+        <LocationDropdown 
+          style={{ flex: 1 }}
+          onLocationSelect={setSelectedLocationId}
+          selectedLocationId={selectedLocationId}
+        />
+      </View>
+
       {/* Main Content */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -441,8 +533,8 @@ export default function TeamManagementScreen() {
           keyExtractor={() => 'sections'}
           renderItem={() => (
             <View style={styles.sectionsContainer}>
-              {/* Section 1: Join Requests - Only show if there are requests */}
-              {joinRequests.length > 0 && (
+              {/* Section 1: Join Requests - Only show if there are requests AND tab allows */}
+              {(activeTab === 'all' || activeTab === 'pending') && joinRequests.length > 0 && (
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
                     <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
@@ -492,8 +584,8 @@ export default function TeamManagementScreen() {
                 </View>
               )}
 
-              {/* Section 2: Pending Invites - Only show if there are invites */}
-              {pendingInvites.length > 0 && (
+              {/* Section 2: Pending Invites - Only show if there are invites AND tab allows */}
+              {(activeTab === 'all' || activeTab === 'pending') && pendingInvites.length > 0 && (
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
                     <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
@@ -533,7 +625,8 @@ export default function TeamManagementScreen() {
                 </View>
               )}
 
-              {/* Section 3: Staff List */}
+              {/* Section 3: Staff List - Only show if tab allows */}
+              {(activeTab === 'all' || activeTab === 'staff') && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
@@ -564,12 +657,12 @@ export default function TeamManagementScreen() {
                           name: user.name,
                           email: user.email,
                           username: user.email.split('@')[0],
-                          role: user.role,
-                          avatar: user.avatar,
+                          role: user.role === 'super_admin' ? 'superAdmin' : user.role,
+                          avatar: user.avatar || undefined,
                         }}
                         isCurrentUser={user.id === currentUser?.id}
-                        canManageRole={isSuperAdmin || (isAdmin && user.role !== 'superAdmin')}
-                        canRemove={isSuperAdmin || (isAdmin && user.role !== 'superAdmin')}
+                        canManageRole={isSuperAdmin || (isAdmin && user.role !== 'super_admin')}
+                        canRemove={isSuperAdmin || (isAdmin && user.role !== 'super_admin')}
                         onRoleChange={handleRoleChange}
                         onRemove={handleRemoveStaff}
                         onReport={handleReportStaff}
@@ -579,6 +672,7 @@ export default function TeamManagementScreen() {
                   )}
                 </View>
               </View>
+              )}
             </View>
           )}
           showsVerticalScrollIndicator={false}
@@ -661,6 +755,47 @@ const styles = StyleSheet.create({
   searchBarContainer: {
     marginTop: 8,
     marginHorizontal: 12,
+  },
+  // Tab Navigation (filterBar pattern from design.json)
+  tabContainer: {
+    flexDirection: 'row',
+    height: 40,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  tab: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  tabText: {
+    fontSize: 14,
+  },
+  tabTextSelected: {
+    fontFamily: 'InterCustom-Bold',
+    color: '#000000',
+  },
+  tabTextUnselected: {
+    fontFamily: 'InterCustom-Medium',
+    color: '#A4AAB8',
+  },
+  // Location Selector
+  locationSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+    marginHorizontal: 8,
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2.5,
+    backgroundColor: '#000000',
   },
   listContent: {
     paddingBottom: 24,

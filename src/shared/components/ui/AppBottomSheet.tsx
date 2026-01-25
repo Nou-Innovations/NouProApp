@@ -5,6 +5,7 @@ import { X } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { OVERLAY, MODAL_TYPOGRAPHY } from '@/shared/ui/tokens/overlays';
 import ListItemCard, { ListItemCardAvatarProps } from './ListItemCard';
+import AppButton from './AppButton';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const ANIMATION_DURATION = 300;
@@ -34,6 +35,9 @@ export interface AppBottomSheetProps {
   // List mode (optional - if items provided, renders list using ListItemCard)
   items?: AppBottomSheetItem[];
   onSelectItem?: (item: AppBottomSheetItem) => void;
+  
+  // Display mode for items: 'list' uses ListItemCard, 'buttons' uses AppButton outline
+  mode?: 'list' | 'buttons';
   
   // Single selection
   selectedItemId?: string;
@@ -72,6 +76,7 @@ export default function AppBottomSheet({
   children,
   items,
   onSelectItem,
+  mode = 'list',
   selectedItemId,
   multiSelect = false,
   selectedItemIds = [],
@@ -227,10 +232,35 @@ export default function AppBottomSheet({
     );
   };
 
+  // Render button item using AppButton
+  const renderButtonItem = (item: AppBottomSheetItem) => {
+    const isDestructive = item.variant === 'destructive';
+
+    return (
+      <AppButton
+        key={item.id}
+        title={item.title}
+        onPress={() => handleItemPress(item)}
+        disabled={item.disabled}
+        variant={isDestructive ? 'danger' : 'outline'}
+      />
+    );
+  };
+
   // Render list content (items only, ScrollView is handled by parent)
   const renderListContent = () => {
     if (!items || items.length === 0) return null;
 
+    // Buttons mode: render as AppButton with outline variant
+    if (mode === 'buttons') {
+      return (
+        <View style={styles.buttonsContainer}>
+          {items.map((item) => renderButtonItem(item))}
+        </View>
+      );
+    }
+
+    // List mode: render as ListItemCard
     return (
       <>
         {items.map((item, index) =>
@@ -346,7 +376,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12, // Match card padding for title alignment
-    paddingBottom: 8,
+    paddingBottom: 16,
   },
   title: { 
     fontSize: MODAL_TYPOGRAPHY.title.fontSize, 
@@ -372,5 +402,9 @@ const styles = StyleSheet.create({
   },
   contentContainerFullHeight: {
     flexGrow: 1,
+  },
+  buttonsContainer: {
+    paddingHorizontal: 12,
+    gap: 8,
   },
 });

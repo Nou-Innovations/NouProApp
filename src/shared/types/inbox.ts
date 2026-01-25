@@ -31,6 +31,7 @@ export type PreviewMessageType =
   | 'video_call'
   | 'missed_video_call'
   | 'invoice'
+  | 'estimate'
   | 'pdf'
   | 'delivery'
   | 'location'
@@ -127,6 +128,12 @@ export interface InvoiceMessage extends BaseMessage {
   replyingTo?: ReplyContext;
 }
 
+export interface EstimateMessage extends BaseMessage {
+  type: 'estimate';
+  estimateId: string;
+  replyingTo?: ReplyContext;
+}
+
 export interface EventMessage extends BaseMessage {
   type: 'event';
   event: string;
@@ -166,6 +173,7 @@ export type Message =
   | VoiceMessage 
   | PdfMessage 
   | InvoiceMessage 
+  | EstimateMessage
   | EventMessage 
   | DeletedMessage
   | LocationMessage

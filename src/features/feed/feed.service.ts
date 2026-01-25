@@ -13,8 +13,9 @@
  * - GET /api/feed?limit=20&cursor=<lastPostId>
  */
 
-import { getFullResponse } from '@/shared/services/api';
-import { FeedPost, FeedResponse } from '@/shared/types/feed';
+import { get, getFullResponse } from '@/shared/services/api';
+import { FeedPost, FeedResponse, NewProductsPost } from '@/shared/types/feed';
+import { UIProduct } from '@/shared/types/product';
 
 // ============================================================================
 // Types
@@ -28,6 +29,13 @@ export interface FeedParams {
 export interface FeedResult {
   posts: FeedPost[];
   nextCursor: string | null;
+}
+
+interface BusinessSummary {
+  id: string;
+  name: string;
+  logoUrl?: string;
+  logo_url?: string;
 }
 
 // ============================================================================
@@ -54,12 +62,74 @@ export async function getFeed(params?: FeedParams): Promise<FeedResult> {
   };
 }
 
+/**
+ * Get public catalog products and map them to feed posts
+ */
+export async function getPublicProductPosts(): Promise<NewProductsPost[]> {
+  const [products, companies] = await Promise.all([
+    get<UIProduct[]>('/products', { scope: 'public' }),
+    get<BusinessSummary[]>('/companies'),
+  ]);
+
+  const companyMap = new Map<string, BusinessSummary>();
+  companies.forEach((company) => {
+    companyMap.set(company.id, company);
+  });
+
+  const grouped = new Map<string, UIProduct[]>();
+  products.forEach((product) => {
+    const businessId = product.ownerBusinessId || product.companyId;
+    if (!businessId) return;
+    if (!grouped.has(businessId)) {
+      grouped.set(businessId, []);
+    }
+    grouped.get(businessId)!.push(product);
+  });
+
+  const posts: NewProductsPost[] = [];
+  grouped.forEach((groupProducts, businessId) => {
+    const company = companyMap.get(businessId);
+    const businessName = company?.name || 'Business';
+    const businessLogo = company?.logoUrl || company?.logo_url || '';
+
+    const productsPayload = groupProducts.slice(0, 6).map((product) => ({
+      id: product.id,
+      name: product.name,
+      unit: product.unit,
+      price: product.price,
+      image: product.productPicture || (product as any).image_url || '',
+      brandName: product.brand || '',
+    }));
+
+    if (productsPayload.length === 0) return;
+
+    const createdAt = groupProducts[0]?.updatedAt || groupProducts[0]?.createdAt || new Date().toISOString();
+
+    posts.push({
+      id: `public-products-${businessId}`,
+      type: 'new_products',
+      timestamp: 'Just now',
+      createdAt,
+      data: {
+        postType: 'distributor_added',
+        businessId,
+        businessName,
+        businessLogo,
+        products: productsPayload,
+      },
+    });
+  });
+
+  return posts;
+}
+
 // ============================================================================
 // Export as namespace
 // ============================================================================
 
 const feedService = {
   getFeed,
+  getPublicProductPosts,
 };
 
 export default feedService;

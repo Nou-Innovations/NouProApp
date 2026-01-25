@@ -37,7 +37,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsPersonalMode, useIsBusinessMode, useProfileStore } from '@/shared/store/profileStore';
-import apiClient, { ApiError } from '@/shared/services/api';
+import { get as apiGet, ApiError } from '@/shared/services/api';
 import {
   ProductDetailsDTO,
   ProductCore,
@@ -138,8 +138,16 @@ function transformToDTO(
   };
 
   // Seller info
+  const sellerCompanyId =
+    apiProduct.ownerBusinessId ||
+    apiProduct.companyId ||
+    apiProduct.business_id ||
+    apiProduct.businessId ||
+    apiProduct.distributorId ||
+    '';
+
   const seller: SellerInfo = {
-    companyId: apiProduct.companyId || apiProduct.business_id || apiProduct.businessId || apiProduct.distributorId || '',
+    companyId: sellerCompanyId,
     companyName: apiProduct.companyName || apiProduct.businessName || apiProduct.distributorName || '',
     companyLogo: apiProduct.companyLogo || apiProduct.businessLogo || apiProduct.brandLogo,
     location: apiProduct.location,
@@ -212,8 +220,8 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     setError(null);
     
     try {
-      // apiClient.get returns data directly (unwrapped)
-      const productData = await apiClient.get<any>(`/products/${productId}`);
+      // Use service helper (properly unwraps { success, data, message })
+      const productData = await apiGet<any>(`/products/${productId}`);
       
       if (productData) {
         const productDTO = transformToDTO(productData, activeCompanyId);

@@ -1,12 +1,10 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  ScrollView,
-  Switch,
   RefreshControl,
   FlatList,
 } from 'react-native';
@@ -18,19 +16,9 @@ import FilterBar from '@/features/search/components/FilterBar';
 import BrandCard from '@/features/brands/components/BrandCard';
 import ProductCard from '@/features/products/components/ProductCard';
 import LocationDropdown from '@/features/company/components/LocationDropdown';
-import { AppBottomSheet, ListItemCard } from '@/shared/components/ui';
-
-// DropdownItem type (kept for location items)
-interface DropdownItem {
-  id: string;
-  title: string;
-  description?: string;
-  icon?: string;
-}
 import ProductActionsModal from '@/features/products/components/ProductActionsModal';
 import ProductCreateModal from '@/features/products/components/ProductCreateModal';
 import PaywallModal from '@/features/subscription/components/PaywallModal';
-import { Icon } from '@/shared/utils/icons';
 import AppButton from '@/shared/components/ui/AppButton';
 import IconButton from '@/shared/components/ui/IconButton';
 import { AppModal } from '@/shared/components/ui';
@@ -64,7 +52,7 @@ const ProductsScreen: React.FC = () => {
   const isAdmin = useProfileStore((state) => state.isAdmin);
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
-  const { currentCompany, currentLocation, locations, setLocation } = useBusinessStore();
+  const { currentCompany } = useBusinessStore();
   
   // Profile store for RBAC
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
@@ -97,18 +85,14 @@ const ProductsScreen: React.FC = () => {
   } = useProducts();
 
   // Local UI state
-  // selectedLocationId now comes from store (currentLocation?.id), persisted across sessions
-  const selectedLocationId = currentLocation?.id || null;
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editedProducts, setEditedProducts] = useState<Record<string, Partial<UIProduct>>>({});
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState<boolean>(false);
-  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const [paywallFeature, setPaywallFeature] = useState<string>('');
-  const [headerTitleLayout, setHeaderTitleLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const hasEditedProducts = Object.keys(editedProducts).length > 0;
 
   const listData: ListItem[] = useMemo(() => {
@@ -258,58 +242,9 @@ const ProductsScreen: React.FC = () => {
     setSelectedStatus(status as UIProductStatus | 'All');
   };
 
-  const handleLocationSelect = (item: DropdownItem) => {
-    if (item.id === 'all') {
-      setLocation(null); // "All Locations"
-    } else {
-      const location = safeLocations.find(loc => loc.id === item.id);
-      setLocation(location || null);
-    }
-  };
-
   const handleProductPress = (productId: string) => {
     (navigation as any).navigate('ProductDetail', { productId });
   };
-
-  // Check user permissions for global vs location-scoped access
-  const canViewAllProducts = isAdmin();
-
-  // Check if business has only one location (with defensive check for undefined/null)
-  const safeLocations = Array.isArray(locations) ? locations : [];
-  const hasSingleLocation = safeLocations.length === 1;
-  const primaryLocation = safeLocations.find(loc => (loc as any).is_primary) || safeLocations[0];
-
-  // Auto-select primary location when there's only one
-  useEffect(() => {
-    if (hasSingleLocation && primaryLocation && !currentLocation) {
-      setLocation(primaryLocation);
-    }
-  }, [hasSingleLocation, primaryLocation?.id, currentLocation]);
-
-  // Create location dropdown items using business store locations
-  const locationItems: DropdownItem[] = useMemo(() => {
-    const items: DropdownItem[] = [];
-    
-    // Only add "All Locations" option if there are multiple locations
-    if (!hasSingleLocation) {
-      items.push({
-        id: 'all',
-        title: 'All Locations',
-        icon: 'grid',
-      });
-    }
-    
-    // Add business locations from store
-    safeLocations.forEach(location => {
-      items.push({
-        id: location.id,
-        title: location.name,
-        icon: 'location',
-      });
-    });
-    
-    return items;
-  }, [safeLocations, hasSingleLocation]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
@@ -328,30 +263,9 @@ const ProductsScreen: React.FC = () => {
         ]}
       />
 
-      {/* Location Selector Section */}
-      <View style={[styles.locationSection, { backgroundColor: appTheme.colors.background }]}>
-        <TouchableOpacity 
-          style={[styles.locationDropdown, { 
-            borderColor: appTheme.colors.borderColor,
-            backgroundColor: appTheme.colors.background
-          }]}
-          onPress={() => !hasSingleLocation && setShowLocationDropdown(true)}
-          disabled={hasSingleLocation}
-          activeOpacity={hasSingleLocation ? 1 : 0.7}
-        >
-          <Text style={[styles.locationText, { 
-            color: appTheme.colors.textSecondary 
-          }]}>
-            {hasSingleLocation && primaryLocation
-              ? primaryLocation.name
-              : selectedLocationId 
-                ? safeLocations.find(l => l.id === selectedLocationId)?.name || 'All Locations' 
-                : 'All Locations'}
-          </Text>
-          {!hasSingleLocation && (
-            <Icon name="chevron-down" size={16} color={appTheme.colors.textSecondary} />
-          )}
-        </TouchableOpacity>
+      {/* Location Selector */}
+      <View style={styles.locationSection}>
+        <LocationDropdown style={{ flex: 1 }} />
       </View>
       
       {/* Search Bar */}
@@ -429,38 +343,6 @@ const ProductsScreen: React.FC = () => {
         selectedView={currentViewTitle}
         onSelectView={handleSelectProductView}
       />
-
-      {/* Location Selection Modal */}
-      <AppBottomSheet
-        visible={showLocationDropdown}
-        onClose={() => setShowLocationDropdown(false)}
-        title="Locations"
-      >
-        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
-          {locationItems.map((item, index) => {
-            const isSelected = (selectedLocationId || 'all') === item.id;
-            return (
-              <ListItemCard
-                key={item.id}
-                avatar={{
-                  type: 'icon',
-                  icon: item.icon || 'location',
-                  iconColor: isSelected ? appTheme.colors.primary : appTheme.colors.iconMuted,
-                  backgroundColor: appTheme.colors.surface,
-                }}
-                title={item.title}
-                onPress={() => {
-                  handleLocationSelect(item);
-                  setShowLocationDropdown(false);
-                }}
-                selected={isSelected}
-                showCheckmark
-                showDivider={index < locationItems.length - 1}
-              />
-            );
-          })}
-        </ScrollView>
-      </AppBottomSheet>
 
       {/* Create Actions Bottom Sheet Modal (+ button) */}
       <ProductCreateModal
@@ -543,69 +425,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginHorizontal: 8,
   },
-  locationDropdown: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 0,
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  locationText: {
-    fontSize: 14,
-    fontWeight: '500',
-    flex: 1,
-    marginRight: 8,
-  },
-  locationContext: {
-    fontSize: 12,
-    marginTop: 4,
-    marginHorizontal: 8,
-  },
-
-  headerContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    height: 48,
-  },
-  titleSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    lineHeight: 32,
-  },
-  dropdownArrow: {
-    marginLeft: 8,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   mockDataBanner: {
     padding: 8,
     alignItems: 'center',
@@ -632,20 +451,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 8,
-  },
-  // AppBottomSheet location item styles
-  locationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 0.5,
-    gap: 12,
-  },
-  locationItemText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
   },
 }); 
 

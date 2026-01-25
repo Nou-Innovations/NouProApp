@@ -24,6 +24,9 @@ require('dotenv').config();
 const { getRepos, getDataSource } = require('./src/repositories');
 const repos = getRepos();
 
+// Services
+const { orderStatus: orderStatusService } = require('./src/services');
+
 console.log(`📦 Data source: ${getDataSource()}`);
 
 // Import constants from memory store (used by both memory and prisma modes)
@@ -231,6 +234,124 @@ function checkLocationMode(location, requiredMode) {
 }
 
 // ============================================================================
+// STAFF ROLE & ACCESS HELPERS
+// ============================================================================
+
+// Valid roles and statuses for staff management
+const VALID_BUSINESS_ROLES = new Set(['super_admin', 'admin', 'staff']);
+const VALID_MEMBER_STATUSES = new Set(['invited', 'accepted', 'suspended']);
+
+// Finder functions
+function findLocation(companyId, locationId) {
+  return locations.find(l => l.id === locationId && (l.companyId === companyId || l.businessId === companyId));
+}
+
+function findUser(userId) {
+  return users.find(u => u.id === userId);
+}
+
+function findBusinessMember(companyId, userId) {
+  return businessMembers.find(m => m.businessId === companyId && m.userId === userId);
+}
+
+function findLocationMember(companyId, locationId, userId) {
+  return locationMembers.find(m => m.businessId === companyId && m.locationId === locationId && m.userId === userId);
+}
+
+function findUserByEmail(email) {
+  if (!email) return null;
+  return users.find(u => (u.email || '').toLowerCase() === String(email).toLowerCase());
+}
+
+// Validation functions (throw on invalid)
+function ensureRole(role) {
+  if (!VALID_BUSINESS_ROLES.has(role)) {
+    const err = new Error(`Invalid role: ${role}`);
+    err.status = 400;
+    throw err;
+  }
+}
+
+function ensureStatus(status) {
+  if (!VALID_MEMBER_STATUSES.has(status)) {
+    const err = new Error(`Invalid status: ${status}`);
+    err.status = 400;
+    throw err;
+  }
+}
+
+// Access control for location-scoped actions
+function hasLocationAccess(companyId, userId, locationId) {
+  const bm = findBusinessMember(companyId, userId);
+  if (!bm || bm.status === 'suspended') return false;
+
+  // Super admin has access to all locations
+  if (bm.role === 'super_admin') return true;
+
+  // Admin/staff need explicit accepted location assignment
+  const lm = locationMembers.find(m =>
+    m.businessId === companyId &&
+    m.userId === userId &&
+    m.locationId === locationId &&
+    (m.status ?? 'accepted') !== 'suspended'
+  );
+
+  if (!lm) return false;
+  const status = lm.status ?? 'accepted';
+  return status === 'accepted';
+}
+
+// Normalize locationIds input (handles string, array, or undefined)
+function normalizeLocationIds(locationIds) {
+  if (!locationIds) return [];
+  if (Array.isArray(locationIds)) return locationIds;
+  if (typeof locationIds === 'string') return [locationIds];
+  return [];
+}
+
+// Simple ID generator for mock store
+function nextId(prefix) {
+  const rand = Math.random().toString(16).slice(2, 8);
+  return `${prefix}-${Date.now()}-${rand}`;
+}
+
+// Error wrapper for try/catch handlers
+function sendError(res, err) {
+  const status = err.status || 500;
+  res.status(status).json({ success: false, message: err.message || 'Server error' });
+}
+
+// Convert member data to staff DTO shape
+function toStaffDto({ user, role, status, scope, locationId, locationName, joinedAt }) {
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    avatar: user.avatar || null,
+    phone: user.phone || null,
+    role,
+    status: status ?? 'accepted',
+    scope,
+    locationId: locationId || null,
+    locationName: locationName || null,
+    joinedAt: joinedAt || null,
+  };
+}
+
+// Normalize product visibility fields for API responses
+function withProductVisibility(product) {
+  if (!product) return product;
+  const ownerBusinessId = product.ownerBusinessId || product.companyId || product.businessId || product.distributorId;
+  return {
+    ...product,
+    ownerBusinessId,
+    isPublic: product.isPublic ?? product.isDisplayable ?? product.is_listed ?? false,
+  };
+}
+
+// ============================================================================
 // MEMBERSHIP ENFORCEMENT MIDDLEWARE
 // ============================================================================
 
@@ -245,6 +366,28 @@ function requireBusinessMembership(req, res, businessId) {
     res.status(403).json(errorResponse('You do not have access to this business', 'ACCESS_DENIED'));
     return false;
   }
+  return true;
+}
+
+// Require user to be admin or super_admin of the business
+function requireBusinessAdmin(req, res, businessId) {
+  const user = getUserFromRequest(req);
+  if (!user) {
+    res.status(401).json(errorResponse('Authentication required', 'AUTH_REQUIRED'));
+    return false;
+  }
+  
+  const bm = findBusinessMember(businessId, user.id);
+  if (!bm || bm.status !== 'accepted') {
+    res.status(403).json(errorResponse('You do not have access to this business', 'ACCESS_DENIED'));
+    return false;
+  }
+  
+  if (bm.role === 'staff') {
+    res.status(403).json(errorResponse('Admin access required. Staff members cannot access this resource.', 'ADMIN_REQUIRED'));
+    return false;
+  }
+  
   return true;
 }
 
@@ -349,10 +492,9 @@ const MEMBER_ROLES = {
 };
 
 const MEMBER_STATUS = {
-  PENDING: 'pending',
+  INVITED: 'invited',
   ACCEPTED: 'accepted',
-  REJECTED: 'rejected',
-  LOCKED: 'locked'
+  SUSPENDED: 'suspended'
 };
 
 // Membership data (businessMembers, locationMembers) sourced from memoryStore
@@ -1872,7 +2014,7 @@ app.get('/api/businesses/:businessId/orders/:orderId', async (req, res) => {
   }
 });
 
-// Update order status
+// Update order (general fields, not status)
 app.patch('/api/businesses/:businessId/orders/:orderId', async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
@@ -1889,6 +2031,115 @@ app.patch('/api/businesses/:businessId/orders/:orderId', async (req, res) => {
     console.error('Error updating order:', err);
     res.status(500).json(errorResponse('Failed to update order', 'UPDATE_ERROR'));
   }
+});
+
+// Change order status (with validation and audit)
+// This is the preferred endpoint for status changes as it:
+// - Validates transition rules (e.g., can't go from DONE to NEW)
+// - Requires reason for certain statuses (PENDING, CANCELED, REJECTED)
+// - Creates audit history records
+app.patch('/api/businesses/:businessId/orders/:orderId/status', async (req, res) => {
+  // PERMISSION: Require business membership
+  if (!requireBusinessMembership(req, res, req.params.businessId)) return;
+
+  try {
+    const order = await repos.orderRepo.getById(req.params.orderId);
+    if (!verifyOrderOwnership(order, req.params.businessId)) {
+      return res.status(404).json(errorResponse('Order not found', 'NOT_FOUND'));
+    }
+
+    const { status, reason } = req.body;
+    
+    if (!status) {
+      return res.status(400).json(errorResponse('Status is required', 'MISSING_STATUS'));
+    }
+
+    // Get user ID from request context (if using auth)
+    const userId = req.user?.id || req.headers['x-user-id'] || null;
+
+    const updated = await orderStatusService.changeOrderStatus({
+      orderId: req.params.orderId,
+      nextStatus: status,
+      reason,
+      userId,
+    });
+
+    res.json(successResponse(updated, 'Order status updated successfully'));
+  } catch (err) {
+    console.error('Error changing order status:', err);
+    
+    // Return specific error codes
+    if (err.code === 'INVALID_STATUS_TRANSITION') {
+      return res.status(400).json(errorResponse(err.message, 'INVALID_TRANSITION'));
+    }
+    if (err.code === 'STATUS_REASON_REQUIRED') {
+      return res.status(400).json(errorResponse(err.message, 'REASON_REQUIRED'));
+    }
+    if (err.code === 'INVALID_STATUS') {
+      return res.status(400).json(errorResponse(err.message, 'INVALID_STATUS'));
+    }
+    
+    res.status(500).json(errorResponse('Failed to update order status', 'UPDATE_ERROR'));
+  }
+});
+
+// Get order status history
+app.get('/api/businesses/:businessId/orders/:orderId/history', async (req, res) => {
+  // PERMISSION: Require business membership
+  if (!requireBusinessMembership(req, res, req.params.businessId)) return;
+
+  try {
+    const order = await repos.orderRepo.getById(req.params.orderId);
+    if (!verifyOrderOwnership(order, req.params.businessId)) {
+      return res.status(404).json(errorResponse('Order not found', 'NOT_FOUND'));
+    }
+
+    const history = await orderStatusService.getOrderStatusHistory(req.params.orderId);
+    res.json(successResponse(history, 'Order status history retrieved successfully'));
+  } catch (err) {
+    console.error('Error fetching order status history:', err);
+    res.status(500).json(errorResponse('Failed to retrieve status history', 'FETCH_ERROR'));
+  }
+});
+
+// Get valid next statuses for an order
+app.get('/api/businesses/:businessId/orders/:orderId/transitions', async (req, res) => {
+  // PERMISSION: Require business membership
+  if (!requireBusinessMembership(req, res, req.params.businessId)) return;
+
+  try {
+    const order = await repos.orderRepo.getById(req.params.orderId);
+    if (!verifyOrderOwnership(order, req.params.businessId)) {
+      return res.status(404).json(errorResponse('Order not found', 'NOT_FOUND'));
+    }
+
+    const validTransitions = orderStatusService.getValidNextStatuses(order.status);
+    const transitionsWithMeta = validTransitions.map(status => ({
+      status,
+      ...orderStatusService.getStatusMeta(status),
+    }));
+
+    res.json(successResponse({
+      currentStatus: order.status,
+      currentMeta: orderStatusService.getStatusMeta(order.status),
+      isFinal: orderStatusService.isFinalStatus(order.status),
+      canEdit: orderStatusService.canEditInStatus(order.status),
+      validTransitions: transitionsWithMeta,
+    }, 'Valid transitions retrieved successfully'));
+  } catch (err) {
+    console.error('Error fetching valid transitions:', err);
+    res.status(500).json(errorResponse('Failed to retrieve valid transitions', 'FETCH_ERROR'));
+  }
+});
+
+// Get all order status metadata (SINGLE SOURCE OF TRUTH)
+// Frontend should use this to configure UI behavior
+app.get('/api/order-status-meta', (req, res) => {
+  res.json(successResponse({
+    statuses: orderStatusService.ORDER_STATUS,
+    meta: orderStatusService.ORDER_STATUS_META,
+    transitions: orderStatusService.ALLOWED_TRANSITIONS,
+  }, 'Order status metadata retrieved successfully'));
 });
 
 // ============================================================================
@@ -2726,6 +2977,1041 @@ app.get('/api/companies/:companyId/users', (req, res) => {
   res.json(successResponse(companyUsers));
 });
 
+// ============================================================================
+// STAFF MANAGEMENT - Unified staff list for Team Management screen
+// ============================================================================
+// Returns merged list of business-level and location-level members with user details
+app.get('/api/companies/:companyId/staff', (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { status = 'accepted', locationId } = req.query;
+
+    // Validate status
+    const allowed = new Set(['accepted', 'invited', 'suspended', 'all']);
+    if (!allowed.has(String(status))) {
+      return res.status(400).json(errorResponse('Invalid status filter. Use accepted|invited|suspended|all'));
+    }
+
+    // 1) Pull business-level memberships for this business
+    let members = businessMembers.filter(m => m.businessId === companyId);
+
+    // 2) Status filter
+    if (status !== 'all') {
+      members = members.filter(m => (m.status ?? 'accepted') === status);
+    }
+
+    // 3) If locationId is provided:
+    //    - super_admin stays included (implicit access)
+    //    - admin/staff must have a locationMember row for that location
+    if (locationId) {
+      const loc = findLocation(companyId, String(locationId));
+      if (!loc) return res.status(404).json(errorResponse('Location not found for this business'));
+
+      members = members.filter(bm => {
+        const bmStatus = bm.status ?? 'accepted';
+        if (bmStatus === 'suspended') return false;
+
+        if (bm.role === 'super_admin') return true;
+
+        const lm = locationMembers.find(x =>
+          x.businessId === companyId &&
+          x.userId === bm.userId &&
+          x.locationId === String(locationId)
+        );
+        if (!lm) return false;
+
+        // If status filter is set, match location assignment status too
+        if (status === 'all') return true;
+
+        const lmStatus = lm.status ?? bmStatus ?? 'accepted';
+        return lmStatus === status;
+      });
+    }
+
+    // 4) Enrich & normalize into stable DTO
+    const staff = members
+      .map(bm => {
+        const user = findUser(bm.userId);
+        if (!user) return null;
+
+        // Collect all locationIds for this user
+        const locationIds = locationMembers
+          .filter(lm => lm.businessId === companyId && lm.userId === bm.userId)
+          .map(lm => lm.locationId);
+
+        // If location filter is active and non-super_admin, attach locationName
+        let locName = null;
+        let scope = 'business';
+        if (locationId && bm.role !== 'super_admin') {
+          scope = 'location';
+          const loc = findLocation(companyId, String(locationId));
+          locName = loc?.name || null;
+        }
+
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar || null,
+          phone: user.phone || null,
+          role: bm.role,
+          status: bm.status ?? 'accepted',
+          scope,
+          locationId: locationId ? String(locationId) : null,
+          locationIds,
+          locationName: locName,
+          joinedAt: bm.createdAt || null,
+        };
+      })
+      .filter(Boolean);
+
+    return res.json(successResponse(staff));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// ============================================================================
+// LOCATION-FILTERED STAFF ENDPOINTS
+// ============================================================================
+
+// Get staff for a specific location (with status filter)
+// GET /api/companies/:companyId/locations/:locationId/staff?status=accepted|invited|suspended|all&includeBusinessAdmins=true
+app.get('/api/companies/:companyId/locations/:locationId/staff', (req, res) => {
+  try {
+    const { companyId, locationId } = req.params;
+    const { status = 'accepted', includeBusinessAdmins = 'true' } = req.query;
+
+    // Validate status
+    const allowed = new Set(['accepted', 'invited', 'suspended', 'all']);
+    if (!allowed.has(String(status))) {
+      return res.status(400).json(errorResponse('Invalid status filter. Use accepted|invited|suspended|all'));
+    }
+
+    const loc = findLocation(companyId, String(locationId));
+    if (!loc) return res.status(404).json(errorResponse('Location not found for this business'));
+
+    // Super admins (business-level) are implicitly included if requested
+    let superAdmins = [];
+    if (includeBusinessAdmins === 'true') {
+      superAdmins = businessMembers
+        .filter(m => m.businessId === companyId && m.role === 'super_admin')
+        .filter(m => status === 'all' ? true : (m.status ?? 'accepted') === status);
+    }
+
+    // Explicit location members (admin/staff)
+    let locMembers = locationMembers
+      .filter(m => m.businessId === companyId && m.locationId === String(locationId));
+
+    if (status !== 'all') {
+      locMembers = locMembers.filter(m => (m.status ?? 'accepted') === status);
+    }
+
+    const merged = [
+      ...superAdmins.map(bm => ({ type: 'super', bm })),
+      ...locMembers.map(lm => ({ type: 'loc', lm })),
+    ];
+
+    const staff = merged
+      .map(item => {
+        if (item.type === 'super') {
+          const bm = item.bm;
+          const user = findUser(bm.userId);
+          if (!user) return null;
+          
+          // Collect all locationIds for this user
+          const locationIds = locationMembers
+            .filter(lm => lm.businessId === companyId && lm.userId === bm.userId)
+            .map(lm => lm.locationId);
+          
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            avatar: user.avatar || null,
+            phone: user.phone || null,
+            role: bm.role,
+            status: bm.status ?? 'accepted',
+            scope: 'business',
+            locationId: String(locationId),
+            locationIds,
+            locationName: loc.name || null,
+            joinedAt: bm.createdAt || null,
+          };
+        }
+
+        const lm = item.lm;
+        const user = findUser(lm.userId);
+        if (!user) return null;
+
+        // Keep role aligned with business membership if present
+        const bm = findBusinessMember(companyId, lm.userId);
+        const effectiveRole = bm?.role || lm.role || 'staff';
+        const effectiveStatus = lm.status ?? bm?.status ?? 'accepted';
+
+        // Collect all locationIds for this user
+        const locationIds = locationMembers
+          .filter(lmx => lmx.businessId === companyId && lmx.userId === lm.userId)
+          .map(lmx => lmx.locationId);
+
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar || null,
+          phone: user.phone || null,
+          role: effectiveRole,
+          status: effectiveStatus,
+          scope: 'location',
+          locationId: String(locationId),
+          locationIds,
+          locationName: loc.name || null,
+          joinedAt: lm.createdAt || bm?.createdAt || null,
+        };
+      })
+      .filter(Boolean);
+
+    return res.json(successResponse(staff));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Get staff for a location without company prefix (convenience)
+// GET /api/locations/:locationId/staff
+app.get('/api/locations/:locationId/staff', (req, res) => {
+  const { locationId } = req.params;
+  const includeBusinessAdmins = req.query.includeBusinessAdmins === 'true';
+
+  const location = locations.find(l => l.id === locationId);
+  if (!location) return res.status(404).json(errorResponse('Location not found'));
+
+  // Derive companyId from location
+  const companyId = location.businessId || location.companyId;
+
+  // Location-level members for this location
+  const locationStaff = locationMembers
+    .filter(m => m.businessId === companyId && m.locationId === locationId)
+    .map(m => {
+      const user = findUser(m.userId);
+      if (!user) return null;
+
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar || null,
+        phone: user.phone || null,
+        role: m.role,
+        status: m.status ?? 'accepted',
+        scope: 'location',
+        locationId,
+        locationName: location.name,
+        joinedAt: m.createdAt || null,
+      };
+    })
+    .filter(Boolean);
+
+  let businessAdminStaff = [];
+  if (includeBusinessAdmins) {
+    businessAdminStaff = businessMembers
+      .filter(m => m.businessId === companyId && (m.role === 'super_admin' || m.role === 'admin'))
+      .map(m => {
+        const user = findUser(m.userId);
+        if (!user) return null;
+
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar || null,
+          phone: user.phone || null,
+          role: m.role,
+          status: m.status ?? 'accepted',
+          scope: 'business',
+          locationId,
+          locationName: location.name,
+          joinedAt: m.createdAt || null,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  const map = new Map();
+  businessAdminStaff.forEach(m => map.set(m.id, m));
+  locationStaff.forEach(m => map.set(m.id, m));
+
+  return res.json(successResponse(Array.from(map.values())));
+});
+
+// ============================================================================
+// LOCATION STAFF ASSIGNMENT (POST/DELETE/PATCH)
+// ============================================================================
+
+// Assign staff/admin to a location
+// POST /api/companies/:companyId/locations/:locationId/staff
+// Body: { userId, role, status? }
+app.post('/api/companies/:companyId/locations/:locationId/staff', (req, res) => {
+  try {
+    const { companyId, locationId } = req.params;
+    const { userId, role, status = 'accepted' } = req.body || {};
+
+    if (!userId) return res.status(400).json(errorResponse('userId is required'));
+    ensureRole(role);
+    ensureStatus(status);
+
+    // Validate location belongs to business
+    const location = findLocation(companyId, locationId);
+    if (!location) return res.status(404).json(errorResponse('Location not found for this business'));
+
+    // Validate user exists
+    const user = findUser(userId);
+    if (!user) return res.status(404).json(errorResponse('User not found'));
+
+    // Ensure user is a business member first (business role must exist)
+    let bm = findBusinessMember(companyId, userId);
+
+    // If not business member, create it
+    if (!bm) {
+      bm = {
+        id: nextId('bm'),
+        businessId: companyId,
+        userId,
+        role,
+        status,
+        createdAt: new Date().toISOString(),
+      };
+      businessMembers.push(bm);
+    } else {
+      // If already a business member, update business role if it differs
+      bm.role = role;
+      bm.status = status;
+    }
+
+    // Super admin has implicit access to all locations; no need to create locationMember
+    if (role === 'super_admin') {
+      return res.json(successResponse({
+        message: 'Super admin has access to all locations; no explicit location assignment required.',
+        businessMember: bm,
+      }));
+    }
+
+    // For admin/staff we create/update a locationMember record
+    let lm = findLocationMember(companyId, locationId, userId);
+    if (!lm) {
+      lm = {
+        id: nextId('lm'),
+        businessId: companyId,
+        locationId,
+        userId,
+        role,
+        status,
+        createdAt: new Date().toISOString(),
+      };
+      locationMembers.push(lm);
+    } else {
+      lm.role = role;
+      lm.status = status;
+    }
+
+    return res.json(successResponse({
+      businessMember: bm,
+      locationMember: lm,
+    }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Remove staff assignment from a location
+// DELETE /api/companies/:companyId/locations/:locationId/staff/:userId
+app.delete('/api/companies/:companyId/locations/:locationId/staff/:userId', (req, res) => {
+  try {
+    const { companyId, locationId, userId } = req.params;
+
+    const location = findLocation(companyId, locationId);
+    if (!location) return res.status(404).json(errorResponse('Location not found for this business'));
+
+    const bm = findBusinessMember(companyId, userId);
+    if (!bm) return res.status(404).json(errorResponse('User is not a member of this business'));
+
+    // If super_admin, we do not delete implicit access
+    if (bm.role === 'super_admin') {
+      return res.status(400).json(errorResponse('super_admin access is implicit; cannot remove per-location assignment.'));
+    }
+
+    const idx = locationMembers.findIndex(m => m.businessId === companyId && m.locationId === locationId && m.userId === userId);
+    if (idx === -1) return res.status(404).json(errorResponse('No location assignment found for this user'));
+
+    const removed = locationMembers.splice(idx, 1)[0];
+
+    return res.json(successResponse({ removed }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Update role/status for a location assignment
+// PATCH /api/companies/:companyId/locations/:locationId/staff/:userId
+// Body: { role?, status? }
+app.patch('/api/companies/:companyId/locations/:locationId/staff/:userId', (req, res) => {
+  try {
+    const { companyId, locationId, userId } = req.params;
+    const { role, status } = req.body || {};
+
+    if (role !== undefined) ensureRole(role);
+    if (status !== undefined) ensureStatus(status);
+
+    const location = findLocation(companyId, locationId);
+    if (!location) return res.status(404).json(errorResponse('Location not found for this business'));
+
+    const bm = findBusinessMember(companyId, userId);
+    if (!bm) return res.status(404).json(errorResponse('User is not a member of this business'));
+
+    // Super admin is business-level only; location-level patch not allowed
+    if (bm.role === 'super_admin' || role === 'super_admin') {
+      return res.status(400).json(errorResponse('super_admin is business-level only and has implicit access to all locations.'));
+    }
+
+    let lm = findLocationMember(companyId, locationId, userId);
+    if (!lm) {
+      // If not assigned yet, create assignment on patch (useful UX)
+      lm = {
+        id: nextId('lm'),
+        businessId: companyId,
+        locationId,
+        userId,
+        role: role || bm.role || 'staff',
+        status: status || bm.status || 'accepted',
+        createdAt: new Date().toISOString(),
+      };
+      locationMembers.push(lm);
+    } else {
+      if (role !== undefined) lm.role = role;
+      if (status !== undefined) lm.status = status;
+    }
+
+    // Keep business role aligned with location role where applicable
+    if (role !== undefined) bm.role = role;
+    if (status !== undefined) bm.status = status;
+
+    return res.json(successResponse({ businessMember: bm, locationMember: lm }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// ============================================================================
+// ACCESS CONTROL ENDPOINTS
+// ============================================================================
+
+// Get accessible locations for a user in a business
+// GET /api/companies/:companyId/access/locations?userId=usr-002
+// Returns: { role, locations[] }
+app.get('/api/companies/:companyId/access/locations', (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { userId } = req.query;
+
+    if (!userId) return res.status(400).json(errorResponse('userId is required'));
+
+    const bm = findBusinessMember(companyId, userId);
+    if (!bm) return res.status(404).json(errorResponse('User not member of this business'));
+
+    // Super admin has access to all locations
+    if (bm.role === 'super_admin') {
+      const all = locations.filter(l => (l.businessId === companyId || l.companyId === companyId));
+      return res.json(successResponse({ role: bm.role, locations: all }));
+    }
+
+    // Admin/staff: only assigned locations where not suspended
+    const assignedLocationIds = locationMembers
+      .filter(m => m.businessId === companyId && m.userId === userId && m.status !== 'suspended')
+      .map(m => m.locationId);
+
+    const assigned = locations.filter(l => 
+      (l.businessId === companyId || l.companyId === companyId) && 
+      assignedLocationIds.includes(l.id)
+    );
+    
+    return res.json(successResponse({ role: bm.role, locations: assigned }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Get capabilities for a user (for frontend Pro vs Personal mode gating)
+// GET /api/companies/:companyId/access/capabilities?userId=usr-004
+// Returns: { role, canAccessBusinessProfile, canAccessAllLocations }
+app.get('/api/companies/:companyId/access/capabilities', (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json(errorResponse('userId is required'));
+
+    const bm = businessMembers.find(
+      m => m.businessId === companyId && m.userId === userId && m.status === 'accepted'
+    );
+    if (!bm) {
+      return res.status(404).json(errorResponse('Not a business member'));
+    }
+
+    return res.json(successResponse({
+      role: bm.role,
+      canAccessBusinessProfile: bm.role !== 'staff',
+      canAccessAllLocations: bm.role === 'super_admin',
+    }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// ============================================================================
+// STAFF INVITE WORKFLOW
+// ============================================================================
+
+// Invite a new staff member
+// POST /api/companies/:companyId/users/invite
+// Body: { email, name?, role, locationIds[], status? }
+app.post('/api/companies/:companyId/users/invite', (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { email, name, role, locationIds, status = 'invited' } = req.body || {};
+
+    if (!email) return res.status(400).json(errorResponse('email is required'));
+    if (!role) return res.status(400).json(errorResponse('role is required'));
+
+    ensureRole(role);
+    ensureStatus(status);
+
+    const locIds = normalizeLocationIds(locationIds);
+
+    // Business rules
+    if (role === 'staff' || role === 'admin') {
+      if (locIds.length === 0) {
+        return res.status(400).json(errorResponse(`${role} must be assigned to at least one location`));
+      }
+    }
+    if (role === 'super_admin' && locIds.length > 0) {
+      return res.status(400).json(errorResponse('super_admin has implicit access; do not pass locationIds'));
+    }
+
+    // Validate locations belong to business
+    for (const locId of locIds) {
+      const loc = findLocation(companyId, locId);
+      if (!loc) return res.status(404).json(errorResponse(`Location not found for this business: ${locId}`));
+    }
+
+    // Find or create user
+    let user = findUserByEmail(email);
+    if (!user) {
+      user = {
+        id: nextId('usr'),
+        email: String(email).toLowerCase(),
+        name: name || email.split('@')[0],
+        avatar: '',
+        createdAt: new Date().toISOString(),
+      };
+      users.push(user);
+    }
+
+    // Create/update business membership
+    let bm = findBusinessMember(companyId, user.id);
+    if (!bm) {
+      bm = {
+        id: nextId('bm'),
+        businessId: companyId,
+        userId: user.id,
+        role,
+        status, // invited by default
+        createdAt: new Date().toISOString(),
+      };
+      businessMembers.push(bm);
+    } else {
+      bm.role = role;
+      bm.status = status;
+    }
+
+    // Super admin: no locationMembers needed
+    let createdLocationMembers = [];
+    if (role !== 'super_admin') {
+      createdLocationMembers = locIds.map(locId => {
+        let lm = findLocationMember(companyId, locId, user.id);
+        if (!lm) {
+          lm = {
+            id: nextId('lm'),
+            businessId: companyId,
+            locationId: locId,
+            userId: user.id,
+            role,
+            status,
+            createdAt: new Date().toISOString(),
+          };
+          locationMembers.push(lm);
+        } else {
+          lm.role = role;
+          lm.status = status;
+        }
+        return lm;
+      });
+    }
+
+    // Mock invite token/link (in production: email + JWT invite token)
+    const inviteToken = nextId('invite');
+    const inviteLink = `/invite?companyId=${companyId}&userId=${user.id}&token=${inviteToken}`;
+
+    return res.json(successResponse({
+      user,
+      businessMember: bm,
+      locationMembers: createdLocationMembers,
+      invite: { token: inviteToken, link: inviteLink },
+    }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Accept invite
+// POST /api/companies/:companyId/users/:userId/accept
+app.post('/api/companies/:companyId/users/:userId/accept', (req, res) => {
+  try {
+    const { companyId, userId } = req.params;
+
+    const bm = findBusinessMember(companyId, userId);
+    if (!bm) return res.status(404).json(errorResponse('Invite not found'));
+
+    // Accept business membership
+    bm.status = 'accepted';
+
+    // Accept all location assignments for this business+user
+    locationMembers
+      .filter(m => m.businessId === companyId && m.userId === userId)
+      .forEach(m => { m.status = 'accepted'; });
+
+    return res.json(successResponse({ businessMember: bm }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Revoke invite (remove memberships)
+// DELETE /api/companies/:companyId/users/:userId/invite
+app.delete('/api/companies/:companyId/users/:userId/invite', (req, res) => {
+  try {
+    const { companyId, userId } = req.params;
+
+    // Remove location assignments
+    for (let i = locationMembers.length - 1; i >= 0; i--) {
+      const lm = locationMembers[i];
+      if (lm.businessId === companyId && lm.userId === userId) locationMembers.splice(i, 1);
+    }
+
+    // Remove business membership
+    for (let i = businessMembers.length - 1; i >= 0; i--) {
+      const bm = businessMembers[i];
+      if (bm.businessId === companyId && bm.userId === userId) businessMembers.splice(i, 1);
+    }
+
+    return res.json(successResponse({ ok: true }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Decline invite
+// POST /api/companies/:companyId/users/:userId/decline
+app.post('/api/companies/:companyId/users/:userId/decline', (req, res) => {
+  try {
+    const { companyId, userId } = req.params;
+
+    const bmIndex = businessMembers.findIndex(m => m.businessId === companyId && m.userId === userId);
+    if (bmIndex === -1) return res.status(404).json(errorResponse('Invite not found'));
+
+    const bm = businessMembers[bmIndex];
+
+    // Remove location assignments
+    for (let i = locationMembers.length - 1; i >= 0; i--) {
+      const lm = locationMembers[i];
+      if (lm.businessId === companyId && lm.userId === userId) locationMembers.splice(i, 1);
+    }
+
+    // Remove business membership
+    businessMembers.splice(bmIndex, 1);
+
+    return res.json(successResponse({ removed: bm }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Resend invite (mock)
+// POST /api/companies/:companyId/users/:userId/resend-invite
+app.post('/api/companies/:companyId/users/:userId/resend-invite', (req, res) => {
+  try {
+    const { companyId, userId } = req.params;
+    const bm = findBusinessMember(companyId, userId);
+    if (!bm) return res.status(404).json(errorResponse('Invite not found'));
+
+    if (bm.status !== 'invited') {
+      return res.status(400).json(errorResponse('User is not in invited status'));
+    }
+
+    const inviteToken = nextId('invite');
+    const inviteLink = `/invite?companyId=${companyId}&userId=${userId}&token=${inviteToken}`;
+
+    return res.json(successResponse({ invite: { token: inviteToken, link: inviteLink } }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// ============================================================================
+// ROLE UPGRADE REQUESTS (staff → admin)
+// ============================================================================
+
+// Mock storage for role requests (in production: use DB table)
+let roleRequests = [];
+
+// Create role upgrade request (staff only)
+// POST /api/businesses/:businessId/role-requests
+app.post('/api/businesses/:businessId/role-requests', (req, res) => {
+  try {
+    const { businessId } = req.params;
+    const { requestedRole = 'admin', message } = req.body;
+    
+    // Get user from request (in production: from auth token)
+    const userId = req.headers['x-user-id'] || 'usr-004'; // Mock fallback
+    
+    // Verify user is a staff member
+    const bm = findBusinessMember(businessId, userId);
+    if (!bm) {
+      return res.status(404).json(errorResponse('Not a member of this business'));
+    }
+    
+    if (bm.role !== 'staff') {
+      return res.status(400).json(errorResponse('Only staff can request upgrades'));
+    }
+    
+    if (bm.status !== 'accepted') {
+      return res.status(400).json(errorResponse('You must be an accepted member first'));
+    }
+    
+    // Check for existing pending request
+    const existingPending = roleRequests.find(r => 
+      r.businessId === businessId && 
+      r.userId === userId && 
+      r.status === 'PENDING'
+    );
+    
+    if (existingPending) {
+      return res.status(400).json(errorResponse('You already have a pending request'));
+    }
+    
+    // Check cooldown (7 days after rejection)
+    const recentRejection = roleRequests.find(r =>
+      r.businessId === businessId &&
+      r.userId === userId &&
+      r.status === 'REJECTED' &&
+      new Date(r.resolvedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    );
+    
+    if (recentRejection) {
+      return res.status(400).json(errorResponse('Please wait 7 days after rejection before requesting again'));
+    }
+    
+    // Create request
+    const user = findUser(userId);
+    const request = {
+      id: `rr-${Date.now()}`,
+      businessId,
+      userId,
+      userName: user?.name || '',
+      userEmail: user?.email || '',
+      userAvatar: user?.avatar || null,
+      requestedRole,
+      currentRole: 'staff',
+      status: 'PENDING',
+      message: message || null,
+      createdAt: new Date().toISOString(),
+    };
+    
+    roleRequests.push(request);
+    
+    return res.json(successResponse(request, 'Role upgrade request created'));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Get current user's role request (if any)
+// GET /api/businesses/:businessId/role-requests/me
+app.get('/api/businesses/:businessId/role-requests/me', (req, res) => {
+  try {
+    const { businessId } = req.params;
+    const userId = req.headers['x-user-id'] || 'usr-004';
+    
+    const request = roleRequests.find(r =>
+      r.businessId === businessId &&
+      r.userId === userId &&
+      (r.status === 'PENDING' || r.status === 'REJECTED')
+    );
+    
+    return res.json(successResponse(request || null));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Get all role requests for a business (admin only)
+// GET /api/businesses/:businessId/role-requests?status=PENDING
+app.get('/api/businesses/:businessId/role-requests', (req, res) => {
+  try {
+    const { businessId } = req.params;
+    const { status } = req.query;
+    
+    // TODO: Add admin check
+    
+    let requests = roleRequests.filter(r => r.businessId === businessId);
+    
+    if (status) {
+      requests = requests.filter(r => r.status === status);
+    }
+    
+    // Enrich with user details
+    const enriched = requests.map(r => {
+      const user = findUser(r.userId);
+      return {
+        ...r,
+        user: user ? {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar,
+        } : null,
+      };
+    });
+    
+    return res.json(successResponse(enriched));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Approve or reject role request (admin only)
+// PATCH /api/businesses/:businessId/role-requests/:requestId
+app.patch('/api/businesses/:businessId/role-requests/:requestId', (req, res) => {
+  try {
+    const { businessId, requestId } = req.params;
+    const { status, rejectionReason } = req.body;
+    
+    const userId = req.headers['x-user-id'] || 'usr-001'; // Admin user
+    
+    // Verify admin
+    const adminMember = findBusinessMember(businessId, userId);
+    if (!adminMember || adminMember.role === 'staff') {
+      return res.status(403).json(errorResponse('Only admins can approve requests'));
+    }
+    
+    // Find request
+    const request = roleRequests.find(r => r.id === requestId);
+    if (!request || request.businessId !== businessId) {
+      return res.status(404).json(errorResponse('Request not found'));
+    }
+    
+    if (request.status !== 'PENDING') {
+      return res.status(400).json(errorResponse('Request already resolved'));
+    }
+    
+    // Update request
+    request.status = status;
+    request.resolvedAt = new Date().toISOString();
+    request.resolvedByUserId = userId;
+    
+    const admin = findUser(userId);
+    request.resolvedByName = admin?.name || null;
+    
+    if (status === 'REJECTED' && rejectionReason) {
+      request.rejectionReason = rejectionReason;
+    }
+    
+    // If approved, upgrade the user's role
+    if (status === 'APPROVED') {
+      const bm = findBusinessMember(businessId, request.userId);
+      if (bm) {
+        bm.role = 'admin';
+        
+        // Update location memberships too
+        locationMembers
+          .filter(lm => lm.businessId === businessId && lm.userId === request.userId)
+          .forEach(lm => { lm.role = 'admin'; });
+      }
+    }
+    
+    return res.json(successResponse(request, 'Role request resolved'));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// ============================================================================
+// DELIVERY ASSIGNMENT ENDPOINTS
+// ============================================================================
+
+// Assign a delivery to a user (staff/admin)
+// PATCH /api/companies/:companyId/deliveries/:deliveryId/assign
+// Body: { userId }
+app.patch('/api/companies/:companyId/deliveries/:deliveryId/assign', (req, res) => {
+  try {
+    const { companyId, deliveryId } = req.params;
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json(errorResponse('userId is required'));
+    }
+
+    const delivery = deliveries.find(d => d.id === deliveryId && d.companyId === companyId);
+    if (!delivery) {
+      return res.status(404).json(errorResponse('Delivery not found'));
+    }
+
+    const member = businessMembers.find(
+      m => m.businessId === companyId && m.userId === userId && m.status === 'accepted'
+    );
+    if (!member) {
+      return res.status(403).json(errorResponse('User not accepted in this business'));
+    }
+
+    // Enforce location access (unless super_admin)
+    if (member.role !== 'super_admin') {
+      const hasAccess = locationMembers.some(lm =>
+        lm.businessId === companyId &&
+        lm.userId === userId &&
+        lm.locationId === delivery.locationId &&
+        lm.status === 'accepted'
+      );
+
+      if (!hasAccess) {
+        return res.status(403).json(errorResponse('User has no access to this delivery location'));
+      }
+    }
+
+    const user = users.find(u => u.id === userId);
+
+    delivery.assignedStaffId = userId;
+    delivery.assignedTo = user?.name || null;
+    delivery.updatedAt = new Date().toISOString();
+
+    if (delivery.deliveryStatus === 'new') {
+      delivery.deliveryStatus = 'assigned';
+    }
+
+    return res.json(successResponse({ delivery }));
+  } catch (err) {
+    return res.status(500).json(errorResponse(err.message || 'Server error'));
+  }
+});
+
+// Unassign a delivery
+// PATCH /api/companies/:companyId/deliveries/:deliveryId/unassign
+app.patch('/api/companies/:companyId/deliveries/:deliveryId/unassign', (req, res) => {
+  try {
+    const { companyId, deliveryId } = req.params;
+
+    const delivery = deliveries.find(d => d.id === deliveryId && d.companyId === companyId);
+    if (!delivery) {
+      return res.status(404).json(errorResponse('Delivery not found'));
+    }
+
+    delivery.assignedStaffId = null;
+    delivery.assignedTo = null;
+    delivery.updatedAt = new Date().toISOString();
+
+    if (delivery.deliveryStatus === 'assigned') {
+      delivery.deliveryStatus = 'new';
+    }
+
+    return res.json(successResponse({ delivery }));
+  } catch (err) {
+    return res.status(500).json(errorResponse(err.message || 'Server error'));
+  }
+});
+
+// ============================================================================
+// PERSONAL MODE ACTIVITIES ENDPOINTS
+// ============================================================================
+
+// Get Activities for a user (Personal Mode)
+// GET /api/users/:userId/activities
+// Returns delivery tasks assigned to the user across all businesses
+app.get('/api/users/:userId/activities', (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = users.find(u => u.id === userId);
+    if (!user) {
+      return res.status(404).json(errorResponse('User not found'));
+    }
+
+    const assignedDeliveries = deliveries
+      .filter(d => d.assignedStaffId === userId)
+      .map(d => ({
+        id: `activity-${d.id}`,
+        type: 'delivery',
+        createdAt: d.updatedAt || d.createdAt,
+        delivery: {
+          id: d.id,
+          companyId: d.companyId,
+          locationId: d.locationId,
+          clientName: d.clientCompanyName,
+          clientAddress: d.clientAddress,
+          itemCount: d.itemCount,
+          totalAmount: d.totalAmount,
+          deliveryStatus: d.deliveryStatus,
+          expectedDeliveryDateTime: d.expectedDeliveryDateTime,
+          transportMode: d.transportMode,
+        }
+      }));
+
+    return res.json(successResponse({ activities: assignedDeliveries }));
+  } catch (err) {
+    return res.status(500).json(errorResponse(err.message || 'Server error'));
+  }
+});
+
+// Get Activities for a user scoped to a specific business
+// GET /api/companies/:companyId/users/:userId/activities
+app.get('/api/companies/:companyId/users/:userId/activities', (req, res) => {
+  try {
+    const { companyId, userId } = req.params;
+
+    const bm = findBusinessMember(companyId, userId);
+    if (!bm || bm.status !== 'accepted') return res.status(404).json(errorResponse('User not accepted in this business'));
+
+    const activities = deliveries
+      .filter(d => d.companyId === companyId && d.assignedStaffId === userId)
+      .map(d => ({
+        id: `activity-${d.id}`,
+        type: 'delivery',
+        createdAt: d.updatedAt || d.createdAt,
+        delivery: {
+          id: d.id,
+          companyId: d.companyId,
+          locationId: d.locationId,
+          clientName: d.clientCompanyName,
+          clientAddress: d.clientAddress,
+          itemCount: d.itemCount,
+          totalAmount: d.totalAmount,
+          deliveryStatus: d.deliveryStatus,
+          expectedDeliveryDateTime: d.expectedDeliveryDateTime,
+          transportMode: d.transportMode,
+        },
+      }));
+
+    return res.json(successResponse({ activities }));
+  } catch (err) {
+    return res.status(500).json(errorResponse(err.message || 'Server error'));
+  }
+});
+
 // File Upload Route
 app.post('/api/upload', upload.single('file'), (req, res) => {
   if (req.file) {
@@ -2762,6 +4048,45 @@ app.get('/api/feed', (req, res) => {
   });
 });
 
+// Public product catalog (scope/visibility filter)
+// GET /api/products?scope=public&companyId=...&brand=...&category=...
+// GET /api/products?visibility=public (also supported for compatibility)
+app.get('/api/products', async (req, res) => {
+  try {
+    const { scope, visibility, companyId, brand, category } = req.query;
+    let catalog = await repos.productRepo.list();
+
+    // "public catalog" for personal mode + ordering other products
+    if (scope === 'public' || visibility === 'public') {
+      catalog = catalog.filter(p => 
+        (p.is_listed === true || p.isPublic === true) && 
+        (p.isDisplayable === true || p.isPublic === true)
+      );
+    }
+
+    // Optional filters for product-details suggestions carousels
+    if (companyId) {
+      catalog = catalog.filter(p => 
+        (p.companyId || p.businessId || p.ownerBusinessId) === companyId
+      );
+    }
+    if (brand) {
+      catalog = catalog.filter(p => 
+        (p.brand || '').toLowerCase() === String(brand).toLowerCase()
+      );
+    }
+    if (category) {
+      catalog = catalog.filter(p => 
+        (p.category || '').toLowerCase() === String(category).toLowerCase()
+      );
+    }
+
+    return res.json(successResponse(catalog.map(withProductVisibility)));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
 // Get single product by ID (public view)
 app.get('/api/products/:productId', (req, res) => {
   const { productId } = req.params;
@@ -2769,7 +4094,7 @@ app.get('/api/products/:productId', (req, res) => {
   // First check in products array
   const product = products.find(p => p.id === productId);
   if (product) {
-    return res.json(successResponse(product));
+    return res.json(successResponse(withProductVisibility(product)));
   }
   
   // Then check in feed posts (products from feed)
@@ -2783,6 +4108,8 @@ app.get('/api/products/:productId', (req, res) => {
           brandLogo: post.data.brandLogo,
           distributorName: post.data.distributorName,
           distributorId: post.data.distributorId,
+          ownerBusinessId: post.data.distributorId,
+          isPublic: true,
         }));
       }
     }
@@ -2794,6 +4121,8 @@ app.get('/api/products/:productId', (req, res) => {
           businessName: post.data.businessName,
           businessLogo: post.data.businessLogo,
           businessId: post.data.businessId,
+          ownerBusinessId: post.data.businessId,
+          isPublic: true,
         }));
       }
     }
@@ -2889,7 +4218,7 @@ app.get('/api/public/locations/:locationId/products', (req, res) => {
   
   // TODO: Apply location-specific price overrides from locationProducts table
   
-  res.json(successResponse(locationProducts));
+  res.json(successResponse(locationProducts.map(withProductVisibility)));
 });
 
 // Create order from public storefront - STUB (not yet implemented)
@@ -2927,6 +4256,53 @@ app.post('/api/public/locations/:locationId/orders', (req, res) => {
     'Public order creation is not yet implemented. Use internal endpoints for now.',
     'NOT_IMPLEMENTED'
   ));
+});
+
+// ============================================================================
+// AUTOMATION ENDPOINTS
+// ============================================================================
+// These endpoints can be called by cron services (e.g., Render cron jobs)
+// They require an API key for security
+
+const AUTOMATION_API_KEY = process.env.AUTOMATION_API_KEY || 'dev-automation-key';
+
+function requireAutomationAuth(req, res) {
+  const apiKey = req.headers['x-automation-key'] || req.query.key;
+  if (apiKey !== AUTOMATION_API_KEY) {
+    res.status(401).json(errorResponse('Unauthorized', 'UNAUTHORIZED'));
+    return false;
+  }
+  return true;
+}
+
+// Run order automation (auto-cancel stale orders, report stuck pending)
+// Can be called via: curl -H "x-automation-key: your-key" http://localhost:3000/api/automation/orders
+app.post('/api/automation/orders', async (req, res) => {
+  if (!requireAutomationAuth(req, res)) return;
+
+  try {
+    const dryRun = req.query.dryRun === 'true' || req.body.dryRun === true;
+    const { orderAutomation } = require('./src/services');
+    const results = await orderAutomation.runAutomation({ dryRun });
+    res.json(successResponse(results, 'Automation completed'));
+  } catch (err) {
+    console.error('Error running order automation:', err);
+    res.status(500).json(errorResponse('Automation failed', 'AUTOMATION_ERROR'));
+  }
+});
+
+// Get automation status/preview (dry run)
+app.get('/api/automation/orders/preview', async (req, res) => {
+  if (!requireAutomationAuth(req, res)) return;
+
+  try {
+    const { orderAutomation } = require('./src/services');
+    const results = await orderAutomation.runAutomation({ dryRun: true });
+    res.json(successResponse(results, 'Automation preview'));
+  } catch (err) {
+    console.error('Error previewing order automation:', err);
+    res.status(500).json(errorResponse('Automation preview failed', 'AUTOMATION_ERROR'));
+  }
 });
 
 // Health Check

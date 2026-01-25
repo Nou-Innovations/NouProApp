@@ -24,8 +24,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useNavigation, useRoute, ParamListBase, NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
+import LocationDropdown from '@/features/company/components/LocationDropdown';
 import AssignStaffModal from '@/features/team/components/AssignStaffModal';
 import Pill from '@/shared/components/ui/Pill';
 import theme from '@/shared/theme';
@@ -65,8 +66,8 @@ const DeliveryDetailScreen = () => {
   const deliveryId = route.params?.deliveryId;
   const { setDeliveriesUnreadCount, markItemAsViewed } = useNotifications();
   
-  // Business store for locations
-  const { locations, currentLocation, setLocation } = useBusinessStore();
+  // Business store for current location (used for warehouse stock display)
+  const { currentLocation } = useBusinessStore();
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   
   // Find delivery from mock data
@@ -101,22 +102,6 @@ const DeliveryDetailScreen = () => {
   const [expectedDeliveryTime, setExpectedDeliveryTime] = useState<Date>(new Date(delivery.expectedDeliveryDateTime));
   const [distributorNotes, setDistributorNotes] = useState<string>(delivery.distributorNotes || '');
   const [clientNotes, setClientNotes] = useState<string>(delivery.clientNotes || '');
-  // Location/Warehouse selector using businessStore
-  const safeLocations = Array.isArray(locations) ? locations : [];
-  const hasSingleLocation = safeLocations.length === 1;
-  const primaryLocation = safeLocations.find(loc => (loc as any).is_primary) || safeLocations[0];
-  const selectedWarehouse = currentLocation || (hasSingleLocation ? primaryLocation : null);
-  
-  const [showWarehouseModal, setShowWarehouseModal] = useState(false);
-  const [warehouseOverlayAnimation] = useState(new Animated.Value(0));
-  const [warehouseContentAnimation] = useState(new Animated.Value(0));
-  
-  // Auto-select primary location when there's only one
-  useEffect(() => {
-    if (hasSingleLocation && primaryLocation && !currentLocation) {
-      setLocation(primaryLocation);
-    }
-  }, [hasSingleLocation, primaryLocation?.id]);
   
   // State for modals
   const [showStaffModal, setShowStaffModal] = useState(false);
@@ -923,123 +908,6 @@ const DeliveryDetailScreen = () => {
     </Modal>
   );
 
-  // Filter warehouses based on search (using businessStore locations)
-  const [searchWarehouse, setSearchWarehouse] = useState('');
-  const filteredWarehouses = safeLocations.filter(location => 
-    location.name.toLowerCase().includes(searchWarehouse.toLowerCase()) ||
-    (location.address && location.address.toLowerCase().includes(searchWarehouse.toLowerCase()))
-  );
-  
-  // Show warehouse modal with animation
-  const handleShowWarehouseModal = () => {
-    if (hasSingleLocation) return; // Don't show modal if only one location
-    setShowWarehouseModal(true);
-    animateOverlayIn(warehouseOverlayAnimation);
-    animateContentIn(warehouseContentAnimation);
-  };
-
-  // Hide warehouse modal with animation
-  const handleHideWarehouseModal = () => {
-    animateOverlayOut(warehouseOverlayAnimation);
-    animateContentOut(warehouseContentAnimation, () => setShowWarehouseModal(false));
-  };
-
-  // Handle warehouse selection - update global location in store
-  const handleSelectWarehouse = (location: typeof safeLocations[0]) => {
-    setLocation(location);
-    handleHideWarehouseModal();
-  };
-
-  const renderWarehouseModal = () => (
-    <Modal
-      visible={showWarehouseModal}
-      transparent={true}
-      animationType="none"
-      onRequestClose={handleHideWarehouseModal}
-    >
-      <Animated.View 
-        style={[
-          styles.modalContainer,
-          {
-            opacity: warehouseOverlayAnimation,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          }
-        ]}
-      >
-        <Animated.View 
-          style={[
-            styles.modalContent,
-            {
-              transform: [{
-                translateY: warehouseContentAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [500, 0]
-                })
-              }]
-            }
-          ]}
-        >
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Warehouse</Text>
-            <TouchableOpacity onPress={handleHideWarehouseModal}>
-              <Icon name="close" size={24} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.searchContainer}>
-            <Icon name="search" size={20} color="#6B7280" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search warehouse..."
-              value={searchWarehouse}
-              onChangeText={setSearchWarehouse}
-            />
-            {searchWarehouse.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchWarehouse('')}>
-                <Icon name="close-circle" size={20} color="#6B7280" />
-              </TouchableOpacity>
-            )}
-          </View>
-          
-          <ScrollView style={styles.modalScrollView}>
-            {filteredWarehouses.map(location => (
-              <TouchableOpacity 
-                key={location.id} 
-                style={[
-                  styles.modalItem,
-                  selectedWarehouse?.id === location.id && { backgroundColor: `${theme.colors.primary}10` }
-                ]}
-                onPress={() => {
-                  handleSelectWarehouse(location);
-                  setSearchWarehouse('');
-                }}
-              >
-                <View style={styles.modalItemIconContainer}>
-                  <Icon name="location" size={24} color={theme.colors.primary} />
-                </View>
-                <View style={styles.modalItemInfo}>
-                  <Text style={styles.modalItemName}>{location.name}</Text>
-                  {location.address && (
-                    <Text style={styles.modalItemDetails}>{location.address}</Text>
-                  )}
-                </View>
-                {selectedWarehouse?.id === location.id && (
-                  <Icon name="checkmark-circle" size={24} color={theme.colors.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
-            
-            {filteredWarehouses.length === 0 && (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No warehouse found matching "{searchWarehouse}"</Text>
-              </View>
-            )}
-          </ScrollView>
-        </Animated.View>
-      </Animated.View>
-    </Modal>
-  );
-
   const [isOrderDetailsExpanded, setIsOrderDetailsExpanded] = useState(true);
   const orderDetailsHeight = useRef(new Animated.Value(1)).current;
   
@@ -1240,19 +1108,9 @@ const DeliveryDetailScreen = () => {
   );
 
   // More options menu items
-  const moreOptionsItems = [
-    {
-      id: 'share',
-      title: 'Share',
-      description: 'Share delivery details',
-      icon: 'share',
-    },
-    {
-      id: 'delete',
-      title: 'Delete',
-      description: 'Delete this delivery',
-      icon: 'trash-2',
-    },
+  const moreOptionsItems: AppBottomSheetItem[] = [
+    { id: 'share', title: 'Share' },
+    { id: 'delete', title: 'Delete', variant: 'destructive' },
   ];
 
   const handleMoreOptionSelect = (item: { id: string }) => {
@@ -1431,24 +1289,12 @@ const DeliveryDetailScreen = () => {
         <View style={styles.productListContainer}>
           <Text style={[styles.sectionTitle, { paddingHorizontal: 16, marginBottom: 16 }]}>Product List</Text>
 
-          {/* Warehouse Selector - Using businessStore locations */}
-          {isUserAdmin && safeLocations.length > 0 && (
+          {/* Warehouse Selector */}
+          {isUserAdmin && (
             <View style={[styles.infoItem, { paddingHorizontal: 16, marginBottom: 16 }]}>
               <Text style={styles.infoLabel}>Warehouse:</Text>
               <View style={styles.customFieldContainer}>
-                <TouchableOpacity 
-                  onPress={handleShowWarehouseModal}
-                  style={styles.customField}
-                  activeOpacity={hasSingleLocation ? 1 : 0.7}
-                  disabled={hasSingleLocation}
-                >
-                  <Text style={styles.customFieldText}>
-                    {selectedWarehouse?.name || 'Select warehouse'}
-                  </Text>
-                  {!hasSingleLocation && (
-                    <Icon name="chevron-down" size={20} color="#6B7280" />
-                  )}
-                </TouchableOpacity>
+                <LocationDropdown style={{ flex: 1 }} />
               </View>
             </View>
           )}
@@ -1464,7 +1310,7 @@ const DeliveryDetailScreen = () => {
           
           {/* Product Items */}
           {deliveryItems.map((item, index) => {
-            const warehouseName = selectedWarehouse?.name || 'Warehouse A';
+            const warehouseName = currentLocation?.name || 'Warehouse A';
             const availableStock = item.warehouseStock?.[warehouseName] || 0;
             const hasStockWarning = isUserAdmin && item.warehouseStock && availableStock < item.quantityOrdered;
             
@@ -1701,7 +1547,6 @@ const DeliveryDetailScreen = () => {
       {renderTransportModal()}
       {renderOrderStatusModal()}
       {renderPaymentStatusModal()}
-      {renderWarehouseModal()}
       
       {/* Custom Scheduling Modal */}
       <Modal
@@ -1899,26 +1744,10 @@ const DeliveryDetailScreen = () => {
         visible={showMoreOptions}
         onClose={() => setShowMoreOptions(false)}
         title="Options"
-      >
-        {moreOptionsItems.map((item, index) => (
-          <ListItemCard
-            key={item.id}
-            avatar={{
-              type: 'icon',
-              icon: item.icon,
-              iconColor: theme.colors.text,
-              backgroundColor: theme.colors.surface,
-            }}
-            title={item.title}
-            subtitle={item.description}
-            onPress={() => {
-              handleMoreOptionSelect(item);
-              setShowMoreOptions(false);
-            }}
-            showDivider={index < moreOptionsItems.length - 1}
-          />
-        ))}
-      </AppBottomSheet>
+        items={moreOptionsItems}
+        mode="buttons"
+        onSelectItem={handleMoreOptionSelect}
+      />
     </SafeAreaView>
   );
 };

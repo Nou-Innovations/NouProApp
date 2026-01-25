@@ -8,9 +8,10 @@
  * - Business locations
  * - Business CRUD operations
  * 
- * Persistence:
- * - currentLocationId is persisted to remember last selected location
- * - null = "All Locations" view
+ * Location Selection:
+ * - Always defaults to "All Locations" (null) on app startup
+ * - Users can manually select a specific location during the session
+ * - Location selection is NOT persisted across app restarts
  */
 
 import { create } from 'zustand';
@@ -64,7 +65,7 @@ interface BusinessStoreState {
   // Locations
   locations: LegacyLocation[];
   currentLocation: LegacyLocation | null;
-  currentLocationId: string | null; // Persisted: null = "All Locations"
+  currentLocationId: string | null; // null = "All Locations" (default on app start)
   
   // Loading states
   isLoading: boolean;
@@ -92,7 +93,7 @@ interface BusinessStoreState {
 
 /**
  * Business Store
- * Persists currentLocationId to remember last selected location across sessions
+ * Always defaults to "All Locations" on app startup
  */
 export const useBusinessStore = create<BusinessStoreState>()(
   persist(
@@ -101,7 +102,7 @@ export const useBusinessStore = create<BusinessStoreState>()(
   currentBusiness: null,
   locations: [],
   currentLocation: null,
-  currentLocationId: null, // null = "All Locations"
+  currentLocationId: null, // null = "All Locations" (default)
   isLoading: false,
   error: null,
   
@@ -114,6 +115,7 @@ export const useBusinessStore = create<BusinessStoreState>()(
       currentBusiness: business,
       currentCompany: business, // Keep alias in sync
       currentLocation: null,
+      currentLocationId: null, // Reset to "All Locations"
       locations: []
     });
     get().fetchLocations(business.id);
@@ -206,16 +208,9 @@ export const useBusinessStore = create<BusinessStoreState>()(
         });
       }
       
-      // Restore currentLocation from persisted currentLocationId
-      const persistedLocationId = get().currentLocationId;
-      if (persistedLocationId !== null) {
-        // User had a specific location selected - restore it
-        const restoredLocation = locations.find(loc => loc.id === persistedLocationId);
-        if (restoredLocation) {
-          set({ currentLocation: restoredLocation });
-        }
-      }
-      // If persistedLocationId is null, user had "All Locations" - don't auto-select
+      // Default to "All Locations" on app startup
+      // Users can manually select a specific location if needed
+      set({ currentLocation: null, currentLocationId: null });
     } catch (error) {
       // Expected when backend is not running - silently fall back to mock data
       if (__DEV__) console.log('Using mock location data (API unavailable)');
@@ -276,16 +271,9 @@ export const useBusinessStore = create<BusinessStoreState>()(
         });
       }
       
-      // Restore currentLocation from persisted currentLocationId
-      const persistedLocationId = get().currentLocationId;
-      if (persistedLocationId !== null) {
-        // User had a specific location selected - restore it
-        const restoredLocation = mockLocations.find(loc => loc.id === persistedLocationId);
-        if (restoredLocation) {
-          set({ currentLocation: restoredLocation });
-        }
-      }
-      // If persistedLocationId is null, user had "All Locations" - don't auto-select
+      // Default to "All Locations" on app startup
+      // Users can manually select a specific location if needed
+      set({ currentLocation: null, currentLocationId: null });
     }
   },
 
@@ -458,9 +446,9 @@ export const useBusinessStore = create<BusinessStoreState>()(
     {
       name: 'noupro-business-store',
       storage: createJSONStorage(() => AsyncStorage),
-      // Only persist the location selection preference
+      // Don't persist location selection - always default to "All Locations" on app start
       partialize: (state) => ({
-        currentLocationId: state.currentLocationId,
+        // Empty object = nothing persisted
       }),
     }
   )

@@ -1,7 +1,7 @@
 /**
  * MessageBubble Component
  * 
- * Renders different message types (text, order, pdf, invoice, etc.)
+ * Renders different message types (text, order, pdf, invoice, estimate, etc.)
  * Extracted from ChatScreen.tsx for maintainability.
  * 
  * Message types supported:
@@ -9,20 +9,21 @@
  * - order: Order cards with status and actions
  * - pdf: Document attachment
  * - invoice: Invoice preview
+ * - estimate: Estimate preview with confirm action
  * - event: System/event messages (centered)
  * - deleted: Deleted message placeholder
  * - image, voice, location, contact: Placeholder for V2
  */
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   Image,
   StyleSheet,
-  Alert,
   Linking,
+  Alert,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -34,6 +35,8 @@ import {
   ORDER_STATUS_COLORS,
   PAYMENT_STATUS_COLORS,
 } from '../inbox.constants';
+import AppButton from '@/shared/components/ui/AppButton';
+import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
 
 // ============================================================================
 // Types
@@ -45,7 +48,43 @@ export interface MessageBubbleProps {
   onOrderPress?: (orderId: string) => void;
   onOpenDocument?: (fileName: string) => void;
   onDeleteMessage?: (messageId: string) => void;
+  onReplyMessage?: (messageId: string) => void;
   onInvoicePress?: (invoiceId: string) => void;
+  onEstimatePress?: (estimateId: string) => void;
+  onEstimateConfirm?: (estimateId: string) => void;
+  // Message grouping
+  isGrouped?: boolean; // True if this message is part of a group (same sender adjacent)
+  isFirstInGroup?: boolean; // True if this is the first message in a group (chronologically)
+  isLastInGroup?: boolean; // True if this is the last message in a group (chronologically)
+  showSenderName?: boolean; // True to show sender name above the message (for group chats)
+}
+
+// ============================================================================
+// Sender Name Colors - Consistent colors based on sender name hash
+// ============================================================================
+
+const SENDER_COLORS = [
+  '#E91E63', // Pink
+  '#9C27B0', // Purple
+  '#673AB7', // Deep Purple
+  '#3F51B5', // Indigo
+  '#2196F3', // Blue
+  '#00BCD4', // Cyan
+  '#009688', // Teal
+  '#4CAF50', // Green
+  '#8BC34A', // Light Green
+  '#FF9800', // Orange
+  '#FF5722', // Deep Orange
+  '#795548', // Brown
+];
+
+function getSenderNameColor(senderName: string): string {
+  let hash = 0;
+  for (let i = 0; i < senderName.length; i++) {
+    hash = senderName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % SENDER_COLORS.length;
+  return SENDER_COLORS[index];
 }
 
 // ============================================================================
@@ -104,29 +143,45 @@ export function MessageBubble({
   onOrderPress, 
   onOpenDocument, 
   onDeleteMessage,
+  onReplyMessage,
   onInvoicePress,
+  onEstimatePress,
+  onEstimateConfirm,
+  isGrouped = false,
+  isFirstInGroup = false,
+  isLastInGroup = false,
+  showSenderName = false,
 }: MessageBubbleProps) {
   const isOutgoing = message.isOutgoing;
-  const { theme: appTheme } = useTheme();
+  const { theme: appTheme, isDarkMode } = useTheme();
+  const [showOptionsSheet, setShowOptionsSheet] = useState(false);
+  
+  // Only show avatar for the last message in a group (visually at bottom = no same sender below = isLastInGroup)
+  const showAvatar = !isOutgoing && isLastInGroup;
+  
+  // Get sender name color for group chats
+  const senderNameColor = getSenderNameColor(message.sender.name);
+  
+  // Bottom sheet items for message options
+  const messageOptions: AppBottomSheetItem[] = [
+    { id: 'reply', title: 'Reply' },
+    { id: 'delete', title: 'Delete Message', variant: 'destructive' },
+  ];
   
   // ========== Handlers ==========
   
-  const handleLongPress = () => {
+  const handleLongPress = useCallback(() => {
     if (message.type === 'deleted' || message.type === 'event') return;
-    
-    Alert.alert(
-      'Message Options',
-      'What would you like to do with this message?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete Message', 
-          style: 'destructive',
-          onPress: () => onDeleteMessage?.(message.id)
-        },
-      ]
-    );
-  };
+    setShowOptionsSheet(true);
+  }, [message.type]);
+  
+  const handleOptionSelect = useCallback((item: AppBottomSheetItem) => {
+    if (item.id === 'reply') {
+      onReplyMessage?.(message.id);
+    } else if (item.id === 'delete') {
+      onDeleteMessage?.(message.id);
+    }
+  }, [message.id, onReplyMessage, onDeleteMessage]);
   
   const handleLinkPress = async (url: string) => {
     try {
@@ -156,12 +211,12 @@ export function MessageBubble({
     styles.bubble,
     isOutgoing 
       ? [styles.bubbleOutgoing, { backgroundColor: appTheme.colors.primary }] 
-      : [styles.bubbleIncoming, { backgroundColor: '#FFFFFF' }],
+      : [styles.bubbleIncoming, { backgroundColor: appTheme.colors.cardBackground }],
   ];
   
   const textStyle = isOutgoing 
-    ? styles.textOutgoing 
-    : [styles.textIncoming, { color: appTheme.colors.text }];
+    ? [styles.textOutgoing, { color: appTheme.colors.textInverse }] 
+    : [styles.textIncoming, { color: appTheme.colors.primary }];
   
   const bubbleContainerStyle = isOutgoing 
     ? styles.bubbleContainerOutgoing 
@@ -175,7 +230,7 @@ export function MessageBubble({
       <View style={styles.timestampContainer}>
         <Text style={[
           styles.timestamp, 
-          { color: isOutgoing ? 'rgba(255,255,255,0.7)' : appTheme.colors.textSecondary }
+          { color: isOutgoing ? appTheme.colors.textMuted : appTheme.colors.textSecondary }
         ]}>
           {formattedTime}
         </Text>
@@ -206,7 +261,7 @@ export function MessageBubble({
               style={[
                 textStyle,
                 styles.linkText,
-                { color: isOutgoing ? '#93C5FD' : '#2563EB' }
+                { color: isOutgoing ? appTheme.colors.textInverse : appTheme.colors.linkColor }
               ]}
               onPress={() => handleLinkPress(url)}
             >
@@ -259,24 +314,46 @@ export function MessageBubble({
     if (message.type !== 'text') return null;
     
     return (
-      <View style={[styles.row, isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}> 
-        {!isOutgoing && message.sender.avatar && (
-          <Image source={{ uri: message.sender.avatar }} style={styles.avatarSmall} />
-        )}
-        <View style={bubbleContainerStyle}>
-          <TouchableOpacity 
-            activeOpacity={0.8}
-            onLongPress={handleLongPress}
-            delayLongPress={500}
-          >
-            <View style={[bubbleStyle, message.replyingTo && styles.bubbleWithReply]}>
-              {renderReplyContext()}
-              {renderTextWithLinks(message.text)}
-              {renderTimestamp(message.timestamp, message.status)}
-            </View>
-          </TouchableOpacity>
+      <>
+        <View style={[
+          styles.row, 
+          isGrouped && styles.rowGrouped,
+          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
+        ]}> 
+          {!isOutgoing && (
+            showAvatar && message.sender.avatar ? (
+              <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
+            ) : (
+              <View style={styles.avatarPlaceholder} />
+            )
+          )}
+          <View style={bubbleContainerStyle}>
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              onLongPress={handleLongPress}
+              delayLongPress={500}
+            >
+              <View style={[bubbleStyle, message.replyingTo && styles.bubbleWithReply]}>
+                {showSenderName && !isOutgoing && (
+                  <Text style={[styles.senderName, { color: senderNameColor }]}>
+                    {message.sender.name}
+                  </Text>
+                )}
+                {renderReplyContext()}
+                {renderTextWithLinks(message.text)}
+                {renderTimestamp(message.timestamp, message.status)}
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+        <AppBottomSheet
+          visible={showOptionsSheet}
+          onClose={() => setShowOptionsSheet(false)}
+          title="Message Options"
+          items={messageOptions}
+          onSelectItem={handleOptionSelect}
+        />
+      </>
     );
   };
   
@@ -284,28 +361,50 @@ export function MessageBubble({
     if (message.type !== 'pdf') return null;
     
     return (
-      <View style={[styles.row, isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}> 
-        {!isOutgoing && message.sender.avatar && (
-          <Image source={{ uri: message.sender.avatar }} style={styles.avatarSmall} />
-        )}
-        <View style={bubbleContainerStyle}>
-          <TouchableOpacity 
-            style={bubbleStyle} 
-            onPress={() => onOpenDocument?.(message.fileName)}
-            onLongPress={handleLongPress}
-            delayLongPress={500}
-          >
-            <View style={styles.iconTextRow}>
-              <Icon name="file-text" size={18} color={isOutgoing ? '#f9fafb' : '#1f2937'} style={styles.inlineIcon}/>
-              <Text style={textStyle}>{message.fileName || 'Document.pdf'}</Text>
-            </View>
-            <Text style={[{ fontSize: 12, opacity: 0.6 }, isOutgoing ? { color: '#f9fafb' } : { color: '#1f2937' }]}>
-              Tap to view
-            </Text>
-            {renderTimestamp(message.timestamp, message.status)}
-          </TouchableOpacity>
+      <>
+        <View style={[
+          styles.row, 
+          isGrouped && styles.rowGrouped,
+          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
+        ]}> 
+          {!isOutgoing && (
+            showAvatar && message.sender.avatar ? (
+              <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
+            ) : (
+              <View style={styles.avatarPlaceholder} />
+            )
+          )}
+          <View style={bubbleContainerStyle}>
+            <TouchableOpacity 
+              style={bubbleStyle} 
+              onPress={() => onOpenDocument?.(message.fileName)}
+              onLongPress={handleLongPress}
+              delayLongPress={500}
+            >
+              {showSenderName && !isOutgoing && (
+                <Text style={[styles.senderName, { color: senderNameColor }]}>
+                  {message.sender.name}
+                </Text>
+              )}
+              <View style={styles.iconTextRow}>
+                <Icon name="file-text" size={18} color={isOutgoing ? appTheme.colors.textInverse : appTheme.colors.primary} style={styles.inlineIcon}/>
+                <Text style={textStyle}>{message.fileName || 'Document.pdf'}</Text>
+              </View>
+              <Text style={[{ fontSize: 14 }, { color: isOutgoing ? appTheme.colors.textMuted : appTheme.colors.textSecondary }]}>
+                Tap to view
+              </Text>
+              {renderTimestamp(message.timestamp, message.status)}
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+        <AppBottomSheet
+          visible={showOptionsSheet}
+          onClose={() => setShowOptionsSheet(false)}
+          title="Message Options"
+          items={messageOptions}
+          onSelectItem={handleOptionSelect}
+        />
+      </>
     );
   };
   
@@ -313,44 +412,143 @@ export function MessageBubble({
     if (message.type !== 'invoice') return null;
     
     return (
-      <View style={[styles.row, isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}> 
-        {!isOutgoing && message.sender.avatar && (
-          <Image source={{ uri: message.sender.avatar }} style={styles.avatarSmall} />
-        )}
-        <View style={bubbleContainerStyle}>
-          <TouchableOpacity 
-            style={[
-              styles.specialMessageBubble,
-              isOutgoing ? { backgroundColor: appTheme.colors.primary } : { backgroundColor: '#FFFFFF' },
-            ]} 
-            onPress={() => onInvoicePress?.(message.invoiceId)}
-            onLongPress={handleLongPress}
-            delayLongPress={500}
-          >
-            <View style={styles.specialMessageHeader}>
-              <Icon 
-                name="receipt-outline" 
-                size={18} 
-                color={isOutgoing ? '#FFFFFF' : appTheme.colors.primary} 
-                style={styles.specialMessageIcon}
-              />
+      <>
+        <View style={[
+          styles.row, 
+          isGrouped && styles.rowGrouped,
+          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
+        ]}> 
+          {!isOutgoing && (
+            showAvatar && message.sender.avatar ? (
+              <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
+            ) : (
+              <View style={styles.avatarPlaceholder} />
+            )
+          )}
+          <View style={bubbleContainerStyle}>
+            <TouchableOpacity 
+              style={[
+                styles.specialMessageBubble,
+                isOutgoing ? { backgroundColor: appTheme.colors.primary } : { backgroundColor: appTheme.colors.cardBackground },
+              ]} 
+              onPress={() => onInvoicePress?.(message.invoiceId)}
+              onLongPress={handleLongPress}
+              delayLongPress={500}
+            >
+              {showSenderName && !isOutgoing && (
+                <Text style={[styles.senderName, { color: senderNameColor }]}>
+                  {message.sender.name}
+                </Text>
+              )}
+              <View style={styles.specialMessageHeader}>
+                <Icon 
+                  name="receipt-outline" 
+                  size={18} 
+                  color={isOutgoing ? appTheme.colors.textInverse : appTheme.colors.primary} 
+                  style={styles.specialMessageIcon}
+                />
+                <Text style={[
+                  styles.specialMessageTitle,
+                  { color: isOutgoing ? appTheme.colors.textInverse : appTheme.colors.text }
+                ]} numberOfLines={1}>
+                  Invoice #{message.invoiceId}
+                </Text>
+              </View>
               <Text style={[
-                styles.specialMessageTitle,
-                { color: isOutgoing ? '#FFFFFF' : appTheme.colors.text }
-              ]} numberOfLines={1}>
-                Invoice #{message.invoiceId}
+                styles.specialMessageSubtext,
+                { color: isOutgoing ? appTheme.colors.textMuted : appTheme.colors.textSecondary }
+              ]}>
+                Tap to view invoice details
               </Text>
-            </View>
-            <Text style={[
-              styles.specialMessageSubtext,
-              { color: isOutgoing ? 'rgba(255,255,255,0.7)' : appTheme.colors.textSecondary }
-            ]}>
-              Tap to view invoice details
-            </Text>
-            {renderTimestamp(message.timestamp, message.status)}
-          </TouchableOpacity>
+              {renderTimestamp(message.timestamp, message.status)}
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+        <AppBottomSheet
+          visible={showOptionsSheet}
+          onClose={() => setShowOptionsSheet(false)}
+          title="Message Options"
+          items={messageOptions}
+          onSelectItem={handleOptionSelect}
+        />
+      </>
+    );
+  };
+  
+  const renderEstimateMessage = () => {
+    if (message.type !== 'estimate') return null;
+    
+    return (
+      <>
+        <View style={[
+          styles.row, 
+          isGrouped && styles.rowGrouped,
+          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
+        ]}> 
+          {!isOutgoing && (
+            showAvatar && message.sender.avatar ? (
+              <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
+            ) : (
+              <View style={styles.avatarPlaceholder} />
+            )
+          )}
+          <View style={bubbleContainerStyle}>
+            <TouchableOpacity 
+              style={[
+                styles.specialMessageBubble,
+                isOutgoing ? { backgroundColor: appTheme.colors.primary } : { backgroundColor: appTheme.colors.cardBackground },
+              ]} 
+              onPress={() => onEstimatePress?.(message.estimateId)}
+              onLongPress={handleLongPress}
+              delayLongPress={500}
+            >
+              {showSenderName && !isOutgoing && (
+                <Text style={[styles.senderName, { color: senderNameColor }]}>
+                  {message.sender.name}
+                </Text>
+              )}
+              <View style={styles.specialMessageHeader}>
+                <Icon 
+                  name="receipt-outline" 
+                  size={18} 
+                  color={isOutgoing ? appTheme.colors.textInverse : appTheme.colors.primary} 
+                  style={styles.specialMessageIcon}
+                />
+                <Text style={[
+                  styles.specialMessageTitle,
+                  { color: isOutgoing ? appTheme.colors.textInverse : appTheme.colors.text }
+                ]} numberOfLines={1}>
+                  Estimate #{message.estimateId}
+                </Text>
+              </View>
+              <Text style={[
+                styles.specialMessageSubtext,
+                { color: isOutgoing ? appTheme.colors.textMuted : appTheme.colors.textSecondary }
+              ]}>
+                Tap to view estimate details
+              </Text>
+              
+              {/* Confirm Estimate Button */}
+              <AppButton
+                title="Confirm Estimate"
+                size="small"
+                variant={isOutgoing ? 'secondary' : 'primary'}
+                onPress={() => onEstimateConfirm?.(message.estimateId)}
+                style={{ marginTop: 8 }}
+              />
+              
+              {renderTimestamp(message.timestamp, message.status)}
+            </TouchableOpacity>
+          </View>
+        </View>
+        <AppBottomSheet
+          visible={showOptionsSheet}
+          onClose={() => setShowOptionsSheet(false)}
+          title="Message Options"
+          items={messageOptions}
+          onSelectItem={handleOptionSelect}
+        />
+      </>
     );
   };
   
@@ -359,138 +557,149 @@ export function MessageBubble({
     
     const isImport = message.isOutgoing;
     const importExportLabel = isImport ? 'Import' : 'Export';
+    const importExportColor = isImport ? appTheme.colors.statusImport : appTheme.colors.statusExport;
     const showMarkPaymentDone = isImport && message.paymentStatus === 'Unpaid';
     const showConfirmPayment = !isImport && message.paymentStatus === 'Payment Pending Confirmation';
     const showMarkDeliveryDone = !isImport && (message.orderStatus === 'Ongoing' || message.orderStatus === 'New');
     const showConfirmDelivery = isImport && message.orderStatus === 'Delivery Pending Confirmation';
     const showSeeInvoice = message.paymentStatus === 'Paid';
     
-    const orderBgColor = isOutgoing ? appTheme.colors.primary : '#FFFFFF';
-    const orderTextColor = isOutgoing ? '#FFFFFF' : appTheme.colors.text;
-    const orderSubTextColor = isOutgoing ? 'rgba(255,255,255,0.7)' : appTheme.colors.textSecondary;
-    const orderBorderColor = getOrderStatusColor(message.orderStatus);
+    const orderBgColor = isOutgoing ? appTheme.colors.primary : appTheme.colors.cardBackground;
+    const orderTextColor = isOutgoing ? appTheme.colors.textInverse : appTheme.colors.text;
+    const orderSubTextColor = isOutgoing ? appTheme.colors.textMuted : appTheme.colors.textSecondary;
     
     return (
-      <View style={[styles.row, isImport ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}> 
-        {!isImport && message.sender.avatar && (
-          <Image source={{ uri: message.sender.avatar }} style={styles.avatarSmall} />
-        )}
-        <View style={bubbleContainerStyle}>
-          <TouchableOpacity 
-            activeOpacity={0.7}
-            onPress={() => onOrderPress?.(message.orderId)}
-            onLongPress={handleLongPress}
-            delayLongPress={500}
-            style={[
-              styles.specialMessageBubble,
-              { 
-                backgroundColor: orderBgColor,
-                borderWidth: 0.5,
-                borderColor: orderBorderColor,
-              },
-            ]}
-          >
-            {/* Header */}
-            <View style={styles.orderHeader}>
-              <View style={styles.orderHeaderLeft}>
-                <Icon name="cube-outline" size={18} color={isOutgoing ? '#FFFFFF' : appTheme.colors.primary} />
-                <View style={[styles.orderTypeBadge, { backgroundColor: isImport ? '#2ACF01' : '#FF7A00' }]}>
-                  <Text style={styles.orderTypeBadgeText}>{importExportLabel}</Text>
+      <>
+        <View style={[
+          styles.row, 
+          isGrouped && styles.rowGrouped,
+          isImport ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
+        ]}> 
+          {!isImport && (
+            showAvatar && message.sender.avatar ? (
+              <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
+            ) : (
+              <View style={styles.avatarPlaceholder} />
+            )
+          )}
+          <View style={bubbleContainerStyle}>
+            <TouchableOpacity 
+              activeOpacity={0.7}
+              onPress={() => onOrderPress?.(message.orderId)}
+              onLongPress={handleLongPress}
+              delayLongPress={500}
+              style={[
+                styles.specialMessageBubble,
+                { backgroundColor: orderBgColor },
+              ]}
+            >
+              {showSenderName && !isImport && (
+                <Text style={[styles.senderName, { color: senderNameColor }]}>
+                  {message.sender.name}
+                </Text>
+              )}
+              {/* Header with Icon, Order ID, and Badge */}
+              <View style={styles.orderHeader}>
+                <View style={styles.orderHeaderLeft}>
+                  <Icon name="cube-outline" size={18} color={importExportColor} />
+                  <Text style={[styles.orderIdText, { color: orderTextColor, marginLeft: 8 }]}>
+                    #{message.orderId}
+                  </Text>
+                </View>
+                <View style={[styles.orderTypeBadge, { backgroundColor: importExportColor }]}>
+                  <Text style={[styles.orderTypeBadgeText, { color: appTheme.colors.textInverse }]}>{importExportLabel}</Text>
                 </View>
               </View>
-            </View>
-            
-            {/* Order ID */}
-            <Text style={[styles.orderIdText, { color: orderTextColor }]}>
-              #{message.orderId}
-            </Text>
-            
-            {/* Order Details */}
-            <View style={styles.orderDetailsContainer}>
-              <View style={styles.orderDetailRow}>
-                <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Items</Text>
-                <Text style={[styles.orderDetailValueBold, { color: orderTextColor }]}>{message.itemCount}</Text>
+              
+              {/* Order Details */}
+              <View style={styles.orderDetailsContainer}>
+                <View style={styles.orderDetailRow}>
+                  <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Items</Text>
+                  <Text style={[styles.orderDetailValueBold, { color: orderTextColor }]}>{message.itemCount}</Text>
+                </View>
+                <View style={styles.orderDetailRow}>
+                  <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Total</Text>
+                  <Text style={[styles.orderDetailValueBold, { color: orderTextColor }]}>
+                    ${message.totalAmount.toFixed(2)}
+                  </Text>
+                </View>
+                <View style={styles.orderDetailRow}>
+                  <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Status</Text>
+                  <Text style={[styles.orderDetailValueBold, { color: getOrderStatusColor(message.orderStatus) }]}>
+                    {message.orderStatus}
+                  </Text>
+                </View>
+                <View style={styles.orderDetailRow}>
+                  <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Payment</Text>
+                  <Text style={[styles.orderDetailValueBold, { color: getPaymentStatusColor(message.paymentStatus) }]}>
+                    {message.paymentStatus}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.orderDetailRow}>
-                <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Total</Text>
-                <Text style={[styles.orderDetailValueBold, { color: orderTextColor }]}>
-                  ${message.totalAmount.toFixed(2)}
-                </Text>
-              </View>
-              <View style={styles.orderDetailRow}>
-                <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Status</Text>
-                <Text style={[styles.orderDetailValueBold, { color: getOrderStatusColor(message.orderStatus) }]}>
-                  {message.orderStatus}
-                </Text>
-              </View>
-              <View style={styles.orderDetailRow}>
-                <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Payment</Text>
-                <Text style={[styles.orderDetailValueBold, { color: getPaymentStatusColor(message.paymentStatus) }]}>
-                  {message.paymentStatus}
-                </Text>
-              </View>
-            </View>
-            
-            {/* Action Buttons */}
-            {(showMarkPaymentDone || showConfirmPayment || showMarkDeliveryDone || showConfirmDelivery || showSeeInvoice) && (
-              <View style={styles.orderActionsContainer}>
-                {showMarkPaymentDone && (
-                  <TouchableOpacity 
-                    style={[styles.orderActionBtn, isOutgoing && styles.orderActionBtnOutgoing]} 
-                    onPress={() => onOrderAction?.('payment', message)}
-                  >
-                    <Text style={[styles.orderActionBtnText, isOutgoing && styles.orderActionBtnTextOutgoing]}>
-                      Mark Payment Done
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                {showConfirmPayment && (
-                  <TouchableOpacity 
-                    style={[styles.orderActionBtn, isOutgoing && styles.orderActionBtnOutgoing]} 
-                    onPress={() => onOrderAction?.('payment', message)}
-                  >
-                    <Text style={[styles.orderActionBtnText, isOutgoing && styles.orderActionBtnTextOutgoing]}>
-                      Confirm Payment
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                {showMarkDeliveryDone && (
-                  <TouchableOpacity 
-                    style={[styles.orderActionBtn, isOutgoing && styles.orderActionBtnOutgoing]} 
-                    onPress={() => onOrderAction?.('delivery', message)}
-                  >
-                    <Text style={[styles.orderActionBtnText, isOutgoing && styles.orderActionBtnTextOutgoing]}>
-                      Mark Delivery Done
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                {showConfirmDelivery && (
-                  <TouchableOpacity 
-                    style={[styles.orderActionBtn, isOutgoing && styles.orderActionBtnOutgoing]} 
-                    onPress={() => onOrderAction?.('delivery', message)}
-                  >
-                    <Text style={[styles.orderActionBtnText, isOutgoing && styles.orderActionBtnTextOutgoing]}>
-                      Confirm Delivery
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                {showSeeInvoice && (
-                  <TouchableOpacity 
-                    style={[styles.orderActionBtn, isOutgoing && styles.orderActionBtnOutgoing]} 
-                    onPress={() => onOrderAction?.('invoice', message)}
-                  >
-                    <Text style={[styles.orderActionBtnText, isOutgoing && styles.orderActionBtnTextOutgoing]}>
-                      See Invoice
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-            
-            {renderTimestamp(message.timestamp, message.status)}
-          </TouchableOpacity>
+              
+              {/* Action Buttons */}
+              {(showMarkPaymentDone || showConfirmPayment || showMarkDeliveryDone || showConfirmDelivery || showSeeInvoice) && (
+                <View style={styles.orderActionsContainer}>
+                  {showMarkPaymentDone && (
+                    <AppButton
+                      title="Mark Payment Done"
+                      size="small"
+                      variant={isOutgoing ? 'secondary' : 'primary'}
+                      onPress={() => onOrderAction?.('payment', message)}
+                      style={styles.orderActionBtnSpacing}
+                    />
+                  )}
+                  {showConfirmPayment && (
+                    <AppButton
+                      title="Confirm Payment"
+                      size="small"
+                      variant={isOutgoing ? 'secondary' : 'primary'}
+                      onPress={() => onOrderAction?.('payment', message)}
+                      style={styles.orderActionBtnSpacing}
+                    />
+                  )}
+                  {showMarkDeliveryDone && (
+                    <AppButton
+                      title="Mark Delivery Done"
+                      size="small"
+                      variant={isOutgoing ? 'secondary' : 'primary'}
+                      onPress={() => onOrderAction?.('delivery', message)}
+                      style={styles.orderActionBtnSpacing}
+                    />
+                  )}
+                  {showConfirmDelivery && (
+                    <AppButton
+                      title="Confirm Delivery"
+                      size="small"
+                      variant={isOutgoing ? 'secondary' : 'primary'}
+                      onPress={() => onOrderAction?.('delivery', message)}
+                      style={styles.orderActionBtnSpacing}
+                    />
+                  )}
+                  {showSeeInvoice && (
+                    <AppButton
+                      title="See Invoice"
+                      size="small"
+                      variant={isOutgoing ? 'secondary' : 'primary'}
+                      onPress={() => onOrderAction?.('invoice', message)}
+                      style={styles.orderActionBtnSpacing}
+                    />
+                  )}
+                </View>
+              )}
+              
+              {renderTimestamp(message.timestamp, message.status)}
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+        <AppBottomSheet
+          visible={showOptionsSheet}
+          onClose={() => setShowOptionsSheet(false)}
+          title="Message Options"
+          items={messageOptions}
+          onSelectItem={handleOptionSelect}
+        />
+      </>
     );
   };
   
@@ -499,8 +708,8 @@ export function MessageBubble({
     
     return (
       <View style={[styles.row, { justifyContent: 'center' }]}> 
-        <View style={styles.eventBubble}>
-          <Text style={styles.eventText}>{message.event}</Text>
+        <View style={[styles.eventBubble, { backgroundColor: appTheme.colors.surface }]}>
+          <Text style={[styles.eventText, { color: appTheme.colors.textMuted }]}>{message.event}</Text>
         </View>
       </View>
     );
@@ -510,16 +719,23 @@ export function MessageBubble({
     if (message.type !== 'deleted') return null;
     
     return (
-      <View style={[styles.row, isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}> 
-        {!isOutgoing && message.sender.avatar && (
-          <Image source={{ uri: message.sender.avatar }} style={styles.avatarSmall} />
+      <View style={[
+        styles.row, 
+        isGrouped && styles.rowGrouped,
+        isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
+      ]}> 
+        {!isOutgoing && (
+          showAvatar && message.sender.avatar ? (
+            <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
+          ) : (
+            <View style={styles.avatarPlaceholder} />
+          )
         )}
-        <View style={[styles.deletedBubble, bubbleContainerStyle]}>
+        <View style={[styles.deletedBubble, bubbleContainerStyle, { backgroundColor: appTheme.colors.borderColor }]}>
           <View style={styles.deletedContent}>
-            <Icon name="ban-outline" size={14} color="#999" style={{ marginRight: 5 }}/>
-            <Text style={styles.deletedText}>This message was deleted</Text>
+            <Icon name="ban-outline" size={14} color={appTheme.colors.textMuted} style={{ marginRight: 5 }}/>
+            <Text style={[styles.deletedText, { color: appTheme.colors.textMuted }]}>This message was deleted</Text>
           </View>
-          {renderTimestamp(message.timestamp, message.status)}
         </View>
       </View>
     );
@@ -537,21 +753,43 @@ export function MessageBubble({
     };
     
     return (
-      <View style={[styles.row, isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}> 
-        {!isOutgoing && message.sender.avatar && (
-          <Image source={{ uri: message.sender.avatar }} style={styles.avatarSmall} />
-        )}
-        <View style={bubbleContainerStyle}>
-          <View style={[bubbleStyle, { opacity: 0.6 }]}>
-            <Text style={[textStyle, { fontStyle: 'italic' }]}>
-              {labels[message.type] || message.type}
-            </Text>
-            <Text style={[{ fontSize: 12, opacity: 0.6 }, isOutgoing ? { color: '#f9fafb' } : { color: '#1f2937' }]}>
-              Not available in this version
-            </Text>
+      <>
+        <View style={[
+          styles.row, 
+          isGrouped && styles.rowGrouped,
+          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
+        ]}> 
+          {!isOutgoing && (
+            showAvatar && message.sender.avatar ? (
+              <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
+            ) : (
+              <View style={styles.avatarPlaceholder} />
+            )
+          )}
+          <View style={bubbleContainerStyle}>
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              onLongPress={handleLongPress}
+              delayLongPress={500}
+              style={[bubbleStyle, { opacity: 0.6 }]}
+            >
+              <Text style={[textStyle, { fontStyle: 'italic' }]}>
+                {labels[message.type] || message.type}
+              </Text>
+              <Text style={[{ fontSize: 14 }, { color: isOutgoing ? appTheme.colors.textMuted : appTheme.colors.textSecondary }]}>
+                Not available in this version
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </View>
+        <AppBottomSheet
+          visible={showOptionsSheet}
+          onClose={() => setShowOptionsSheet(false)}
+          title="Message Options"
+          items={messageOptions}
+          onSelectItem={handleOptionSelect}
+        />
+      </>
     );
   };
   
@@ -564,6 +802,8 @@ export function MessageBubble({
       return renderPdfMessage();
     case 'invoice':
       return renderInvoiceMessage();
+    case 'estimate':
+      return renderEstimateMessage();
     case 'order':
       return renderOrderMessage();
     case 'event':
@@ -587,26 +827,29 @@ export function MessageBubble({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'flex-end',
     marginBottom: 12,
     paddingHorizontal: 12,
   },
+  rowGrouped: {
+    marginBottom: 4,
+  },
   avatarSmall: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#e5e7eb',
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  avatarPlaceholder: {
+    width: 32,
     marginRight: 8,
   },
   bubble: {
     borderRadius: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginBottom: 2,
+    padding: 8,
     overflow: 'visible',
   },
   bubbleIncoming: {
-    backgroundColor: '#FFFFFF',
     marginLeft: 0,
   },
   bubbleOutgoing: {
@@ -626,14 +869,17 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   textIncoming: {
-    color: '#111827',
     fontSize: 16,
     lineHeight: 22,
   },
   textOutgoing: {
-    color: '#f9fafb',
     fontSize: 16,
     lineHeight: 22,
+  },
+  senderName: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 0,
   },
   timestamp: {
     fontSize: 12,
@@ -665,12 +911,15 @@ const styles = StyleSheet.create({
   inlineIcon: {
     marginRight: 8,
   },
+  pdfSubtext: {
+    fontSize: 14,
+  },
   // Special message styles
   specialMessageBubble: {
     borderRadius: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    minWidth: 220,
+    minWidth: 200,
   },
   specialMessageHeader: {
     flexDirection: 'row',
@@ -681,15 +930,21 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   specialMessageTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     flexShrink: 1,
   },
   specialMessageSubtext: {
-    fontSize: 13,
+    fontSize: 14,
     marginBottom: 4,
   },
   // Order styles
+  orderBubble: {
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 200,
+  },
   orderHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -699,12 +954,12 @@ const styles = StyleSheet.create({
   orderHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   orderTypeBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
-    marginLeft: 8,
   },
   orderTypeBadgeText: {
     fontSize: 12,
@@ -715,7 +970,6 @@ const styles = StyleSheet.create({
   orderIdText: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 4,
   },
   orderDetailsContainer: {
     marginBottom: 4,
@@ -737,59 +991,38 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 4,
   },
-  orderActionBtn: {
-    backgroundColor: '#000000',
-    borderRadius: 8,
-    height: 40,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+  orderActionBtnSpacing: {
     marginTop: 6,
-  },
-  orderActionBtnOutgoing: {
-    backgroundColor: '#FFFFFF',
-  },
-  orderActionBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  orderActionBtnTextOutgoing: {
-    color: '#000000',
   },
   // Event styles
   eventBubble: {
     alignSelf: 'center',
-    backgroundColor: '#f3f4f6',
     borderRadius: 16,
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 14,
     alignItems: 'center',
     marginVertical: 4,
   },
   eventText: {
-    color: '#6b7280',
-    fontSize: 13,
+    fontSize: 14,
     fontStyle: 'italic',
+    fontWeight: '400',
     textAlign: 'center',
   },
   // Deleted styles
   deletedBubble: {
     flexDirection: 'column',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     marginBottom: 2,
     maxWidth: '75%',
-    opacity: 0.8,
   },
   deletedContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   deletedText: {
-    color: '#6b7280',
     fontSize: 14,
     fontStyle: 'italic',
   },

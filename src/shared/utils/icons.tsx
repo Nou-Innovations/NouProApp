@@ -612,7 +612,7 @@ interface IconProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function Icon({ name, size = 24, color = '#000', strokeWidth = 2, style }: IconProps) {
+export function Icon({ name, size = 24, color = '#000', strokeWidth = 2.5, style }: IconProps) {
   const IconComponent = getIcon(name);
   return <IconComponent size={size} color={color} strokeWidth={strokeWidth} style={style} />;
 }

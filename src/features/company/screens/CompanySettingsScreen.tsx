@@ -25,6 +25,8 @@ import {
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import { useProfileStore } from '@/shared/store/profileStore';
+import { getCapabilities } from '@/shared/auth/capabilities';
+import BusinessAdminGuard from '@/shared/guards/BusinessAdminGuard';
 import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import theme from '@/shared/theme';
@@ -80,32 +82,12 @@ export default function CompanySettingsScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
   const { currentCompany } = useBusinessStore();
+  const currentUserRole = useProfileStore((state) => state.currentUserRole);
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
   
-  // Use profileStore for role checks (single source of truth)
-  const isAdminRole = useProfileStore((state) => state.isAdmin);
-  const isAdmin = isAdminRole();
-
-  if (!isAdmin) {
-    return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-        <View style={styles.accessDeniedContainer}>
-          <Lock size={60} color={appTheme.colors.textMuted} strokeWidth={2} />
-          <Text style={[styles.accessDeniedText, { color: appTheme.colors.text }]}>
-            Access Denied
-          </Text>
-          <Text style={[styles.accessDeniedSubtext, { color: appTheme.colors.textSecondary }]}>
-            Only admins can access company settings
-          </Text>
-          <TouchableOpacity 
-            style={[styles.backButton, { backgroundColor: appTheme.colors.primary }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // Use capabilities for access control (single source of truth)
+  const capabilities = currentUserRole ? getCapabilities(currentUserRole) : null;
+  const canManageBusiness = capabilities?.canManageBusiness ?? false;
 
   const handleEditProfile = () => {
     // @ts-ignore
@@ -152,11 +134,12 @@ export default function CompanySettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <SecondaryHeader
-        title="Settings"
-        leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
-      />
+    <BusinessAdminGuard message={`Only admins can access ${activeBusiness?.name || 'business'} settings.`}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
+        <SecondaryHeader
+          title="Settings"
+          leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+        />
 
       <ScrollView 
         style={styles.scrollView} 
@@ -234,7 +217,8 @@ export default function CompanySettingsScreen() {
           </View>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </BusinessAdminGuard>
   );
 }
 

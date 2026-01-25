@@ -10,10 +10,34 @@
         "resourceClass": "m-medium"
       }
     },
-    "production": {
+    "preview": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "demo",
+        "EXPO_PUBLIC_API_URL": "http://192.168.100.226:3000/api"
+      },
       "ios": {
-        "releaseChannel": "production"
-      }
+        "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "channel": "preview"
+    },
+    "production": {
+      "distribution": "store",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "prod"
+      },
+      "ios": {
+        "releaseChannel": "production",
+        "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "aab"
+      },
+      "channel": "production"
     }
   },
   "submit": {

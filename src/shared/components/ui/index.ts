@@ -38,7 +38,9 @@ export { default as IconButton } from './IconButton';
 export { default as ImagePlaceholder } from './ImagePlaceholder';
 export { default as Pill } from './Pill';
 export { default as ListItemCard } from './ListItemCard';
+export { OrderStatusBadge, OrderStatusPill } from './OrderStatusBadge';
 export type { ListItemCardProps, ListItemCardAvatarProps, ListItemCardRightRow1Props } from './ListItemCard';
+export { DemoModeBadge } from './DemoModeBadge';
 
 // Typography
 export { Text, H1, H2, H3, H4, Caption, ButtonText, Label, BodyBold, BodyMedium } from './Typography';

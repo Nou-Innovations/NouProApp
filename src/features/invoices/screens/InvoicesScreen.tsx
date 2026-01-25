@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  ScrollView,
   FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,15 +14,8 @@ import { Icon } from '@/shared/utils/icons';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/features/search/components/FilterBar';
 import InvoiceCard from '@/features/invoices/components/InvoiceCard';
-import { AppBottomSheet, ListItemCard } from '@/shared/components/ui';
-
-// DropdownItem type (kept for location items)
-interface DropdownItem {
-  id: string;
-  title: string;
-  description?: string;
-  icon?: string;
-}
+import LocationDropdown from '@/features/company/components/LocationDropdown';
+import { AppBottomSheet } from '@/shared/components/ui';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
 import InvoiceActionsModal from '@/features/invoices/components/InvoiceActionsModal';
 import PaywallModal from '@/features/subscription/components/PaywallModal';
@@ -46,15 +38,13 @@ export default function InvoicesScreen() {
   const [search, setSearch] = useState('');
   const statuses = ['all', 'draft', 'sent', 'paid', 'overdue'];
   const [filter, setFilter] = useState('all');
-  // selectedLocationId now comes from store (currentLocation?.id), persisted across sessions
   const [activeTab, setActiveTab] = useState<'invoices' | 'estimates'>('invoices');
   const [showViewDropdown, setShowViewDropdown] = useState<boolean>(false);
-  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [showActionsModal, setShowActionsModal] = useState<boolean>(false);
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const { theme: appTheme } = useTheme();
   const { setInvoicesUnreadCount, isItemViewed } = useNotifications();
-  const { currentCompany, currentLocation, locations, setLocation } = useBusinessStore();
+  const { currentLocation } = useBusinessStore();
   const selectedLocationId = currentLocation?.id || null;
   
   // Profile store for RBAC (single source of truth)
@@ -108,55 +98,6 @@ export default function InvoicesScreen() {
     setInvoicesUnreadCount(unviewedInvoicesCount);
   }, [unviewedInvoicesCount, setInvoicesUnreadCount]);
 
-  const handleLocationSelect = (item: DropdownItem) => {
-    if (item.id === 'all') {
-      setLocation(null); // "All Locations"
-    } else {
-      const location = safeLocations.find(loc => loc.id === item.id);
-      setLocation(location || null);
-    }
-  };
-
-  // Check user permissions for global vs location-scoped access
-  const canViewAllInvoices = isAdmin();
-
-  // Check if business has only one location (with defensive check for undefined/null)
-  const safeLocations = Array.isArray(locations) ? locations : [];
-  const hasSingleLocation = safeLocations.length === 1;
-  const primaryLocation = safeLocations.find(loc => (loc as any).is_primary) || safeLocations[0];
-
-  // Auto-select primary location when there's only one
-  useEffect(() => {
-    if (hasSingleLocation && primaryLocation && !currentLocation) {
-      setLocation(primaryLocation);
-    }
-  }, [hasSingleLocation, primaryLocation?.id, currentLocation]);
-
-  // Create location dropdown items using business store locations
-  const locationItems: DropdownItem[] = useMemo(() => {
-    const items: DropdownItem[] = [];
-    
-    // Only add "All Locations" option if there are multiple locations
-    if (!hasSingleLocation) {
-      items.push({
-        id: 'all',
-        title: 'All Locations',
-        icon: 'grid',
-      });
-    }
-    
-    // Add business locations from store
-    safeLocations.forEach(location => {
-      items.push({
-        id: location.id,
-        title: location.name,
-        icon: 'location',
-      });
-    });
-    
-    return items;
-  }, [safeLocations, hasSingleLocation]);
-
   const handleCreateNew = () => {
     if (!hasManagePermission) {
       // Check if it's a role issue or plan issue
@@ -209,30 +150,9 @@ export default function InvoicesScreen() {
         ]}
       />
 
-      {/* Location Filter Section */}
-      <View style={[styles.locationSection, { backgroundColor: appTheme.colors.background }]}>
-        <TouchableOpacity 
-          style={[styles.locationDropdown, { 
-            borderColor: appTheme.colors.borderColor,
-            backgroundColor: appTheme.colors.background
-          }]}
-          onPress={() => !hasSingleLocation && setShowLocationDropdown(true)}
-          disabled={hasSingleLocation}
-          activeOpacity={hasSingleLocation ? 1 : 0.7}
-        >
-          <Text style={[styles.locationText, { 
-            color: appTheme.colors.textSecondary 
-          }]}>
-            {hasSingleLocation && primaryLocation
-              ? primaryLocation.name
-              : selectedLocationId 
-                ? safeLocations.find(l => l.id === selectedLocationId)?.name || 'All Locations' 
-                : 'All Locations'}
-          </Text>
-          {!hasSingleLocation && (
-            <Icon name="chevron-down" size={16} color={appTheme.colors.textSecondary} />
-          )}
-        </TouchableOpacity>
+      {/* Location Selector */}
+      <View style={styles.locationSection}>
+        <LocationDropdown style={{ flex: 1 }} />
       </View>
       
       {/* Search Bar */}
@@ -376,38 +296,6 @@ export default function InvoicesScreen() {
         ))}
       </AppBottomSheet>
 
-      {/* Location Selection Modal */}
-      <AppBottomSheet
-        visible={showLocationDropdown}
-        onClose={() => setShowLocationDropdown(false)}
-        title="Locations"
-      >
-        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
-          {locationItems.map((item, index) => {
-            const isSelected = (selectedLocationId || 'all') === item.id;
-            return (
-              <ListItemCard
-                key={item.id}
-                avatar={{
-                  type: 'icon',
-                  icon: item.icon || 'location',
-                  iconColor: isSelected ? appTheme.colors.primary : appTheme.colors.iconMuted,
-                  backgroundColor: appTheme.colors.surface,
-                }}
-                title={item.title}
-                onPress={() => {
-                  handleLocationSelect(item);
-                  setShowLocationDropdown(false);
-                }}
-                selected={isSelected}
-                showCheckmark
-                showDivider={index < locationItems.length - 1}
-              />
-            );
-          })}
-        </ScrollView>
-      </AppBottomSheet>
-
       {/* Actions Bottom Sheet Modal */}
       <InvoiceActionsModal
         visible={showActionsModal}
@@ -464,28 +352,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
     marginBottom: 8,
-    marginHorizontal: 8,
-  },
-  locationDropdown: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 0,
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  locationText: {
-    fontSize: 14,
-    fontWeight: '500',
-    flex: 1,
-    marginRight: 8,
-  },
-  locationContext: {
-    fontSize: 12,
-    marginTop: 4,
     marginHorizontal: 8,
   },
   searchContainer: {

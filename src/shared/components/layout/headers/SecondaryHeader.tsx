@@ -8,6 +8,7 @@ export type HeaderAction = {
   icon: string;
   onPress: () => void;
   accessibilityLabel?: string;
+  badge?: number; // Optional badge count (shows if > 0)
 };
 
 export type SecondaryHeaderVariant = 'solid' | 'transparent';
@@ -107,6 +108,13 @@ export default function SecondaryHeader({
                 accessibilityLabel={a.accessibilityLabel}
               >
                 <Icon name={a.icon} size={28} color={theme.colors.iconColor} strokeWidth={2} />
+                {a.badge && a.badge > 0 && (
+                  <View style={[styles.badge, { backgroundColor: theme.colors.error }]}>
+                    <Text style={styles.badgeText}>
+                      {a.badge > 9 ? '9+' : a.badge}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             ))}
             {/* Keep layout stable when fewer buttons */}
@@ -153,6 +161,22 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '500',
     lineHeight: 32,
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontFamily: theme.fonts.primary.bold,
   },
 });
 

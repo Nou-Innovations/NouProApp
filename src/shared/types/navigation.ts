@@ -178,6 +178,7 @@ export type RootStackParamList = {
   // Team management
   TeamManagement: undefined;
   InviteStaff: undefined;
+  RoleRequests: undefined;
   
   // Locations & Transports
   Locations: undefined;

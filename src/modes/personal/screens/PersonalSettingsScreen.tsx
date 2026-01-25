@@ -26,6 +26,7 @@ import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
 import Avatar from '@/shared/components/ui/Avatar';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { DemoModeBadge } from '@/shared/components/ui/DemoModeBadge';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -379,6 +380,9 @@ export default function PersonalSettingsScreen() {
         bounces={false}
         contentContainerStyle={styles.scrollViewContent}
       >
+        <View style={styles.demoModeContainer}>
+          <DemoModeBadge />
+        </View>
         {renderSettingsSection()}
       </ScrollView>
 
@@ -401,6 +405,10 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     flexGrow: 1,
+  },
+  demoModeContainer: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
   },
   settingsSection: {
     marginTop: theme.spacing.sm,

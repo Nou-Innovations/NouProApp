@@ -116,6 +116,7 @@ import { FeedbackCategoriesScreen, FeedbackListScreen, AddSuggestionScreen } fro
 // Screens - Business/Team
 import TeamManagementScreen from '@/features/team/screens/TeamManagementScreen';
 import InviteStaffScreen from '@/features/team/screens/InviteStaffScreen';
+import RoleRequestsScreen from '@/features/team/screens/RoleRequestsScreen';
 
 // Screens - Locations & Transports
 import LocationsScreen from '@/features/locations/screens/LocationsScreen';
@@ -168,8 +169,16 @@ const navigationTheme: Theme = {
  */
 function MainTabNavigator() {
   const activeMode = useProfileStore((state) => state.activeMode);
+  const currentUserRole = useProfileStore((state) => state.currentUserRole);
+  const switchToPersonal = useProfileStore((state) => state.switchToPersonal);
   
-  if (activeMode === 'business') {
+  useEffect(() => {
+    if (activeMode === 'business' && currentUserRole === 'staff') {
+      switchToPersonal();
+    }
+  }, [activeMode, currentUserRole, switchToPersonal]);
+  
+  if (activeMode === 'business' && currentUserRole !== 'staff') {
     return <BusinessTabNavigator />;
   }
   
@@ -331,6 +340,7 @@ function AppNavigator() {
         {/* Team Management */}
         <RootStack.Screen name="TeamManagement" component={TeamManagementScreen} />
         <RootStack.Screen name="InviteStaff" component={InviteStaffScreen} />
+        <RootStack.Screen name="RoleRequests" component={RoleRequestsScreen} />
         
         {/* Locations & Transports */}
         <RootStack.Screen name="Locations" component={LocationsScreen} />

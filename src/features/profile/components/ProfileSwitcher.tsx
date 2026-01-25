@@ -9,7 +9,7 @@
  * - Tabs, permissions, and UI change based on active profile
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,12 +19,16 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
 import { UserBusiness } from '@/shared/types/business';
+import { getCapabilities } from '@/shared/auth/capabilities';
+import { RoleRequest } from '@/shared/types/roleRequest';
+import roleRequestService from '@/features/team/roleRequest.service';
 import theme from '@/shared/theme';
 
 interface ProfileSwitcherProps {
@@ -54,6 +58,11 @@ export function ProfileSwitcher({
   const { theme: appTheme } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Role request state
+  const [roleRequests, setRoleRequests] = useState<Map<string, RoleRequest>>(new Map());
+  const [showAccessDialog, setShowAccessDialog] = useState(false);
+  const [selectedBusiness, setSelectedBusiness] = useState<UserBusiness | null>(null);
 
   // Profile store state and actions
   const {
@@ -65,6 +74,35 @@ export function ProfileSwitcher({
     switchToBusiness,
     currentUserRole,
   } = useProfileStore();
+  
+  // Load role request statuses for staff memberships
+  useEffect(() => {
+    const loadRoleRequests = async () => {
+      const requests = new Map<string, RoleRequest>();
+      
+      for (const ub of userBusinesses) {
+        if (ub.role === 'staff') {
+          try {
+            const request = await roleRequestService.getMyRoleRequest(ub.business.id);
+            if (request) {
+              requests.set(ub.business.id, request);
+            }
+          } catch (error) {
+            // No request exists - that's fine
+            if (__DEV__) {
+              console.log(`[ProfileSwitcher] No role request for ${ub.business.id}`);
+            }
+          }
+        }
+      }
+      
+      setRoleRequests(requests);
+    };
+    
+    if (modalVisible && userBusinesses.some(ub => ub.role === 'staff')) {
+      loadRoleRequests();
+    }
+  }, [modalVisible, userBusinesses]);
 
   /**
    * Get current profile display info
@@ -91,18 +129,91 @@ export function ProfileSwitcher({
   /**
    * Handle profile selection
    */
-  const handleSelectProfile = async (type: 'personal' | 'business', businessId?: string) => {
-    setIsLoading(true);
-    
-    try {
-      if (type === 'personal') {
+  const handleSelectProfile = async (
+    type: 'personal' | 'business', 
+    businessId?: string,
+    userBusiness?: UserBusiness
+  ) => {
+    // Personal profile - always allowed
+    if (type === 'personal') {
+      setIsLoading(true);
+      try {
         switchToPersonal();
-      } else if (businessId) {
-        await switchToBusiness(businessId);
+        setModalVisible(false);
+      } catch (error) {
+        console.error('Error switching to personal:', error);
+      } finally {
+        setIsLoading(false);
       }
-      setModalVisible(false);
-    } catch (error) {
-      console.error('Error switching profile:', error);
+      return;
+    }
+    
+    // Business profile - check role restrictions
+    if (businessId && userBusiness) {
+      const capabilities = getCapabilities(userBusiness.role);
+      
+      // Staff cannot access Business Profile mode
+      if (capabilities.isStaff) {
+        setSelectedBusiness(userBusiness);
+        setShowAccessDialog(true);
+        return;
+      }
+      
+      // Admin/Super Admin - switch immediately
+      setIsLoading(true);
+      try {
+        const success = await switchToBusiness(businessId);
+        if (success) {
+          setModalVisible(false);
+        }
+      } catch (error) {
+        console.error('Error switching to business:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+  
+  /**
+   * Handle request admin access
+   */
+  const handleRequestAccess = async () => {
+    if (!selectedBusiness) return;
+    
+    setIsLoading(true);
+    try {
+      await roleRequestService.createRoleRequest(selectedBusiness.business.id, {
+        requestedRole: 'admin',
+        message: 'Requesting admin access to help manage business operations',
+      });
+      
+      Alert.alert(
+        'Request Sent',
+        `Your admin access request for ${selectedBusiness.business.name} has been sent to the business owner. You'll be notified when it's reviewed.`,
+        [{ text: 'OK', onPress: () => setShowAccessDialog(false) }]
+      );
+      
+      // Reload role requests to show pending state
+      const request = await roleRequestService.getMyRoleRequest(selectedBusiness.business.id);
+      if (request) {
+        setRoleRequests(prev => new Map(prev).set(selectedBusiness.business.id, request));
+      }
+    } catch (error: any) {
+      console.error('Error requesting access:', error);
+      
+      // Handle specific error cases
+      if (error.message?.includes('already exists') || error.message?.includes('pending')) {
+        Alert.alert('Request Already Sent', 'You already have a pending admin access request for this business.');
+      } else if (error.message?.includes('cooldown') || error.message?.includes('recently rejected')) {
+        Alert.alert(
+          'Request Cooldown',
+          'Your previous request was recently reviewed. Please wait before requesting again.'
+        );
+      } else {
+        Alert.alert('Request Failed', 'Failed to send admin access request. Please try again.');
+      }
+      
+      setShowAccessDialog(false);
     } finally {
       setIsLoading(false);
     }
@@ -183,29 +294,94 @@ export function ProfileSwitcher({
     subtitle: string,
     avatar?: string,
     businessId?: string,
-    isActive?: boolean
-  ) => (
-    <TouchableOpacity
-      key={businessId || 'personal'}
-      style={[
-        styles.profileRow,
-        isActive && styles.profileRowActive,
-      ]}
-      onPress={() => handleSelectProfile(type, businessId)}
-      disabled={isLoading}
-    >
-      {renderAvatar(avatar, name, type === 'business')}
-      <View style={styles.profileRowInfo}>
-        <Text style={[styles.profileRowName, isActive && styles.profileRowNameActive]}>
-          {name}
-        </Text>
-        <Text style={styles.profileRowSubtitle}>{subtitle}</Text>
-      </View>
-      {isActive && (
-        <Icon name="checkmark-circle" size={24} color="#22C55E" />
-      )}
-    </TouchableOpacity>
-  );
+    isActive?: boolean,
+    userBusiness?: UserBusiness
+  ) => {
+    const isStaff = userBusiness?.role === 'staff';
+    const roleRequest = businessId ? roleRequests.get(businessId) : undefined;
+    
+    // Determine button state for staff members
+    let staffButtonState: 'restricted' | 'pending' | 'rejected' | null = null;
+    if (isStaff) {
+      if (roleRequest?.status === 'PENDING') {
+        staffButtonState = 'pending';
+      } else if (roleRequest?.status === 'REJECTED') {
+        staffButtonState = 'rejected';
+      } else {
+        staffButtonState = 'restricted';
+      }
+    }
+    
+    return (
+      <TouchableOpacity
+        key={businessId || 'personal'}
+        style={[
+          styles.profileRow,
+          isActive && styles.profileRowActive,
+          isStaff && styles.profileRowRestricted,
+        ]}
+        onPress={() => handleSelectProfile(type, businessId, userBusiness)}
+        disabled={isLoading || (isStaff && staffButtonState === 'pending')}
+      >
+        {renderAvatar(avatar, name, type === 'business')}
+        <View style={styles.profileRowInfo}>
+          <View style={styles.profileRowHeader}>
+            <Text style={[styles.profileRowName, isActive && styles.profileRowNameActive]}>
+              {name}
+            </Text>
+            {/* Role badge */}
+            {type === 'business' && userBusiness && (
+              <View style={[
+                styles.roleBadge,
+                { backgroundColor: isStaff ? '#FEF3C7' : '#DBEAFE' }
+              ]}>
+                <Text style={[
+                  styles.roleBadgeText,
+                  { color: isStaff ? '#92400E' : '#1E40AF' }
+                ]}>
+                  {userBusiness.role === 'super_admin' ? 'OWNER' : userBusiness.role.toUpperCase()}
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.profileRowSubtitle}>{subtitle}</Text>
+          
+          {/* Status indicator for staff */}
+          {isStaff && staffButtonState && (
+            <View style={styles.staffStatusContainer}>
+              {staffButtonState === 'pending' && (
+                <View style={[styles.statusPill, { backgroundColor: '#FEF3C7' }]}>
+                  <View style={[styles.statusDot, { backgroundColor: '#F59E0B' }]} />
+                  <Text style={[styles.statusText, { color: '#92400E' }]}>
+                    Request Pending
+                  </Text>
+                </View>
+              )}
+              {staffButtonState === 'rejected' && (
+                <View style={[styles.statusPill, { backgroundColor: '#FEE2E2' }]}>
+                  <Icon name="close-circle" size={14} color="#DC2626" />
+                  <Text style={[styles.statusText, { color: '#991B1B' }]}>
+                    Request Declined
+                  </Text>
+                </View>
+              )}
+              {staffButtonState === 'restricted' && (
+                <View style={[styles.statusPill, { backgroundColor: '#F3F4F6' }]}>
+                  <Icon name="lock-closed" size={14} color="#6B7280" />
+                  <Text style={[styles.statusText, { color: '#374151' }]}>
+                    Tap to request access
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+        {isActive && !isStaff && (
+          <Icon name="checkmark-circle" size={24} color="#22C55E" />
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <>
@@ -301,7 +477,8 @@ export function ProfileSwitcher({
                       getRoleDisplayName(ub.role),
                       ub.business.logo_url,
                       ub.business.id,
-                      activeMode === 'business' && activeBusiness?.id === ub.business.id
+                      activeMode === 'business' && activeBusiness?.id === ub.business.id,
+                      ub
                     )
                   ))}
                 </>
@@ -332,6 +509,64 @@ export function ProfileSwitcher({
             </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+      
+      {/* Access Restriction Dialog */}
+      <Modal
+        visible={showAccessDialog}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAccessDialog(false)}
+      >
+        <View style={styles.dialogOverlay}>
+          <View style={[styles.dialogContent, { backgroundColor: appTheme.colors.cardBackground }]}>
+            {/* Icon */}
+            <View style={[styles.dialogIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Icon name="lock-closed" size={32} color="#F59E0B" />
+            </View>
+            
+            {/* Title */}
+            <Text style={[styles.dialogTitle, { color: appTheme.colors.text }]}>
+              Access Restricted
+            </Text>
+            
+            {/* Message */}
+            <Text style={[styles.dialogMessage, { color: appTheme.colors.textSecondary }]}>
+              You're currently a Staff member in{' '}
+              <Text style={[styles.dialogBusinessName, { color: appTheme.colors.text }]}>
+                {selectedBusiness?.business.name}
+              </Text>
+              . Only Admins can access Business Profile mode.
+            </Text>
+            
+            {/* Buttons */}
+            <View style={styles.dialogButtons}>
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonSecondary, { borderColor: appTheme.colors.border }]}
+                onPress={() => setShowAccessDialog(false)}
+                disabled={isLoading}
+              >
+                <Text style={[styles.dialogButtonTextSecondary, { color: appTheme.colors.text }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.dialogButton, styles.dialogButtonPrimary, { backgroundColor: appTheme.colors.primary }]}
+                onPress={handleRequestAccess}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.dialogButtonTextPrimary}>
+                    Request Admin Access
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </>
   );
@@ -439,9 +674,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#A7F3D0',
   },
+  profileRowRestricted: {
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
   profileRowInfo: {
     flex: 1,
     marginLeft: 12,
+  },
+  profileRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
   },
   profileRowName: {
     fontSize: theme.fontSize.base,
@@ -456,6 +702,37 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.regular,
     color: '#6B7280',
     marginTop: 2,
+  },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.fonts.primary.bold,
+    letterSpacing: 0.5,
+  },
+  staffStatusContainer: {
+    marginTop: 6,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 12,
+    fontFamily: theme.fonts.primary.medium,
   },
   
   // Action Buttons
@@ -486,6 +763,75 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.medium,
     color: '#374151',
     marginLeft: 12,
+  },
+  
+  // Access Restriction Dialog
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  dialogContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  dialogIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dialogTitle: {
+    fontSize: 20,
+    fontFamily: theme.fonts.primary.bold,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  dialogMessage: {
+    fontSize: 15,
+    fontFamily: theme.fonts.primary.regular,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  dialogBusinessName: {
+    fontFamily: theme.fonts.primary.bold,
+  },
+  dialogButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  dialogButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  dialogButtonSecondary: {
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  dialogButtonPrimary: {
+    // backgroundColor set inline
+  },
+  dialogButtonTextSecondary: {
+    fontSize: 15,
+    fontFamily: theme.fonts.primary.semiBold,
+  },
+  dialogButtonTextPrimary: {
+    fontSize: 15,
+    fontFamily: theme.fonts.primary.semiBold,
+    color: '#FFFFFF',
   },
 });
 

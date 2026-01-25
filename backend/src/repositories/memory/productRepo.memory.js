@@ -23,6 +23,8 @@ async function create(data) {
   const newProduct = {
     ...rest,
     companyId: businessId,
+    ownerBusinessId: rest.ownerBusinessId || businessId,
+    isPublic: rest.isPublic ?? rest.isDisplayable ?? rest.is_listed ?? false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -55,7 +57,13 @@ async function remove(id) {
 // Helper to map companyId -> businessId
 function mapToBusinessId(product) {
   const { companyId, ...rest } = product;
-  return { ...rest, businessId: companyId };
+  return {
+    ...rest,
+    companyId,
+    businessId: companyId,
+    ownerBusinessId: product.ownerBusinessId || companyId,
+    isPublic: product.isPublic ?? product.isDisplayable ?? product.is_listed ?? false,
+  };
 }
 
 module.exports = { 

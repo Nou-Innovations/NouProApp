@@ -20,7 +20,12 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navig
 import { ChatHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
+import AppButton from '@/shared/components/ui/AppButton';
+import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
+import { ListItemCard } from '@/shared/components/ui/ListItemCard';
 import { getMessagesForChat } from '@/shared/data/mockChatMessages';
+import { MessageBubble } from '../components/MessageBubble';
+import type { Message, OrderMessage, TextMessage, EventMessage, DeletedMessage } from '@/shared/types/inbox';
 
 // Order status colors from design.json
 const ORDER_STATUS_COLORS: Record<string, string> = {
@@ -41,591 +46,13 @@ const PAYMENT_STATUS_COLORS: Record<string, string> = {
   'Payment Pending Confirmation': '#FFB600',
 };
 
-// Add message type definitions
-interface Sender {
-  name: string;
-  avatar: string;
-  role: string;
-}
+// MessageBubble component is now imported from ../components/MessageBubble
+// The embedded MessageBubble component has been removed to eliminate code duplication
 
-interface BaseMessage {
-  id: string;
-  type: string;
-  isOutgoing: boolean;
-  sender: {
-    name: string;
-    avatar: string;
-    role: string;
-  };
-  timestamp: string;
-  status?: 'sent' | 'delivered' | 'read';
-}
+// REMOVED: Local MessageBubbleProps interface (now using the one from MessageBubble component)
+// REMOVED: Embedded MessageBubble function (lines 152-642 in original file)
 
-interface ReplyContext {
-  senderName: string;
-  messageSnippet: string;
-  messageId: string;
-}
-
-interface TextMessage extends BaseMessage {
-  type: 'text';
-  text: string;
-  replyingTo?: ReplyContext;
-}
-
-interface OrderMessage extends BaseMessage {
-  type: 'order';
-  orderId: string;
-  itemCount: number;
-  totalAmount: number;
-  orderStatus: string;
-  paymentStatus: string;
-  replyingTo?: ReplyContext;
-}
-
-interface ImageMessage extends BaseMessage {
-  type: 'image';
-  imageUrl: string;
-  replyingTo?: ReplyContext;
-}
-
-interface VoiceMessage extends BaseMessage {
-  type: 'voice';
-  replyingTo?: ReplyContext;
-}
-
-interface PdfMessage extends BaseMessage {
-  type: 'pdf';
-  fileName: string;
-  replyingTo?: ReplyContext;
-}
-
-interface InvoiceMessage extends BaseMessage {
-  type: 'invoice';
-  invoiceId: string;
-  replyingTo?: ReplyContext;
-}
-
-interface EventMessage extends BaseMessage {
-  type: 'event';
-  event: string;
-}
-
-interface DeletedMessage extends BaseMessage {
-  type: 'deleted';
-  text?: undefined;
-  imageUrl?: undefined;
-  orderId?: undefined;
-  fileName?: undefined;
-  invoiceId?: undefined;
-  replyingTo?: undefined;
-}
-
-interface LocationMessage extends BaseMessage {
-  type: 'location';
-  locationName: string;
-  address: string;
-  replyingTo?: ReplyContext;
-}
-
-interface ContactMessage extends BaseMessage {
-  type: 'contact';
-  contactName: string;
-  contactPhone: string;
-  replyingTo?: ReplyContext;
-}
-
-type Message = TextMessage | OrderMessage | ImageMessage | VoiceMessage | PdfMessage | InvoiceMessage | EventMessage | DeletedMessage | LocationMessage | ContactMessage;
-
-interface MessageBubbleProps {
-  message: Message;
-  onOrderAction: (type: string, message: OrderMessage) => void;
-  onOrderPress: (orderId: string) => void;
-  onOpenDocument: (fileName: string) => void;
-  onDeleteMessage: (messageId: string) => void;
-}
-
-function MessageBubble({ message, onOrderAction, onOrderPress, onOpenDocument, onDeleteMessage }: MessageBubbleProps) {
-  const isOutgoing = message.isOutgoing;
-  const { theme: appTheme, isDarkMode } = useTheme();
-  
-  // Handle long press to show delete option
-  const handleLongPress = () => {
-    if (message.type === 'deleted' || message.type === 'event') return; // Can't delete already deleted or event messages
-    
-    Alert.alert(
-      'Message Options',
-      'What would you like to do with this message?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete Message', 
-          style: 'destructive',
-          onPress: () => onDeleteMessage(message.id)
-        },
-      ]
-    );
-  };
-  
-  const bubbleStyle = [
-    styles.bubble,
-    isOutgoing 
-      ? [styles.bubbleOutgoing, { backgroundColor: appTheme.colors.primary }] 
-      : [styles.bubbleIncoming, { backgroundColor: '#FFFFFF' }],
-  ];
-  const textStyle = isOutgoing ? styles.textOutgoing : [styles.textIncoming, { color: appTheme.colors.text }];
-
-  // Message bubble timestamp - ONLY shows time (HH:MM), no date
-  const formatSmartTimestamp = (timestamp: string): string => {
-    // If timestamp is just time (HH:MM), return as-is
-    if (/^\d{1,2}:\d{2}$/.test(timestamp)) {
-      return timestamp;
-    }
-    
-    // Try to parse as a date
-    const messageDate = new Date(timestamp);
-    if (isNaN(messageDate.getTime())) {
-      return timestamp; // Return as-is if not a valid date
-    }
-    
-    // Return only the time (HH:MM format)
-    return messageDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-  };
-
-  // Helper for status colors using design.json colors
-  const getOrderStatusColor = (status: string): string => {
-    return ORDER_STATUS_COLORS[status] || appTheme.colors.text;
-  };
-  
-  const getPaymentStatusColor = (status: string): string => {
-    return PAYMENT_STATUS_COLORS[status] || '#FF2400';
-  };
-
-  // Render Reply Context UI (pass isOutgoing)
-  const renderReplyContext = (isOutgoingReply: boolean) => {
-    if (message.type !== 'text' || !message.replyingTo) return null;
-    
-    const senderColor = isOutgoingReply ? appTheme.colors.textInverse : appTheme.colors.text;
-    const snippetColor = isOutgoingReply ? appTheme.colors.textInverse : appTheme.colors.textSecondary;
-    
-    return (
-      <View style={[styles.replyContextContainer, isOutgoingReply ? styles.replyContextContainerOutgoing : styles.replyContextContainerIncoming]}>
-        <View style={[styles.replyContextIndicator, { backgroundColor: isOutgoingReply ? appTheme.colors.textInverse : appTheme.colors.accent }]} />
-        <View style={styles.replyContextTextContainer}>
-          <Text style={[styles.replyContextSender, { color: senderColor }]}>{message.replyingTo.senderName}</Text>
-          <Text style={[styles.replyContextSnippet, { color: snippetColor }]} numberOfLines={1}>
-            {message.replyingTo.messageSnippet}
-          </Text>
-        </View>
-      </View>
-    );
-  };
-
-  // Determine alignment for the bubble container
-  const bubbleContainerStyle = isOutgoing ? styles.bubbleContainerOutgoing : styles.bubbleContainerIncoming;
-
-  // Add new component for message status
-  const MessageStatus = ({ status }: { status?: 'sent' | 'delivered' | 'read' }) => {
-    if (!status) return null;
-    
-    let iconName: 'checkmark' | 'checkmark-done' = 'checkmark';
-    let iconColor = appTheme.colors.textMuted;
-    
-    if (status === 'delivered' || status === 'read') {
-      iconName = 'checkmark-done';
-      // Read status uses accent color (double checkmarks)
-      iconColor = status === 'read' ? appTheme.colors.accent : appTheme.colors.textMuted;
-    }
-    
-    return (
-      <View style={styles.messageStatusContainer}>
-        <Icon 
-          name={iconName} 
-          size={12} 
-          color={iconColor} 
-          style={styles.messageStatusIcon}
-        />
-      </View>
-    );
-  };
-
-  // Render text with clickable links
-  const renderTextWithLinks = (text: string, textStyle: any, isOutgoing: boolean) => {
-    // URL regex pattern
-    const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
-    const parts = text.split(urlRegex);
-    const matches = text.match(urlRegex) || [];
-    
-    if (matches.length === 0) {
-      return <Text style={textStyle}>{text}</Text>;
-    }
-    
-    const elements: React.ReactNode[] = [];
-    let matchIndex = 0;
-    
-    parts.forEach((part, index) => {
-      if (part) {
-        // Check if this part is a URL
-        if (urlRegex.test(part)) {
-          urlRegex.lastIndex = 0; // Reset regex
-          const url = part.startsWith('http') ? part : `https://${part}`;
-          elements.push(
-            <Text
-              key={`link-${index}`}
-              style={[
-                textStyle,
-                styles.linkText,
-                { color: isOutgoing ? '#93C5FD' : '#2563EB' }
-              ]}
-              onPress={() => handleLinkPress(url)}
-            >
-              {part}
-            </Text>
-          );
-        } else {
-          elements.push(
-            <Text key={`text-${index}`} style={textStyle}>
-              {part}
-            </Text>
-          );
-        }
-      }
-    });
-    
-    return <Text style={textStyle}>{elements}</Text>;
-  };
-
-  const handleLinkPress = async (url: string) => {
-    try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (canOpen) {
-        Alert.alert(
-          'Open Link',
-          `Open ${url}?`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open', onPress: () => Linking.openURL(url) },
-            { text: 'Copy', onPress: () => {
-              // In a real app, use Clipboard API
-              Alert.alert('Copied', 'Link copied to clipboard');
-            }},
-          ]
-        );
-      } else {
-        Alert.alert('Error', 'Cannot open this link');
-      }
-    } catch (error) {
-      console.error('Error opening link:', error);
-      Alert.alert('Error', 'Could not open link');
-    }
-  };
-
-  // Update the timestamp rendering in renderMessageContent
-  const renderTimestamp = (timestamp: string, isOutgoing: boolean, status?: 'sent' | 'delivered' | 'read') => {
-    const formattedTime = formatSmartTimestamp(timestamp);
-    return (
-      <View style={styles.timestampContainer}>
-        <Text style={[
-          styles.timestamp, 
-          { color: isOutgoing ? 'rgba(255,255,255,0.7)' : appTheme.colors.textSecondary }
-        ]}>
-          {formattedTime}
-        </Text>
-        {isOutgoing && status && <MessageStatus status={status} />}
-      </View>
-    );
-  };
-
-  // Update the message content rendering to use the new timestamp component
-  const renderMessageContent = () => {
-    switch (message.type) {
-      case 'text':
-        return (
-          <View style={[styles.row, isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}> 
-            {!isOutgoing && message.sender.avatar ? <Image source={{ uri: message.sender.avatar }} style={styles.avatarSmall} /> : null}
-            <View style={bubbleContainerStyle}>
-              <TouchableOpacity 
-                activeOpacity={0.8}
-                onLongPress={handleLongPress}
-                delayLongPress={500}
-              >
-                <View style={[
-                  bubbleStyle, 
-                  message.replyingTo && styles.bubbleWithReply
-                ]}>
-                  {renderReplyContext(isOutgoing)}
-                  {renderTextWithLinks(message.text, textStyle, isOutgoing)}
-                  {renderTimestamp(message.timestamp, isOutgoing, message.status)}
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
-        );
-      case 'pdf':
-        return (
-          <View style={[styles.row, isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}> 
-            {!isOutgoing && message.sender.avatar ? (
-              <Image source={{ uri: message.sender.avatar }} style={styles.avatarSmall} />
-            ) : null}
-            <View style={bubbleContainerStyle}>
-              {renderReplyContext(isOutgoing)}
-              <TouchableOpacity 
-                style={bubbleStyle} 
-                onPress={() => onOpenDocument(message.fileName)}
-                onLongPress={handleLongPress}
-                delayLongPress={500}
-              >
-                <View style={styles.iconTextRow}>
-                  <Icon name="file-text" size={18} color={isOutgoing ? '#f9fafb' : '#1f2937'} style={styles.inlineIcon}/>
-                  <Text style={textStyle}>{message.fileName || 'Invoice.pdf'}</Text>
-                </View>
-                <Text style={[{ fontSize: 12, opacity: 0.6 }, isOutgoing ? { color: '#f9fafb' } : { color: '#1f2937' }]}>
-                  Tap to view
-                </Text>
-                {renderTimestamp(message.timestamp, isOutgoing, message.status)}
-              </TouchableOpacity>
-            </View>
-          </View>
-        );
-      case 'invoice':
-        return (
-          <View style={[styles.row, isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}> 
-            {!isOutgoing && message.sender.avatar ? <Image source={{ uri: message.sender.avatar }} style={styles.avatarSmall} /> : null}
-            <View style={bubbleContainerStyle}>
-              <TouchableOpacity 
-                style={[
-                  styles.specialMessageBubble,
-                  isOutgoing ? { backgroundColor: appTheme.colors.primary } : { backgroundColor: '#FFFFFF' },
-                ]} 
-                onPress={() => console.log('Open Invoice', message.invoiceId)}
-                onLongPress={handleLongPress}
-                delayLongPress={500}
-              >
-                <View style={styles.specialMessageHeader}>
-                  <Icon 
-                    name="receipt-outline" 
-                    size={18} 
-                    color={isOutgoing ? '#FFFFFF' : appTheme.colors.primary} 
-                    style={styles.specialMessageIcon}
-                  />
-                  <Text style={[
-                    styles.specialMessageTitle,
-                    { color: isOutgoing ? '#FFFFFF' : appTheme.colors.text }
-                  ]} numberOfLines={1}>
-                    Invoice #{message.invoiceId}
-                  </Text>
-                </View>
-                <Text style={[
-                  styles.specialMessageSubtext,
-                  { color: isOutgoing ? 'rgba(255,255,255,0.7)' : appTheme.colors.textSecondary }
-                ]}>
-                  Tap to view invoice details
-                </Text>
-                {renderTimestamp(message.timestamp, isOutgoing, message.status)}
-              </TouchableOpacity>
-            </View>
-          </View>
-        );
-      case 'order': {
-        const isImport = message.isOutgoing;
-        const importExportLabel = isImport ? 'Import' : 'Export';
-        const showMarkPaymentDone = isImport && message.paymentStatus === 'Unpaid';
-        const showConfirmPayment = !isImport && message.paymentStatus === 'Payment Pending Confirmation';
-        const showMarkDeliveryDone = !isImport && (message.orderStatus === 'Ongoing' || message.orderStatus === 'New');
-        const showConfirmDelivery = isImport && message.orderStatus === 'Delivery Pending Confirmation';
-        const showSeeInvoice = message.paymentStatus === 'Paid';
-        
-        const orderBgColor = isOutgoing ? appTheme.colors.primary : '#FFFFFF';
-        const orderTextColor = isOutgoing ? '#FFFFFF' : appTheme.colors.text;
-        const orderSubTextColor = isOutgoing ? 'rgba(255,255,255,0.7)' : appTheme.colors.textSecondary;
-        const orderBorderColor = getOrderStatusColor(message.orderStatus);
-        
-        return (
-          <View style={[styles.row, isImport ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}> 
-            {!isImport && message.sender.avatar ? (
-              <Image source={{ uri: message.sender.avatar }} style={styles.avatarSmall} />
-            ) : null}
-            <View style={bubbleContainerStyle}>
-              <TouchableOpacity 
-                activeOpacity={0.7}
-                onPress={() => onOrderPress(message.orderId)}
-                onLongPress={handleLongPress}
-                delayLongPress={500}
-                style={[
-                  styles.specialMessageBubble,
-                  { 
-                    backgroundColor: orderBgColor,
-                    borderWidth: 0.5,
-                    borderColor: orderBorderColor,
-                  },
-                ]}
-              >
-                {/* Header - Icon + Import/Export badge */}
-                <View style={styles.orderHeader}>
-                  <View style={styles.orderHeaderLeft}>
-                    <Icon name="cube-outline" size={18} color={isOutgoing ? '#FFFFFF' : appTheme.colors.primary} />
-                    <View style={[
-                      styles.orderTypeBadge, 
-                      { backgroundColor: isImport ? '#2ACF01' : '#FF7A00' }
-                    ]}>
-                      <Text style={styles.orderTypeBadgeText}>{importExportLabel}</Text>
-                  </View>
-                    </View>
-                </View>
-                
-                {/* Order ID on second line */}
-                <Text style={[styles.orderIdText, { color: orderTextColor }]}>
-                  #{message.orderId}
-                    </Text>
-                
-                {/* Order Details */}
-                <View style={styles.orderDetailsContainer}>
-                  <View style={styles.orderDetailRow}>
-                    <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Items</Text>
-                    <Text style={[styles.orderDetailValueBold, { color: orderTextColor }]}>{message.itemCount}</Text>
-                  </View>
-                  <View style={styles.orderDetailRow}>
-                    <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Total</Text>
-                    <Text style={[styles.orderDetailValueBold, { color: orderTextColor }]}>
-                      ${message.totalAmount.toFixed(2)}
-                    </Text>
-                  </View>
-                  <View style={styles.orderDetailRow}>
-                    <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Status</Text>
-                    <Text style={[
-                      styles.orderDetailValueBold,
-                      { color: getOrderStatusColor(message.orderStatus) }
-                    ]}>
-                      {message.orderStatus}
-                    </Text>
-                  </View>
-                  <View style={styles.orderDetailRow}>
-                    <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Payment</Text>
-                    <Text style={[
-                      styles.orderDetailValueBold,
-                      { color: getPaymentStatusColor(message.paymentStatus) }
-                    ]}>
-                      {message.paymentStatus}
-                    </Text>
-                  </View>
-                </View>
-                
-                {/* Action Buttons */}
-                {(showMarkPaymentDone || showConfirmPayment || showMarkDeliveryDone || showConfirmDelivery || showSeeInvoice) && (
-                  <View style={styles.orderActionsContainer}>
-                    {showMarkPaymentDone && (
-                      <TouchableOpacity 
-                        style={[styles.orderActionBtn, isOutgoing && styles.orderActionBtnOutgoing]} 
-                        onPress={() => onOrderAction('payment', message as OrderMessage)}
-                      >
-                        <Text style={[styles.orderActionBtnText, isOutgoing && styles.orderActionBtnTextOutgoing]}>
-                          Mark Payment Done
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                    {showConfirmPayment && (
-                      <TouchableOpacity 
-                        style={[styles.orderActionBtn, isOutgoing && styles.orderActionBtnOutgoing]} 
-                        onPress={() => onOrderAction('payment', message as OrderMessage)}
-                      >
-                        <Text style={[styles.orderActionBtnText, isOutgoing && styles.orderActionBtnTextOutgoing]}>
-                          Confirm Payment
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                    {showMarkDeliveryDone && (
-                      <TouchableOpacity 
-                        style={[styles.orderActionBtn, isOutgoing && styles.orderActionBtnOutgoing]} 
-                        onPress={() => onOrderAction('delivery', message as OrderMessage)}
-                      >
-                        <Text style={[styles.orderActionBtnText, isOutgoing && styles.orderActionBtnTextOutgoing]}>
-                          Mark Delivery Done
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                    {showConfirmDelivery && (
-                      <TouchableOpacity 
-                        style={[styles.orderActionBtn, isOutgoing && styles.orderActionBtnOutgoing]} 
-                        onPress={() => onOrderAction('delivery', message as OrderMessage)}
-                      >
-                        <Text style={[styles.orderActionBtnText, isOutgoing && styles.orderActionBtnTextOutgoing]}>
-                          Confirm Delivery
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                    {showSeeInvoice && (
-                      <TouchableOpacity 
-                        style={[styles.orderActionBtn, isOutgoing && styles.orderActionBtnOutgoing]} 
-                        onPress={() => onOrderAction('invoice', message as OrderMessage)}
-                      >
-                        <Text style={[styles.orderActionBtnText, isOutgoing && styles.orderActionBtnTextOutgoing]}>
-                          See Invoice
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
-                
-                    {renderTimestamp(message.timestamp, isOutgoing, message.status)}
-              </TouchableOpacity>
-            </View>
-          </View>
-        );
-      }
-      case 'event':
-        // Event/System messages - only show event text, no timestamp
-        // Date Separator is handled separately in renderItem
-        return (
-          <View style={[styles.row, { justifyContent: 'center' }]}> 
-            <View style={styles.eventBubble}>
-              <Text style={styles.eventText}>{message.event}</Text>
-            </View>
-          </View>
-        );
-      // Removed: image, voice, location, contact - not in V1
-      case 'image':
-      case 'voice':
-      case 'location':
-      case 'contact':
-        // These message types are not supported in V1
-        // Render as a placeholder or skip
-        return (
-          <View style={[styles.row, isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}> 
-            {!isOutgoing && message.sender.avatar ? <Image source={{ uri: message.sender.avatar }} style={styles.avatarSmall} /> : null}
-            <View style={bubbleContainerStyle}>
-              <View style={[bubbleStyle, { opacity: 0.6 }]}>
-                <Text style={[textStyle, { fontStyle: 'italic' }]}>
-                  {message.type === 'image' ? '🖼️ Image' : 
-                   message.type === 'voice' ? '🎤 Voice note' :
-                   message.type === 'location' ? '📍 Location' : '👤 Contact'}
-                </Text>
-                <Text style={[{ fontSize: 12, opacity: 0.6 }, isOutgoing ? { color: '#f9fafb' } : { color: '#1f2937' }]}>
-                  Not available in this version
-                </Text>
-              </View>
-            </View>
-          </View>
-        );
-      case 'deleted':
-        return (
-          <View style={[styles.row, isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}> 
-            {!isOutgoing && message.sender.avatar ? <Image source={{ uri: message.sender.avatar }} style={styles.avatarSmall} /> : null}
-            <View style={[styles.deletedBubble, bubbleContainerStyle]}>
-              <View style={styles.deletedContent}>
-                <Icon name="ban-outline" size={14} color="#999" style={{ marginRight: 5 }}/>
-                <Text style={styles.deletedText}>This message was deleted</Text>
-              </View>
-              {renderTimestamp(message.timestamp, isOutgoing, message.status)}
-            </View>
-          </View>
-        );
-      default:
-        return null;
-    }
-  };
-
-  return renderMessageContent();
-}
+// The ChatScreen now uses the standalone MessageBubble component
 
 // Update the route params type to include the unread count for this specific chat
 type ChatScreenRouteParams = {
@@ -663,8 +90,45 @@ export default function ChatScreen() {
   
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false); // Track if we've already marked this chat as read
+  const [showParticipantsSheet, setShowParticipantsSheet] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState<{ id: string; name: string; avatar: string; role: string; isCurrentUser?: boolean } | null>(null);
+  const [showParticipantOptionsSheet, setShowParticipantOptionsSheet] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
+  
+  // Extract unique participants from messages for group chats
+  // Also detect group chats by having multiple unique senders
+  const participants = React.useMemo(() => {
+    const participantMap = new Map<string, { id: string; name: string; avatar: string; role: string; isCurrentUser?: boolean }>();
+    
+    // Add current user first
+    participantMap.set('You', {
+      id: 'current-user',
+      name: 'You',
+      avatar: '',
+      role: 'user',
+      isCurrentUser: true,
+    });
+    
+    messages.forEach(msg => {
+      if (msg.type !== 'event' && msg.sender && msg.sender.name !== 'You' && msg.sender.name !== 'System') {
+        if (!participantMap.has(msg.sender.name)) {
+          participantMap.set(msg.sender.name, {
+            id: msg.sender.id || msg.sender.name,
+            name: msg.sender.name,
+            avatar: msg.sender.avatar || '',
+            role: msg.sender.role || 'user',
+            isCurrentUser: false,
+          });
+        }
+      }
+    });
+    
+    return Array.from(participantMap.values());
+  }, [messages]);
+  
+  // Detect if this is a group chat (multiple participants or explicitly marked as group)
+  const isGroupChat = isGroup || partnerType === 'group' || participants.length > 1;
 
   // Mark this specific chat as viewed when screen is focused and reduce unread count
   useFocusEffect(
@@ -786,8 +250,8 @@ export default function ChatScreen() {
   // Date Separator Component
   const DateSeparator = ({ date }: { date: string }) => (
     <View style={styles.dateSeparatorContainer}>
-      <View style={styles.dateSeparatorBubble}>
-        <Text style={styles.dateSeparatorText}>{date}</Text>
+      <View style={[styles.dateSeparatorBubble, { backgroundColor: appTheme.colors.borderColor }]}>
+        <Text style={[styles.dateSeparatorText, { color: appTheme.colors.textMuted }]}>{date}</Text>
       </View>
     </View>
   );
@@ -795,6 +259,23 @@ export default function ChatScreen() {
   const renderItem = ({ item, index }: { item: Message; index: number }) => {
     const showDateSeparator = shouldShowDateSeparator(index);
     const dateLabel = showDateSeparator ? formatDateSeparator(item.timestamp) : '';
+    
+    // Message grouping logic (for inverted list where index 0 = newest = bottom of screen)
+    const prevMessage = index > 0 ? messages[index - 1] : null; // Lower index = newer = visually BELOW
+    const nextMessage = index < messages.length - 1 ? messages[index + 1] : null; // Higher index = older = visually ABOVE
+    
+    // Check if same sender as adjacent messages (excluding events)
+    const isSameSenderAsPrev = !!(prevMessage && prevMessage.sender.name === item.sender.name && prevMessage.type !== 'event' && item.type !== 'event');
+    const isSameSenderAsNext = !!(nextMessage && nextMessage.sender.name === item.sender.name && nextMessage.type !== 'event' && item.type !== 'event');
+    
+    // isGrouped for 4px gap: only apply when SAME sender as message BELOW (prevMessage in inverted list)
+    // This controls the bottom margin of this message
+    const isGrouped = isSameSenderAsPrev;
+    const isFirstInGroup = !isSameSenderAsNext; // No same sender ABOVE = top of group visually (show avatar here)
+    const isLastInGroup = !isSameSenderAsPrev; // No same sender BELOW = bottom of group visually
+    
+    // Show sender name only in group chats with more than 2 users (participants > 1 means 3+ people including "You")
+    const showSenderName = !item.isOutgoing && item.type !== 'event' && participants.length > 1;
     
     return (
       <View>
@@ -804,6 +285,11 @@ export default function ChatScreen() {
           onOrderPress={handleOrderPress}
           onOpenDocument={handleOpenDocument}
           onDeleteMessage={handleDeleteMessage}
+          onReplyMessage={handleReplyMessage}
+          isGrouped={isGrouped}
+          isFirstInGroup={isFirstInGroup}
+          isLastInGroup={isLastInGroup}
+          showSenderName={showSenderName}
         />
         {/* Date separator appears AFTER the message in inverted list (so it shows ABOVE in UI) */}
         {showDateSeparator && dateLabel && (
@@ -845,10 +331,16 @@ export default function ChatScreen() {
     
     const newMessage: TextMessage = {
       id: String(Date.now()),
+      chatId: id, // Use the chat ID from route params
       type: 'text',
       text: inputText,
       isOutgoing: true,
-      sender: { name: 'You', avatar: 'https://randomuser.me/api/portraits/men/2.jpg', role: 'business' },
+      sender: { 
+        id: 'current-user', 
+        name: 'You', 
+        avatar: 'https://randomuser.me/api/portraits/men/2.jpg', 
+        role: 'business' 
+      },
       timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
       status: 'sent',
     };
@@ -872,7 +364,7 @@ export default function ChatScreen() {
     setTimeout(() => {
       setMessages(prevMessages => 
         prevMessages.map(msg => 
-          msg.id === newMessage.id ? { ...msg, status: 'read' } as Message : msg
+          msg.id === newMessage.id ? { ...msg, status: 'seen' } as Message : msg
         )
       );
     }, 2000);
@@ -881,11 +373,13 @@ export default function ChatScreen() {
   const addEventMessage = (orderId: string, importExportLabel: string) => {
     const eventMessage: EventMessage = {
       id: String(Date.now() + 1),
+      chatId: id, // Use the chat ID from route params
       type: 'event',
       event: `Order #${orderId} status updated (${importExportLabel})`,
       timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
       isOutgoing: false,
       sender: {
+        id: 'system',
         name: 'System',
         avatar: '',
         role: 'system'
@@ -894,7 +388,11 @@ export default function ChatScreen() {
     setMessages(prevMessages => [eventMessage, ...prevMessages]);
   };
   
-  const handleOrderAction = (type: string, msg: OrderMessage) => {
+  const handleOrderAction = (type: string, message: Message) => {
+    // Type guard to ensure message is an OrderMessage
+    if (message.type !== 'order') return;
+    const msg = message as OrderMessage;
+    
     console.log('Order action:', type, 'for message:', msg.id, 'Order ID:', msg.orderId);
     if (type === 'delivery') {
       if (msg.orderStatus === 'Ongoing' || msg.orderStatus === 'New') {
@@ -916,13 +414,24 @@ export default function ChatScreen() {
   };
 
   const handleViewProfile = () => {
-    if (partnerType === 'business') {
+    // Check for group first (detected by multiple participants or explicit flag)
+    if (isGroupChat) {
+      // For groups, show participants sheet
+      setShowParticipantsSheet(true);
+    } else if (partnerType === 'business') {
       (navigation as any).navigate('ViewBusinessProfile', { businessId: partnerId });
     } else if (partnerType === 'user') {
       (navigation as any).navigate('ViewUserProfile', { userId: partnerId });
-    } else if (partnerType === 'group') {
-      // For groups, show group info
-      Alert.alert("Group Info", `Showing info for group: ${name}`);
+    }
+  };
+  
+  const handleParticipantPress = (participant: { id: string; name: string; avatar: string; role: string }) => {
+    setShowParticipantsSheet(false);
+    // Navigate to user or business profile based on role
+    if (participant.role === 'business' || participant.role === 'admin') {
+      (navigation as any).navigate('ViewBusinessProfile', { businessId: participant.id });
+    } else {
+      (navigation as any).navigate('ViewUserProfile', { userId: participant.id, userName: participant.name });
     }
   };
 
@@ -982,6 +491,7 @@ export default function ChatScreen() {
         if (msg.id === messageId) {
           const deletedMessage: DeletedMessage = {
             id: msg.id,
+            chatId: msg.chatId,
             type: 'deleted',
             isOutgoing: msg.isOutgoing,
             sender: msg.sender,
@@ -993,6 +503,17 @@ export default function ChatScreen() {
         return msg;
       })
     );
+  };
+
+  const handleReplyMessage = (messageId: string) => {
+    // Find the message to reply to
+    const messageToReply = messages.find(msg => msg.id === messageId);
+    if (messageToReply && messageToReply.type === 'text') {
+      // TODO: Implement reply functionality - set reply context in input area
+      Alert.alert('Reply', `Replying to: "${messageToReply.text.substring(0, 50)}..."`);
+    } else {
+      Alert.alert('Reply', 'Replying to this message');
+    }
   };
 
   // Function to get input colors based on state (matching AppSearchBar)
@@ -1041,7 +562,7 @@ export default function ChatScreen() {
       <ChatHeader
         title={name || 'Chat'}
         leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
-        rightAction={{ icon: partnerType === 'business' ? 'building-2' : 'user', onPress: handleViewProfile }}
+        rightAction={{ icon: isGroupChat ? 'users' : (partnerType === 'business' ? 'building-2' : 'user'), onPress: handleViewProfile }}
         onTitlePress={handleViewProfile}
       />
       <KeyboardAvoidingView
@@ -1096,6 +617,114 @@ export default function ChatScreen() {
             </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      
+      {/* Participants Bottom Sheet for Group Chats */}
+      <AppBottomSheet
+        visible={showParticipantsSheet}
+        onClose={() => setShowParticipantsSheet(false)}
+        title="Group Members"
+      >
+        <View>
+          {participants.map((participant, index) => (
+            <ListItemCard
+              key={participant.id || index}
+              avatar={{
+                type: participant.avatar ? 'image' : 'initials',
+                imageUri: participant.avatar || undefined,
+                userName: participant.name,
+                userId: participant.id,
+              }}
+              title={participant.name}
+              subtitle={participant.role && participant.role !== 'user' && participant.role !== 'staff' 
+                ? participant.role.charAt(0).toUpperCase() + participant.role.slice(1) 
+                : undefined}
+              showOptionsButton
+              onOptionsPress={() => {
+                setSelectedParticipant(participant);
+                setShowParticipantOptionsSheet(true);
+              }}
+              showDivider={index < participants.length - 1}
+              onPress={() => !participant.isCurrentUser && handleParticipantPress(participant)}
+            />
+          ))}
+        </View>
+      </AppBottomSheet>
+      
+      {/* Participant Options Bottom Sheet */}
+      <AppBottomSheet
+        visible={showParticipantOptionsSheet}
+        onClose={() => {
+          setShowParticipantOptionsSheet(false);
+          setSelectedParticipant(null);
+        }}
+        title={selectedParticipant?.name || 'Options'}
+        items={selectedParticipant?.isCurrentUser 
+          ? [
+              {
+                id: 'leave-group',
+                title: 'Leave group',
+                avatar: { type: 'icon', icon: 'log-out' },
+                variant: 'destructive',
+              },
+            ]
+          : [
+              {
+                id: 'view-profile',
+                title: 'View profile',
+                avatar: { type: 'icon', icon: 'user' },
+              },
+              {
+                id: 'remove-from-group',
+                title: 'Remove from group',
+                avatar: { type: 'icon', icon: 'user-minus' },
+                variant: 'destructive',
+              },
+            ]
+        }
+        onSelectItem={(item) => {
+          if (item.id === 'leave-group') {
+            setShowParticipantOptionsSheet(false);
+            setShowParticipantsSheet(false);
+            Alert.alert(
+              'Leave Group',
+              'Are you sure you want to leave this group?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                  text: 'Leave', 
+                  style: 'destructive',
+                  onPress: () => {
+                    // TODO: Implement leave group logic
+                    navigation.goBack();
+                  }
+                },
+              ]
+            );
+          } else if (item.id === 'view-profile') {
+            setShowParticipantOptionsSheet(false);
+            if (selectedParticipant) {
+              handleParticipantPress(selectedParticipant);
+            }
+          } else if (item.id === 'remove-from-group') {
+            setShowParticipantOptionsSheet(false);
+            Alert.alert(
+              'Remove Member',
+              `Are you sure you want to remove ${selectedParticipant?.name} from this group?`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                  text: 'Remove', 
+                  style: 'destructive',
+                  onPress: () => {
+                    // TODO: Implement remove member logic
+                    setSelectedParticipant(null);
+                  }
+                },
+              ]
+            );
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -1108,30 +737,26 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#eee',
   },
   avatarSmall: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#e5e7eb',
+    width: 40,
+    height: 40,
+    borderRadius: 8,
     marginRight: 8,
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'flex-end',
     marginBottom: 12,
     paddingHorizontal: 12,
   },
   bubble: {
     borderRadius: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    padding: 8,
     marginBottom: 2,
     overflow: 'visible',
   },
   bubbleIncoming: {
-    backgroundColor: '#FFFFFF',
     marginLeft: 0,
   },
   bubbleOutgoing: {
@@ -1146,18 +771,15 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   textIncoming: {
-    color: '#111827',
     fontSize: 16,
     lineHeight: 22,
   },
   textOutgoing: {
-    color: '#f9fafb',
     fontSize: 16,
     lineHeight: 22,
   },
   timestamp: {
     fontSize: 12,
-    color: '#9ca3af',
     marginRight: 2,
   },
   image: { 
@@ -1167,9 +789,9 @@ const styles = StyleSheet.create({
   // Special Message Bubble (Order, Invoice)
   specialMessageBubble: {
     borderRadius: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    minWidth: 220,
+    minWidth: 200,
   },
   specialMessageHeader: {
     flexDirection: 'row',
@@ -1180,12 +802,12 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   specialMessageTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     flexShrink: 1,
   },
   specialMessageSubtext: {
-    fontSize: 13,
+    fontSize: 14,
     marginBottom: 4,
   },
   
@@ -1199,23 +821,21 @@ const styles = StyleSheet.create({
   orderHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   orderTypeBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
-    marginLeft: 8,
   },
   orderTypeBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFFFFF',
     textTransform: 'uppercase',
   },
   orderIdText: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 4,
   },
   orderDetailsContainer: {
     marginBottom: 4,
@@ -1241,40 +861,22 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 4,
   },
-  orderActionBtn: {
-    backgroundColor: '#000000',
-    borderRadius: 8,
-    height: 40,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+  orderActionBtnSpacing: {
     marginTop: 6,
-  },
-  orderActionBtnOutgoing: {
-    backgroundColor: '#FFFFFF',
-  },
-  orderActionBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  orderActionBtnTextOutgoing: {
-    color: '#000000',
   },
   // Event/System messages - distinct from Date Separators
   eventBubble: {
     alignSelf: 'center',
-    backgroundColor: '#f3f4f6',
     borderRadius: 16,
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 14,
     alignItems: 'center',
     marginVertical: 4,
   },
   eventText: {
-    color: '#6b7280',
-    fontSize: 13,
+    fontSize: 14,
     fontStyle: 'italic',
+    fontWeight: '400',
     textAlign: 'center',
   },
   // Date Separator (WhatsApp style day headers)
@@ -1284,15 +886,13 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   dateSeparatorBubble: {
-    backgroundColor: '#e5e7eb',
     borderRadius: 8,
     paddingVertical: 4,
     paddingHorizontal: 12,
   },
   dateSeparatorText: {
-    color: '#4b5563',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 14,
+    fontFamily: 'InterCustom-medium',
   },
   input: {
     flex: 1,
@@ -1301,15 +901,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     paddingHorizontal: 16,
     paddingVertical: 11,
-    backgroundColor: '#f3f4f6',
     borderRadius: 21,
     fontSize: 16,
-    color: '#1f2937',
     lineHeight: 20,
     textAlignVertical: 'center',
   },
   sendButton: {
-    backgroundColor: '#1f2937',
     borderRadius: 21,
     width: 42,
     height: 42,
@@ -1318,8 +915,6 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   importLabel: {
-    backgroundColor: '#22c55e',
-    color: '#fff',
     fontWeight: 'bold',
     fontSize: 11,
     paddingHorizontal: 6,
@@ -1329,8 +924,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   exportLabel: {
-    backgroundColor: '#fb923c',
-    color: '#fff',
     fontWeight: 'bold',
     fontSize: 11,
     paddingHorizontal: 6,
@@ -1340,35 +933,27 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   statusPaid: {
-    color: '#22c55e',
     fontWeight: 'bold',
   },
   statusUnpaid: {
-    color: '#ef4444',
     fontWeight: 'bold',
   },
   statusDone: {
-    color: '#22c55e',
     fontWeight: 'bold',
   },
   statusNew: {
-    color: '#0ea5e9',
     fontWeight: 'bold',
   },
   statusOngoing: {
-    color: '#f59e42',
     fontWeight: 'bold',
   },
   statusPending: {
-    color: '#eab308',
     fontWeight: 'bold',
   },
   statusCancel: {
-    color: '#ef4444',
     fontWeight: 'bold',
   },
   statusDefault: {
-    color: '#6b7280',
     fontWeight: 'bold',
   },
   listContent: {
@@ -1381,8 +966,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderTopWidth: 1,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
   },
   imageBubbleContainer: {
     maxWidth: '80%',
@@ -1405,10 +988,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   imageTimestampOutgoing: {
-    color: '#fff',
   },
   imageOverlayOutgoing: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   replyContextContainer: {
     flexDirection: 'row',
@@ -1418,17 +999,12 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
   },
   replyContextContainerIncoming: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     borderLeftWidth: 4,
-    borderLeftColor: '#d1d5db',
   },
   replyContextContainerOutgoing: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderLeftWidth: 4,
-    borderLeftColor: '#E2E8F0',
   },
   replyContextIndicator: {
     width: 4,
@@ -1447,20 +1023,17 @@ const styles = StyleSheet.create({
   },
   deletedBubble: {
     flexDirection: 'column',
-    backgroundColor: '#f3f4f6',
     borderRadius: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     marginBottom: 2,
     maxWidth: '75%',
-    opacity: 0.8,
   },
   deletedContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   deletedText: {
-    color: '#6b7280',
     fontSize: 14,
     fontStyle: 'italic',
   },
@@ -1506,8 +1079,6 @@ const styles = StyleSheet.create({
   },
   imageTimestamp: {
     fontSize: 11,
-    color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },

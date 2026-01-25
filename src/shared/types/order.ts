@@ -4,29 +4,69 @@
  */
 
 /**
- * Order status enum
- * Based on app-logic.json statusEnums.orderStatus
+ * Order status type
+ * Re-exported from constants for convenience
  */
-export type OrderStatus = 'pending' | 'accepted' | 'completed' | 'cancelled';
+export type { OrderStatus } from '@/shared/constants/orderStatus';
+export { 
+  ORDER_STATUS_META,
+  ORDER_STATUS_TONE,
+  ORDER_STATUSES,
+  ALLOWED_TRANSITIONS,
+  getStatusLabel,
+  statusRequiresReason,
+  canEditOrder,
+  isFinalStatus,
+  sortByStatusRank,
+  sortOrdersByStatusAndDate,
+  getValidTransitions,
+  isValidTransition,
+  getTransitionsWithMeta,
+  STATUSES_REQUIRING_REASON,
+  FINAL_STATUSES,
+  ACTIVE_STATUSES,
+} from '@/shared/constants/orderStatus';
 
 /**
- * Order status colors for UI
+ * @deprecated Use ORDER_STATUS_TONE and theme colors instead
+ * Kept for backward compatibility
  */
-export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
+export const ORDER_STATUS_COLORS: Record<string, string> = {
+  // Legacy lowercase statuses
   pending: '#F59E0B',
   accepted: '#0EA5E9',
   completed: '#22C55E',
   cancelled: '#6B7280',
+  // New uppercase statuses
+  NEW: '#0075FF',
+  ACCEPTED: '#0075FF',
+  ONGOING: '#FFB600',
+  PENDING: '#A4AAB8',
+  IN_REVIEW: '#A76AF0',
+  DONE: '#2ACF01',
+  CANCELED: '#FF6B6B',
+  REJECTED: '#FF2400',
 };
 
 /**
- * Order status labels for display
+ * @deprecated Use getStatusLabel() instead
+ * Kept for backward compatibility
  */
-export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+export const ORDER_STATUS_LABELS: Record<string, string> = {
+  // Legacy lowercase statuses
   pending: 'Pending',
   accepted: 'Accepted',
   completed: 'Completed',
   cancelled: 'Cancelled',
+  // New uppercase statuses
+  NEW: 'New order',
+  ACCEPTED: 'Accepted',
+  ONGOING: 'Ongoing',
+  PENDING: 'Pending',
+  IN_REVIEW: 'In review',
+  DONE: 'Done',
+  CANCELED: 'Canceled',
+  REJECTED: 'Rejected',
 };
 
 /**
@@ -53,6 +93,8 @@ export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
   done: 'Delivered',
 };
 
+import type { OrderStatus as OrderStatusType } from '@/shared/constants/orderStatus';
+
 /**
  * Order - B2B orders between businesses
  * Based on app-logic.json dataModels.order
@@ -63,12 +105,18 @@ export interface Order {
   to_business_id: string; // Business receiving the order
   from_business_name?: string; // For display
   to_business_name?: string; // For display
-  status: OrderStatus;
+  status: OrderStatusType;
   total_price: number; // Snapshot at order time
   notes?: string;
   created_by: string; // FK to User who created the order
   created_at: string;
   updated_at?: string;
+  
+  // Status tracking fields
+  statusChangedAt?: string; // When status was last changed
+  statusChangedBy?: string; // User ID who changed status
+  statusReason?: string; // Reason for PENDING/CANCELED/REJECTED
+  lastActivityAt?: string; // Last activity timestamp (for automation)
 }
 
 /**

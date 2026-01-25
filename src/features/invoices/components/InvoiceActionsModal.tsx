@@ -1,7 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
-import AppButton from '@/shared/components/ui/AppButton';
+import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
 
 interface InvoiceActionsModalProps {
   visible: boolean;
@@ -16,37 +14,27 @@ export default function InvoiceActionsModal({
   onCreateInvoice,
   onCreateEstimate,
 }: InvoiceActionsModalProps) {
-  const handleCreateInvoice = () => {
-    onCreateInvoice();
-    onClose();
-  };
+  const actionItems: AppBottomSheetItem[] = [
+    { id: 'invoice', title: 'Create New Invoice' },
+    { id: 'estimate', title: 'Create New Estimate' },
+  ];
 
-  const handleCreateEstimate = () => {
-    onCreateEstimate();
-    onClose();
+  const handleSelectItem = (item: AppBottomSheetItem) => {
+    if (item.id === 'invoice') {
+      onCreateInvoice();
+    } else if (item.id === 'estimate') {
+      onCreateEstimate();
+    }
   };
 
   return (
-    <AppBottomSheet visible={visible} onClose={onClose} title="Actions">
-      <View style={styles.content}>
-        <AppButton
-          title="Create New Invoice"
-          onPress={handleCreateInvoice}
-          variant="outline"
-        />
-        <AppButton
-          title="Create New Estimate"
-          onPress={handleCreateEstimate}
-          variant="outline"
-        />
-      </View>
-    </AppBottomSheet>
+    <AppBottomSheet
+      visible={visible}
+      onClose={onClose}
+      title="Actions"
+      items={actionItems}
+      mode="buttons"
+      onSelectItem={handleSelectItem}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 12,
-    gap: 8,
-  },
-});

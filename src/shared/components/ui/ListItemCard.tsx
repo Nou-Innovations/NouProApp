@@ -421,10 +421,10 @@ export function ListItemCard({
                 </View>
               </View>
             ) : (
-              /* Default row-based layout */
-              <>
-                {/* Row 1: Title + Right Row 1 (status pill, timestamp) */}
-                <View style={styles.contentRow}>
+              /* Default two-column layout: text on left, right content on right */
+              <View style={styles.twoColumnLayout}>
+                {/* Left column: Title, Subtitle, ExtraInfo stacked */}
+                <View style={styles.textColumn}>
                   <Text
                     style={[
                       styles.title, 
@@ -434,62 +434,56 @@ export function ListItemCard({
                   >
                     {title}
                   </Text>
-                  {hasRightRow1Content && (
-                    <View style={styles.rightRowContent}>
-                      {rightRow1?.statusPill && (
-                        <StatusPill text={rightRow1.statusPill.text} color={rightRow1.statusPill.color} />
-                      )}
-                      {rightRow1?.timestamp && (
-                        <Text style={[
-                          styles.timestamp, 
-                          { color: appTheme.colors.textMuted },
-                          // Add margin only when status pill is present
-                          rightRow1?.statusPill && { marginLeft: 8 }
-                        ]}>
-                          {rightRow1.timestamp}
-                        </Text>
-                      )}
-                    </View>
+                  {subtitle && (
+                    typeof subtitle === 'string' ? (
+                      <Text
+                        style={[
+                          styles.subtitle, 
+                          { color: isOptionList && selected ? appTheme.colors.textMuted : appTheme.colors.textSecondary },
+                          { marginTop: lineGap }
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {subtitle}
+                      </Text>
+                    ) : (
+                      <View style={{ marginTop: lineGap }}>{subtitle}</View>
+                    )
+                  )}
+                  {extraInfo && (
+                    <Text
+                      style={[styles.extraInfo, { color: appTheme.colors.textMuted, marginTop: lineGap }]}
+                      numberOfLines={1}
+                    >
+                      {extraInfo}
+                    </Text>
                   )}
                 </View>
 
-                {/* Row 2: Subtitle + Right Row 2 */}
-                {(subtitle || rightRow2) && (
-                  <View style={[styles.contentRow, { marginTop: lineGap }]}>
-                    {subtitle && (
-                      typeof subtitle === 'string' ? (
-                        <Text
-                          style={[
-                            styles.subtitle, 
-                            { color: isOptionList && selected ? appTheme.colors.textMuted : appTheme.colors.textSecondary }
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {subtitle}
-                        </Text>
-                      ) : (
-                        <View style={{ flex: 1 }}>{subtitle}</View>
-                      )
+                {/* Right column: rightRow1, rightRow2, rightRow3 stacked */}
+                {(hasRightRow1Content || rightRow2 || rightRow3) && (
+                  <View style={styles.rightColumn}>
+                    {hasRightRow1Content && (
+                      <View style={styles.rightRowContent}>
+                        {rightRow1?.statusPill && (
+                          <StatusPill text={rightRow1.statusPill.text} color={rightRow1.statusPill.color} />
+                        )}
+                        {rightRow1?.timestamp && (
+                          <Text style={[
+                            styles.timestamp, 
+                            { color: appTheme.colors.textMuted },
+                            rightRow1?.statusPill && { marginLeft: 8 }
+                          ]}>
+                            {rightRow1.timestamp}
+                          </Text>
+                        )}
+                      </View>
                     )}
                     {rightRow2 && <View style={styles.rightRowContent}>{rightRow2}</View>}
-                  </View>
-                )}
-
-                {/* Row 3: Extra Info + Right Row 3 */}
-                {(extraInfo || rightRow3) && (
-                  <View style={[styles.contentRow, { marginTop: lineGap }]}>
-                    {extraInfo && (
-                      <Text
-                        style={[styles.extraInfo, { color: appTheme.colors.textMuted }]}
-                        numberOfLines={1}
-                      >
-                        {extraInfo}
-                      </Text>
-                    )}
                     {rightRow3 && <View style={styles.rightRowContent}>{rightRow3}</View>}
                   </View>
                 )}
-              </>
+              </View>
             )}
           </View>
 
@@ -527,7 +521,7 @@ const styles = StyleSheet.create({
     paddingVertical: LIST_ITEM_CARD.paddingVertical,
   },
   containerWithOptionsButton: {
-    paddingRight: 4, // Only 4px when options button (3-dots) is shown
+    paddingRight: 0, // No extra padding, button provides spacing
   },
   borderVariant: {
     borderWidth: LIST_ITEM_CARD.selectionBorder.borderWidth,
@@ -538,7 +532,7 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start', // Align content to top of avatar
+    alignItems: 'center', // Vertically center content with avatar
   },
   avatarContainer: {
     marginRight: LIST_ITEM_CARD.avatar.marginRight,
@@ -564,6 +558,19 @@ const styles = StyleSheet.create({
   rightColumnContainer: {
     marginLeft: 8,
     alignItems: 'flex-end',
+  },
+  twoColumnLayout: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  textColumn: {
+    flex: 1,
+    marginRight: 8,
+  },
+  rightColumn: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   contentRow: {
     flexDirection: 'row',
@@ -607,7 +614,7 @@ const styles = StyleSheet.create({
     width: LIST_ITEM_CARD.optionsButton.size,
     height: LIST_ITEM_CARD.optionsButton.size,
     justifyContent: 'center',
-    alignItems: 'flex-end', // Align icon to right edge
+    alignItems: 'center',
   },
   checkmark: {
     width: LIST_ITEM_CARD.checkmark.size,

@@ -23,7 +23,7 @@ import { RootStackParamList } from '@/shared/types/navigation';
 import { format, parseISO } from 'date-fns';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNotifications } from '@/shared/context/NotificationContext';
@@ -442,33 +442,20 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
   }
 
   // More options menu items - dynamically built based on document type and ownership
-  const moreOptionsItems = [
+  const moreOptionsItems: AppBottomSheetItem[] = [
     // Send option - only for owner and for estimates or draft invoices
     ...(isInvoiceOwner && (isEstimate || status === 'draft') ? [{
       id: 'send',
       title: isEstimate ? 'Send Estimate' : 'Send Invoice',
-      description: `Send ${isEstimate ? 'estimate' : 'invoice'} to client`,
-      icon: 'send',
     }] : []),
     // Download PDF - always available
-    {
-      id: 'download',
-      title: 'Download PDF',
-      description: `Download ${isEstimate ? 'estimate' : 'invoice'} as PDF`,
-      icon: 'download',
-    },
-    {
-      id: 'share',
-      title: 'Share',
-      description: `Share ${isEstimate ? 'estimate' : 'invoice'} details`,
-      icon: 'share',
-    },
+    { id: 'download', title: 'Download PDF' },
+    { id: 'share', title: 'Share' },
     // Delete - only for owner
     ...(isInvoiceOwner ? [{
       id: 'delete',
       title: 'Delete',
-      description: `Delete this ${isEstimate ? 'estimate' : 'invoice'}`,
-      icon: 'trash-2',
+      variant: 'destructive' as const,
     }] : []),
   ];
 
@@ -889,58 +876,26 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
         visible={showMoreOptions}
         onClose={() => setShowMoreOptions(false)}
         title="Options"
-      >
-        {moreOptionsItems.map((item, index) => (
-          <ListItemCard
-            key={item.id}
-            avatar={{
-              type: 'icon',
-              icon: item.icon,
-              iconColor: theme.colors.text,
-              backgroundColor: theme.colors.surface,
-            }}
-            title={item.title}
-            subtitle={item.description}
-            onPress={() => {
-              handleMoreOptionSelect(item);
-              setShowMoreOptions(false);
-            }}
-            showDivider={index < moreOptionsItems.length - 1}
-          />
-        ))}
-      </AppBottomSheet>
+        items={moreOptionsItems}
+        mode="buttons"
+        onSelectItem={handleMoreOptionSelect}
+      />
 
       {/* Payment Options Bottom Sheet */}
       <AppBottomSheet
         visible={showPaymentOptions}
         onClose={() => setShowPaymentOptions(false)}
         title="Payment Options"
-      >
-        <ListItemCard
-          avatar={{
-            type: 'icon',
-            icon: 'add-circle-outline',
-            iconColor: theme.colors.text,
-            backgroundColor: theme.colors.surface,
-          }}
-          title="Add Partial Payment"
-          subtitle="Record a partial payment received"
-          onPress={handleAddPartialPayment}
-          showDivider
-        />
-        <ListItemCard
-          avatar={{
-            type: 'icon',
-            icon: 'checkmark-circle',
-            iconColor: '#FFFFFF',
-            backgroundColor: theme.colors.success,
-          }}
-          title="Mark as Fully Paid"
-          subtitle="Mark invoice as completely paid"
-          onPress={handleMarkFullyPaid}
-          showDivider={false}
-        />
-      </AppBottomSheet>
+        items={[
+          { id: 'partial', title: 'Add Partial Payment' },
+          { id: 'full', title: 'Mark as Fully Paid' },
+        ]}
+        mode="buttons"
+        onSelectItem={(item) => {
+          if (item.id === 'partial') handleAddPartialPayment();
+          else if (item.id === 'full') handleMarkFullyPaid();
+        }}
+      />
     </SafeAreaView>
   );
 }

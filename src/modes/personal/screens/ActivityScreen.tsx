@@ -5,7 +5,7 @@
  * Based on app-logic.json navigation.personalProfileTabs.Activity
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   FlatList,
   RefreshControl,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -20,188 +21,154 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
+import { get } from '@/shared/services/api';
 import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
 import FilterBar from '@/features/search/components/FilterBar';
 import TaskCard, { TaskType, TaskStatus } from '@/features/tasks/components/TaskCard';
 
 // Filter options
-const FILTER_OPTIONS = ['All', 'Pending', 'In Progress', 'Completed'];
+const FILTER_OPTIONS = ['All', 'New', 'Assigned', 'Ongoing', 'Delivered'];
 
-// Mock tasks data
-const mockTasks: Array<{
+// Activity type from backend
+interface DeliveryActivity {
   id: string;
-  title: string;
-  description: string;
-  type: TaskType;
-  status: TaskStatus;
-  businessName: string;
-  businessLogo: string;
-  businessId: string;
-  dueDate?: string;
-  assignedAt: string;
-  hasFullAccess: boolean;
-}> = [
-  {
-    id: 'task-1',
-    title: 'Delivery to Port Louis',
-    description: 'Deliver order #ORD-2025-001 to ABC Corporation',
-    type: 'delivery',
-    status: 'pending',
-    businessName: 'NouPro Distribution',
-    businessLogo: 'https://picsum.photos/seed/noupro/100/100',
-    businessId: 'biz-001',
-    dueDate: new Date(Date.now() + 7200000).toISOString(),
-    assignedAt: new Date(Date.now() - 3600000).toISOString(),
-    hasFullAccess: false,
-  },
-  {
-    id: 'task-2',
-    title: 'Process Order #ORD-2025-002',
-    description: 'Review and confirm order from Fresh Farms',
-    type: 'order',
-    status: 'in_progress',
-    businessName: 'NouPro Distribution',
-    businessLogo: 'https://picsum.photos/seed/noupro/100/100',
-    businessId: 'biz-001',
-    assignedAt: new Date(Date.now() - 7200000).toISOString(),
-    hasFullAccess: false,
-  },
-  {
-    id: 'task-3',
-    title: 'Invoice Review',
-    description: 'Review invoice #INV-2025-003 before sending',
-    type: 'invoice',
-    status: 'pending',
-    businessName: 'Global Supply Co.',
-    businessLogo: 'https://picsum.photos/seed/global/100/100',
-    businessId: 'biz-002',
-    dueDate: new Date(Date.now() + 86400000).toISOString(),
-    assignedAt: new Date(Date.now() - 14400000).toISOString(),
-    hasFullAccess: true,
-  },
-  {
-    id: 'task-4',
-    title: 'Delivery to Curepipe',
-    description: 'Urgent delivery for Premium Foods Ltd',
-    type: 'delivery',
-    status: 'in_progress',
-    businessName: 'NouPro Distribution',
-    businessLogo: 'https://picsum.photos/seed/noupro/100/100',
-    businessId: 'biz-001',
-    dueDate: new Date(Date.now() - 3600000).toISOString(), // Overdue
-    assignedAt: new Date(Date.now() - 28800000).toISOString(),
-    hasFullAccess: false,
-  },
-  {
-    id: 'task-5',
-    title: 'Completed Delivery',
-    description: 'Order delivered to Tech Solutions',
-    type: 'delivery',
-    status: 'completed',
-    businessName: 'NouPro Distribution',
-    businessLogo: 'https://picsum.photos/seed/noupro/100/100',
-    businessId: 'biz-001',
-    assignedAt: new Date(Date.now() - 86400000).toISOString(),
-    hasFullAccess: false,
-  },
-  {
-    id: 'task-6',
-    title: 'Stock Check',
-    description: 'Verify inventory levels at Warehouse A',
-    type: 'general',
-    status: 'completed',
-    businessName: 'Global Supply Co.',
-    businessLogo: 'https://picsum.photos/seed/global/100/100',
-    businessId: 'biz-002',
-    assignedAt: new Date(Date.now() - 172800000).toISOString(),
-    hasFullAccess: true,
-  },
-];
+  type: 'delivery';
+  createdAt: string;
+  delivery: {
+    id: string;
+    companyId: string;
+    locationId: string | null;
+    clientName: string | null;
+    clientAddress: string | null;
+    itemCount: number;
+    totalAmount: number;
+    deliveryStatus: string;
+    expectedDeliveryDateTime: string | null;
+    transportMode: string | null;
+  };
+}
 
 export default function ActivityScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
   const currentUser = useProfileStore((state) => state.currentUser);
   const userBusinesses = useProfileStore((state) => state.userBusinesses);
-  const switchToBusiness = useProfileStore((state) => state.switchToBusiness);
 
+  const [activities, setActivities] = useState<DeliveryActivity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState('All');
   const [refreshing, setRefreshing] = useState(false);
 
-  // Map filter labels to status values
+  // Fetch activities from backend
+  const loadActivities = useCallback(async () => {
+    if (!currentUser?.id) {
+      setActivities([]);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const response = await get<{ activities: DeliveryActivity[] }>(`/users/${currentUser.id}/activities`);
+      setActivities(response.activities || []);
+    } catch (error) {
+      console.error('Error fetching activities:', error);
+      setActivities([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentUser?.id]);
+
+  // Load on mount
+  useEffect(() => {
+    loadActivities();
+  }, [loadActivities]);
+
+  // Map filter labels to delivery status values
   const getStatusFromFilter = (filterValue: string): string | null => {
     const statusMap: Record<string, string | null> = {
       'All': null,
-      'Pending': 'pending',
-      'In Progress': 'in_progress',
-      'Completed': 'completed',
+      'New': 'new',
+      'Assigned': 'assigned',
+      'Ongoing': 'ongoing',
+      'Delivered': 'delivered',
     };
     return statusMap[filterValue] ?? null;
   };
 
-  // Filter tasks
-  const filteredTasks = useMemo(() => {
+  // Filter activities
+  const filteredActivities = useMemo(() => {
     const status = getStatusFromFilter(filter);
-    if (!status) return mockTasks;
-    return mockTasks.filter((task) => task.status === status);
-  }, [filter]);
+    if (!status) return activities;
+    return activities.filter((a) => a.delivery.deliveryStatus === status);
+  }, [filter, activities]);
 
-  // Calculate stats
+  // Calculate stats from real data
   const stats = useMemo(() => {
     return {
-      pending: mockTasks.filter((t) => t.status === 'pending').length,
-      inProgress: mockTasks.filter((t) => t.status === 'in_progress').length,
-      completed: mockTasks.filter((t) => t.status === 'completed').length,
+      new: activities.filter((a) => a.delivery.deliveryStatus === 'new' || a.delivery.deliveryStatus === 'assigned').length,
+      ongoing: activities.filter((a) => a.delivery.deliveryStatus === 'ongoing').length,
+      delivered: activities.filter((a) => a.delivery.deliveryStatus === 'delivered').length,
     };
-  }, []);
+  }, [activities]);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
-  }, []);
+    await loadActivities();
+    setRefreshing(false);
+  }, [loadActivities]);
 
-  const handleTaskPress = async (task: typeof mockTasks[0]) => {
-    // Navigate to Personal Delivery Detail screen with limited info
-    // @ts-ignore
+  const handleActivityPress = (activity: DeliveryActivity) => {
+    // Navigate to Personal Delivery Detail screen
+    // Uses taskId format to match existing navigation type
+    // @ts-ignore - Navigation type will be updated separately
     navigation.navigate('PersonalDeliveryDetail', { 
-      taskId: task.id,
-      businessId: task.businessId,
-      hasFullAccess: task.hasFullAccess,
+      taskId: activity.delivery.id,
+      businessId: activity.delivery.companyId,
+      hasFullAccess: false, // Staff always has limited access
     });
   };
 
 
+  // Map delivery status to TaskCard status
+  const mapDeliveryStatusToTaskStatus = (deliveryStatus: string): TaskStatus => {
+    const statusMap: Record<string, TaskStatus> = {
+      'new': 'pending',
+      'assigned': 'pending',
+      'ongoing': 'in_progress',
+      'delivered': 'completed',
+      'pending': 'pending',
+    };
+    return statusMap[deliveryStatus] || 'pending';
+  };
+
   const renderStatsCards = () => (
     <View style={styles.statsContainer}>
       <View style={[styles.statCard, { backgroundColor: '#FEF3C7' }]}>
-        <Text style={[styles.statNumber, { color: '#F59E0B' }]}>{stats.pending}</Text>
+        <Text style={[styles.statNumber, { color: '#F59E0B' }]}>{stats.new}</Text>
         <Text style={[styles.statLabel, { color: '#92400E' }]}>Pending</Text>
       </View>
       <View style={[styles.statCard, { backgroundColor: '#DBEAFE' }]}>
-        <Text style={[styles.statNumber, { color: '#0EA5E9' }]}>{stats.inProgress}</Text>
-        <Text style={[styles.statLabel, { color: '#1E40AF' }]}>In Progress</Text>
+        <Text style={[styles.statNumber, { color: '#0EA5E9' }]}>{stats.ongoing}</Text>
+        <Text style={[styles.statLabel, { color: '#1E40AF' }]}>Ongoing</Text>
       </View>
       <View style={[styles.statCard, { backgroundColor: '#DCFCE7' }]}>
-        <Text style={[styles.statNumber, { color: '#22C55E' }]}>{stats.completed}</Text>
-        <Text style={[styles.statLabel, { color: '#166534' }]}>Completed</Text>
+        <Text style={[styles.statNumber, { color: '#22C55E' }]}>{stats.delivered}</Text>
+        <Text style={[styles.statLabel, { color: '#166534' }]}>Delivered</Text>
       </View>
     </View>
   );
 
-  const renderTaskItem = ({ item }: { item: typeof mockTasks[0] }) => (
+  const renderActivityItem = ({ item }: { item: DeliveryActivity }) => (
     <TaskCard
       id={item.id}
-      title={item.title}
-      description={item.description}
-      type={item.type}
-      status={item.status}
-      businessName={item.businessName}
-      businessLogo={item.businessLogo}
-      dueDate={item.dueDate}
-      assignedAt={item.assignedAt}
-      onPress={() => handleTaskPress(item)}
+      title={`Delivery to ${item.delivery.clientName || 'Customer'}`}
+      description={item.delivery.clientAddress || 'Address pending'}
+      type="delivery"
+      status={mapDeliveryStatusToTaskStatus(item.delivery.deliveryStatus)}
+      businessName={item.delivery.companyId}
+      dueDate={item.delivery.expectedDeliveryDateTime || undefined}
+      assignedAt={item.createdAt}
+      onPress={() => handleActivityPress(item)}
     />
   );
 
@@ -209,12 +176,12 @@ export default function ActivityScreen() {
     <View style={styles.emptyState}>
       <Icon name="checkbox-outline" size={60} color={appTheme.colors.textLight} />
       <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>
-        {filter === 'All' ? 'No tasks yet' : `No ${filter.toLowerCase()} tasks`}
+        {filter === 'All' ? 'No deliveries assigned' : `No ${filter.toLowerCase()} deliveries`}
       </Text>
       <Text style={[styles.emptySubtitle, { color: appTheme.colors.textLight }]}>
         {userBusinesses.length > 0
-          ? 'Tasks assigned to you will appear here'
-          : 'Join a business to receive tasks'}
+          ? 'Deliveries assigned to you will appear here'
+          : 'Join a business to receive deliveries'}
       </Text>
       {userBusinesses.length === 0 && (
         <TouchableOpacity
@@ -226,6 +193,27 @@ export default function ActivityScreen() {
       )}
     </View>
   );
+
+  const renderLoading = () => (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color={appTheme.colors.primary} />
+      <Text style={[styles.loadingText, { color: appTheme.colors.textLight }]}>
+        Loading activities...
+      </Text>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: appTheme.colors.background }]}
+        edges={['top']}
+      >
+        <PrimaryHeader title="Activity" />
+        {renderLoading()}
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -240,9 +228,9 @@ export default function ActivityScreen() {
         onSelectStatus={setFilter}
       />
       <FlatList
-        data={filteredTasks}
+        data={filteredActivities}
         keyExtractor={(item) => item.id}
-        renderItem={renderTaskItem}
+        renderItem={renderActivityItem}
         ListEmptyComponent={renderEmptyState}
         refreshControl={
           <RefreshControl
@@ -320,5 +308,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: theme.fontSize.base,
     fontFamily: theme.fonts.primary.medium,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    marginTop: 16,
   },
 });

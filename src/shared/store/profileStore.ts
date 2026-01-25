@@ -276,7 +276,21 @@ export const useProfileStore = create<ProfileStore>()(
 
         // Check if staff status is accepted
         if (userBusiness.staff_entry.status !== 'accepted') {
-          set({ error: 'Your access to this business is pending or restricted' });
+          set({ error: 'Your access to this business is invited or suspended' });
+          return false;
+        }
+
+        // Staff cannot access business mode
+        if (userBusiness.role === 'staff') {
+          set({
+            activeMode: 'personal',
+            activeBusinessId: null,
+            activeBusiness: null,
+            currentUserRole: null,
+            currentStaffEntry: null,
+            currentStaffRoleType: null,
+            error: 'Staff members can only use Personal mode',
+          });
           return false;
         }
 

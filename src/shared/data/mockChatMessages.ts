@@ -1129,12 +1129,12 @@ const mikeChenBusinessMessages: Message[] = [
   },
 ];
 
-// Warehouse A Team - Internal team chat
+// Warehouse A Team - Group chat with multiple senders
 const warehouseATeamMessages: Message[] = [
   {
     id: 'wa1',
     type: 'event',
-    event: 'Inventory check completed',
+    event: 'Marie Manager created this group',
     isOutgoing: false,
     sender: { name: 'System', avatar: '', role: 'system' },
     timestamp: '08:00',
@@ -1143,36 +1143,126 @@ const warehouseATeamMessages: Message[] = [
   {
     id: 'wa2',
     type: 'text',
-    text: 'Stock levels updated for all product categories.',
-    isOutgoing: true,
-    sender: { name: 'You', avatar: '', role: 'business' },
-    timestamp: '08:45',
-    status: 'read'
+    text: 'Hey team! Let\'s use this group to coordinate our sales efforts.',
+    isOutgoing: false,
+    sender: { name: 'Marie Manager', avatar: 'https://picsum.photos/seed/marie/40/40', role: 'admin' },
+    timestamp: '08:05',
+    status: undefined
   },
   {
     id: 'wa3',
-    type: 'pdf',
-    fileName: 'Inventory_Report_Jan2025.pdf',
-    isOutgoing: true,
-    sender: { name: 'You', avatar: '', role: 'business' },
-    timestamp: '08:46',
-    status: 'delivered'
+    type: 'text',
+    text: 'Sounds good!',
+    isOutgoing: false,
+    sender: { name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'staff' },
+    timestamp: '08:10',
+    status: undefined
   },
   {
     id: 'wa4',
     type: 'text',
-    text: 'Noted! I\'ll update the system records.',
+    text: 'I\'m in!',
     isOutgoing: false,
-    sender: { name: 'John', avatar: 'https://picsum.photos/seed/john/40/40', role: 'internal' },
-    timestamp: '08:50',
+    sender: { name: 'Mike Chen', avatar: 'https://picsum.photos/seed/mike/40/40', role: 'staff' },
+    timestamp: '08:12',
     status: undefined
   },
   {
     id: 'wa5',
     type: 'text',
-    text: 'Low stock alert: Item SKU-1234 needs reorder.',
+    text: 'Let\'s start with reviewing last month\'s performance.',
+    isOutgoing: true,
+    sender: { name: 'You', avatar: '', role: 'business' },
+    timestamp: '08:20',
+    status: 'read'
+  },
+  {
+    id: 'wa6',
+    type: 'text',
+    text: 'I\'ve prepared a summary of our Q4 results.',
     isOutgoing: false,
-    sender: { name: 'System', avatar: '', role: 'system' },
+    sender: { name: 'Marie Manager', avatar: 'https://picsum.photos/seed/marie/40/40', role: 'admin' },
+    timestamp: '08:25',
+    status: undefined
+  },
+  {
+    id: 'wa7',
+    type: 'text',
+    text: 'We exceeded targets by 15%!',
+    isOutgoing: false,
+    sender: { name: 'Marie Manager', avatar: 'https://picsum.photos/seed/marie/40/40', role: 'admin' },
+    timestamp: '08:26',
+    status: undefined
+  },
+  {
+    id: 'wa8',
+    type: 'text',
+    text: 'That\'s amazing! 🎉',
+    isOutgoing: false,
+    sender: { name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'staff' },
+    timestamp: '08:30',
+    status: undefined
+  },
+  {
+    id: 'wa9',
+    type: 'text',
+    text: 'Congrats everyone!',
+    isOutgoing: false,
+    sender: { name: 'Mike Chen', avatar: 'https://picsum.photos/seed/mike/40/40', role: 'staff' },
+    timestamp: '08:35',
+    status: undefined
+  },
+  {
+    id: 'wa10',
+    type: 'text',
+    text: 'Great work team!',
+    isOutgoing: true,
+    sender: { name: 'You', avatar: '', role: 'business' },
+    timestamp: '08:40',
+    status: 'read'
+  },
+  {
+    id: 'wa11',
+    type: 'text',
+    text: 'Let\'s aim for 20% next quarter.',
+    isOutgoing: true,
+    sender: { name: 'You', avatar: '', role: 'business' },
+    timestamp: '08:41',
+    status: 'read'
+  },
+  {
+    id: 'wa12',
+    type: 'text',
+    text: 'Challenge accepted!',
+    isOutgoing: false,
+    sender: { name: 'Mike Chen', avatar: 'https://picsum.photos/seed/mike/40/40', role: 'staff' },
+    timestamp: '08:45',
+    status: undefined
+  },
+  {
+    id: 'wa13',
+    type: 'text',
+    text: 'I have some ideas for new strategies.',
+    isOutgoing: false,
+    sender: { name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'staff' },
+    timestamp: '08:50',
+    status: undefined
+  },
+  {
+    id: 'wa14',
+    type: 'text',
+    text: 'Let\'s discuss them in our meeting tomorrow.',
+    isOutgoing: false,
+    sender: { name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'staff' },
+    timestamp: '08:51',
+    status: undefined
+  },
+  {
+    id: 'wa15',
+    type: 'text',
+    text: 'Great job on the quarterly targets!',
+    isOutgoing: false,
+    sender: { name: 'Marie Manager', avatar: 'https://picsum.photos/seed/marie/40/40', role: 'admin' },
     timestamp: '09:00',
     status: undefined
   },

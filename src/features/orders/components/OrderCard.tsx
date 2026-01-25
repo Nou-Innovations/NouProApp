@@ -5,12 +5,14 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { OrderWithItems, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from '@/shared/types/order';
+import { OrderWithItems } from '@/shared/types/order';
+import type { OrderStatus } from '@/shared/constants/orderStatus';
 import { formatRelativeTime, formatCurrency } from '@/shared/data/mockOrders';
-import { ListItemCard } from '@/shared/components/ui';
+import { ListItemCard, OrderStatusBadge } from '@/shared/components/ui';
+import { Text } from '@/shared/components/ui/Typography';
 
 interface OrderCardProps {
   order: OrderWithItems;
@@ -26,10 +28,6 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, type, onPress }) => {
     ? order.from_business_name 
     : order.to_business_name;
 
-  // Get status color
-  const statusColor = ORDER_STATUS_COLORS[order.status];
-  const statusLabel = ORDER_STATUS_LABELS[order.status];
-
   // Get item summary
   const itemCount = order.items.length;
   const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -43,12 +41,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, type, onPress }) => {
   // Bottom row with status badge and total price
   const bottomRow = (
     <View style={styles.bottomRow}>
-      <View style={[styles.statusBadge, { backgroundColor: `${statusColor}20` }]}>
-        <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-        <Text style={[styles.statusText, { color: statusColor }]}>
-          {statusLabel}
-        </Text>
-      </View>
+      <OrderStatusBadge status={order.status as OrderStatus} size="sm" />
       <Text style={[styles.totalPrice, { color: appTheme.colors.text }]}>
         {formatCurrency(order.total_price)}
       </Text>
@@ -80,23 +73,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    fontFamily: theme.fonts.primary.medium,
   },
   totalPrice: {
     fontSize: 16,

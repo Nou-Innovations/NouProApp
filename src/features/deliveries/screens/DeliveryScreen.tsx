@@ -7,7 +7,6 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
-  ScrollView,
   FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,15 +14,13 @@ import { useNavigation } from '@react-navigation/native';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/features/search/components/FilterBar';
 import DeliveryCard from '@/features/deliveries/components/DeliveryCard';
-import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
-import { ListItemCard } from '@/shared/components/ui';
+import LocationDropdown from '@/features/company/components/LocationDropdown';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
 import DeliveryActionsModal from '@/features/deliveries/components/DeliveryActionsModal';
 import DeliveryCreateModal from '@/features/deliveries/components/DeliveryCreateModal';
 import PaywallModal from '@/features/subscription/components/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
-import { useBusinessStore } from '@/shared/store/businessStore';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { Icon } from '@/shared/utils/icons';
 import {
@@ -41,13 +38,11 @@ const DELIVERY_STATUSES: (DeliveryStatus | 'all')[] = ['all', 'new', 'pending', 
 
 export default function DeliveryScreen() {
   const navigation = useNavigation();
-  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState<boolean>(false);
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const { theme: appTheme } = useTheme();
   const { setDeliveriesUnreadCount, isItemViewed } = useNotifications();
-  const { currentCompany, currentLocation, locations, setLocation } = useBusinessStore();
   
   // Profile store for RBAC (single source of truth)
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
@@ -96,52 +91,6 @@ export default function DeliveryScreen() {
   useEffect(() => {
     setDeliveriesUnreadCount(unviewedDeliveriesCount);
   }, [unviewedDeliveriesCount, setDeliveriesUnreadCount]);
-
-  const handleLocationSelect = (item: { id: string }) => {
-    const locationId = item.id === 'all' ? null : item.id;
-    setSelectedLocationId(locationId);
-    setShowLocationDropdown(false);
-  };
-
-  // Check user permissions for global vs location-scoped access
-  const canViewAllDeliveries = isAdmin();
-
-  // Check if business has only one location (with defensive check for undefined/null)
-  const safeLocations = Array.isArray(locations) ? locations : [];
-  const hasSingleLocation = safeLocations.length === 1;
-  const primaryLocation = safeLocations.find(loc => (loc as any).is_primary) || safeLocations[0];
-
-  // Auto-select primary location when there's only one
-  useEffect(() => {
-    if (hasSingleLocation && primaryLocation && !currentLocation) {
-      setLocation(primaryLocation);
-    }
-  }, [hasSingleLocation, primaryLocation?.id, currentLocation]);
-
-  // Create location dropdown items using business store locations
-  const locationItems = useMemo(() => {
-    const items: { id: string; title: string; icon: string }[] = [];
-    
-    // Only add "All Locations" option if there are multiple locations
-    if (!hasSingleLocation) {
-      items.push({
-        id: 'all',
-        title: 'All Locations',
-        icon: 'grid',
-      });
-    }
-    
-    // Add business locations from store
-    safeLocations.forEach(location => {
-      items.push({
-        id: location.id,
-        title: location.name,
-        icon: 'location',
-      });
-    });
-    
-    return items;
-  }, [safeLocations, hasSingleLocation]);
 
   const handleCreateNew = () => {
     if (!hasManagePermission) {
@@ -204,30 +153,13 @@ export default function DeliveryScreen() {
         ]}
       />
 
-      {/* Location Selector Section */}
-      <View style={[styles.locationSection, { backgroundColor: appTheme.colors.background }]}>
-        <TouchableOpacity 
-          style={[styles.locationDropdown, { 
-            borderColor: appTheme.colors.borderColor,
-            backgroundColor: appTheme.colors.background
-          }]}
-          onPress={() => !hasSingleLocation && setShowLocationDropdown(true)}
-          disabled={hasSingleLocation}
-          activeOpacity={hasSingleLocation ? 1 : 0.7}
-        >
-          <Text style={[styles.locationText, { 
-            color: appTheme.colors.textSecondary 
-          }]}>
-            {hasSingleLocation && primaryLocation
-              ? primaryLocation.name
-              : selectedLocationId 
-                ? safeLocations.find(l => l.id === selectedLocationId)?.name || 'All Locations' 
-                : 'All Locations'}
-          </Text>
-          {!hasSingleLocation && (
-            <Icon name="chevron-down" size={16} color={appTheme.colors.textSecondary} />
-          )}
-        </TouchableOpacity>
+      {/* Location Selector */}
+      <View style={styles.locationSection}>
+        <LocationDropdown 
+          style={{ flex: 1 }}
+          onLocationSelect={setSelectedLocationId}
+          selectedLocationId={selectedLocationId}
+        />
       </View>
       
       {/* Search Bar */}
@@ -327,35 +259,6 @@ export default function DeliveryScreen() {
         onSelectView={handleSelectView}
       />
 
-      {/* Location Selection Modal */}
-      <AppBottomSheet
-        visible={showLocationDropdown}
-        onClose={() => setShowLocationDropdown(false)}
-        title="Locations"
-      >
-        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
-          {locationItems.map((item, index) => {
-            const isSelected = (selectedLocationId || 'all') === item.id;
-            return (
-              <ListItemCard
-                key={item.id}
-                avatar={{
-                  type: 'icon',
-                  icon: item.icon,
-                  iconColor: isSelected ? appTheme.colors.primary : appTheme.colors.iconMuted,
-                  backgroundColor: appTheme.colors.surface,
-                }}
-                title={item.title}
-                onPress={() => handleLocationSelect(item)}
-                selected={isSelected}
-                showCheckmark
-                showDivider={index < locationItems.length - 1}
-              />
-            );
-          })}
-        </ScrollView>
-      </AppBottomSheet>
-
       {/* Create Actions Bottom Sheet Modal (+ button) */}
       <DeliveryCreateModal
         visible={showCreateModal}
@@ -420,28 +323,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
     marginBottom: 8,
-    marginHorizontal: 8,
-  },
-  locationDropdown: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical:0,
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  locationText: {
-    fontSize: 14,
-    fontWeight: '500',
-    flex: 1,
-    marginRight: 8,
-  },
-  locationContext: {
-    fontSize: 12,
-    marginTop: 4,
     marginHorizontal: 8,
   },
   searchContainer: {

@@ -210,6 +210,8 @@ export interface UIProduct {
   isImported?: boolean;
   isDisplayable?: boolean;
   companyId?: string;
+  ownerBusinessId?: string;
+  isPublic?: boolean;
   locationId?: string;
   sku?: string;
   barcode?: string;

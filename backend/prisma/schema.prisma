@@ -145,13 +145,39 @@ model Order {
   notes                 String?
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
+  
+  // Status tracking fields
+  statusChangedAt       DateTime    @default(now())
+  statusChangedBy       String?     // userId who changed status
+  statusReason          String?     // Required for PENDING/CANCELED/REJECTED
+  lastActivityAt        DateTime    @default(now())
+  
+  // Relations
   business              Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
   fulfillmentLocation   Location?   @relation("OrdersFulfilledByLocation", fields: [fulfillmentLocationId], references: [id])
   soldByLocation        Location?   @relation("OrdersSoldByLocation", fields: [soldByLocationId], references: [id])
+  statusHistory         OrderStatusHistory[]
 
   @@index([businessId])
   @@index([soldByLocationId])
   @@index([fulfillmentLocationId])
+  @@index([status])
+  @@index([lastActivityAt])
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  from      OrderStatus
+  to        OrderStatus
+  reason    String?
+  changedBy String?     // userId
+  createdAt DateTime    @default(now())
+
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([createdAt])
 }
 
 model Invoice {
@@ -327,11 +353,13 @@ enum MemberStatus {
 
 enum OrderStatus {
   NEW
-  ASSIGNED
-  PACKED
-  OUT_FOR_DELIVERY
-  DELIVERED
-  CANCELLED
+  ACCEPTED
+  ONGOING
+  PENDING
+  IN_REVIEW
+  DONE
+  CANCELED
+  REJECTED
 }
 
 enum OrderScope {

@@ -291,6 +291,7 @@ export function useFeed(): UseFeedResult {
   
   // Check if user is new (for welcome feed)
   const isNewUser = useProfileStore((state) => state.isNewUser);
+  const activeMode = useProfileStore((state) => state.activeMode);
 
   // Initial load
   const loadInitial = useCallback(async () => {
@@ -310,13 +311,17 @@ export function useFeed(): UseFeedResult {
     }
 
     try {
-      const result = await feedService.getFeed({ limit: FEED_PAGE_SIZE });
-      setPosts(result.posts);
-      setNextCursor(result.nextCursor);
+      const [feedResult, publicPosts] = await Promise.all([
+        feedService.getFeed({ limit: FEED_PAGE_SIZE }),
+        activeMode === 'personal' ? feedService.getPublicProductPosts() : Promise.resolve([]),
+      ]);
+
+      setPosts([...feedResult.posts, ...publicPosts]);
+      setNextCursor(feedResult.nextCursor);
       setIsMockData(false);
       
       if (__DEV__) {
-        console.log(`[useFeed] Loaded ${result.posts.length} posts from API`);
+        console.log(`[useFeed] Loaded ${feedResult.posts.length} posts from API`);
       }
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Failed to load feed';
@@ -326,13 +331,22 @@ export function useFeed(): UseFeedResult {
       if (__DEV__) {
         console.warn('[useFeed] API failed, using mock data:', message);
       }
-      setPosts(mockFeedPosts);
+      let fallbackPosts = mockFeedPosts;
+      if (activeMode === 'personal') {
+        try {
+          const publicPosts = await feedService.getPublicProductPosts();
+          fallbackPosts = [...fallbackPosts, ...publicPosts];
+        } catch {
+          // Ignore public product failures on fallback
+        }
+      }
+      setPosts(fallbackPosts);
       setNextCursor(null);
       setIsMockData(true);
     } finally {
       setLoading(false);
     }
-  }, [isNewUser]);
+  }, [isNewUser, activeMode]);
 
   // Pull-to-refresh
   const refresh = useCallback(async () => {
@@ -349,9 +363,13 @@ export function useFeed(): UseFeedResult {
     }
 
     try {
-      const result = await feedService.getFeed({ limit: FEED_PAGE_SIZE });
-      setPosts(result.posts);
-      setNextCursor(result.nextCursor);
+      const [feedResult, publicPosts] = await Promise.all([
+        feedService.getFeed({ limit: FEED_PAGE_SIZE }),
+        activeMode === 'personal' ? feedService.getPublicProductPosts() : Promise.resolve([]),
+      ]);
+
+      setPosts([...feedResult.posts, ...publicPosts]);
+      setNextCursor(feedResult.nextCursor);
       setIsMockData(false);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Failed to refresh feed';

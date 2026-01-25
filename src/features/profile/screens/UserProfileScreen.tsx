@@ -11,7 +11,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { userAvatarService } from '@/shared/services/userAvatarService';
 import Avatar from '@/shared/components/ui/Avatar';
-import { AppBottomSheet, ListItemCard } from '@/shared/components/ui';
+import { AppBottomSheet, ListItemCard, type AppBottomSheetItem } from '@/shared/components/ui';
 import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
 import { ProfileViewType, getProfileAdditionalOptions } from '@/shared/types/profile';
 import theme from '@/shared/theme';
@@ -101,11 +101,10 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
   };
 
   // Action menu items for bottom sheet
-  const moreOptionsItems = getProfileAdditionalOptions(viewType).map((option) => ({
+  const moreOptionsItems: AppBottomSheetItem[] = getProfileAdditionalOptions(viewType).map((option) => ({
     id: option.toLowerCase().replace(/\s/g, '-'),
     title: option,
-    isDestructive: option === 'Block',
-    icon: option === 'Block' ? 'slash' : option === 'Report' ? 'flag' : option === 'Share Profile' ? 'share' : 'ellipsis-horizontal',
+    variant: option === 'Block' ? 'destructive' : 'default',
   }));
 
   const handleMoreOptionAction = (title: string) => {
@@ -352,22 +351,10 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
         visible={isMoreOptionsVisible}
         onClose={() => setIsMoreOptionsVisible(false)}
         title="Options"
-      >
-        {moreOptionsItems.map((item, index) => (
-          <ListItemCard
-            key={item.id}
-            avatar={{
-              type: 'icon',
-              icon: item.icon,
-              iconColor: item.isDestructive ? appTheme.colors.error : appTheme.colors.text,
-              backgroundColor: item.isDestructive ? `${appTheme.colors.error}15` : appTheme.colors.surface,
-            }}
-            title={item.title}
-            onPress={() => handleMoreOptionAction(item.title)}
-            showDivider={index < moreOptionsItems.length - 1}
-          />
-        ))}
-      </AppBottomSheet>
+        items={moreOptionsItems}
+        mode="buttons"
+        onSelectItem={(item) => handleMoreOptionAction(item.title)}
+      />
     </SafeAreaView>
   );
 }
