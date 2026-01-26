@@ -127,8 +127,9 @@ export default function ChatScreen() {
     return Array.from(participantMap.values());
   }, [messages]);
   
-  // Detect if this is a group chat (multiple participants or explicitly marked as group)
-  const isGroupChat = isGroup || partnerType === 'group' || participants.length > 1;
+  // Detect if this is a group chat (3+ participants including "You", or explicitly marked as group)
+  // participants.length > 2 means You + 2+ others = group chat
+  const isGroupChat = isGroup || partnerType === 'group' || participants.length > 2;
 
   // Mark this specific chat as viewed when screen is focused and reduce unread count
   useFocusEffect(
@@ -275,7 +276,7 @@ export default function ChatScreen() {
     const isLastInGroup = !isSameSenderAsPrev; // No same sender BELOW = bottom of group visually
     
     // Show sender name only in group chats with more than 2 users (participants > 1 means 3+ people including "You")
-    const showSenderName = !item.isOutgoing && item.type !== 'event' && participants.length > 1;
+    const showSenderName = !item.isOutgoing && item.type !== 'event' && isGroupChat;
     
     return (
       <View>
@@ -290,6 +291,7 @@ export default function ChatScreen() {
           isFirstInGroup={isFirstInGroup}
           isLastInGroup={isLastInGroup}
           showSenderName={showSenderName}
+          isGroupChat={isGroupChat}
         />
         {/* Date separator appears AFTER the message in inverted list (so it shows ABOVE in UI) */}
         {showDateSeparator && dateLabel && (

@@ -247,8 +247,8 @@ export function ListItemCard({
 }: ListItemCardProps) {
   const { theme: appTheme } = useTheme();
 
-  // Check if options button is shown (only this gets 4px right padding)
-  const hasOptionsButton = showOptionsButton;
+  // Check if far right element is shown (options button or chevron get reduced right padding)
+  const hasFarRightElement = showOptionsButton || showChevron;
 
   // Determine container styles based on selection variant
   const getContainerStyle = (): ViewStyle[] => {
@@ -257,9 +257,9 @@ export function ListItemCard({
       { backgroundColor: appTheme.colors.cardBackground },
     ];
 
-    // Reduce right padding ONLY when options button is shown (4px)
-    if (hasOptionsButton) {
-      baseStyles.push(styles.containerWithOptionsButton);
+    // Reduce right padding when far right element (options button or chevron) is shown
+    if (hasFarRightElement) {
+      baseStyles.push(styles.containerWithFarRight);
     }
 
     if (selectionVariant === 'highlight' && selected) {
@@ -520,8 +520,8 @@ const styles = StyleSheet.create({
     paddingRight: LIST_ITEM_CARD.paddingHorizontal,
     paddingVertical: LIST_ITEM_CARD.paddingVertical,
   },
-  containerWithOptionsButton: {
-    paddingRight: 0, // No extra padding, button provides spacing
+  containerWithFarRight: {
+    paddingRight: 0, // No extra padding, far right element (button/chevron) provides spacing
   },
   borderVariant: {
     borderWidth: LIST_ITEM_CARD.selectionBorder.borderWidth,
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
   },
   twoColumnLayout: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
   },
   textColumn: {
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
   },
   rightColumn: {
     alignItems: 'flex-end',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   contentRow: {
     flexDirection: 'row',

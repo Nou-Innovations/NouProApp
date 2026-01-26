@@ -6,4 +6,5 @@ export { MessageBubble } from './MessageBubble';
 export type { MessageBubbleProps } from './MessageBubble';
 export { default as NewChatModal } from './NewChatModal';
 export { default as NewChatModalList } from './NewChatModalList';
+export { OrderEventCard } from './OrderEventCard';
 

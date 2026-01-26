@@ -27,7 +27,7 @@ import {
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import type { Message } from '@/shared/types/inbox';
+import type { Message, OrderEventMessage, OrderEventStatus } from '@/shared/types/inbox';
 import { formatMessageTimestamp } from '../inbox.format';
 import { 
   getOrderStatusColor, 
@@ -37,6 +37,7 @@ import {
 } from '../inbox.constants';
 import AppButton from '@/shared/components/ui/AppButton';
 import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
+import { OrderEventCard } from './OrderEventCard';
 
 // ============================================================================
 // Types
@@ -52,11 +53,14 @@ export interface MessageBubbleProps {
   onInvoicePress?: (invoiceId: string) => void;
   onEstimatePress?: (estimateId: string) => void;
   onEstimateConfirm?: (estimateId: string) => void;
+  // Order Event Card handlers
+  onOrderEventAction?: (actionId: string, orderId: string) => void;
   // Message grouping
   isGrouped?: boolean; // True if this message is part of a group (same sender adjacent)
   isFirstInGroup?: boolean; // True if this is the first message in a group (chronologically)
   isLastInGroup?: boolean; // True if this is the last message in a group (chronologically)
   showSenderName?: boolean; // True to show sender name above the message (for group chats)
+  isGroupChat?: boolean; // True if this is a group chat (shows avatar on left for incoming messages)
 }
 
 // ============================================================================
@@ -147,17 +151,19 @@ export function MessageBubble({
   onInvoicePress,
   onEstimatePress,
   onEstimateConfirm,
+  onOrderEventAction,
   isGrouped = false,
   isFirstInGroup = false,
   isLastInGroup = false,
   showSenderName = false,
+  isGroupChat = false,
 }: MessageBubbleProps) {
   const isOutgoing = message.isOutgoing;
   const { theme: appTheme, isDarkMode } = useTheme();
   const [showOptionsSheet, setShowOptionsSheet] = useState(false);
   
-  // Only show avatar for the last message in a group (visually at bottom = no same sender below = isLastInGroup)
-  const showAvatar = !isOutgoing && isLastInGroup;
+  // Only show avatar for the last message in a group in GROUP CHATS ONLY
+  const showAvatar = isGroupChat && !isOutgoing && isLastInGroup;
   
   // Get sender name color for group chats
   const senderNameColor = getSenderNameColor(message.sender.name);
@@ -320,7 +326,7 @@ export function MessageBubble({
           isGrouped && styles.rowGrouped,
           isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
         ]}> 
-          {!isOutgoing && (
+          {!isOutgoing && isGroupChat && (
             showAvatar && message.sender.avatar ? (
               <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
             ) : (
@@ -367,7 +373,7 @@ export function MessageBubble({
           isGrouped && styles.rowGrouped,
           isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
         ]}> 
-          {!isOutgoing && (
+          {!isOutgoing && isGroupChat && (
             showAvatar && message.sender.avatar ? (
               <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
             ) : (
@@ -418,7 +424,7 @@ export function MessageBubble({
           isGrouped && styles.rowGrouped,
           isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
         ]}> 
-          {!isOutgoing && (
+          {!isOutgoing && isGroupChat && (
             showAvatar && message.sender.avatar ? (
               <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
             ) : (
@@ -485,7 +491,7 @@ export function MessageBubble({
           isGrouped && styles.rowGrouped,
           isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
         ]}> 
-          {!isOutgoing && (
+          {!isOutgoing && isGroupChat && (
             showAvatar && message.sender.avatar ? (
               <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
             ) : (
@@ -575,7 +581,7 @@ export function MessageBubble({
           isGrouped && styles.rowGrouped,
           isImport ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
         ]}> 
-          {!isImport && (
+          {!isImport && isGroupChat && (
             showAvatar && message.sender.avatar ? (
               <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
             ) : (
@@ -724,7 +730,7 @@ export function MessageBubble({
         isGrouped && styles.rowGrouped,
         isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
       ]}> 
-        {!isOutgoing && (
+        {!isOutgoing && isGroupChat && (
           showAvatar && message.sender.avatar ? (
             <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
           ) : (
@@ -759,7 +765,7 @@ export function MessageBubble({
           isGrouped && styles.rowGrouped,
           isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
         ]}> 
-          {!isOutgoing && (
+          {!isOutgoing && isGroupChat && (
             showAvatar && message.sender.avatar ? (
               <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
             ) : (
@@ -793,6 +799,77 @@ export function MessageBubble({
     );
   };
   
+  const renderOrderEventMessage = () => {
+    // Handle both 'order_event' and legacy 'order' types
+    if (message.type !== 'order_event' && message.type !== 'order') return null;
+    
+    let orderEventMessage: OrderEventMessage;
+    
+    if (message.type === 'order') {
+      // Convert legacy 'order' type to 'order_event' format
+      const legacyOrder = message as any;
+      const statusMap: Record<string, OrderEventStatus> = {
+        'New': 'NEW',
+        'Ongoing': 'ONGOING',
+        'Pending': 'PENDING',
+        'Done': 'DONE',
+        'Cancel': 'CANCELED',
+      };
+      
+      orderEventMessage = {
+        id: legacyOrder.id,
+        chatId: legacyOrder.chatId || '',
+        type: 'order_event',
+        isSystem: true,
+        isOutgoing: legacyOrder.isOutgoing,
+        sender: legacyOrder.sender,
+        timestamp: legacyOrder.timestamp,
+        status: legacyOrder.status,
+        payload: {
+          orderId: legacyOrder.orderId,
+          orderRef: legacyOrder.orderId,
+          buyer: { id: 'buyer', name: 'Buyer', logo: '', location: '' },
+          seller: { id: 'seller', name: 'Seller', logo: '', location: '' },
+          status: statusMap[legacyOrder.orderStatus] || 'NEW',
+          paymentStatus: legacyOrder.paymentStatus || 'Unpaid',
+          itemsPreview: [],
+          totalItemsCount: legacyOrder.itemCount || 0,
+          subtotal: legacyOrder.totalAmount || 0,
+          vatAmount: 0,
+          vatPercent: 0,
+          deliveryFee: 0,
+          totalAmount: legacyOrder.totalAmount || 0,
+          currency: 'MUR',
+          delivery: { type: 'delivery' },
+          createdAt: legacyOrder.timestamp,
+          schemaVersion: '1.0',
+        },
+      };
+    } else {
+      orderEventMessage = message as OrderEventMessage;
+    }
+    
+    return (
+      <View style={[
+        styles.row, 
+        isGrouped && styles.rowGrouped,
+        isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
+      ]}> 
+        {!isOutgoing && isGroupChat && (
+          showAvatar && message.sender.avatar ? (
+            <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
+          ) : (
+            <View style={styles.avatarPlaceholder} />
+          )
+        )}
+        <OrderEventCard
+          message={orderEventMessage}
+          onOrderPress={onOrderPress}
+        />
+      </View>
+    );
+  };
+  
   // ========== Main Render ==========
   
   switch (message.type) {
@@ -805,7 +882,8 @@ export function MessageBubble({
     case 'estimate':
       return renderEstimateMessage();
     case 'order':
-      return renderOrderMessage();
+    case 'order_event':
+      return renderOrderEventMessage();
     case 'event':
       return renderEventMessage();
     case 'deleted':
@@ -919,7 +997,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    minWidth: 200,
+    width: 280,
   },
   specialMessageHeader: {
     flexDirection: 'row',
@@ -943,7 +1021,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    minWidth: 200,
+    minWidth: 280,
   },
   orderHeader: {
     flexDirection: 'row',

@@ -140,7 +140,6 @@ export function ProActivityTimeline({
               title="View all activity"
               onPress={onSeeAll}
               variant="outline"
-              size="small"
               disabled={true}
             />
           </View>
@@ -195,7 +194,6 @@ export function ProActivityTimeline({
             title="View all activity"
             onPress={onSeeAll || (() => {})}
             variant="outline"
-            size="small"
           />
         </View>
       )}
@@ -210,7 +208,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
+    paddingHorizontal: 12,
     marginBottom: theme.spacing.sm,
   },
   sectionTitle: {
@@ -218,22 +216,22 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.bold,
   },
   timelineContainer: {
-    marginHorizontal: theme.spacing.md,
-    borderRadius: 12,
+    marginHorizontal: 0,
+    borderRadius: 0,
     overflow: 'hidden',
   },
   listContent: {
     paddingVertical: 4,
   },
   seeAllButtonContainer: {
-    marginHorizontal: theme.spacing.md,
+    paddingHorizontal: 12,
     marginTop: theme.spacing.sm,
   },
   errorContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: theme.spacing.lg,
-    marginHorizontal: theme.spacing.md,
+    marginHorizontal: 12,
     borderRadius: 12,
     gap: 4,
   },
@@ -245,7 +243,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: theme.spacing.lg,
-    marginHorizontal: theme.spacing.md,
+    marginHorizontal: 12,
     borderRadius: 12,
     gap: 4,
   },

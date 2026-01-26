@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -461,6 +460,14 @@ export default function TeamManagementScreen() {
         rightActions={[{ icon: 'user-plus', onPress: () => navigation.navigate('InviteStaff' as never) }]}
       />
 
+      {/* Location Dropdown - above search bar */}
+      <LocationDropdown
+        selectedLocationId={selectedLocationId}
+        onLocationSelect={setSelectedLocationId}
+        showAllLocationsOption={true}
+        style={styles.locationDropdown}
+      />
+
       {/* Search Bar */}
       <AppSearchBar
         placeholder="Search staff members..."
@@ -508,15 +515,6 @@ export default function TeamManagementScreen() {
           </Text>
           {activeTab === 'pending' && <View style={styles.tabIndicator} />}
         </TouchableOpacity>
-      </View>
-
-      {/* Location Selector */}
-      <View style={styles.locationSection}>
-        <LocationDropdown 
-          style={{ flex: 1 }}
-          onLocationSelect={setSelectedLocationId}
-          selectedLocationId={selectedLocationId}
-        />
       </View>
 
       {/* Main Content */}
@@ -781,13 +779,10 @@ const styles = StyleSheet.create({
     fontFamily: 'InterCustom-Medium',
     color: '#A4AAB8',
   },
-  // Location Selector
-  locationSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 8,
-    marginHorizontal: 8,
+  // Location Dropdown (above search bar)
+  locationDropdown: {
+    marginTop: 12,
+    marginHorizontal: 12,
   },
   tabIndicator: {
     position: 'absolute',

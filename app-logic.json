@@ -2223,6 +2223,105 @@
                       "description": "Invoice card with ID and tap-to-view",
                       "tapAction": "Opens invoice details",
                       "deleteOnLongPress": true
+                    },
+                    "order_event": {
+                      "description": "Order Event Card - accordion-based order summary card",
+                      "component": "OrderEventCard",
+                      "tapAction": "Navigate to Order Details",
+                      "deleteOnLongPress": true,
+                      "structure": {
+                        "header": {
+                          "icon": "package",
+                          "text": "#{orderRef}"
+                        },
+                        "expectedDate": {
+                          "showWhen": "status !== 'NEW' && status !== 'CANCELED'",
+                          "format": "Expected: {Day}, {Date} or 'Not planned yet'"
+                        },
+                        "accordionGrid": {
+                          "description": "4 expandable rows showing order details",
+                          "rows": ["Items", "Total", "Order", "Payment"]
+                        }
+                      },
+                      "accordions": {
+                        "items": {
+                          "label": "Items",
+                          "collapsedValue": "{count} item(s)",
+                          "expandedContent": {
+                            "description": "List of items with individual prices",
+                            "itemFormat": [
+                              "{itemName} ×{quantity}",
+                              "{currency} {unitPrice × quantity}"
+                            ]
+                          }
+                        },
+                        "total": {
+                          "label": "Total",
+                          "collapsedValue": "{currency} {totalAmount}",
+                          "expandedContent": {
+                            "rows": [
+                              { "label": "Subtotal", "value": "{subtotal}" },
+                              { "label": "VAT ({vatPercent}%)", "value": "{vatAmount}" },
+                              { "label": "Delivery", "value": "{deliveryFee}", "showIf": "deliveryFee > 0" },
+                              { "label": "Total", "value": "{totalAmount}", "style": "bold" }
+                            ]
+                          }
+                        },
+                        "order": {
+                          "label": "Order",
+                          "collapsedValue": "{statusLabel}",
+                          "valueColor": "STATUS_COLORS[status]",
+                          "expandedContent": {
+                            "description": "Order activity timeline",
+                            "timeline": [
+                              { "label": "Order placed", "showAlways": true },
+                              { "label": "Order confirmed", "showWhen": "status !== 'NEW'" },
+                              { "label": "Preparing", "showWhen": "status === 'ONGOING' || status === 'DONE'" },
+                              { "label": "Delivered", "showWhen": "status === 'DONE'" },
+                              { "label": "Canceled", "showWhen": "status === 'CANCELED'" }
+                            ],
+                            "dateFormat": "{DD} {MMM}, {HH:mm}"
+                          }
+                        },
+                        "payment": {
+                          "label": "Payment",
+                          "collapsedValue": "{paymentStatus}",
+                          "collapsedValueMapping": {
+                            "Payment Pending Confirmation": "Pending"
+                          },
+                          "valueColor": "PAYMENT_COLORS[paymentStatus]",
+                          "expandedContent": {
+                            "description": "Payment activity timeline showing partial or full payments",
+                            "timeline": {
+                              "Unpaid": [
+                                { "label": "Awaiting payment", "date": "{createdAt}" }
+                              ],
+                              "Payment Pending Confirmation": [
+                                { "label": "Payment submitted", "amount": "{totalAmount}", "date": "{createdAt}" },
+                                { "label": "Awaiting confirmation", "date": "{createdAt}" }
+                              ],
+                              "Paid": [
+                                { "label": "Payment received", "amount": "{totalAmount}", "date": "{createdAt}" }
+                              ]
+                            },
+                            "dateFormat": "{DD} {MMM}, {HH:mm}",
+                            "amountFormat": "{currency} {amount}"
+                          }
+                        }
+                      },
+                      "statusColors": {
+                        "NEW": "#991B1B",
+                        "ONGOING": "#1E40AF",
+                        "PENDING": "#0075FF",
+                        "DONE": "#065F46",
+                        "IN_REVIEW": "#5B21B6",
+                        "CANCELED": "#6B7280"
+                      },
+                      "paymentColors": {
+                        "Unpaid": "#DC2626",
+                        "Paid": "#059669",
+                        "Payment Pending Confirmation": "#D97706"
+                      }
                     }
                   },
                   "v1NotSupported": ["image", "voice", "location", "contact"],

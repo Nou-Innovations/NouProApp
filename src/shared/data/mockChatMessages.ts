@@ -704,7 +704,64 @@ const showcaseAllMessageTypes: Message[] = [
     status: 'read'
   },
   
-  // ==================== ORDER MESSAGES - ALL STATUSES ====================
+  // ==================== NEW ORDER EVENT CARD (Clean Version) ====================
+  {
+    id: 'show-order-event-new',
+    type: 'order_event',
+    isSystem: true,
+    isOutgoing: false,
+    sender: { name: 'System', avatar: '', role: 'system' },
+    timestamp: '2024-01-15T08:05:30',
+    status: undefined,
+    payload: {
+      orderId: 'ord-event-001',
+      orderRef: 'ORD-EVT-001',
+      buyer: {
+        id: 'buyer-1',
+        name: 'Acme Corp',
+        logo: 'https://picsum.photos/seed/acme/40/40',
+        location: 'Port Louis, Mauritius',
+      },
+      seller: {
+        id: 'seller-1',
+        name: 'NouPro Distribution',
+        logo: 'https://picsum.photos/seed/noupro/40/40',
+        location: 'Curepipe, Mauritius',
+      },
+      status: 'NEW',
+      paymentStatus: 'Unpaid',
+      itemsPreview: [
+        { id: 'item-1', name: 'Premium Coffee Beans (1kg)', quantity: 5, unitPrice: 450.00, unit: 'bag' },
+        { id: 'item-2', name: 'Organic Green Tea (500g)', quantity: 10, unitPrice: 180.00, unit: 'box' },
+        { id: 'item-3', name: 'Artisan Chocolate (200g)', quantity: 8, unitPrice: 95.00, unit: 'bar' },
+      ],
+      totalItemsCount: 5,
+      subtotal: 4810.00,
+      vatAmount: 721.50,
+      vatPercent: 15,
+      deliveryFee: 150.00,
+      totalAmount: 5681.50,
+      currency: 'MUR',
+      delivery: {
+        type: 'delivery',
+        expectedDate: 'Jan 20, 2024',
+        address: '123 Business Park, Port Louis, Mauritius',
+      },
+      createdAt: '2024-01-15T08:05:30',
+      schemaVersion: '1.0',
+    },
+  },
+  {
+    id: 'show-text-order-event-new',
+    type: 'text',
+    text: '📦 NEW ORDER EVENT CARD (Export, Seller view)\nClean card: state + next action. Tap card → View Order.',
+    isOutgoing: false,
+    sender: { name: 'Demo Contact', avatar: 'https://picsum.photos/seed/demo/40/40', role: 'client' },
+    timestamp: '2024-01-15T08:05:45',
+    status: undefined
+  },
+  
+  // ==================== ORDER MESSAGES - ALL STATUSES (Original) ====================
   {
     id: 'show-order-new',
     type: 'order',
@@ -793,6 +850,171 @@ const showcaseAllMessageTypes: Message[] = [
     timestamp: '2024-01-15T08:09:30',
     status: 'read'
   },
+  
+  // ==================== ORDER EVENT CARD - ONGOING (Unpaid) ====================
+  {
+    id: 'show-order-event-ongoing',
+    type: 'order_event',
+    isSystem: true,
+    isOutgoing: true,
+    sender: { name: 'System', avatar: '', role: 'system' },
+    timestamp: '2024-01-15T08:09:45',
+    status: undefined,
+    payload: {
+      orderId: 'ord-event-002',
+      orderRef: 'ORD-EVT-002',
+      buyer: {
+        id: 'buyer-2',
+        name: 'Your Business',
+        logo: 'https://picsum.photos/seed/mybiz/40/40',
+        location: 'Quatre Bornes, Mauritius',
+      },
+      seller: {
+        id: 'seller-2',
+        name: 'XYZ Suppliers',
+        logo: 'https://picsum.photos/seed/xyz/40/40',
+        location: 'Rose Hill, Mauritius',
+      },
+      status: 'ONGOING',
+      paymentStatus: 'Unpaid',
+      itemsPreview: [
+        { id: 'item-4', name: 'Industrial Supplies Kit', quantity: 2, unitPrice: 1200.00, unit: 'kit' },
+        { id: 'item-5', name: 'Safety Equipment Set', quantity: 5, unitPrice: 350.00, unit: 'set' },
+      ],
+      totalItemsCount: 2,
+      subtotal: 4150.00,
+      vatAmount: 622.50,
+      vatPercent: 15,
+      deliveryFee: 0,
+      totalAmount: 4772.50,
+      currency: 'MUR',
+      delivery: {
+        type: 'pickup',
+        expectedDate: 'Jan 18, 2024',
+      },
+      createdAt: '2024-01-15T08:09:45',
+      schemaVersion: '1.0',
+    },
+  },
+  {
+    id: 'show-text-order-event-ongoing',
+    type: 'text',
+    text: '📦 ORDER EVENT CARD - ONGOING (Import, Buyer view)\nPayment: Unpaid',
+    isOutgoing: true,
+    sender: { name: 'You', avatar: '', role: 'business' },
+  },
+  
+  // ==================== ORDER EVENT CARD - PENDING (Payment Pending Confirmation) ====================
+  {
+    id: 'show-order-event-pending',
+    type: 'order_event',
+    isSystem: true,
+    isOutgoing: false,
+    sender: { name: 'System', avatar: '', role: 'system' },
+    timestamp: '2024-01-15T08:10:00',
+    status: undefined,
+    payload: {
+      orderId: 'ord-event-003',
+      orderRef: 'ORD-EVT-003',
+      buyer: {
+        id: 'buyer-3',
+        name: 'Metro Supplies',
+        logo: 'https://picsum.photos/seed/metro/40/40',
+        location: 'Vacoas, Mauritius',
+      },
+      seller: {
+        id: 'seller-3',
+        name: 'NouPro Distribution',
+        logo: 'https://picsum.photos/seed/noupro/40/40',
+        location: 'Curepipe, Mauritius',
+      },
+      status: 'PENDING',
+      paymentStatus: 'Payment Pending Confirmation',
+      itemsPreview: [
+        { id: 'item-6', name: 'Office Supplies Bundle', quantity: 3, unitPrice: 850.00, unit: 'bundle' },
+        { id: 'item-7', name: 'Printer Paper (A4)', quantity: 20, unitPrice: 125.00, unit: 'ream' },
+      ],
+      totalItemsCount: 2,
+      subtotal: 5050.00,
+      vatAmount: 757.50,
+      vatPercent: 15,
+      deliveryFee: 100.00,
+      totalAmount: 5907.50,
+      currency: 'MUR',
+      delivery: {
+        type: 'delivery',
+        expectedDate: 'Jan 22, 2024',
+        address: '45 Commerce Street, Vacoas, Mauritius',
+      },
+      createdAt: '2024-01-15T08:10:00',
+      schemaVersion: '1.0',
+    },
+  },
+  {
+    id: 'show-text-order-event-pending',
+    type: 'text',
+    text: '📦 ORDER EVENT CARD - PENDING\nPayment: Pending Confirmation (partial payments shown)',
+    isOutgoing: false,
+    sender: { name: 'Demo Contact', avatar: 'https://picsum.photos/seed/demo/40/40', role: 'client' },
+  },
+  
+  // ==================== ORDER EVENT CARD - DONE (Paid) ====================
+  {
+    id: 'show-order-event-done',
+    type: 'order_event',
+    isSystem: true,
+    isOutgoing: true,
+    sender: { name: 'System', avatar: '', role: 'system' },
+    timestamp: '2024-01-15T08:11:00',
+    status: undefined,
+    payload: {
+      orderId: 'ord-event-004',
+      orderRef: 'ORD-EVT-004',
+      buyer: {
+        id: 'buyer-4',
+        name: 'Island Retail Co',
+        logo: 'https://picsum.photos/seed/island/40/40',
+        location: 'Grand Baie, Mauritius',
+      },
+      seller: {
+        id: 'seller-4',
+        name: 'NouPro Distribution',
+        logo: 'https://picsum.photos/seed/noupro/40/40',
+        location: 'Curepipe, Mauritius',
+      },
+      status: 'DONE',
+      paymentStatus: 'Paid',
+      itemsPreview: [
+        { id: 'item-8', name: 'Premium Snacks Assortment', quantity: 15, unitPrice: 280.00, unit: 'box' },
+        { id: 'item-9', name: 'Beverages Mixed Pack', quantity: 10, unitPrice: 450.00, unit: 'case' },
+        { id: 'item-10', name: 'Gourmet Condiments Set', quantity: 8, unitPrice: 195.00, unit: 'set' },
+      ],
+      totalItemsCount: 3,
+      subtotal: 10260.00,
+      vatAmount: 1539.00,
+      vatPercent: 15,
+      deliveryFee: 200.00,
+      totalAmount: 11999.00,
+      currency: 'MUR',
+      delivery: {
+        type: 'delivery',
+        expectedDate: 'Jan 25, 2024',
+        address: '78 Coastal Road, Grand Baie, Mauritius',
+      },
+      createdAt: '2024-01-15T08:11:00',
+      schemaVersion: '1.0',
+    },
+  },
+  {
+    id: 'show-text-order-event-done',
+    type: 'text',
+    text: '📦 ORDER EVENT CARD - DONE ✓\nPayment: Paid (multiple partial payments shown)',
+    isOutgoing: true,
+    sender: { name: 'You', avatar: '', role: 'business' },
+    timestamp: '2024-01-15T08:09:50',
+    status: 'read'
+  },
+  
   {
     id: 'show-order-cancel',
     type: 'order',

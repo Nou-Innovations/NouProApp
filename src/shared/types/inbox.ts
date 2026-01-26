@@ -143,6 +143,65 @@ export interface DeletedMessage extends BaseMessage {
   type: 'deleted';
 }
 
+// ============================================================================
+// Order Event Message Types (New Order Event Bubble)
+// ============================================================================
+
+export type OrderEventStatus = 
+  | 'NEW' 
+  | 'ONGOING' 
+  | 'PENDING' 
+  | 'DONE' 
+  | 'IN_REVIEW' 
+  | 'CANCELED';
+
+export interface OrderEventBusiness {
+  id: string;
+  name: string;
+  logo?: string;
+  location?: string;
+}
+
+export interface OrderEventItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  unit?: string;
+}
+
+export interface OrderEventDelivery {
+  type: 'pickup' | 'delivery';
+  expectedDate?: string;
+  address?: string;
+}
+
+export interface OrderEventPayload {
+  orderId: string;
+  orderRef: string;
+  buyer: OrderEventBusiness;
+  seller: OrderEventBusiness;
+  status: OrderEventStatus;
+  paymentStatus: 'Unpaid' | 'Paid' | 'Payment Pending Confirmation';
+  itemsPreview: OrderEventItem[];
+  totalItemsCount: number;
+  subtotal: number;
+  vatAmount: number;
+  vatPercent: number;
+  deliveryFee: number;
+  totalAmount: number;
+  currency: string;
+  delivery: OrderEventDelivery;
+  createdAt: string;
+  schemaVersion: string;
+}
+
+export interface OrderEventMessage extends BaseMessage {
+  type: 'order_event';
+  isSystem: boolean;
+  payload: OrderEventPayload;
+}
+
 export interface LocationMessage extends BaseMessage {
   type: 'location';
   locationName: string;
@@ -177,7 +236,8 @@ export type Message =
   | EventMessage 
   | DeletedMessage
   | LocationMessage
-  | ContactMessage;
+  | ContactMessage
+  | OrderEventMessage;
 
 // ============================================================================
 // API Response Types
