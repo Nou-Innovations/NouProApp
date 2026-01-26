@@ -27,6 +27,9 @@ const repos = getRepos();
 // Services
 const { orderStatus: orderStatusService } = require('./src/services');
 
+// Authentication middleware
+const { requireAuth, optionalAuth } = require('./src/middleware/auth');
+
 console.log(`📦 Data source: ${getDataSource()}`);
 
 // Import constants from memory store (used by both memory and prisma modes)
@@ -67,27 +70,76 @@ const app = express();
 
 // Configuration from environment variables with sensible defaults
 const PORT = process.env.PORT || 3000;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 const HOST = process.env.HOST || '0.0.0.0'; // Listen on all interfaces for LAN access
+
+// CORS Configuration - whitelist-based for security
+const corsRaw = process.env.CORS_ORIGIN || '';
+const corsAllowlist = corsRaw.split(',').map(s => s.trim()).filter(Boolean);
 
 // Middleware
 app.use(cors({
-  origin: CORS_ORIGIN,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, curl, etc.)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    // If no allowlist configured, block all cross-origin requests in production
+    if (corsAllowlist.length === 0) {
+      console.warn('[CORS] No CORS_ORIGIN configured - blocking cross-origin request from:', origin);
+      return callback(new Error('CORS_NOT_CONFIGURED'), false);
+    }
+    
+    // Check if origin is in allowlist
+    if (corsAllowlist.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Log and block unknown origins
+    console.warn('[CORS] Blocked request from unknown origin:', origin);
+    return callback(new Error('CORS_BLOCKED'), false);
+  },
   credentials: true,
 }));
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
-// File upload setup
+// File upload setup with security hardening
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'uploads/');
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname));
+    // Sanitize filename and add unique prefix
+    const sanitized = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + '-' + sanitized);
   }
 });
-const upload = multer({ storage: storage });
+
+// Allowed MIME types for uploads
+const ALLOWED_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+];
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB max file size
+    files: 5, // Max 5 files per request
+  },
+  fileFilter: (req, file, cb) => {
+    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      // Reject file with error
+      return cb(new Error('INVALID_FILE_TYPE: Only images (PNG, JPEG, GIF, WebP) and PDFs are allowed'));
+    }
+    cb(null, true);
+  },
+});
 
 // ============================================================================
 // SUBSCRIPTION TIERS & CAPABILITY DERIVATION
@@ -185,10 +237,21 @@ function getPublicDisabledReason(business, location) {
 // PERMISSION MIDDLEWARE HELPERS
 // ============================================================================
 
-// Get user from request (mock auth via header)
-// In production, replace with JWT verification
+// Get user from request
+// Uses JWT auth middleware (req.user) when available, falls back to x-user-id header for backwards compatibility
+// NOTE: In production, all routes should use requireAuth middleware instead of this function
 function getUserFromRequest(req) {
-  const userId = req.headers['x-user-id'] || 'usr-001'; // Default to usr-001 for testing
+  // Prefer JWT-authenticated user from middleware
+  if (req.user?.id) {
+    return users.find(u => u.id === req.user.id);
+  }
+  
+  // Fallback to x-user-id header (for backwards compatibility during migration)
+  // WARNING: This should be removed once all routes use requireAuth middleware
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return null; // No default fallback - require explicit authentication
+  }
   return users.find(u => u.id === userId);
 }
 
@@ -464,15 +527,9 @@ function verifyOrderLocationAccess(order, locationId, location) {
 // ============================================================================
 // MOCK DATABASE - ORDERS (with scope: PARENT vs LOCATION)
 // ============================================================================
-
-const ORDER_STATUS = {
-  NEW: 'NEW',
-  ASSIGNED: 'ASSIGNED',
-  PACKED: 'PACKED',
-  OUT_FOR_DELIVERY: 'OUT_FOR_DELIVERY',
-  DELIVERED: 'DELIVERED',
-  CANCELLED: 'CANCELLED'
-};
+// NOTE: ORDER_STATUS is imported from memoryStore as ORDER_STATUS_FROM_STORE
+// which aligns with the Prisma enum and orderStatus service.
+// Valid statuses: NEW, ACCEPTED, ONGOING, PENDING, IN_REVIEW, DONE, CANCELED, REJECTED
 
 const ORDER_SCOPE = {
   PARENT: 'PARENT',    // Created by parent business
@@ -1939,7 +1996,7 @@ app.post('/api/businesses/:businessId/orders', async (req, res) => {
       soldByScope: ORDER_SCOPE_FROM_STORE.PARENT,
       soldByLocationId: null,
       fulfillmentLocationId: fulfillmentLocationId || null,
-      status: fulfillmentLocationId ? ORDER_STATUS_FROM_STORE.ASSIGNED : ORDER_STATUS_FROM_STORE.NEW,
+      status: fulfillmentLocationId ? ORDER_STATUS_FROM_STORE.ACCEPTED : ORDER_STATUS_FROM_STORE.NEW,
       paymentStatus: 'Unpaid',
       customerId: null,
       customerName,
@@ -1986,7 +2043,7 @@ app.post('/api/businesses/:businessId/orders/:orderId/assign', async (req, res) 
       fulfillmentLocationId: fulfillmentLocationId || null,
       assignedStaffId: assignedStaffId || null,
       assignedTo: assignedTo || null,
-      status: ORDER_STATUS_FROM_STORE.ASSIGNED,
+      status: ORDER_STATUS_FROM_STORE.ACCEPTED, // ASSIGNED was removed - use ACCEPTED
     });
 
     res.json(successResponse(updated, 'Order assigned successfully'));
@@ -3679,8 +3736,11 @@ app.post('/api/businesses/:businessId/role-requests', (req, res) => {
     const { businessId } = req.params;
     const { requestedRole = 'admin', message } = req.body;
     
-    // Get user from request (in production: from auth token)
-    const userId = req.headers['x-user-id'] || 'usr-004'; // Mock fallback
+    // Get user from request (JWT or x-user-id header)
+    const userId = req.user?.id || req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json(errorResponse('Authentication required'));
+    }
     
     // Verify user is a staff member
     const bm = findBusinessMember(businessId, userId);
@@ -3748,7 +3808,10 @@ app.post('/api/businesses/:businessId/role-requests', (req, res) => {
 app.get('/api/businesses/:businessId/role-requests/me', (req, res) => {
   try {
     const { businessId } = req.params;
-    const userId = req.headers['x-user-id'] || 'usr-004';
+    const userId = req.user?.id || req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json(errorResponse('Authentication required'));
+    }
     
     const request = roleRequests.find(r =>
       r.businessId === businessId &&
@@ -3804,7 +3867,11 @@ app.patch('/api/businesses/:businessId/role-requests/:requestId', (req, res) => 
     const { businessId, requestId } = req.params;
     const { status, rejectionReason } = req.body;
     
-    const userId = req.headers['x-user-id'] || 'usr-001'; // Admin user
+    // Get user from request (JWT or x-user-id header)
+    const userId = req.user?.id || req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json(errorResponse('Authentication required'));
+    }
     
     // Verify admin
     const adminMember = findBusinessMember(businessId, userId);

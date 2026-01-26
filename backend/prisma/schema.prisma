@@ -84,7 +84,7 @@ model Product {
   variants         Json?
   unit             String?
   stockQuantity    Int?
-  is_listed        Boolean?
+  isListed         Boolean?          @map("is_listed")
   isCreatedByUser  Boolean?
   isDisplayable    Boolean?
   isImported       Boolean?
@@ -140,8 +140,8 @@ model Order {
   customerPhone         String?
   items                 Json
   totalAmount           Float?
-  status                OrderStatus @default(NEW)
-  paymentStatus         String?
+  status                OrderStatus   @default(NEW)
+  paymentStatus         PaymentStatus? @default(UNPAID)
   notes                 String?
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
@@ -192,7 +192,7 @@ model Invoice {
   amount             Float?
   taxAmount          Float?
   totalAmount        Float?
-  status             String?
+  status             InvoiceStatus? @default(DRAFT)
   type               String?
   issueDate          String?
   dueDate            String?
@@ -370,4 +370,33 @@ enum OrderScope {
 enum InvoiceScope {
   PARENT
   LOCATION
+}
+
+// Payment status for orders
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  PAYMENT_PENDING
+  PENDING_CONFIRMATION
+  PROCESSING
+  OVERDUE
+  DUE_TODAY
+  FAILED
+  CANCELED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  DISPUTED
+}
+
+// Invoice status
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELED
+  VOID
+  REFUNDED
 }
