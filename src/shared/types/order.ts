@@ -28,48 +28,6 @@ export {
 } from '@/shared/constants/orderStatus';
 
 /**
- * @deprecated Use ORDER_STATUS_TONE and theme colors instead
- * Kept for backward compatibility
- */
-export const ORDER_STATUS_COLORS: Record<string, string> = {
-  // Legacy lowercase statuses
-  pending: '#F59E0B',
-  accepted: '#0EA5E9',
-  completed: '#22C55E',
-  cancelled: '#6B7280',
-  // New uppercase statuses
-  NEW: '#0075FF',
-  ACCEPTED: '#0075FF',
-  ONGOING: '#FFB600',
-  PENDING: '#A4AAB8',
-  IN_REVIEW: '#A76AF0',
-  DONE: '#2ACF01',
-  CANCELED: '#FF6B6B',
-  REJECTED: '#FF2400',
-};
-
-/**
- * @deprecated Use getStatusLabel() instead
- * Kept for backward compatibility
- */
-export const ORDER_STATUS_LABELS: Record<string, string> = {
-  // Legacy lowercase statuses
-  pending: 'Pending',
-  accepted: 'Accepted',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-  // New uppercase statuses
-  NEW: 'New order',
-  ACCEPTED: 'Accepted',
-  ONGOING: 'Ongoing',
-  PENDING: 'Pending',
-  IN_REVIEW: 'In review',
-  DONE: 'Done',
-  CANCELED: 'Canceled',
-  REJECTED: 'Rejected',
-};
-
-/**
  * Delivery status enum
  * Based on app-logic.json statusEnums.deliveryStatus
  */

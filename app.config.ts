@@ -68,7 +68,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ],
     },
     web: {
-      favicon: './assets/favicon.png',
+      favicon: './assets/images/favicon.png',
     },
     plugins: [
       'expo-dev-client',

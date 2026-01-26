@@ -444,10 +444,11 @@ function ProfileStoreInitializer({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Initialize with mock data in dev mode
-    if (!isInitialized && __DEV__) {
-      console.log('[Dev] Loading mock seed data...');
-      initializeDevData(setCurrentUser, setUserBusinesses);
-    }
+    // TEMPORARILY DISABLED to test real backend login
+    // if (!isInitialized && __DEV__) {
+    //   console.log('[Dev] Loading mock seed data...');
+    //   initializeDevData(setCurrentUser, setUserBusinesses);
+    // }
   }, [isInitialized, setCurrentUser, setUserBusinesses]);
 
   // Restore active business if we were in business mode
@@ -484,6 +485,16 @@ const AppWithTheme = () => {
   // Auth state from store
   const currentUser = useProfileStore((state) => state.currentUser);
   const accessToken = useProfileStore((state) => state.accessToken);
+  const logout = useProfileStore((state) => state.logout);
+  
+  // TEMPORARY: Force logout on app start to test real backend login
+  // Remove this once you've successfully tested login with Render backend
+  useEffect(() => {
+    if (accessToken || currentUser) {
+      console.log('[DEBUG] Force logout to test backend login');
+      logout();
+    }
+  }, []); // Empty deps = run once on mount
   
   // Determine if user is signed in
   const isSignedIn = Boolean(accessToken && currentUser);

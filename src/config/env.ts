@@ -43,26 +43,32 @@ export const IS_PROD = APP_ENV === 'prod';
  * Read from EXPO_PUBLIC_API_URL environment variable
  */
 export const API_BASE_URL = ((): string => {
-  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  // TEMPORARY: Force Render backend URL for testing
+  const FORCE_URL = 'https://nouproapp.onrender.com/api';
+  console.log('[ENV] 🔴 USING FORCED URL:', FORCE_URL);
+  return FORCE_URL;
   
-  if (envUrl) {
-    return envUrl;
-  }
-  
-  // Development fallback
-  if (IS_DEV) {
-    console.warn(
-      '[ENV] No EXPO_PUBLIC_API_URL set. Using localhost:3000.\n' +
-      'For physical device testing, set EXPO_PUBLIC_API_URL in .env file.'
-    );
-    return 'http://localhost:3000/api';
-  }
-  
-  // Production/demo must have explicit URL
-  throw new Error(
-    `EXPO_PUBLIC_API_URL must be set for ${APP_ENV} environment.\n` +
-    'Set it in your .env file or EAS build profile.'
-  );
+  // Original logic (commented out for testing)
+  // const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  // 
+  // if (envUrl) {
+  //   return envUrl;
+  // }
+  // 
+  // // Development fallback
+  // if (IS_DEV) {
+  //   console.warn(
+  //     '[ENV] No EXPO_PUBLIC_API_URL set. Using localhost:3000.\n' +
+  //     'For physical device testing, set EXPO_PUBLIC_API_URL in .env file.'
+  //   );
+  //   return 'http://localhost:3000/api';
+  // }
+  // 
+  // // Production/demo must have explicit URL
+  // throw new Error(
+  //   `EXPO_PUBLIC_API_URL must be set for ${APP_ENV} environment.\n` +
+  //   'Set it in your .env file or EAS build profile.'
+  // );
 })();
 
 /**
