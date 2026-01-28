@@ -129,9 +129,9 @@ model Stock {
 }
 
 model Order {
-  id                    String      @id
+  id                    String         @id
   businessId            String
-  soldByScope           OrderScope  @default(PARENT)
+  soldByScope           OrderScope     @default(PARENT)
   soldByLocationId      String?
   fulfillmentLocationId String?
   customerId            String?
@@ -140,17 +140,18 @@ model Order {
   customerPhone         String?
   items                 Json
   totalAmount           Float?
-  status                OrderStatus   @default(NEW)
+  status                OrderStatus    @default(NEW)
   paymentStatus         PaymentStatus? @default(UNPAID)
+  deliveryStatus        DeliveryStatus @default(NOT_ASSIGNED)
   notes                 String?
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
   
   // Status tracking fields
-  statusChangedAt       DateTime    @default(now())
-  statusChangedBy       String?     // userId who changed status
-  statusReason          String?     // Required for PENDING/CANCELED/REJECTED
-  lastActivityAt        DateTime    @default(now())
+  statusChangedAt       DateTime       @default(now())
+  statusChangedBy       String?        // userId who changed status
+  statusReason          String?        // Required for PENDING/CANCELED/REJECTED
+  lastActivityAt        DateTime       @default(now())
   
   // Relations
   business              Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -298,8 +299,8 @@ model Delivery {
   items                    Json?
   totalAmount              Float?
   trackingNumber           String?
-  deliveryStatus           String?
-  paymentStatus            String?
+  deliveryStatus           DeliveryStatus @default(NOT_ASSIGNED)
+  paymentStatus            PaymentStatus  @default(UNPAID)
   assignedStaffId          String?
   assignedTo               String?
   transportMode            String?
@@ -324,6 +325,19 @@ model FeedPost {
 
   @@index([businessId])
   @@index([type])
+}
+
+// Tracks read state for derived notifications
+// Since notifications are computed at fetch time, this table stores
+// which notification keys have been read by each user
+model NotificationRead {
+  id              String   @id @default(uuid())
+  userId          String
+  notificationKey String   // Derived key like "join-request-{id}" or "invoice-{id}"
+  readAt          DateTime @default(now())
+
+  @@unique([userId, notificationKey])
+  @@index([userId])
 }
 
 enum SubscriptionTier {
@@ -399,4 +413,15 @@ enum InvoiceStatus {
   CANCELED
   VOID
   REFUNDED
+}
+
+// Delivery status for order fulfillment tracking
+enum DeliveryStatus {
+  NOT_ASSIGNED
+  ASSIGNED
+  PACKED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  CANCELED
 }

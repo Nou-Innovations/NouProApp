@@ -4,13 +4,14 @@
  * Accessed from "View all activity" button on Pro Home
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -20,34 +21,24 @@ import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import SecondaryHeader from '@/shared/components/layout/headers/SecondaryHeader';
 import { ListItemCard } from '@/shared/components/ui';
 import theme from '@/shared/theme';
+import { getActivityFeed, ActivityItem as APIActivityItem, formatActivityTime } from '@/features/business/activity.service';
+import { useProfileStore } from '@/shared/store/profileStore';
 
-// Types
-export type ActivityType = 
-  | 'order_created' 
-  | 'order_confirmed'
-  | 'delivery_completed' 
-  | 'delivery_started'
-  | 'invoice_sent'
-  | 'invoice_paid'
-  | 'product_added'
-  | 'stock_updated'
-  | 'message_received';
+// Types - use API types with added UI properties
+export type ActivityType = APIActivityItem['type'];
 
-interface ActivityItem {
-  id: string;
-  type: ActivityType;
-  title: string;
-  description?: string;
-  timestamp: string;
+interface ActivityItem extends APIActivityItem {
   relatedId?: string;
 }
 
 // Type configuration for icons and colors
-const TYPE_CONFIG: Record<ActivityType, { icon: string; color: string; label: string }> = {
+const TYPE_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
   order_created: { icon: 'cart', color: '#007AFF', label: 'Order' },
   order_confirmed: { icon: 'checkmark-circle', color: '#34C759', label: 'Order' },
   delivery_completed: { icon: 'checkmark-done', color: '#34C759', label: 'Delivery' },
   delivery_started: { icon: 'car', color: '#FF9500', label: 'Delivery' },
+  delivery_pending: { icon: 'time', color: '#FFB600', label: 'Delivery' },
+  delivery_canceled: { icon: 'close-circle', color: '#FF3B30', label: 'Delivery' },
   invoice_sent: { icon: 'send', color: '#9C27B0', label: 'Invoice' },
   invoice_paid: { icon: 'cash', color: '#34C759', label: 'Invoice' },
   product_added: { icon: 'add-circle', color: '#007AFF', label: 'Product' },
@@ -55,176 +46,71 @@ const TYPE_CONFIG: Record<ActivityType, { icon: string; color: string; label: st
   message_received: { icon: 'mail', color: '#007AFF', label: 'Message' },
 };
 
-// Mock data - comprehensive activity list
-const MOCK_ACTIVITY: ActivityItem[] = [
-  {
-    id: 'act-1',
-    type: 'order_created',
-    title: 'Order #1235 created',
-    description: 'Global Distributors - Rs 8,500',
-    timestamp: '5 min ago',
-    relatedId: '1235',
-  },
-  {
-    id: 'act-2',
-    type: 'delivery_completed',
-    title: 'Delivery #455 completed',
-    description: 'Premium Foods Ltd',
-    timestamp: '25 min ago',
-    relatedId: '455',
-  },
-  {
-    id: 'act-3',
-    type: 'invoice_sent',
-    title: 'Invoice #INV-790 sent',
-    description: 'ABC Corporation - Rs 12,000',
-    timestamp: '1 hour ago',
-    relatedId: '790',
-  },
-  {
-    id: 'act-4',
-    type: 'product_added',
-    title: 'New product added',
-    description: 'Coconut Water 500ml',
-    timestamp: '2 hours ago',
-    relatedId: 'cw-500',
-  },
-  {
-    id: 'act-5',
-    type: 'delivery_started',
-    title: 'Delivery #457 started',
-    description: 'Fresh Farms - Route A',
-    timestamp: '3 hours ago',
-    relatedId: '457',
-  },
-  {
-    id: 'act-6',
-    type: 'order_confirmed',
-    title: 'Order #1234 confirmed',
-    description: 'Island Grocers - Rs 15,200',
-    timestamp: '4 hours ago',
-    relatedId: '1234',
-  },
-  {
-    id: 'act-7',
-    type: 'invoice_paid',
-    title: 'Invoice #INV-785 paid',
-    description: 'Metro Mart - Rs 45,000',
-    timestamp: '5 hours ago',
-    relatedId: '785',
-  },
-  {
-    id: 'act-8',
-    type: 'stock_updated',
-    title: 'Stock updated',
-    description: 'Orange Juice 1L - 500 units added',
-    timestamp: '6 hours ago',
-    relatedId: 'oj-1l',
-  },
-  {
-    id: 'act-9',
-    type: 'delivery_completed',
-    title: 'Delivery #453 completed',
-    description: 'SuperValue Stores',
-    timestamp: 'Yesterday',
-    relatedId: '453',
-  },
-  {
-    id: 'act-10',
-    type: 'order_created',
-    title: 'Order #1233 created',
-    description: 'QuickStop - Rs 3,200',
-    timestamp: 'Yesterday',
-    relatedId: '1233',
-  },
-  {
-    id: 'act-11',
-    type: 'message_received',
-    title: 'New message from supplier',
-    description: 'Regarding bulk order discount',
-    timestamp: 'Yesterday',
-    relatedId: 'msg-001',
-  },
-  {
-    id: 'act-12',
-    type: 'product_added',
-    title: 'New product added',
-    description: 'Mango Smoothie 330ml',
-    timestamp: '2 days ago',
-    relatedId: 'ms-330',
-  },
-  {
-    id: 'act-13',
-    type: 'invoice_sent',
-    title: 'Invoice #INV-784 sent',
-    description: 'Fresh Mart - Rs 8,750',
-    timestamp: '2 days ago',
-    relatedId: '784',
-  },
-  {
-    id: 'act-14',
-    type: 'delivery_started',
-    title: 'Delivery #450 started',
-    description: 'City Center Mall - Route B',
-    timestamp: '3 days ago',
-    relatedId: '450',
-  },
-  {
-    id: 'act-15',
-    type: 'stock_updated',
-    title: 'Low stock alert resolved',
-    description: 'Apple Juice 500ml - restocked',
-    timestamp: '3 days ago',
-    relatedId: 'aj-500',
-  },
-];
-
 export default function AllActivityScreen() {
   const navigation = useNavigation<any>();
   const { theme: appTheme } = useTheme();
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Profile store
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
+
+  // Fetch activities from API
+  const fetchActivities = useCallback(async () => {
+    if (!activeBusiness?.id) return;
+    
+    try {
+      setLoading(true);
+      const data = await getActivityFeed(activeBusiness.id, { limit: 50 });
+      setActivities(data);
+    } catch (error) {
+      console.error('Failed to fetch activities:', error);
+      setActivities([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeBusiness?.id]);
+
+  // Load on mount
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
 
   // Filter activity based on search
   const filteredActivity = useMemo(() => {
-    if (!search.trim()) return MOCK_ACTIVITY;
+    if (!search.trim()) return activities;
     
     const searchLower = search.toLowerCase();
-    return MOCK_ACTIVITY.filter(item => 
+    return activities.filter(item => 
       item.title.toLowerCase().includes(searchLower) ||
       (item.description?.toLowerCase().includes(searchLower)) ||
-      TYPE_CONFIG[item.type].label.toLowerCase().includes(searchLower)
+      (TYPE_CONFIG[item.type]?.label.toLowerCase().includes(searchLower))
     );
-  }, [search]);
+  }, [search, activities]);
 
   // Handle refresh
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
-  }, []);
+    await fetchActivities();
+    setRefreshing(false);
+  }, [fetchActivities]);
 
-  // Handle activity item press
+  // Handle activity item press - use entityType and entityId from API
   const handleItemPress = (item: ActivityItem) => {
-    switch (item.type) {
-      case 'order_created':
-      case 'order_confirmed':
-      case 'delivery_completed':
-      case 'delivery_started':
-        navigation.navigate('DeliveryDetail', { deliveryId: item.relatedId });
+    switch (item.entityType) {
+      case 'invoice':
+        navigation.navigate('InvoiceDetails', { invoiceId: item.entityId });
         break;
-      case 'invoice_sent':
-      case 'invoice_paid':
-        navigation.navigate('InvoiceDetails', { invoiceId: item.relatedId });
+      case 'delivery':
+        navigation.navigate('DeliveryDetail', { deliveryId: item.entityId });
         break;
-      case 'product_added':
-      case 'stock_updated':
-        navigation.navigate('ProductDetail', { productId: item.relatedId });
+      case 'order':
+        navigation.navigate('DeliveryDetail', { deliveryId: item.entityId });
         break;
-      case 'message_received':
-        // Navigate back to BusinessInbox tab (first tab in business mode)
-        navigation.navigate('BusinessInbox' as never);
+      case 'product':
+        navigation.navigate('ProductDetail', { productId: item.entityId });
         break;
       default:
         console.log('Activity pressed:', item.id);
@@ -247,7 +133,7 @@ export default function AllActivityScreen() {
 
   // Render activity item
   const renderItem = ({ item }: { item: ActivityItem }) => {
-    const config = TYPE_CONFIG[item.type];
+    const config = TYPE_CONFIG[item.type] || { icon: 'information-circle', color: '#6B7280', label: 'Activity' };
 
     return (
       <ListItemCard
@@ -259,7 +145,7 @@ export default function AllActivityScreen() {
         }}
         title={item.title}
         subtitle={item.description}
-        rightRow1={{ timestamp: item.timestamp }}
+        rightRow1={{ timestamp: formatActivityTime(item.timestamp) }}
         showChevron
         onPress={() => handleItemPress(item)}
         showDivider
@@ -304,25 +190,34 @@ export default function AllActivityScreen() {
       />
 
       {/* Activity List */}
-      <FlatList
-        data={filteredActivity}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={appTheme.colors.primary}
-          />
-        }
-        ListEmptyComponent={renderEmpty}
-        contentContainerStyle={[
-          styles.listContent,
-          filteredActivity.length === 0 && styles.listContentEmpty
-        ]}
-        style={{ flex: 1 }}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={appTheme.colors.primary} />
+          <Text style={[styles.loadingText, { color: appTheme.colors.textSecondary }]}>
+            Loading activities...
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredActivity}
+          keyExtractor={item => item.id}
+          renderItem={renderItem}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={appTheme.colors.primary}
+            />
+          }
+          ListEmptyComponent={renderEmpty}
+          contentContainerStyle={[
+            styles.listContent,
+            filteredActivity.length === 0 && styles.listContentEmpty
+          ]}
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -336,6 +231,17 @@ const styles = StyleSheet.create({
   },
   listContentEmpty: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.xxl,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+    marginTop: theme.spacing.md,
   },
   // Empty state (unchanged)
   emptyContainer: {

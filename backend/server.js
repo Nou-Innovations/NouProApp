@@ -25,7 +25,7 @@ const { getRepos, getDataSource } = require('./src/repositories');
 const repos = getRepos();
 
 // Services
-const { orderStatus: orderStatusService } = require('./src/services');
+const { orderStatus: orderStatusService, eventMessages } = require('./src/services');
 
 // Authentication middleware
 const { requireAuth, optionalAuth } = require('./src/middleware/auth');
@@ -65,6 +65,7 @@ let messages = store.messages;
 let deliveries = store.deliveries;
 let locationProducts = store.locationProducts;
 let feedPosts = store.feedPosts;
+// notificationReads now accessed via repos.notificationReadRepo
 
 const app = express();
 
@@ -238,21 +239,15 @@ function getPublicDisabledReason(business, location) {
 // ============================================================================
 
 // Get user from request
-// Uses JWT auth middleware (req.user) when available, falls back to x-user-id header for backwards compatibility
-// NOTE: In production, all routes should use requireAuth middleware instead of this function
+// Requires JWT authentication - all routes using this should have requireAuth middleware
 function getUserFromRequest(req) {
-  // Prefer JWT-authenticated user from middleware
+  // Only use JWT-authenticated user from middleware
   if (req.user?.id) {
     return users.find(u => u.id === req.user.id);
   }
   
-  // Fallback to x-user-id header (for backwards compatibility during migration)
-  // WARNING: This should be removed once all routes use requireAuth middleware
-  const userId = req.headers['x-user-id'];
-  if (!userId) {
-    return null; // No default fallback - require explicit authentication
-  }
-  return users.find(u => u.id === userId);
+  // No fallback - authentication required
+  return null;
 }
 
 // Check if user is a member of business (any role)
@@ -582,8 +577,8 @@ const _deliveries_removed = [
     ],
     totalAmount: 116.97,
     trackingNumber: 'TRK-001-2025',
-    deliveryStatus: 'new',
-    paymentStatus: 'Unpaid',
+    deliveryStatus: 'NOT_ASSIGNED',
+    paymentStatus: 'UNPAID',
     assignedStaffId: null,
     assignedTo: null,
     transportMode: null,
@@ -613,8 +608,8 @@ const _deliveries_removed = [
     ],
     totalAmount: 207.00,
     trackingNumber: 'TRK-002-2025',
-    deliveryStatus: 'ongoing',
-    paymentStatus: 'Paid',
+    deliveryStatus: 'OUT_FOR_DELIVERY',
+    paymentStatus: 'PAID',
     assignedStaffId: 'S001',
     assignedTo: 'John Doe',
     transportMode: 'Truck',
@@ -640,8 +635,8 @@ const _deliveries_removed = [
     itemCount: 3,
     totalAmount: 89.50,
     trackingNumber: 'TRK-003-2025',
-    deliveryStatus: 'delivered',
-    paymentStatus: 'Paid',
+    deliveryStatus: 'DELIVERED',
+    paymentStatus: 'PAID',
     assignedStaffId: 'S002',
     assignedTo: 'Jane Smith',
     transportMode: 'Van',
@@ -667,8 +662,8 @@ const _deliveries_removed = [
     itemCount: 50,
     totalAmount: 2500.00,
     trackingNumber: 'TRK-004-2025',
-    deliveryStatus: 'pending',
-    paymentStatus: 'Unpaid',
+    deliveryStatus: 'ASSIGNED',
+    paymentStatus: 'UNPAID',
     assignedStaffId: null,
     assignedTo: null,
     transportMode: null,
@@ -691,8 +686,8 @@ const _deliveries_removed = [
     expectedDeliveryDateTime: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
     itemCount: 20,
     totalAmount: 0,
-    deliveryStatus: 'pending',
-    paymentStatus: 'Paid',
+    deliveryStatus: 'ASSIGNED',
+    paymentStatus: 'PAID',
     assignedStaffId: 'S003',
     assignedTo: 'Bob Johnson',
     transportMode: 'Truck',
@@ -718,8 +713,8 @@ const _deliveries_removed = [
     itemCount: 12,
     totalAmount: 345.75,
     trackingNumber: 'TRK-006-2025',
-    deliveryStatus: 'new',
-    paymentStatus: 'Pending Confirmation',
+    deliveryStatus: 'NOT_ASSIGNED',
+    paymentStatus: 'PENDING_CONFIRMATION',
     assignedStaffId: null,
     assignedTo: null,
     transportMode: null,
@@ -751,7 +746,7 @@ const _invoices_removed = [
     amount: 116.97,
     taxAmount: 17.55,
     totalAmount: 134.52,
-    status: 'sent',
+    status: 'SENT',
     type: 'invoice',
     issueDate: '2025-01-15',
     dueDate: '2025-02-14',
@@ -775,7 +770,7 @@ const _invoices_removed = [
     amount: 450.00,
     taxAmount: 67.50,
     totalAmount: 517.50,
-    status: 'paid',
+    status: 'PAID',
     type: 'invoice',
     issueDate: '2025-01-14',
     dueDate: '2025-02-13',
@@ -798,7 +793,7 @@ const _invoices_removed = [
     amount: 249.50,
     taxAmount: 37.43,
     totalAmount: 286.93,
-    status: 'paid',
+    status: 'PAID',
     type: 'invoice',
     issueDate: '2025-01-06',
     dueDate: '2025-02-05',
@@ -1120,7 +1115,7 @@ const _messages_removed = {
       itemCount: 5,
       totalAmount: 150.00,
       orderStatus: 'New',
-      paymentStatus: 'Unpaid',
+      paymentStatus: 'UNPAID',
       isOutgoing: false,
       sender: { id: 'demo-1', name: 'Demo Contact', avatar: 'https://picsum.photos/seed/demo/40/40', role: 'client' },
       timestamp: new Date(Date.now() - 70 * 60 * 1000).toISOString()
@@ -1460,6 +1455,28 @@ const errorResponse = (error, message = 'Error') => ({
   message
 });
 
+// Helper to format timestamp to relative time (e.g., "5 min ago")
+const formatRelativeTime = (timestamp) => {
+  const now = new Date();
+  const time = new Date(timestamp);
+  const diffMs = now.getTime() - time.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins} min ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  
+  // Format as date for older items
+  return time.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric' 
+  });
+};
+
 // Auth Routes
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
@@ -1601,7 +1618,7 @@ app.get('/api/businesses/:businessId', async (req, res) => {
 });
 
 // Update business
-app.patch('/api/businesses/:businessId', async (req, res) => {
+app.patch('/api/businesses/:businessId', requireAuth, async (req, res) => {
   const existing = await repos.businessRepo.getById(req.params.businessId);
   if (!existing) {
     return res.status(404).json(errorResponse('Business not found'));
@@ -1643,7 +1660,7 @@ app.get('/api/companies/:id', async (req, res) => {
   }));
 });
 
-app.put('/api/companies/:id', async (req, res) => {
+app.put('/api/companies/:id', requireAuth, async (req, res) => {
   const existing = await repos.businessRepo.getById(req.params.id);
   if (!existing) {
     return res.status(404).json(errorResponse('Company not found'));
@@ -1676,7 +1693,7 @@ app.get('/api/businesses/:businessId/locations', async (req, res) => {
 });
 
 // Create location with mode enforcement
-app.post('/api/businesses/:businessId/locations', async (req, res) => {
+app.post('/api/businesses/:businessId/locations', requireAuth, async (req, res) => {
   const business = await repos.businessRepo.getById(req.params.businessId);
   if (!business) {
     return res.status(404).json(errorResponse('Business not found'));
@@ -1742,7 +1759,7 @@ app.get('/api/locations/:locationId', async (req, res) => {
 });
 
 // Update location (with mode change enforcement + grandfathering policy)
-app.patch('/api/locations/:locationId', async (req, res) => {
+app.patch('/api/locations/:locationId', requireAuth, async (req, res) => {
   const location = await repos.locationRepo.getById(req.params.locationId);
   if (!location) {
     return res.status(404).json(errorResponse('Location not found'));
@@ -1789,7 +1806,7 @@ app.patch('/api/locations/:locationId', async (req, res) => {
 });
 
 // Delete location
-app.delete('/api/locations/:locationId', async (req, res) => {
+app.delete('/api/locations/:locationId', requireAuth, async (req, res) => {
   const ok = await repos.locationRepo.delete(req.params.locationId);
   if (!ok) {
     return res.status(404).json(errorResponse('Location not found'));
@@ -1803,7 +1820,7 @@ app.get('/api/companies/:companyId/locations', async (req, res) => {
   res.json(successResponse(companyLocations));
 });
 
-app.post('/api/companies/:companyId/locations', async (req, res) => {
+app.post('/api/companies/:companyId/locations', requireAuth, async (req, res) => {
   const business = await repos.businessRepo.getById(req.params.companyId);
   const capabilities = business ? deriveCapabilities(business) : {};
   
@@ -1825,7 +1842,7 @@ app.post('/api/companies/:companyId/locations', async (req, res) => {
   res.json(successResponse(created));
 });
 
-app.put('/api/companies/:companyId/locations/:locationId', async (req, res) => {
+app.put('/api/companies/:companyId/locations/:locationId', requireAuth, async (req, res) => {
   const location = await repos.locationRepo.getById(req.params.locationId);
   const businessId = location?.businessId || location?.companyId;
   
@@ -1840,7 +1857,7 @@ app.put('/api/companies/:companyId/locations/:locationId', async (req, res) => {
   res.json(successResponse(updated));
 });
 
-app.delete('/api/companies/:companyId/locations/:locationId', async (req, res) => {
+app.delete('/api/companies/:companyId/locations/:locationId', requireAuth, async (req, res) => {
   const location = await repos.locationRepo.getById(req.params.locationId);
   const businessId = location?.businessId || location?.companyId;
   
@@ -1970,7 +1987,7 @@ app.get('/api/businesses/:businessId/orders', async (req, res) => {
 });
 
 // Create order at Parent level (always allowed for paid plans)
-app.post('/api/businesses/:businessId/orders', async (req, res) => {
+app.post('/api/businesses/:businessId/orders', requireAuth, async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
 
@@ -1997,7 +2014,7 @@ app.post('/api/businesses/:businessId/orders', async (req, res) => {
       soldByLocationId: null,
       fulfillmentLocationId: fulfillmentLocationId || null,
       status: fulfillmentLocationId ? ORDER_STATUS_FROM_STORE.ACCEPTED : ORDER_STATUS_FROM_STORE.NEW,
-      paymentStatus: 'Unpaid',
+      paymentStatus: 'UNPAID',
       customerId: null,
       customerName,
       customerAddress,
@@ -2009,6 +2026,26 @@ app.post('/api/businesses/:businessId/orders', async (req, res) => {
 
     const created = await repos.orderRepo.create(newOrder);
 
+    // Create event message for the order (non-blocking)
+    try {
+      await eventMessages.createEventMessage({
+        type: 'order_event',
+        fromBusinessId: created.businessId,
+        toBusinessId: null, // B2C order - no recipient business
+        entityId: created.id,
+        actorId: req.user?.id,
+        actorName: req.user?.name || 'Staff',
+        metadata: { 
+          status: created.status, 
+          orderNumber: created.id,
+          customerName: created.customerName 
+        }
+      });
+    } catch (msgErr) {
+      console.error('Failed to create order event message:', msgErr);
+      // Don't fail the order creation if message creation fails
+    }
+
     res.status(201).json(successResponse(created, 'Order created successfully'));
   } catch (err) {
     console.error('Error creating business order:', err);
@@ -2017,7 +2054,7 @@ app.post('/api/businesses/:businessId/orders', async (req, res) => {
 });
 
 // Assign order to a location for fulfillment
-app.post('/api/businesses/:businessId/orders/:orderId/assign', async (req, res) => {
+app.post('/api/businesses/:businessId/orders/:orderId/assign', requireAuth, async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
 
@@ -2072,7 +2109,7 @@ app.get('/api/businesses/:businessId/orders/:orderId', async (req, res) => {
 });
 
 // Update order (general fields, not status)
-app.patch('/api/businesses/:businessId/orders/:orderId', async (req, res) => {
+app.patch('/api/businesses/:businessId/orders/:orderId', requireAuth, async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
 
@@ -2095,7 +2132,7 @@ app.patch('/api/businesses/:businessId/orders/:orderId', async (req, res) => {
 // - Validates transition rules (e.g., can't go from DONE to NEW)
 // - Requires reason for certain statuses (PENDING, CANCELED, REJECTED)
 // - Creates audit history records
-app.patch('/api/businesses/:businessId/orders/:orderId/status', async (req, res) => {
+app.patch('/api/businesses/:businessId/orders/:orderId/status', requireAuth, async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
 
@@ -2111,8 +2148,11 @@ app.patch('/api/businesses/:businessId/orders/:orderId/status', async (req, res)
       return res.status(400).json(errorResponse('Status is required', 'MISSING_STATUS'));
     }
 
-    // Get user ID from request context (if using auth)
-    const userId = req.user?.id || req.headers['x-user-id'] || null;
+    // Store previous status for event message
+    const previousStatus = order.status;
+
+    // Get user ID from request context (requires JWT auth)
+    const userId = req.user?.id || null;
 
     const updated = await orderStatusService.changeOrderStatus({
       orderId: req.params.orderId,
@@ -2120,6 +2160,26 @@ app.patch('/api/businesses/:businessId/orders/:orderId/status', async (req, res)
       reason,
       userId,
     });
+
+    // Create status update event message (non-blocking)
+    try {
+      await eventMessages.createEventMessage({
+        type: 'status_update',
+        fromBusinessId: updated.businessId,
+        toBusinessId: null, // B2C order - no recipient business
+        entityId: updated.id,
+        actorId: req.user?.id,
+        actorName: req.user?.name || 'Staff',
+        metadata: { 
+          status: status, 
+          previousStatus: previousStatus,
+          orderNumber: updated.id
+        }
+      });
+    } catch (msgErr) {
+      console.error('Failed to create status update message:', msgErr);
+      // Don't fail the status update if message creation fails
+    }
 
     res.json(successResponse(updated, 'Order status updated successfully'));
   } catch (err) {
@@ -2137,6 +2197,57 @@ app.patch('/api/businesses/:businessId/orders/:orderId/status', async (req, res)
     }
     
     res.status(500).json(errorResponse('Failed to update order status', 'UPDATE_ERROR'));
+  }
+});
+
+// Update order delivery status
+// PATCH /api/businesses/:businessId/orders/:orderId/delivery-status
+// Body: { deliveryStatus: string }
+// Validates delivery status values and updates the delivery tracking
+app.patch('/api/businesses/:businessId/orders/:orderId/delivery-status', requireAuth, async (req, res) => {
+  // PERMISSION: Require business membership
+  if (!requireBusinessMembership(req, res, req.params.businessId)) return;
+
+  try {
+    const order = await repos.orderRepo.getById(req.params.orderId);
+    if (!verifyOrderOwnership(order, req.params.businessId)) {
+      return res.status(404).json(errorResponse('Order not found', 'NOT_FOUND'));
+    }
+
+    const { deliveryStatus } = req.body;
+    
+    if (!deliveryStatus) {
+      return res.status(400).json(errorResponse('Delivery status is required', 'MISSING_DELIVERY_STATUS'));
+    }
+
+    // Validate delivery status enum
+    const allowedStatuses = new Set([
+      'NOT_ASSIGNED',
+      'ASSIGNED',
+      'PACKED',
+      'OUT_FOR_DELIVERY',
+      'DELIVERED',
+      'FAILED',
+      'CANCELED',
+    ]);
+
+    if (!allowedStatuses.has(deliveryStatus)) {
+      return res.status(400).json(errorResponse(
+        `Invalid delivery status. Allowed values: ${Array.from(allowedStatuses).join(', ')}`,
+        'INVALID_DELIVERY_STATUS'
+      ));
+    }
+
+    // Update order with new delivery status
+    const updated = await repos.orderRepo.update(req.params.orderId, {
+      deliveryStatus,
+      updatedAt: new Date(),
+    });
+
+    res.json(successResponse(updated, 'Delivery status updated successfully'));
+  } catch (err) {
+    console.error('Error updating delivery status:', err);
+    res.status(500).json(errorResponse('Failed to update delivery status', 'UPDATE_ERROR'));
   }
 });
 
@@ -2243,7 +2354,7 @@ app.get('/api/locations/:locationId/orders', async (req, res) => {
 
 // Create order at Location level (INDEPENDENT locations only) - INTERNAL USE
 // For customer-facing orders, use /api/public/locations/:locationId/orders
-app.post('/api/locations/:locationId/orders', async (req, res) => {
+app.post('/api/locations/:locationId/orders', requireAuth, async (req, res) => {
   // PERMISSION: Require location membership (internal staff creating order)
   if (!requireLocationMembership(req, res, req.params.locationId)) return;
 
@@ -2303,11 +2414,32 @@ app.post('/api/locations/:locationId/orders', async (req, res) => {
       items: items || [],
       totalAmount,
       status: ORDER_STATUS_FROM_STORE.NEW,
-      paymentStatus: 'Unpaid',
+      paymentStatus: 'UNPAID',
       notes: notes || null,
     };
 
     const created = await repos.orderRepo.create(newOrder);
+
+    // Create event message for the order (non-blocking)
+    try {
+      await eventMessages.createEventMessage({
+        type: 'order_event',
+        fromBusinessId: created.businessId,
+        toBusinessId: null, // B2C order - no recipient business
+        entityId: created.id,
+        actorId: req.user?.id,
+        actorName: req.user?.name || 'Staff',
+        metadata: { 
+          status: created.status, 
+          orderNumber: created.id,
+          customerName: created.customerName,
+          locationId: req.params.locationId
+        }
+      });
+    } catch (msgErr) {
+      console.error('Failed to create order event message:', msgErr);
+      // Don't fail the order creation if message creation fails
+    }
 
     res.status(201).json(successResponse(created, 'Order created successfully'));
   } catch (err) {
@@ -2317,7 +2449,7 @@ app.post('/api/locations/:locationId/orders', async (req, res) => {
 });
 
 // Update order at location level
-app.patch('/api/locations/:locationId/orders/:orderId', async (req, res) => {
+app.patch('/api/locations/:locationId/orders/:orderId', requireAuth, async (req, res) => {
   // PERMISSION: Require location membership
   if (!requireLocationMembership(req, res, req.params.locationId)) return;
 
@@ -2426,7 +2558,7 @@ app.get('/api/locations/:locationId/stock', async (req, res) => {
 });
 
 // Update stock at location
-app.patch('/api/locations/:locationId/stock/:productId', async (req, res) => {
+app.patch('/api/locations/:locationId/stock/:productId', requireAuth, async (req, res) => {
   try {
     // PERMISSION: Require location membership
     if (!requireLocationMembership(req, res, req.params.locationId)) return;
@@ -2521,7 +2653,7 @@ app.get('/api/companies/:companyId/deliveries', async (req, res) => {
   }
 });
 
-app.post('/api/companies/:companyId/deliveries', async (req, res) => {
+app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
 
@@ -2582,7 +2714,7 @@ app.get('/api/businesses/:businessId/invoices', async (req, res) => {
 });
 
 // Create invoice at Parent level
-app.post('/api/businesses/:businessId/invoices', async (req, res) => {
+app.post('/api/businesses/:businessId/invoices', requireAuth, async (req, res) => {
   // PERMISSION: Require business membership
   if (!requireBusinessMembership(req, res, req.params.businessId)) return;
 
@@ -2611,12 +2743,35 @@ app.post('/api/businesses/:businessId/invoices', async (req, res) => {
       issuedByScope: INVOICE_SCOPE_FROM_STORE.PARENT,
       issuedByLocationId: null,
       invoiceNumber,
-      status: 'draft',
+      status: 'DRAFT',
       type: 'invoice',
       ...req.body,
     };
 
     const created = await repos.invoiceRepo.create(newInvoice);
+
+    // Create event message if invoice is being sent (not draft)
+    if (created.status && created.status !== 'DRAFT') {
+      try {
+        const messageType = created.type === 'estimate' ? 'estimate' : 'invoice';
+        await eventMessages.createEventMessage({
+          type: messageType,
+          fromBusinessId: created.businessId,
+          toBusinessId: null, // B2C invoice
+          entityId: created.id,
+          actorId: req.user?.id,
+          actorName: req.user?.name || 'Staff',
+          metadata: { 
+            amount: created.totalAmount || created.total,
+            currency: business.settings?.currency || 'EUR',
+            invoiceNumber: created.invoiceNumber,
+            clientName: created.clientName
+          }
+        });
+      } catch (msgErr) {
+        console.error('Failed to create invoice event message:', msgErr);
+      }
+    }
 
     res.status(201).json(successResponse(created, 'Invoice created successfully'));
   } catch (err) {
@@ -2663,7 +2818,7 @@ app.get('/api/locations/:locationId/invoices', async (req, res) => {
 });
 
 // Create invoice at Location level (INDEPENDENT only) - INTERNAL USE
-app.post('/api/locations/:locationId/invoices', async (req, res) => {
+app.post('/api/locations/:locationId/invoices', requireAuth, async (req, res) => {
   // PERMISSION: Require location membership
   if (!requireLocationMembership(req, res, req.params.locationId)) return;
 
@@ -2718,12 +2873,36 @@ app.post('/api/locations/:locationId/invoices', async (req, res) => {
       issuedByScope: INVOICE_SCOPE_FROM_STORE.LOCATION,
       issuedByLocationId: location.id,
       invoiceNumber,
-      status: 'draft',
+      status: 'DRAFT',
       type: 'invoice',
       ...req.body,
     };
 
     const created = await repos.invoiceRepo.create(newInvoice);
+
+    // Create event message if invoice is being sent (not draft)
+    if (created.status && created.status !== 'DRAFT') {
+      try {
+        const messageType = created.type === 'estimate' ? 'estimate' : 'invoice';
+        await eventMessages.createEventMessage({
+          type: messageType,
+          fromBusinessId: created.businessId,
+          toBusinessId: null, // B2C invoice
+          entityId: created.id,
+          actorId: req.user?.id,
+          actorName: req.user?.name || 'Staff',
+          metadata: { 
+            amount: created.totalAmount || created.total,
+            currency: business.settings?.currency || 'EUR',
+            invoiceNumber: created.invoiceNumber,
+            clientName: created.clientName,
+            locationId: location.id
+          }
+        });
+      } catch (msgErr) {
+        console.error('Failed to create invoice event message:', msgErr);
+      }
+    }
 
     res.status(201).json(successResponse(created, 'Invoice created successfully'));
   } catch (err) {
@@ -2733,14 +2912,41 @@ app.post('/api/locations/:locationId/invoices', async (req, res) => {
 });
 
 // Update invoice
-app.patch('/api/invoices/:invoiceId', async (req, res) => {
+app.patch('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
   try {
     const invoice = await repos.invoiceRepo.getById(req.params.invoiceId);
     if (!invoice) {
       return res.status(404).json(errorResponse('Invoice not found', 'NOT_FOUND'));
     }
 
+    // Track if status is changing to 'SENT'
+    const wasNotSent = invoice.status === 'DRAFT' || !invoice.status;
+    const isBeingSent = req.body.status === 'SENT';
+
     const updated = await repos.invoiceRepo.update(req.params.invoiceId, req.body);
+
+    // Create event message when invoice/estimate is sent
+    if (wasNotSent && isBeingSent) {
+      try {
+        const messageType = updated.type === 'estimate' ? 'estimate' : 'invoice';
+        await eventMessages.createEventMessage({
+          type: messageType,
+          fromBusinessId: updated.businessId,
+          toBusinessId: null, // B2C invoice
+          entityId: updated.id,
+          actorId: req.user?.id,
+          actorName: req.user?.name || 'Staff',
+          metadata: { 
+            amount: updated.totalAmount || updated.total,
+            currency: 'EUR',
+            invoiceNumber: updated.invoiceNumber,
+            clientName: updated.clientName
+          }
+        });
+      } catch (msgErr) {
+        console.error('Failed to create invoice sent event message:', msgErr);
+      }
+    }
 
     res.json(successResponse(updated, 'Invoice updated successfully'));
   } catch (err) {
@@ -2875,7 +3081,7 @@ app.get('/api/companies/:companyId/chats/:chatId/messages', async (req, res) => 
 });
 
 // Mark chat as read
-app.post('/api/companies/:companyId/chats/:chatId/read', async (req, res) => {
+app.post('/api/companies/:companyId/chats/:chatId/read', requireAuth, async (req, res) => {
   try {
     const { companyId, chatId } = req.params;
 
@@ -2897,7 +3103,7 @@ app.post('/api/companies/:companyId/chats/:chatId/read', async (req, res) => {
 });
 
 // Send message to chat
-app.post('/api/companies/:companyId/chats/:chatId/messages', async (req, res) => {
+app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, async (req, res) => {
   try {
     const { chatId, companyId } = req.params;
     const { type, content, replyToId, attachmentUrl, metadata } = req.body;
@@ -2908,12 +3114,14 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', async (req, res) =>
     }
 
     // Create message based on type
+    // Note: isOutgoing is computed on the frontend by comparing sender.id with current user
+    const senderId = req.user?.id || 'user-1';
+    const senderName = req.user?.name || 'You';
     const newMessage = {
       id: `msg-${Date.now()}`,
       chatId,
       type: type || 'text',
-      isOutgoing: true,
-      sender: { id: 'user-1', name: 'You', avatar: '', role: 'business' },
+      sender: { id: senderId, name: senderName, avatar: '', role: 'business' },
       timestamp: new Date().toISOString(),
       status: 'sent'
     };
@@ -3308,7 +3516,7 @@ app.get('/api/locations/:locationId/staff', (req, res) => {
 // Assign staff/admin to a location
 // POST /api/companies/:companyId/locations/:locationId/staff
 // Body: { userId, role, status? }
-app.post('/api/companies/:companyId/locations/:locationId/staff', (req, res) => {
+app.post('/api/companies/:companyId/locations/:locationId/staff', requireAuth, (req, res) => {
   try {
     const { companyId, locationId } = req.params;
     const { userId, role, status = 'accepted' } = req.body || {};
@@ -3382,7 +3590,7 @@ app.post('/api/companies/:companyId/locations/:locationId/staff', (req, res) => 
 
 // Remove staff assignment from a location
 // DELETE /api/companies/:companyId/locations/:locationId/staff/:userId
-app.delete('/api/companies/:companyId/locations/:locationId/staff/:userId', (req, res) => {
+app.delete('/api/companies/:companyId/locations/:locationId/staff/:userId', requireAuth, (req, res) => {
   try {
     const { companyId, locationId, userId } = req.params;
 
@@ -3411,7 +3619,7 @@ app.delete('/api/companies/:companyId/locations/:locationId/staff/:userId', (req
 // Update role/status for a location assignment
 // PATCH /api/companies/:companyId/locations/:locationId/staff/:userId
 // Body: { role?, status? }
-app.patch('/api/companies/:companyId/locations/:locationId/staff/:userId', (req, res) => {
+app.patch('/api/companies/:companyId/locations/:locationId/staff/:userId', requireAuth, (req, res) => {
   try {
     const { companyId, locationId, userId } = req.params;
     const { role, status } = req.body || {};
@@ -3530,7 +3738,7 @@ app.get('/api/companies/:companyId/access/capabilities', (req, res) => {
 // Invite a new staff member
 // POST /api/companies/:companyId/users/invite
 // Body: { email, name?, role, locationIds[], status? }
-app.post('/api/companies/:companyId/users/invite', (req, res) => {
+app.post('/api/companies/:companyId/users/invite', requireAuth, (req, res) => {
   try {
     const { companyId } = req.params;
     const { email, name, role, locationIds, status = 'invited' } = req.body || {};
@@ -3630,7 +3838,7 @@ app.post('/api/companies/:companyId/users/invite', (req, res) => {
 
 // Accept invite
 // POST /api/companies/:companyId/users/:userId/accept
-app.post('/api/companies/:companyId/users/:userId/accept', (req, res) => {
+app.post('/api/companies/:companyId/users/:userId/accept', requireAuth, (req, res) => {
   try {
     const { companyId, userId } = req.params;
 
@@ -3653,7 +3861,7 @@ app.post('/api/companies/:companyId/users/:userId/accept', (req, res) => {
 
 // Revoke invite (remove memberships)
 // DELETE /api/companies/:companyId/users/:userId/invite
-app.delete('/api/companies/:companyId/users/:userId/invite', (req, res) => {
+app.delete('/api/companies/:companyId/users/:userId/invite', requireAuth, (req, res) => {
   try {
     const { companyId, userId } = req.params;
 
@@ -3677,7 +3885,7 @@ app.delete('/api/companies/:companyId/users/:userId/invite', (req, res) => {
 
 // Decline invite
 // POST /api/companies/:companyId/users/:userId/decline
-app.post('/api/companies/:companyId/users/:userId/decline', (req, res) => {
+app.post('/api/companies/:companyId/users/:userId/decline', requireAuth, (req, res) => {
   try {
     const { companyId, userId } = req.params;
 
@@ -3703,7 +3911,7 @@ app.post('/api/companies/:companyId/users/:userId/decline', (req, res) => {
 
 // Resend invite (mock)
 // POST /api/companies/:companyId/users/:userId/resend-invite
-app.post('/api/companies/:companyId/users/:userId/resend-invite', (req, res) => {
+app.post('/api/companies/:companyId/users/:userId/resend-invite', requireAuth, (req, res) => {
   try {
     const { companyId, userId } = req.params;
     const bm = findBusinessMember(companyId, userId);
@@ -3731,13 +3939,13 @@ let roleRequests = [];
 
 // Create role upgrade request (staff only)
 // POST /api/businesses/:businessId/role-requests
-app.post('/api/businesses/:businessId/role-requests', (req, res) => {
+app.post('/api/businesses/:businessId/role-requests', requireAuth, (req, res) => {
   try {
     const { businessId } = req.params;
     const { requestedRole = 'admin', message } = req.body;
     
-    // Get user from request (JWT or x-user-id header)
-    const userId = req.user?.id || req.headers['x-user-id'];
+    // Get user from request (requires JWT auth)
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json(errorResponse('Authentication required'));
     }
@@ -3808,7 +4016,7 @@ app.post('/api/businesses/:businessId/role-requests', (req, res) => {
 app.get('/api/businesses/:businessId/role-requests/me', (req, res) => {
   try {
     const { businessId } = req.params;
-    const userId = req.user?.id || req.headers['x-user-id'];
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json(errorResponse('Authentication required'));
     }
@@ -3834,27 +4042,32 @@ app.get('/api/businesses/:businessId/role-requests', (req, res) => {
     
     // TODO: Add admin check
     
-    let requests = roleRequests.filter(r => r.businessId === businessId);
+    let allRequests = roleRequests.filter(r => r.businessId === businessId);
     
     if (status) {
-      requests = requests.filter(r => r.status === status);
+      allRequests = allRequests.filter(r => r.status === status);
     }
     
-    // Enrich with user details
-    const enriched = requests.map(r => {
-      const user = findUser(r.userId);
+    // Enrich with full user details for frontend display
+    const enhancedRequests = allRequests.map(req => {
+      const user = users.find(u => u.id === req.userId);
       return {
-        ...r,
+        ...req,
         user: user ? {
           id: user.id,
           name: user.name,
           email: user.email,
-          avatar: user.avatar,
+          avatar: user.avatar_url,
+          phone: user.phone,
         } : null,
+        // Also add direct properties for easier access in frontend
+        userName: user?.name,
+        userEmail: user?.email,
+        userAvatar: user?.avatar_url,
       };
     });
     
-    return res.json(successResponse(enriched));
+    return res.json(successResponse({ requests: enhancedRequests }));
   } catch (err) {
     return sendError(res, err);
   }
@@ -3862,13 +4075,13 @@ app.get('/api/businesses/:businessId/role-requests', (req, res) => {
 
 // Approve or reject role request (admin only)
 // PATCH /api/businesses/:businessId/role-requests/:requestId
-app.patch('/api/businesses/:businessId/role-requests/:requestId', (req, res) => {
+app.patch('/api/businesses/:businessId/role-requests/:requestId', requireAuth, (req, res) => {
   try {
     const { businessId, requestId } = req.params;
     const { status, rejectionReason } = req.body;
     
-    // Get user from request (JWT or x-user-id header)
-    const userId = req.user?.id || req.headers['x-user-id'];
+    // Get user from request (requires JWT auth)
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json(errorResponse('Authentication required'));
     }
@@ -3927,7 +4140,7 @@ app.patch('/api/businesses/:businessId/role-requests/:requestId', (req, res) => 
 // Assign a delivery to a user (staff/admin)
 // PATCH /api/companies/:companyId/deliveries/:deliveryId/assign
 // Body: { userId }
-app.patch('/api/companies/:companyId/deliveries/:deliveryId/assign', (req, res) => {
+app.patch('/api/companies/:companyId/deliveries/:deliveryId/assign', requireAuth, (req, res) => {
   try {
     const { companyId, deliveryId } = req.params;
     const { userId } = req.body;
@@ -3979,7 +4192,7 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/assign', (req, res) 
 
 // Unassign a delivery
 // PATCH /api/companies/:companyId/deliveries/:deliveryId/unassign
-app.patch('/api/companies/:companyId/deliveries/:deliveryId/unassign', (req, res) => {
+app.patch('/api/companies/:companyId/deliveries/:deliveryId/unassign', requireAuth, (req, res) => {
   try {
     const { companyId, deliveryId } = req.params;
 
@@ -4080,7 +4293,7 @@ app.get('/api/companies/:companyId/users/:userId/activities', (req, res) => {
 });
 
 // File Upload Route
-app.post('/api/upload', upload.single('file'), (req, res) => {
+app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
   if (req.file) {
     // Use request host for dynamic URL (works with LAN IP)
     const protocol = req.protocol;
@@ -4113,6 +4326,305 @@ app.get('/api/feed', (req, res) => {
     nextCursor: hasMore ? nextCursor : null,
     message: 'Success'
   });
+});
+
+// Activity Feed - Aggregates invoices, deliveries, orders for business timeline
+// GET /api/companies/:companyId/activity-feed?locationId=...&limit=50
+app.get('/api/companies/:companyId/activity-feed', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { locationId, limit = 50 } = req.query;
+    const maxLimit = Math.min(parseInt(limit, 10), 100);
+    
+    // Verify user has access to this business
+    const userId = req.user?.id;
+    if (!userId || !isBusinessMember(companyId, userId)) {
+      return res.status(403).json(errorResponse('ACCESS_DENIED', 'You do not have access to this business'));
+    }
+    
+    // Helper to format currency
+    const formatCurrency = (amount) => `Rs ${Number(amount).toFixed(2)}`;
+    
+    let activities = [];
+    
+    // 1. Recent invoices
+    const businessInvoices = await repos.invoiceRepo.getByBusinessId(companyId);
+    const recentInvoices = businessInvoices
+      .filter(inv => locationId ? inv.issuedByLocationId === locationId : true)
+      .slice(0, 20)
+      .map(inv => ({
+        id: `inv-${inv.id}`,
+        type: 'invoice_sent',
+        title: `Invoice ${inv.id} sent`,
+        description: `${inv.clientName} - ${formatCurrency(inv.totalAmount)}`,
+        timestamp: inv.createdAt,
+        entityId: inv.id,
+        entityType: 'invoice',
+        metadata: {
+          status: inv.status,
+          amount: inv.totalAmount,
+          clientName: inv.clientName,
+        },
+      }));
+    activities.push(...recentInvoices);
+    
+    // 2. Recent deliveries
+    const businessDeliveries = await repos.deliveryRepo.getByBusinessId(companyId);
+    const recentDeliveries = businessDeliveries
+      .filter(del => locationId ? del.locationId === locationId : true)
+      .slice(0, 20)
+      .map(del => {
+        const statusMap = {
+          'PENDING': 'delivery_pending',
+          'IN_TRANSIT': 'delivery_started',
+          'DELIVERED': 'delivery_completed',
+          'CANCELED': 'delivery_canceled',
+        };
+        const activityType = statusMap[del.deliveryStatus] || 'delivery_started';
+        
+        return {
+          id: `del-${del.id}`,
+          type: activityType,
+          title: `Delivery #${del.id} ${del.deliveryStatus.toLowerCase().replace('_', ' ')}`,
+          description: `${del.clientCompanyName} - ${del.itemCount} items`,
+          timestamp: del.updatedAt || del.createdAt,
+          entityId: del.id,
+          entityType: 'delivery',
+          metadata: {
+            status: del.deliveryStatus,
+            clientName: del.clientCompanyName,
+            itemCount: del.itemCount,
+          },
+        };
+      });
+    activities.push(...recentDeliveries);
+    
+    // 3. Recent orders (if separate from deliveries)
+    const businessOrders = await repos.orderRepo.getByBusinessId(companyId);
+    const recentOrders = businessOrders
+      .filter(ord => locationId ? ord.locationId === locationId : true)
+      .slice(0, 20)
+      .map(ord => ({
+        id: `ord-${ord.id}`,
+        type: 'order_created',
+        title: `Order #${ord.id} created`,
+        description: `${ord.clientName || 'Client'} - ${formatCurrency(ord.totalAmount)}`,
+        timestamp: ord.createdAt,
+        entityId: ord.id,
+        entityType: 'order',
+        metadata: {
+          status: ord.status,
+          amount: ord.totalAmount,
+        },
+      }));
+    activities.push(...recentOrders);
+    
+    // Sort by timestamp (newest first) and limit
+    activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    activities = activities.slice(0, maxLimit);
+    
+    return res.json(successResponse({ activities }));
+  } catch (err) {
+    console.error('Error fetching activity feed:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch activity feed'));
+  }
+});
+
+// Notifications API - Aggregates notifications from multiple sources
+// GET /api/users/:userId/notifications?filter=all|unread|requests
+app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { filter = 'all' } = req.query;
+    
+    // Verify user is requesting their own notifications
+    const requestUserId = req.user?.id;
+    if (requestUserId !== userId) {
+      return res.status(403).json(errorResponse('ACCESS_DENIED', 'You can only access your own notifications'));
+    }
+    
+    // Helper to format currency
+    const formatCurrency = (amount) => `Rs ${Number(amount || 0).toFixed(2)}`;
+    
+    let notifications = [];
+    
+    // Get user's businesses for team-related notifications
+    const userBusinesses = await repos.businessMemberRepo.getByUserId(userId);
+    
+    // 1. Join requests (for admins)
+    for (const ub of userBusinesses) {
+      if (ub.role === 'admin' || ub.role === 'super_admin') {
+        const pendingRequests = roleRequests.filter(
+          rr => rr.businessId === ub.businessId && rr.status === 'PENDING'
+        );
+        
+        for (const rr of pendingRequests) {
+          const user = users.find(u => u.id === rr.userId);
+          notifications.push({
+            id: `req-${rr.id}`,
+            type: 'staff_request',
+            title: 'Join request',
+            description: `${user?.name || 'Someone'} wants to join your company`,
+            time: formatRelativeTime(rr.createdAt),
+            timestamp: rr.createdAt,
+            read: false,
+            avatar: user?.avatar_url || null,
+            status: 'pending',
+            requestData: {
+              requestId: rr.id,
+              userId: rr.userId,
+              userName: user?.name,
+              userEmail: user?.email,
+              businessId: rr.businessId,
+            },
+          });
+        }
+      }
+    }
+    
+    // 2. Pending invites (sent by user's business) - informational, not actionable
+    for (const ub of userBusinesses) {
+      if (ub.role === 'admin' || ub.role === 'super_admin') {
+        const pendingInvites = businessMembers.filter(
+          m => m.businessId === ub.businessId && m.status === 'invited'
+        );
+        
+        for (const inv of pendingInvites) {
+          notifications.push({
+            id: `inv-${inv.id}`,
+            type: 'invite_pending',
+            title: 'Invite pending',
+            description: `Invitation sent to ${inv.email}`,
+            time: formatRelativeTime(inv.createdAt),
+            timestamp: inv.createdAt,
+            read: false,
+            avatar: null,
+            status: 'pending',
+            requestData: {
+              inviteId: inv.id,
+              email: inv.email,
+              role: inv.role,
+              businessId: ub.businessId,
+            },
+          });
+        }
+      }
+    }
+    
+    // 3. Recent invoice notifications (payments received)
+    for (const ub of userBusinesses) {
+      try {
+        const allInvoices = await repos.invoiceRepo.getByBusinessId(ub.businessId);
+        const paidInvoices = allInvoices
+          .filter(inv => inv.status === 'PAID')
+          .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+          .slice(0, 5);
+        
+        for (const inv of paidInvoices) {
+          notifications.push({
+            id: `inv-paid-${inv.id}`,
+            type: 'invoice',
+            title: 'Invoice payment received',
+            description: `Payment of ${formatCurrency(inv.totalAmount)} received for invoice #${inv.id}`,
+            time: formatRelativeTime(inv.updatedAt || inv.createdAt),
+            timestamp: inv.updatedAt || inv.createdAt,
+            read: false,
+            avatar: null,
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching invoices for notifications:', err);
+      }
+    }
+    
+    // 4. Recent delivery notifications (completed deliveries)
+    for (const ub of userBusinesses) {
+      try {
+        const allDeliveries = await repos.deliveryRepo.getByBusinessId(ub.businessId);
+        const completedDeliveries = allDeliveries
+          .filter(del => del.deliveryStatus === 'DELIVERED')
+          .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+          .slice(0, 3);
+        
+        for (const del of completedDeliveries) {
+          notifications.push({
+            id: `del-completed-${del.id}`,
+            type: 'delivery',
+            title: 'Delivery completed',
+            description: `Delivery #${del.id} to ${del.clientCompanyName || 'client'} completed`,
+            time: formatRelativeTime(del.updatedAt || del.createdAt),
+            timestamp: del.updatedAt || del.createdAt,
+            read: false,
+            avatar: null,
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching deliveries for notifications:', err);
+      }
+    }
+    
+    // Sort by timestamp (newest first)
+    notifications.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // Apply read state from notificationReadRepo
+    const notificationKeys = notifications.map(n => n.id);
+    const readStates = await repos.notificationReadRepo.getReadStates(userId, notificationKeys);
+    const readRecords = await repos.notificationReadRepo.getByUserId(userId);
+    const readAtMap = {};
+    for (const record of readRecords) {
+      readAtMap[record.notificationKey] = record.readAt;
+    }
+    
+    notifications = notifications.map(n => ({
+      ...n,
+      read: !!readStates[n.id],
+      readAt: readAtMap[n.id] || null
+    }));
+    
+    // Apply filters
+    if (filter === 'unread') {
+      notifications = notifications.filter(n => !n.read);
+    } else if (filter === 'requests') {
+      notifications = notifications.filter(n => 
+        n.type === 'staff_request' || n.type === 'company_request' || n.type === 'invite_pending'
+      );
+    }
+    
+    return res.json(successResponse({ notifications }));
+  } catch (err) {
+    console.error('Error fetching notifications:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch notifications'));
+  }
+});
+
+// Mark notification as read
+// POST /api/users/:userId/notifications/:notificationId/read
+app.post('/api/users/:userId/notifications/:notificationId/read', requireAuth, async (req, res) => {
+  try {
+    const { userId, notificationId } = req.params;
+    
+    // Verify user is updating their own notification
+    const requestUserId = req.user?.id;
+    if (requestUserId !== userId) {
+      return res.status(403).json(errorResponse('ACCESS_DENIED', 'You can only update your own notifications'));
+    }
+    
+    // Persist read state using notificationReadRepo
+    const record = await repos.notificationReadRepo.upsert({
+      userId,
+      notificationKey: notificationId,
+      readAt: new Date().toISOString()
+    });
+    
+    return res.json(successResponse({ 
+      success: true, 
+      message: 'Notification marked as read',
+      readAt: record.readAt
+    }));
+  } catch (err) {
+    console.error('Error marking notification as read:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to mark notification as read'));
+  }
 });
 
 // Public product catalog (scope/visibility filter)

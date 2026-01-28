@@ -634,19 +634,19 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
                 <Icon 
                   name={tab.icon as any} 
                   size={20} 
-                  color={isSelected ? appTheme.colors.text : appTheme.colors.textLight} 
+                  color={isSelected ? appTheme.colors.primary : appTheme.colors.iconMuted} 
                 />
                 <Text
                   style={[
                     styles.tabText,
-                    { color: isSelected ? appTheme.colors.text : appTheme.colors.textLight },
+                    { color: isSelected ? appTheme.colors.primary : appTheme.colors.textMuted },
                     isSelected && styles.tabTextActive,
                   ]}
                 >
                   {tab.label}
                 </Text>
                 {isSelected && (
-                  <View style={[styles.tabIndicator, { backgroundColor: appTheme.colors.text }]} />
+                  <View style={[styles.tabIndicator, { backgroundColor: appTheme.colors.primary }]} />
                 )}
               </TouchableOpacity>
             );
@@ -765,20 +765,19 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
     gap: 10,
   },
-  // Tab bar styles - matching BusinessProfileOwnScreen
+  // Tab bar styles - per design.json filterBar spec
   tabBar: {
     flexDirection: 'row',
+    height: 40,
     borderBottomWidth: 1,
-    marginTop: 0,
   },
   tabItem: {
     flex: 1,
     flexDirection: 'row',
-    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    gap: 6,
+    gap: 12,
   },
   tabText: {
     fontSize: theme.fontSize.sm,
@@ -790,10 +789,9 @@ const styles = StyleSheet.create({
   tabIndicator: {
     position: 'absolute',
     bottom: 0,
-    left: '15%',
-    right: '15%',
-    height: 3,
-    borderRadius: 1.5,
+    left: 0,
+    right: 0,
+    height: 2.5,
   },
   tabContentOuterContainer: {
     flex: 1,

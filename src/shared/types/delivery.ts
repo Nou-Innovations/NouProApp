@@ -10,14 +10,17 @@
 // ============================================================================
 
 /**
- * Normalized delivery status values
- * - 'new': Just received, not yet processed
- * - 'pending': Acknowledged, awaiting pickup/dispatch
- * - 'ongoing': In transit
- * - 'delivered': Completed successfully
- * - 'canceled': Canceled by either party
+ * Delivery status enum (matches Prisma DeliveryStatus)
+ * Used for tracking order fulfillment logistics
  */
-export type DeliveryStatus = 'new' | 'pending' | 'ongoing' | 'delivered' | 'canceled';
+export type DeliveryStatus =
+  | 'NOT_ASSIGNED'
+  | 'ASSIGNED'
+  | 'PACKED'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'FAILED'
+  | 'CANCELED';
 
 export type PaymentStatus = 'Paid' | 'Unpaid' | 'Pending Confirmation';
 
@@ -32,19 +35,23 @@ export type DeliveryDirection = 'incoming' | 'outgoing';
 // ============================================================================
 
 export const DELIVERY_STATUS_COLORS: Record<DeliveryStatus, string> = {
-  new: '#6E0000',
-  pending: '#FFB600',
-  ongoing: '#0075FF',
-  delivered: '#2ACF01',
-  canceled: '#A4AAB8',
+  NOT_ASSIGNED: '#6B7280',     // gray
+  ASSIGNED: '#1E40AF',         // dark blue
+  PACKED: '#5B21B6',           // purple
+  OUT_FOR_DELIVERY: '#0075FF', // blue
+  DELIVERED: '#065F46',        // dark green
+  FAILED: '#FF2400',           // red
+  CANCELED: '#6B7280',         // gray
 };
 
 export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
-  new: 'New',
-  pending: 'Pending',
-  ongoing: 'Ongoing',
-  delivered: 'Delivered',
-  canceled: 'Canceled',
+  NOT_ASSIGNED: 'Not assigned',
+  ASSIGNED: 'Assigned',
+  PACKED: 'Packed',
+  OUT_FOR_DELIVERY: 'Out for delivery',
+  DELIVERED: 'Delivered',
+  FAILED: 'Failed',
+  CANCELED: 'Canceled',
 };
 
 export const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
@@ -71,7 +78,7 @@ export interface DeliveryItem {
 
 export interface Delivery {
   id: string;
-  companyId?: string;
+  businessId?: string;
   type?: DeliveryType;
   direction?: DeliveryDirection;
   locationId?: string;

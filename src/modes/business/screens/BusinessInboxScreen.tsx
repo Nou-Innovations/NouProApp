@@ -37,12 +37,12 @@ import FilterBar from '@/features/search/components/FilterBar';
 import MessageCard from '@/features/inbox/components/MessageCard';
 import NewChatModalList from '@/features/inbox/components/NewChatModalList';
 import { MessageSquare, Pencil } from '@/shared/utils/icons';
+import { getActivityFeed, type ActivityItem } from '@/features/business/activity.service';
+import { getChats } from '@/features/inbox/inbox.service';
+import type { Chat } from '@/shared/types/inbox';
 
 // Pro Home Components
-import {
-  ProActivityTimeline,
-  type ActivityItem,
-} from '../components';
+import { ProActivityTimeline } from '../components';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -253,6 +253,10 @@ export default function BusinessInboxScreen() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(true);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [loadingChats, setLoadingChats] = useState(true);
   
   // Refs
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -289,34 +293,17 @@ export default function BusinessInboxScreen() {
     navigation.navigate('Notifications');
   }, [navigation]);
 
-  // Filter chats based on company, filter, and search
+  // Filter chats for unread count
   const filteredChats = useMemo(() => {
-    let chats: any[] = mockBusinessChats;
+    let filtered = chats;
 
-    // Filter by company in business mode
-    if (activeBusiness) {
-      chats = chats.filter((chat: any) => chat.companyId === activeBusiness.id);
-    }
-
-    // Apply type filter
+    // Apply unread filter
     if (filter === 'unread') {
-      chats = chats.filter(chat => chat.unreadCount > 0);
-    } else if (filter === 'direct') {
-      chats = chats.filter(chat => chat.type === 'client' || chat.type === 'supplier');
-    } else if (filter === 'group') {
-      chats = chats.filter(chat => chat.type === 'internal');
+      filtered = filtered.filter(chat => chat.unreadCount > 0);
     }
 
-    // Apply search filter
-    if (search) {
-      chats = chats.filter(chat =>
-        chat.name.toLowerCase().includes(search.toLowerCase()) ||
-        chat.lastMessage.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    return chats;
-  }, [search, filter, activeBusiness]);
+    return filtered;
+  }, [chats, filter]);
 
   // Calculate unread chats count
   const unreadChatsCount = filteredChats.filter(chat => chat.unreadCount > 0).length;
@@ -328,6 +315,53 @@ export default function BusinessInboxScreen() {
 
   // Permissions using profileStore
   const canManageExternalContacts = isAdmin();
+
+  // Fetch activity feed from API
+  useEffect(() => {
+    const fetchActivity = async () => {
+      if (!activeBusiness?.id) return;
+      try {
+        setLoadingActivity(true);
+        const activities = await getActivityFeed(activeBusiness.id, { limit: 5 });
+        setActivityItems(activities);
+      } catch (error) {
+        console.error('Failed to fetch activities:', error);
+        // Keep empty array on error, don't show mock data
+        setActivityItems([]);
+      } finally {
+        setLoadingActivity(false);
+      }
+    };
+    fetchActivity();
+  }, [activeBusiness?.id]);
+
+  // Fetch chats from API
+  useEffect(() => {
+    const fetchChatList = async () => {
+      if (!activeBusiness?.id) {
+        setLoadingChats(false);
+        return;
+      }
+      
+      try {
+        setLoadingChats(true);
+        const data = await getChats({
+          companyId: activeBusiness.id,
+          locationId: undefined, // Can add location filter later
+          type: filter === 'direct' ? 'client' : filter === 'group' ? 'internal' : undefined,
+          search: search || undefined,
+        });
+        setChats(data);
+      } catch (error) {
+        console.error('Failed to load chats:', error);
+        setChats([]);
+      } finally {
+        setLoadingChats(false);
+      }
+    };
+    
+    fetchChatList();
+  }, [activeBusiness?.id, filter, search]);
 
   // Helper function to format timestamps
   const formatTime = (timestamp: string) => {
@@ -397,16 +431,36 @@ export default function BusinessInboxScreen() {
   });
   
   // Refresh handler
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // Simulate API call - replace with actual data fetching
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
-  }, []);
+    
+    // Refresh both activity and chats
+    const promises = [];
+    
+    if (activeBusiness?.id) {
+      promises.push(
+        getActivityFeed(activeBusiness.id, { limit: 5 })
+          .then(setActivityItems)
+          .catch(err => console.error('Failed to refresh activities:', err))
+      );
+      
+      promises.push(
+        getChats({
+          companyId: activeBusiness.id,
+          type: filter === 'direct' ? 'client' : filter === 'group' ? 'internal' : undefined,
+          search: search || undefined,
+        })
+          .then(setChats)
+          .catch(err => console.error('Failed to refresh chats:', err))
+      );
+    }
+    
+    await Promise.all(promises);
+    setRefreshing(false);
+  }, [activeBusiness?.id, filter, search]);
 
   // Chat handlers
-  const handleChatPress = (chat: any) => {
+  const handleChatPress = (chat: Chat) => {
     // Determine if it's a group chat based on type
     const isGroupChat = chat.type === 'internal';
     
@@ -418,7 +472,7 @@ export default function BusinessInboxScreen() {
       name: chat.name,
       isGroup: isGroupChat,
       avatar: chat.avatar,
-      partnerId: chat.id,
+      partnerId: chat.participants?.[0] || chat.id,
       partnerType: partnerType,
       unreadCount: chat.unreadCount || 0,
     });
@@ -446,49 +500,25 @@ export default function BusinessInboxScreen() {
     }
   };
 
-  // Activity Timeline data
-  const activityItems: ActivityItem[] = [
-    {
-      id: 'act-1',
-      type: 'order_created',
-      title: 'Order #1235 created',
-      description: 'Global Distributors - Rs 8,500',
-      timestamp: '5 min ago',
-      onPress: () => navigation.navigate('DeliveryDetail' as never, { deliveryId: 'DEL-001' } as never),
-    },
-    {
-      id: 'act-2',
-      type: 'delivery_completed',
-      title: 'Delivery #455 completed',
-      description: 'Premium Foods Ltd',
-      timestamp: '25 min ago',
-      onPress: () => navigation.navigate('DeliveryDetail' as never, { deliveryId: '455' } as never),
-    },
-    {
-      id: 'act-3',
-      type: 'invoice_sent',
-      title: 'Invoice #INV-790 sent',
-      description: 'ABC Corporation - Rs 12,000',
-      timestamp: '1 hour ago',
-      onPress: () => navigation.navigate('InvoiceDetails' as never, { invoiceId: '790' } as never),
-    },
-    {
-      id: 'act-4',
-      type: 'product_added',
-      title: 'New product added',
-      description: 'Coconut Water 500ml',
-      timestamp: '2 hours ago',
-      onPress: () => navigation.navigate('ProductDetail' as never, { productId: 'cw-500' } as never),
-    },
-    {
-      id: 'act-5',
-      type: 'delivery_started',
-      title: 'Delivery #457 started',
-      description: 'Fresh Farms - Route A',
-      timestamp: '3 hours ago',
-      onPress: () => navigation.navigate('DeliveryDetail' as never, { deliveryId: '457' } as never),
-    },
-  ];
+  // Handle activity item press - navigate to appropriate detail screen
+  const handleActivityPress = (item: ActivityItem) => {
+    switch (item.entityType) {
+      case 'invoice':
+        (navigation as any).navigate('InvoiceDetails', { invoiceId: item.entityId });
+        break;
+      case 'delivery':
+        (navigation as any).navigate('DeliveryDetail', { deliveryId: item.entityId });
+        break;
+      case 'order':
+        (navigation as any).navigate('DeliveryDetail', { deliveryId: item.entityId });
+        break;
+      case 'product':
+        (navigation as any).navigate('ProductDetail', { productId: item.entityId });
+        break;
+      default:
+        console.log('Unknown activity type:', item.entityType);
+    }
+  };
 
   // Render custom header using PrimaryHeader
   const renderHeader = () => (
@@ -503,35 +533,22 @@ export default function BusinessInboxScreen() {
   );
 
   // Render chat item
-  const renderChatItem = ({ item }: { item: any }) => {
-    // Use the messageType from mock data if available, otherwise detect from content
-    let messageType = item.messageType || 'text';
+  const renderChatItem = ({ item }: { item: Chat }) => {
+    const lastMessage = item.lastMessage;
     
-    if (!item.messageType) {
-      if (item.lastMessage === 'Photo') {
-        messageType = 'photo';
-      } else if (item.lastMessage.includes('Invoice #')) {
-        messageType = 'invoice';
-      } else if (item.lastMessage.includes('.pdf')) {
-        messageType = 'pdf';
-      }
-    }
-
     return (
       <MessageCard
         chatId={item.id}
         userId={item.id}
-        avatar={item.avatar}
+        avatar={item.avatar || undefined}
         name={item.name}
-        message={item.lastMessage}
-        type={messageType}
-        time={formatTime(item.timestamp)}
-        status={item.status}
+        message={lastMessage?.content || ''}
+        type={lastMessage?.type || 'text'}
+        time={formatTime(lastMessage?.timestamp || item.updatedAt)}
+        status={lastMessage?.status}
         unreadCount={item.unreadCount}
-        orderStatus={item.orderStatus}
-        transferStatus={item.transferStatus}
-        transferDirection={item.transferDirection}
-        isOutgoing={item.isOutgoing}
+        orderStatus={lastMessage?.deliveryStatus}
+        isOutgoing={lastMessage?.isOutgoing || false}
         onPress={() => handleChatPress(item)}
       />
     );
@@ -585,7 +602,10 @@ export default function BusinessInboxScreen() {
             >
               {/* Activity Timeline */}
               <ProActivityTimeline
-                items={activityItems}
+                items={activityItems.map(item => ({
+                  ...item,
+                  onPress: () => handleActivityPress(item),
+                }))}
                 maxItems={5}
                 onSeeAll={() => navigation.navigate('AllActivity' as never)}
               />

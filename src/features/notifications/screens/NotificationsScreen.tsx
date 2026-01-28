@@ -7,7 +7,7 @@
  * Design System: components.overlayScreens.notificationsOverlay
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -31,24 +32,16 @@ import FilterBar from '@/features/search/components/FilterBar';
 import { AppModal, ListItemCard } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import theme from '@/shared/theme';
+import { getNotifications, markNotificationRead, Notification as APINotification } from '../notifications.service';
+import { 
+  acceptJoinRequestWithRole, 
+  rejectJoinRequestById, 
+  cancelInvite, 
+  resendInvite 
+} from '@/features/team/team.service';
 
-// Types
-interface Notification {
-  id: string;
-  type: 'message' | 'delivery' | 'invoice' | 'system' | 'staff_request' | 'company_request' | 'connection_accepted' | 'join_accepted' | 'onboarding_create_business' | 'onboarding_join_company';
-  title: string;
-  description: string;
-  time: string;
-  read: boolean;
-  avatar: string | null;
-  status?: 'pending' | 'accepted' | 'declined';
-  requestData?: {
-    userId?: string;
-    userName?: string;
-    companyId?: string;
-    companyName?: string;
-  };
-}
+// Types - use API types
+type Notification = APINotification;
 
 interface NotificationCardProps {
   notification: Notification;
@@ -59,105 +52,7 @@ interface NotificationCardProps {
   currentRole?: string;
 }
 
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: 'notif-1',
-    type: 'staff_request',
-    title: 'Join request',
-    description: 'John Doe wants to join your company as a staff member',
-    time: '30 min ago',
-    read: false,
-    avatar: 'https://randomuser.me/api/portraits/men/3.jpg',
-    status: 'pending',
-    requestData: {
-      userId: 'user-john',
-      userName: 'John Doe',
-    },
-  },
-  {
-    id: 'notif-2',
-    type: 'company_request',
-    title: 'Connection request',
-    description: 'TechCorp Inc. wants to connect with your company',
-    time: '1 hour ago',
-    read: false,
-    avatar: 'https://placehold.co/80x80/blue/white?text=TC',
-    status: 'pending',
-    requestData: {
-      companyId: 'company-techcorp',
-      companyName: 'TechCorp Inc.',
-    },
-  },
-  {
-    id: 'notif-3',
-    type: 'connection_accepted',
-    title: 'Connection Request Accepted',
-    description: 'You and GlobalTech Solutions are now connected.',
-    time: '2 hours ago',
-    read: false,
-    avatar: 'https://placehold.co/80x80/green/white?text=GT',
-    requestData: {
-      companyId: 'company-globaltech',
-      companyName: 'GlobalTech Solutions',
-    },
-  },
-  {
-    id: 'notif-4',
-    type: 'staff_request',
-    title: 'Join request',
-    description: 'Sarah Wilson is now part of your staff',
-    time: '3 hours ago',
-    read: true,
-    avatar: 'https://randomuser.me/api/portraits/women/4.jpg',
-    status: 'accepted',
-    requestData: {
-      userId: 'user-sarah',
-      userName: 'Sarah Wilson',
-    },
-  },
-  {
-    id: 'notif-5',
-    type: 'join_accepted',
-    title: 'Join Request Accepted',
-    description: 'You are now part of InnovateCorp\'s staff.',
-    time: '4 hours ago',
-    read: false,
-    avatar: 'https://placehold.co/80x80/purple/white?text=IC',
-    requestData: {
-      companyId: 'company-innovate',
-      companyName: 'InnovateCorp',
-    },
-  },
-  {
-    id: 'notif-6',
-    type: 'delivery',
-    title: 'Order ready for pickup',
-    description: 'Your order from The Burning Distributor is ready for pickup',
-    time: '5 hours ago',
-    read: false,
-    avatar: 'https://placehold.co/80x80/orange/white?text=🔥',
-  },
-  {
-    id: 'notif-7',
-    type: 'invoice',
-    title: 'Invoice payment received',
-    description: 'Payment of $1,250.00 has been received for invoice #INV-001',
-    time: '6 hours ago',
-    read: true,
-    avatar: null,
-  },
-  {
-    id: 'notif-8',
-    type: 'system',
-    title: 'Profile updated',
-    description: 'Your business profile has been successfully updated',
-    time: 'Yesterday',
-    read: true,
-    avatar: null,
-  },
-];
-
-const notificationFilterStatuses = ['all', 'request', 'deliveries', 'invoices'];
+const notificationFilterStatuses = ['all', 'requests', 'deliveries', 'invoices'];
 
 // Onboarding notifications for new users who skipped business/company selection
 const ONBOARDING_NOTIFICATIONS: Notification[] = [
@@ -167,6 +62,7 @@ const ONBOARDING_NOTIFICATIONS: Notification[] = [
     title: 'Create your Business profile',
     description: 'Set up your own business and start managing your operations',
     time: 'Just now',
+    timestamp: new Date().toISOString(),
     read: false,
     avatar: null,
   },
@@ -176,6 +72,7 @@ const ONBOARDING_NOTIFICATIONS: Notification[] = [
     title: 'Join an existing Company',
     description: 'Request to join a company and collaborate with your team',
     time: 'Just now',
+    timestamp: new Date().toISOString(),
     read: false,
     avatar: null,
   },
@@ -326,7 +223,8 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
 export default function NotificationsScreen() {
   const [search, setSearch] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null);
   const [notificationRoles, setNotificationRoles] = useState<Record<string, string>>({});
@@ -340,29 +238,51 @@ export default function NotificationsScreen() {
   const { markAllAsRead, setUnreadCount } = useNotifications();
   const insets = useSafeAreaInsets();
   
-  // Check if user is new (just registered and skipped business setup)
+  // Get current user from store
+  const currentUser = useProfileStore((state) => state.currentUser);
   const isNewUser = useProfileStore((state) => state.isNewUser);
   const userBusinesses = useProfileStore((state) => state.userBusinesses);
+  const currentUserRole = useProfileStore((state) => state.currentUserRole);
   
   // Show onboarding notifications for new users with no businesses
   const isOnboardingUser = isNewUser && userBusinesses.length === 0;
-  
-  // Get the appropriate notifications based on user status
-  const effectiveNotifications = useMemo(() => {
-    if (isOnboardingUser) {
-      return ONBOARDING_NOTIFICATIONS;
-    }
-    return notifications;
-  }, [isOnboardingUser, notifications]);
 
-  // Mock current user role
-  const currentUserRole: 'admin' | 'super_admin' | 'user' = 'admin';
+  // Fetch notifications from API
+  const fetchNotifications = useCallback(async () => {
+    if (!currentUser?.id || isOnboardingUser) {
+      // For onboarding users, show static onboarding notifications
+      if (isOnboardingUser) {
+        setNotifications(ONBOARDING_NOTIFICATIONS);
+      }
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const data = await getNotifications(
+        currentUser.id, 
+        selectedFilter === 'all' ? undefined : selectedFilter as any
+      );
+      setNotifications(data);
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUser?.id, selectedFilter, isOnboardingUser]);
+
+  // Load on mount and when filter changes
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   // Calculate unread count
-  const unreadCount = effectiveNotifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   // Update global unread count
-  React.useEffect(() => {
+  useEffect(() => {
     setUnreadCount(unreadCount);
   }, [unreadCount, setUnreadCount]);
 
@@ -370,49 +290,37 @@ export default function NotificationsScreen() {
     return notificationRoles[notificationId] || 'Staff';
   };
 
-  const handleStatusUpdate = (notificationId: string, status: 'accepted' | 'declined', role?: string) => {
-    setNotifications(prev => prev.map(notif => {
-      if (notif.id === notificationId) {
-        let updatedDescription = notif.description;
-        
-        if (status === 'accepted') {
-          if (notif.type === 'staff_request') {
-            updatedDescription = `${notif.requestData?.userName} is now part of your staff`;
-          } else if (notif.type === 'company_request') {
-            updatedDescription = `You and ${notif.requestData?.companyName} are now connected.`;
-          }
-        } else if (status === 'declined') {
-          updatedDescription = 'You have declined the request';
-        }
-        
-        return { ...notif, status, description: updatedDescription };
-      }
-      return notif;
-    }));
-
+  const handleStatusUpdate = async (notificationId: string, status: 'accepted' | 'declined', role?: string) => {
     const notification = notifications.find(n => n.id === notificationId);
-    if (notification) {
-      if (status === 'accepted') {
-        if (notification.type === 'staff_request') {
-          Alert.alert(
-            'Request Accepted',
-            `${notification.requestData?.userName} has been added to your staff${role ? ` as ${role}` : ''}.`,
-            [{ text: 'OK' }]
+    if (!notification?.requestData || !currentUser?.id) return;
+    
+    try {
+      if (notification.type === 'staff_request') {
+        if (status === 'accepted') {
+          await acceptJoinRequestWithRole(
+            notification.requestData.businessId!,
+            notification.requestData.requestId!,
+            role || 'staff'
           );
-        } else if (notification.type === 'company_request') {
-          Alert.alert(
-            'Connection Accepted',
-            `You and ${notification.requestData?.companyName} are now connected.`,
-            [{ text: 'OK' }]
+          setSuccessMessage(`${notification.requestData.userName} has been added to your staff${role ? ` as ${role}` : ''}`);
+        } else {
+          await rejectJoinRequestById(
+            notification.requestData.businessId!,
+            notification.requestData.requestId!
           );
+          setSuccessMessage('Join request has been declined');
         }
-      } else {
-        Alert.alert(
-          'Request Declined',
-          'The request has been declined.',
-          [{ text: 'OK' }]
-        );
+        setShowSuccessDialog(true);
+        
+        // Refresh notifications
+        await fetchNotifications();
+      } else if (notification.type === 'company_request') {
+        // TODO: Implement company connection accept/decline
+        Alert.alert('Not Implemented', 'Company connection requests are not yet implemented');
       }
+    } catch (error) {
+      console.error('Error updating notification status:', error);
+      Alert.alert('Error', 'Failed to update request. Please try again.');
     }
   };
 
@@ -458,13 +366,13 @@ export default function NotificationsScreen() {
     setPendingRole(null);
   };
 
-  const filteredNotifications = effectiveNotifications.filter(notification => {
+  const filteredNotifications = notifications.filter(notification => {
     const searchMatch = notification.title.toLowerCase().includes(search.toLowerCase()) || 
                         notification.description.toLowerCase().includes(search.toLowerCase());
     
     let filterMatch = true;
-    if (selectedFilter === 'request') {
-      filterMatch = notification.type === 'staff_request' || notification.type === 'company_request';
+    if (selectedFilter === 'requests') {
+      filterMatch = notification.type === 'staff_request' || notification.type === 'company_request' || notification.type === 'invite_pending';
     } else if (selectedFilter === 'deliveries') {
       filterMatch = notification.type === 'delivery';
     } else if (selectedFilter === 'invoices') {
@@ -517,12 +425,11 @@ export default function NotificationsScreen() {
     navigation.goBack();
   };
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
-  }, []);
+    await fetchNotifications();
+    setRefreshing(false);
+  }, [fetchNotifications]);
 
   // Mark all notifications as read when screen is focused
   useFocusEffect(
@@ -560,45 +467,54 @@ export default function NotificationsScreen() {
       />
 
       {/* Notification List */}
-      <FlatList
-        data={filteredNotifications}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <NotificationCard
-            notification={item}
-            onPress={handleNotificationPress}
-            currentUserRole={currentUserRole}
-            onStatusUpdate={handleStatusUpdate}
-            onShowRoleModal={handleShowRoleModal}
-            currentRole={getCurrentRole(item.id)}
-          />
-        )}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={appTheme.colors.primary}
-          />
-        }
-        ListEmptyComponent={() => (
-          <View style={styles.emptyContainer}>
-            <Icon
-              name="notifications-off-outline"
-              size={60}
-              color={appTheme.colors.textMuted}
+      {loading && !refreshing ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={appTheme.colors.primary} />
+          <Text style={[styles.loadingText, { color: appTheme.colors.textSecondary }]}>
+            Loading notifications...
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredNotifications}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <NotificationCard
+              notification={item}
+              onPress={handleNotificationPress}
+              currentUserRole={currentUserRole as any}
+              onStatusUpdate={handleStatusUpdate}
+              onShowRoleModal={handleShowRoleModal}
+              currentRole={getCurrentRole(item.id)}
             />
-            <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>
-              No notifications
-            </Text>
-            <Text style={[styles.emptySubtitle, { color: appTheme.colors.textSecondary }]}>
-              You're all caught up! Check back later for updates.
-            </Text>
-          </View>
-        )}
-        contentContainerStyle={styles.listContent}
-        style={{ flex: 1 }}
-        showsVerticalScrollIndicator={false}
-      />
+          )}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={appTheme.colors.primary}
+            />
+          }
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Icon
+                name="notifications-off-outline"
+                size={60}
+                color={appTheme.colors.textMuted}
+              />
+              <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>
+                No notifications
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: appTheme.colors.textSecondary }]}>
+                {search ? 'No matching notifications found' : "You're all caught up! Check back later for updates."}
+              </Text>
+            </View>
+          )}
+          contentContainerStyle={styles.listContent}
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       {/* Role Selection Bottom Sheet - design spec: components.modals.actionBottomSheet */}
       <Modal
@@ -750,6 +666,17 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.regular,
     textAlign: 'center',
     marginTop: theme.spacing.xs,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.xxl,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+    marginTop: theme.spacing.md,
   },
   // ============================================================
   // BOTTOM SHEET MODAL - design spec: components.modals.bottomSheet

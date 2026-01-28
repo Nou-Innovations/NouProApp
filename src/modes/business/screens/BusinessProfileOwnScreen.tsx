@@ -43,7 +43,8 @@ import {
   canDeleteBusiness,
   checkPaywall,
 } from '@/shared/utils/permissions';
-import mockProducts, { Product } from '@/shared/data/mockProducts';
+import { useProducts } from '@/features/products/hooks/useProducts';
+import type { UIProduct } from '@/shared/types/product';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const COVER_HEIGHT = SCREEN_WIDTH * (4 / 3); // 3:4 aspect ratio
@@ -60,7 +61,7 @@ interface DisplayBrand {
   name: string;
   logo?: string;
   productCount: number;
-  products: Product[];
+  products: UIProduct[];
 }
 
 // Mock business hours data
@@ -80,8 +81,8 @@ const mockMapLocation = {
   longitude: 57.498,
 };
 
-const processProductsToBrands = (products: Product[]): DisplayBrand[] => {
-  const brandsMap = new Map<string, { logo?: string; products: Product[] }>();
+const processProductsToBrands = (products: UIProduct[]): DisplayBrand[] => {
+  const brandsMap = new Map<string, { logo?: string; products: UIProduct[] }>();
   
   products.forEach(product => {
     if (!brandsMap.has(product.brand)) {
@@ -154,8 +155,14 @@ export default function BusinessProfileOwnScreen() {
   const canPublish = canPublishBusinessPage(currentUserRole, activeBusiness?.plan || null);
   const canDelete = canDeleteBusiness(currentUserRole);
 
-  // Process products for display
-  const displayBrands = useMemo(() => processProductsToBrands(mockProducts), []);
+  // Get products from real hook instead of mock data
+  const { products, loading: loadingProducts } = useProducts();
+
+  // Process products for display (only show published/displayable products on profile)
+  const displayBrands = useMemo(
+    () => processProductsToBrands(products.filter(p => p.isDisplayable)),
+    [products]
+  );
 
   const handleEditProfile = () => {
     if (!canEdit) {
@@ -451,19 +458,19 @@ export default function BusinessProfileOwnScreen() {
           <Icon 
             name={tab.icon as any} 
             size={20} 
-            color={activeTab === tab.key ? appTheme.colors.text : appTheme.colors.textLight} 
+            color={activeTab === tab.key ? appTheme.colors.primary : appTheme.colors.iconMuted} 
           />
           <Text
             style={[
               styles.tabText,
-              { color: activeTab === tab.key ? appTheme.colors.text : appTheme.colors.textLight },
+              { color: activeTab === tab.key ? appTheme.colors.primary : appTheme.colors.textMuted },
               activeTab === tab.key && styles.tabTextActive,
             ]}
           >
             {tab.label}
           </Text>
           {activeTab === tab.key && (
-            <View style={[styles.tabIndicator, { backgroundColor: appTheme.colors.text }]} />
+            <View style={[styles.tabIndicator, { backgroundColor: appTheme.colors.primary }]} />
           )}
         </TouchableOpacity>
       ))}
@@ -1031,17 +1038,16 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
+    height: 40,
     borderBottomWidth: 1,
-    marginTop: 0,
   },
   tabItem: {
     flex: 1,
     flexDirection: 'row',
-    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    gap: 6,
+    gap: 12,
   },
   tabItemActive: {},
   tabText: {
@@ -1054,10 +1060,9 @@ const styles = StyleSheet.create({
   tabIndicator: {
     position: 'absolute',
     bottom: 0,
-    left: '15%',
-    right: '15%',
-    height: 3,
-    borderRadius: 1.5,
+    left: 0,
+    right: 0,
+    height: 2.5,
   },
   productsContainer: {
     paddingTop: theme.spacing.sm,

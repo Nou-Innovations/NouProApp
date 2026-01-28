@@ -29,6 +29,14 @@ import {
   updateTeamMemberRole,
   type AccessibleLocation,
 } from '@/features/team/team.service';
+import {
+  getJoinRequests,
+  getPendingInvites,
+  acceptJoinRequestWithRole,
+  rejectJoinRequestById,
+  type JoinRequest,
+  type PendingInvite,
+} from '@/features/team/team.service';
 
 // User type for team management (matches backend /staff response)
 interface User {
@@ -69,65 +77,10 @@ export default function TeamManagementScreen() {
   const [locations, setLocations] = useState<AccessibleLocation[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   
-  // Pending join requests state (users who sent request to join our business)
-  interface JoinRequest {
-    id: string;
-    userId: string;
-    userName: string;
-    userEmail: string;
-    userAvatar?: string;
-    requestedAt: string;
-    message?: string;
-  }
-  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([
-    {
-      id: 'req-1',
-      userId: 'user-new-1',
-      userName: 'Sarah Johnson',
-      userEmail: 'sarah.johnson@email.com',
-      requestedAt: '2025-01-07T14:30:00Z',
-      message: 'I would like to join your team as a sales representative.',
-    },
-    {
-      id: 'req-2',
-      userId: 'user-new-2',
-      userName: 'Michael Chen',
-      userEmail: 'michael.chen@email.com',
-      requestedAt: '2025-01-06T09:15:00Z',
-    },
-  ]);
-  
-  // Pending invites state (invitations we sent to users)
-  interface PendingInvite {
-    id: string;
-    email: string;
-    name?: string;
-    role: 'admin' | 'staff';
-    invitedAt: string;
-    expiresAt?: string;
-  }
-  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([
-    {
-      id: 'inv-001',
-      email: 'alex.wilson@company.com',
-      name: 'Alex Wilson',
-      role: 'admin',
-      invitedAt: '2025-01-05T10:00:00Z',
-    },
-    {
-      id: 'inv-002',
-      email: 'emma.davis@gmail.com',
-      name: 'Emma Davis',
-      role: 'staff',
-      invitedAt: '2025-01-04T16:45:00Z',
-    },
-    {
-      id: 'inv-003',
-      email: 'james.taylor@outlook.com',
-      role: 'staff',
-      invitedAt: '2025-01-03T11:20:00Z',
-    },
-  ]);
+  // Join requests and pending invites state (fetched from API)
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(true);
   
   // Bottom sheet state for Join Requests
   const [selectedJoinRequest, setSelectedJoinRequest] = useState<JoinRequest | null>(null);
@@ -149,8 +102,31 @@ export default function TeamManagementScreen() {
   useEffect(() => {
     if (activeBusiness?.id && canManageTeam) {
       fetchUsers();
+      fetchRequestsAndInvites();
     }
   }, [activeBusiness?.id, canManageTeam]);
+
+  // Fetch join requests and pending invites
+  const fetchRequestsAndInvites = async () => {
+    if (!activeBusiness?.id) return;
+    
+    try {
+      setLoadingRequests(true);
+      const [requests, invites] = await Promise.all([
+        getJoinRequests(activeBusiness.id, 'PENDING'),
+        getPendingInvites(activeBusiness.id),
+      ]);
+      setJoinRequests(requests);
+      setPendingInvites(invites);
+    } catch (error) {
+      console.error('Failed to fetch requests/invites:', error);
+      // Keep empty arrays on error
+      setJoinRequests([]);
+      setPendingInvites([]);
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
 
   // Fetch accessible locations for the location filter
   useEffect(() => {
@@ -324,21 +300,37 @@ export default function TeamManagementScreen() {
     staff: filteredUsers.filter(user => user.role === 'staff'),
   };
   
-  // Handle accepting a join request
+  // Handle accepting a join request - show role selection
   const handleAcceptRequest = (request: JoinRequest) => {
     Alert.alert(
-      'Accept Request',
-      `Accept ${request.userName}'s request to join the team?`,
+      'Select Role',
+      `What role should ${request.userName} have?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'Accept', 
+          text: 'Staff', 
           onPress: async () => {
             if (!activeBusiness?.id) return;
             try {
-              await acceptJoinRequest(activeBusiness.id, request.id);
-              setJoinRequests(prev => prev.filter(r => r.id !== request.id));
-              setSuccessMessage(`${request.userName} has been added to the team`);
+              await acceptJoinRequestWithRole(activeBusiness.id, request.id, 'staff');
+              await fetchRequestsAndInvites();
+              setSuccessMessage(`${request.userName} has been added as staff`);
+              setShowSuccessDialog(true);
+              fetchUsers();
+            } catch (error) {
+              console.error('Error accepting request:', error);
+              Alert.alert('Error', 'Failed to accept request. Please try again.');
+            }
+          }
+        },
+        { 
+          text: 'Admin', 
+          onPress: async () => {
+            if (!activeBusiness?.id) return;
+            try {
+              await acceptJoinRequestWithRole(activeBusiness.id, request.id, 'admin');
+              await fetchRequestsAndInvites();
+              setSuccessMessage(`${request.userName} has been added as admin`);
               setShowSuccessDialog(true);
               fetchUsers();
             } catch (error) {
@@ -364,8 +356,8 @@ export default function TeamManagementScreen() {
           onPress: async () => {
             if (!activeBusiness?.id) return;
             try {
-              await rejectJoinRequest(activeBusiness.id, request.id);
-              setJoinRequests(prev => prev.filter(r => r.id !== request.id));
+              await rejectJoinRequestById(activeBusiness.id, request.id);
+              await fetchRequestsAndInvites();
               setSuccessMessage('Join request rejected');
               setShowSuccessDialog(true);
             } catch (error) {
@@ -392,7 +384,7 @@ export default function TeamManagementScreen() {
             if (!activeBusiness?.id) return;
             try {
               await cancelInvite(activeBusiness.id, invite.id);
-              setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
+              await fetchRequestsAndInvites();
               setSuccessMessage('Invitation cancelled');
               setShowSuccessDialog(true);
             } catch (error) {

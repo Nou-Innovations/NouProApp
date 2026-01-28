@@ -183,6 +183,107 @@ export async function resendInvite(companyId: string, userId: string): Promise<v
   await post(`/companies/${companyId}/users/${userId}/resend-invite`, {});
 }
 
+// ============================================================================
+// JOIN REQUESTS & PENDING INVITES (for notifications & team management)
+// ============================================================================
+
+export interface JoinRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userAvatar?: string;
+  requestedAt: string;
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
+  message?: string;
+}
+
+export interface PendingInvite {
+  id: string;
+  email: string;
+  name?: string;
+  role: 'admin' | 'staff';
+  invitedAt: string;
+  expiresAt?: string;
+}
+
+/**
+ * Get join requests for a business (users requesting to join)
+ */
+export async function getJoinRequests(
+  businessId: string,
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED' = 'PENDING'
+): Promise<JoinRequest[]> {
+  const response = await get<{ requests: any[] }>(
+    `/businesses/${businessId}/role-requests`,
+    { status }
+  );
+  
+  // Handle empty or missing requests array
+  const requests = response?.requests || [];
+  
+  // Map to JoinRequest interface
+  return requests.map(req => ({
+    id: req.id,
+    userId: req.userId,
+    userName: req.userName || req.user?.name || 'Unknown',
+    userEmail: req.userEmail || req.user?.email || '',
+    userAvatar: req.userAvatar || req.user?.avatar,
+    requestedAt: req.createdAt,
+    status: req.status,
+    message: req.message,
+  }));
+}
+
+/**
+ * Accept a join request and assign role
+ */
+export async function acceptJoinRequestWithRole(
+  businessId: string,
+  requestId: string,
+  role: string
+): Promise<void> {
+  await patch(`/businesses/${businessId}/role-requests/${requestId}`, {
+    status: 'ACCEPTED',
+    role,
+  });
+}
+
+/**
+ * Reject a join request
+ */
+export async function rejectJoinRequestById(
+  businessId: string,
+  requestId: string
+): Promise<void> {
+  await patch(`/businesses/${businessId}/role-requests/${requestId}`, {
+    status: 'DECLINED',
+  });
+}
+
+/**
+ * Get pending invites (invitations sent by business)
+ */
+export async function getPendingInvites(
+  businessId: string
+): Promise<PendingInvite[]> {
+  // Get team members with 'invited' status
+  const members = await getTeamMembers(businessId, 'invited');
+  
+  // Handle empty or missing members array
+  if (!members || !Array.isArray(members)) {
+    return [];
+  }
+  
+  return members.map(m => ({
+    id: m.id,
+    email: m.email,
+    name: m.name,
+    role: m.role as 'admin' | 'staff',
+    invitedAt: m.joinedAt || new Date().toISOString(),
+  }));
+}
+
 const teamService = {
   // Capabilities
   getCapabilities,
@@ -201,6 +302,11 @@ const teamService = {
   rejectJoinRequest,
   cancelInvite,
   resendInvite,
+  // Join Requests & Pending Invites
+  getJoinRequests,
+  acceptJoinRequestWithRole,
+  rejectJoinRequestById,
+  getPendingInvites,
 };
 
 export default teamService;

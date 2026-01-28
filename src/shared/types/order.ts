@@ -28,67 +28,149 @@ export {
 } from '@/shared/constants/orderStatus';
 
 /**
- * Delivery status enum
- * Based on app-logic.json statusEnums.deliveryStatus
+ * Delivery status enum (matches Prisma DeliveryStatus)
+ * Used for tracking order fulfillment logistics
  */
-export type DeliveryStatus = 'pending' | 'on_the_way' | 'done';
+export type DeliveryStatus =
+  | 'NOT_ASSIGNED'
+  | 'ASSIGNED'
+  | 'PACKED'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'FAILED'
+  | 'CANCELED';
 
 /**
  * Delivery status colors for UI
  */
 export const DELIVERY_STATUS_COLORS: Record<DeliveryStatus, string> = {
-  pending: '#F59E0B',
-  on_the_way: '#0EA5E9',
-  done: '#22C55E',
+  NOT_ASSIGNED: '#6B7280',     // gray
+  ASSIGNED: '#1E40AF',         // dark blue
+  PACKED: '#5B21B6',           // purple
+  OUT_FOR_DELIVERY: '#0075FF', // blue
+  DELIVERED: '#065F46',        // dark green
+  FAILED: '#FF2400',           // red
+  CANCELED: '#6B7280',         // gray
 };
 
 /**
  * Delivery status labels for display
  */
 export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
-  pending: 'Pending',
-  on_the_way: 'On the Way',
-  done: 'Delivered',
+  NOT_ASSIGNED: 'Not assigned',
+  ASSIGNED: 'Assigned',
+  PACKED: 'Packed',
+  OUT_FOR_DELIVERY: 'Out for delivery',
+  DELIVERED: 'Delivered',
+  FAILED: 'Failed',
+  CANCELED: 'Canceled',
+};
+
+/**
+ * Payment status enum (matches Prisma PaymentStatus)
+ * Used for tracking order payment state
+ */
+export type PaymentStatus =
+  | 'UNPAID'
+  | 'PARTIALLY_PAID'
+  | 'PAID'
+  | 'PAYMENT_PENDING'
+  | 'PENDING_CONFIRMATION'
+  | 'PROCESSING'
+  | 'OVERDUE'
+  | 'DUE_TODAY'
+  | 'FAILED'
+  | 'CANCELED'
+  | 'REFUNDED'
+  | 'PARTIALLY_REFUNDED'
+  | 'DISPUTED';
+
+/**
+ * Payment status colors for UI
+ */
+export const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
+  UNPAID: '#6B7280',           // gray
+  PARTIALLY_PAID: '#F59E0B',   // amber
+  PAID: '#059669',             // green
+  PAYMENT_PENDING: '#3B82F6',  // blue
+  PENDING_CONFIRMATION: '#8B5CF6', // purple
+  PROCESSING: '#0EA5E9',       // sky blue
+  OVERDUE: '#DC2626',          // red
+  DUE_TODAY: '#F97316',        // orange
+  FAILED: '#DC2626',           // red
+  CANCELED: '#6B7280',         // gray
+  REFUNDED: '#10B981',         // emerald
+  PARTIALLY_REFUNDED: '#14B8A6', // teal
+  DISPUTED: '#EF4444',         // red
+};
+
+/**
+ * Payment status labels for display
+ */
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  UNPAID: 'Unpaid',
+  PARTIALLY_PAID: 'Partially paid',
+  PAID: 'Paid',
+  PAYMENT_PENDING: 'Payment pending',
+  PENDING_CONFIRMATION: 'Pending confirmation',
+  PROCESSING: 'Processing',
+  OVERDUE: 'Overdue',
+  DUE_TODAY: 'Due today',
+  FAILED: 'Payment failed',
+  CANCELED: 'Canceled',
+  REFUNDED: 'Refunded',
+  PARTIALLY_REFUNDED: 'Partially refunded',
+  DISPUTED: 'Disputed',
 };
 
 import type { OrderStatus as OrderStatusType } from '@/shared/constants/orderStatus';
 
 /**
- * Order - B2B orders between businesses
- * Based on app-logic.json dataModels.order
+ * Order - Business orders (B2C)
+ * Orders placed by a business to fulfill customer requests
+ * Normalized to camelCase to match backend API
  */
 export interface Order {
-  id: string; // UUID
-  from_business_id: string; // Business placing the order
-  to_business_id: string; // Business receiving the order
-  from_business_name?: string; // For display
-  to_business_name?: string; // For display
+  id: string;
+  businessId: string;
+  soldByScope?: 'PARENT' | 'LOCATION';
+  soldByLocationId?: string;
+  fulfillmentLocationId?: string;
+  customerId?: string;
+  customerName?: string;
+  customerAddress?: string;
+  customerPhone?: string;
+  items: Json;
+  totalAmount?: number;
   status: OrderStatusType;
-  total_price: number; // Snapshot at order time
+  paymentStatus?: PaymentStatus;
+  deliveryStatus?: DeliveryStatus;
   notes?: string;
-  created_by: string; // FK to User who created the order
-  created_at: string;
-  updated_at?: string;
+  createdAt: string;
+  updatedAt?: string;
   
   // Status tracking fields
-  statusChangedAt?: string; // When status was last changed
-  statusChangedBy?: string; // User ID who changed status
-  statusReason?: string; // Reason for PENDING/CANCELED/REJECTED
-  lastActivityAt?: string; // Last activity timestamp (for automation)
+  statusChangedAt?: string;
+  statusChangedBy?: string;
+  statusReason?: string;
+  lastActivityAt?: string;
 }
+
+// Type alias for JSON
+type Json = any;
 
 /**
  * Order Item - Line items in an order
- * Based on app-logic.json dataModels.orderItem
+ * Normalized to camelCase
  */
 export interface OrderItem {
-  id: string; // UUID
-  order_id: string; // FK to Order
-  product_id: string; // FK to Product
-  product_name?: string; // Snapshot at order time
+  id: string;
+  orderId: string;
+  productId: string;
+  productName?: string;
   quantity: number;
-  unit_price: number; // Captured at time of ordering
-  subtotal: number; // Computed: quantity × unit_price
+  unitPrice: number;
+  subtotal: number;
 }
 
 /**
@@ -100,21 +182,21 @@ export interface OrderWithItems extends Order {
 
 /**
  * Delivery - Delivery assignments for orders
- * Based on app-logic.json dataModels.delivery
+ * Normalized to camelCase
  */
 export interface Delivery {
-  id: string; // UUID
-  order_id: string; // FK to Order
-  order?: Order; // Optional expanded order
-  assigned_to?: string; // FK to User (delivery staff)
-  assigned_to_name?: string; // For display
+  id: string;
+  orderId: string;
+  order?: Order;
+  assignedTo?: string;
+  assignedToName?: string;
   status: DeliveryStatus;
-  delivery_address?: string;
-  delivery_notes?: string;
-  proof_photo_url?: string; // Optional proof of delivery
-  completed_at?: string;
-  created_at: string;
-  updated_at?: string;
+  deliveryAddress?: string;
+  deliveryNotes?: string;
+  proofPhotoUrl?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 /**
@@ -126,48 +208,56 @@ export interface DeliveryWithOrder extends Delivery {
 
 /**
  * Create order payload
+ * Normalized to camelCase
  */
 export interface CreateOrderPayload {
-  from_business_id: string;
-  to_business_id: string;
+  businessId: string;
+  soldByLocationId?: string;
+  fulfillmentLocationId?: string;
+  customerName?: string;
+  customerAddress?: string;
+  customerPhone?: string;
   items: {
-    product_id: string;
+    productId: string;
     quantity: number;
-    unit_price: number;
+    unitPrice: number;
   }[];
   notes?: string;
 }
 
 /**
  * Create delivery payload
+ * Normalized to camelCase
  */
 export interface CreateDeliveryPayload {
-  order_id: string;
-  assigned_to?: string;
-  delivery_address?: string;
-  delivery_notes?: string;
+  orderId: string;
+  assignedTo?: string;
+  deliveryAddress?: string;
+  deliveryNotes?: string;
 }
 
 /**
  * Update delivery payload
+ * Normalized to camelCase
  */
 export interface UpdateDeliveryPayload {
-  assigned_to?: string;
+  assignedTo?: string;
   status?: DeliveryStatus;
-  delivery_notes?: string;
-  proof_photo_url?: string;
+  deliveryNotes?: string;
+  proofPhotoUrl?: string;
 }
 
 /**
  * Cart item for B2B ordering
+ * Normalized to camelCase
  */
 export interface CartItem {
-  product_id: string;
+  productId: string;
   product: {
     id: string;
     name: string;
     price: number;
-    image_url?: string;
+    imageUrl?: string;
     unit?: string;
   };
   quantity: number;
@@ -175,10 +265,11 @@ export interface CartItem {
 
 /**
  * Cart state for a specific business
+ * Normalized to camelCase
  */
 export interface BusinessCart {
-  business_id: string;
-  business_name: string;
+  businessId: string;
+  businessName: string;
   items: CartItem[];
   total: number;
 }

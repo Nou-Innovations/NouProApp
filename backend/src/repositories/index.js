@@ -35,6 +35,7 @@ function getRepos() {
       deliveryRepo: require('./prisma/deliveryRepo.prisma'),
       stockRepo: require('./prisma/stockRepo.prisma'),
       userRepo: require('./prisma/userRepo.prisma'),
+      notificationReadRepo: require('./prisma/notificationReadRepo.prisma'),
     };
   } else {
     cachedRepos = {
@@ -48,6 +49,7 @@ function getRepos() {
       deliveryRepo: require('./memory/deliveryRepo.memory'),
       stockRepo: require('./memory/stockRepo.memory'),
       userRepo: require('./memory/userRepo.memory'),
+      notificationReadRepo: require('./memory/notificationReadRepo.memory'),
     };
   }
 

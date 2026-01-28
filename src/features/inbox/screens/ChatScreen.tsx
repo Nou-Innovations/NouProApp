@@ -20,10 +20,12 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navig
 import { ChatHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
+import { useProfileStore } from '@/shared/store/profileStore';
 import AppButton from '@/shared/components/ui/AppButton';
 import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
 import { ListItemCard } from '@/shared/components/ui/ListItemCard';
 import { getMessagesForChat } from '@/shared/data/mockChatMessages';
+import { getMessages, sendMessage, markChatAsRead } from '../inbox.service';
 import { MessageBubble } from '../components/MessageBubble';
 import type { Message, OrderMessage, TextMessage, EventMessage, DeletedMessage } from '@/shared/types/inbox';
 
@@ -78,15 +80,48 @@ export default function ChatScreen() {
   
   const { id, name, avatar, isGroup, partnerId, partnerType, highlightMessage, searchQuery, scrollToMessage, unreadCount = 0 } = route.params;
   
-  // Load chat-specific messages based on the chat ID
-  const [messages, setMessages] = useState<Message[]>(() => getMessagesForChat(id) as Message[]);
-  const [inputText, setInputText] = useState('');
+  // Get active business from store
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
   
-  // Update messages when chat ID changes (for when navigating between different chats)
+  // Load messages from API or fallback to mock
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [loadingMessages, setLoadingMessages] = useState(true);
+  
+  // Fetch messages from API
   useEffect(() => {
-    const newMessages = getMessagesForChat(id) as Message[];
-    setMessages(newMessages);
-  }, [id]);
+    const fetchChatMessages = async () => {
+      if (!activeBusiness?.id) {
+        // No active business - use mock data
+        const mockMessages = getMessagesForChat(id) as Message[];
+        setMessages(mockMessages);
+        setLoadingMessages(false);
+        return;
+      }
+      
+      try {
+        setLoadingMessages(true);
+        const result = await getMessages({
+          companyId: activeBusiness.id,
+          chatId: id,
+          limit: 50,
+        });
+        setMessages(result.messages);
+        
+        // Mark chat as read
+        await markChatAsRead(activeBusiness.id, id);
+      } catch (error) {
+        console.error('Failed to load messages from API, falling back to mock:', error);
+        // Fallback to mock data
+        const mockMessages = getMessagesForChat(id) as Message[];
+        setMessages(mockMessages);
+      } finally {
+        setLoadingMessages(false);
+      }
+    };
+    
+    fetchChatMessages();
+  }, [id, activeBusiness?.id]);
   
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false); // Track if we've already marked this chat as read
@@ -287,6 +322,10 @@ export default function ChatScreen() {
           onOpenDocument={handleOpenDocument}
           onDeleteMessage={handleDeleteMessage}
           onReplyMessage={handleReplyMessage}
+          onInvoicePress={handleInvoicePress}
+          onEstimatePress={handleEstimatePress}
+          onEstimateConfirm={handleEstimateConfirm}
+          onOrderEventAction={handleOrderEventAction}
           isGrouped={isGrouped}
           isFirstInGroup={isFirstInGroup}
           isLastInGroup={isLastInGroup}
@@ -314,9 +353,9 @@ export default function ChatScreen() {
     }, 100);
   };
 
-  // Navigate to Order Details screen
+  // Navigate to Delivery Details screen (orders map to deliveries)
   const handleOrderPress = (orderId: string) => {
-    (navigation as any).navigate('OrderDetails', { orderId });
+    (navigation as any).navigate('DeliveryDetail', { deliveryId: orderId });
   };
 
   const updateOrderMessage = (id: string, updates: Partial<OrderMessage>) => {
@@ -328,48 +367,77 @@ export default function ChatScreen() {
     }));
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputText.trim()) return;
     
-    const newMessage: TextMessage = {
-      id: String(Date.now()),
-      chatId: id, // Use the chat ID from route params
+    // Optimistic update - add message immediately
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage: TextMessage = {
+      id: tempId,
+      chatId: id,
       type: 'text',
       text: inputText,
       isOutgoing: true,
       sender: { 
         id: 'current-user', 
         name: 'You', 
-        avatar: 'https://randomuser.me/api/portraits/men/2.jpg', 
+        avatar: '', 
         role: 'business' 
       },
-      timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
-      status: 'sent',
+      timestamp: new Date().toISOString(),
+      status: 'sending',
     };
 
-    setMessages(prevMessages => [newMessage, ...prevMessages]);
+    setMessages(prevMessages => [optimisticMessage, ...prevMessages]);
+    const messageText = inputText;
     setInputText('');
     Keyboard.dismiss();
     if (flatListRef.current) {
       flatListRef.current.scrollToOffset({ offset: 0, animated: true });
     }
 
-    // Simulate message being delivered and read
-    setTimeout(() => {
-      setMessages(prevMessages => 
-        prevMessages.map(msg => 
-          msg.id === newMessage.id ? { ...msg, status: 'delivered' } as Message : msg
-        )
-      );
-    }, 1000);
+    // Send to API if business is active
+    if (activeBusiness?.id) {
+      try {
+        const sentMessage = await sendMessage(activeBusiness.id, id, {
+          type: 'text',
+          content: messageText,
+        });
+        
+        // Replace optimistic message with real one
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === tempId ? sentMessage : msg
+          )
+        );
+      } catch (error) {
+        console.error('Failed to send message:', error);
+        // Update status to failed
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === tempId ? { ...msg, status: 'failed' } as Message : msg
+          )
+        );
+        Alert.alert('Error', 'Failed to send message. Please try again.');
+      }
+    } else {
+      // No active business - simulate delivery for mock mode
+      setTimeout(() => {
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === tempId ? { ...msg, status: 'delivered' } as Message : msg
+          )
+        );
+      }, 1000);
 
-    setTimeout(() => {
-      setMessages(prevMessages => 
-        prevMessages.map(msg => 
-          msg.id === newMessage.id ? { ...msg, status: 'seen' } as Message : msg
-        )
-      );
-    }, 2000);
+      setTimeout(() => {
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === tempId ? { ...msg, status: 'seen' } as Message : msg
+          )
+        );
+      }, 2000);
+    }
   };
 
   const addEventMessage = (orderId: string, importExportLabel: string) => {
@@ -516,6 +584,37 @@ export default function ChatScreen() {
     } else {
       Alert.alert('Reply', 'Replying to this message');
     }
+  };
+
+  const handleInvoicePress = (invoiceId: string) => {
+    (navigation as any).navigate('InvoiceDetails', { invoiceId });
+  };
+
+  const handleEstimatePress = (estimateId: string) => {
+    (navigation as any).navigate('InvoiceDetails', { invoiceId: estimateId });
+  };
+
+  const handleEstimateConfirm = async (estimateId: string) => {
+    Alert.alert(
+      'Confirm Estimate',
+      'Convert this estimate to an invoice?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: () => {
+            // TODO: Implement estimate conversion when invoice service is connected
+            Alert.alert('Success', 'Estimate has been converted to invoice');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleOrderEventAction = (actionId: string, orderId: string) => {
+    console.log('Order event action:', actionId, 'for order:', orderId);
+    // TODO: Implement order event actions (confirm delivery, confirm payment, etc.)
+    Alert.alert('Order Action', `Action "${actionId}" for order ${orderId}`);
   };
 
   // Function to get input colors based on state (matching AppSearchBar)

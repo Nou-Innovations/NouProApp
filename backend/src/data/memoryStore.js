@@ -442,7 +442,7 @@ let orders = [
     ],
     totalAmount: 116.97,
     status: ORDER_STATUS.ACCEPTED,
-    paymentStatus: 'Unpaid',
+    paymentStatus: 'UNPAID',
     notes: 'Please call before delivery',
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
@@ -462,7 +462,7 @@ let orders = [
     ],
     totalAmount: 450.00,
     status: ORDER_STATUS.ONGOING,
-    paymentStatus: 'Paid',
+    paymentStatus: 'PAID',
     notes: '',
     createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
     updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
@@ -483,7 +483,7 @@ let orders = [
     ],
     totalAmount: 299.95,
     status: ORDER_STATUS.NEW,
-    paymentStatus: 'Unpaid',
+    paymentStatus: 'UNPAID',
     notes: 'Urgent order',
     createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
     updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
@@ -503,7 +503,7 @@ let orders = [
     ],
     totalAmount: 249.50,
     status: ORDER_STATUS.DONE,
-    paymentStatus: 'Paid',
+    paymentStatus: 'PAID',
     notes: '',
     createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     updatedAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString()
@@ -616,8 +616,8 @@ let deliveries = [
     ],
     totalAmount: 116.97,
     trackingNumber: 'TRK-001-2025',
-    deliveryStatus: 'new',
-    paymentStatus: 'Unpaid',
+    deliveryStatus: 'NOT_ASSIGNED',
+    paymentStatus: 'UNPAID',
     assignedStaffId: null,
     assignedTo: null,
     transportMode: null,
@@ -647,8 +647,8 @@ let deliveries = [
     ],
     totalAmount: 207.00,
     trackingNumber: 'TRK-002-2025',
-    deliveryStatus: 'ongoing',
-    paymentStatus: 'Paid',
+    deliveryStatus: 'OUT_FOR_DELIVERY',
+    paymentStatus: 'PAID',
     assignedStaffId: 'stf-001',
     assignedTo: 'John Doe',
     transportMode: 'Truck',
@@ -674,8 +674,8 @@ let deliveries = [
     itemCount: 3,
     totalAmount: 89.50,
     trackingNumber: 'TRK-003-2025',
-    deliveryStatus: 'delivered',
-    paymentStatus: 'Paid',
+    deliveryStatus: 'DELIVERED',
+    paymentStatus: 'PAID',
     assignedStaffId: 'stf-002',
     assignedTo: 'Jane Smith',
     transportMode: 'Van',
@@ -701,8 +701,8 @@ let deliveries = [
     itemCount: 50,
     totalAmount: 2500.00,
     trackingNumber: 'TRK-004-2025',
-    deliveryStatus: 'pending',
-    paymentStatus: 'Unpaid',
+    deliveryStatus: 'ASSIGNED',
+    paymentStatus: 'UNPAID',
     assignedStaffId: null,
     assignedTo: null,
     transportMode: null,
@@ -725,8 +725,8 @@ let deliveries = [
     expectedDeliveryDateTime: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
     itemCount: 20,
     totalAmount: 0,
-    deliveryStatus: 'pending',
-    paymentStatus: 'Paid',
+    deliveryStatus: 'ASSIGNED',
+    paymentStatus: 'PAID',
     assignedStaffId: 'stf-003',
     assignedTo: 'Bob Johnson',
     transportMode: 'Truck',
@@ -752,7 +752,7 @@ let deliveries = [
     itemCount: 12,
     totalAmount: 345.75,
     trackingNumber: 'TRK-006-2025',
-    deliveryStatus: 'new',
+    deliveryStatus: 'NOT_ASSIGNED',
     paymentStatus: 'Pending Confirmation',
     assignedStaffId: null,
     assignedTo: null,
@@ -779,7 +779,7 @@ let invoices = [
     amount: 116.97,
     taxAmount: 17.55,
     totalAmount: 134.52,
-    status: 'sent',
+    status: 'SENT',
     type: 'invoice',
     issueDate: '2025-01-15',
     dueDate: '2025-02-14',
@@ -803,7 +803,7 @@ let invoices = [
     amount: 450.00,
     taxAmount: 67.50,
     totalAmount: 517.50,
-    status: 'paid',
+    status: 'PAID',
     type: 'invoice',
     issueDate: '2025-01-14',
     dueDate: '2025-02-13',
@@ -826,7 +826,7 @@ let invoices = [
     amount: 249.50,
     taxAmount: 37.43,
     totalAmount: 286.93,
-    status: 'paid',
+    status: 'PAID',
     type: 'invoice',
     issueDate: '2025-01-06',
     dueDate: '2025-02-05',
@@ -1244,6 +1244,14 @@ let feedPosts = [
 ];
 
 // ============================================================================
+// MOCK DATABASE - NOTIFICATION READS
+// ============================================================================
+// Tracks which notifications have been read by each user
+// Key format: `${userId}_${notificationKey}` -> { readAt: Date }
+
+let notificationReads = {};
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -1271,6 +1279,7 @@ module.exports = {
   chats,
   messages,
   users,
-  feedPosts
+  feedPosts,
+  notificationReads
 };
 
