@@ -31,6 +31,7 @@ import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import Avatar from '@/shared/components/ui/Avatar';
+import { EmptyState } from '@/shared/components/ui';
 import BrandCard from '@/features/brands/components/BrandCard';
 import ProductCard from '@/features/products/components/ProductCard';
 import ProfileActionButtons from '@/features/profile/components/ProfileActionButtons';
@@ -326,7 +327,7 @@ export default function BusinessProfileOwnScreen() {
     closeAddBusinessOptions();
     setTimeout(() => {
       // @ts-ignore
-      navigation.navigate('CreateBusiness');
+      navigation.navigate('BusinessBasicInfo', { fromProfileSwitcher: true });
     }, 100);
   };
 
@@ -481,21 +482,14 @@ export default function BusinessProfileOwnScreen() {
   const renderProductsTab = () => {
     if (displayBrands.length === 0) {
       return (
-        <View style={styles.emptyState}>
-          <Icon name="cube-outline" size={60} color={appTheme.colors.textLight} />
-          <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>
-            No products yet
-          </Text>
-          <Text style={[styles.emptySubtitle, { color: appTheme.colors.textLight }]}>
-            Add your first product to get started
-          </Text>
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: appTheme.colors.primary }]}
-            onPress={() => navigation.navigate('CreateProduct' as never)}
-          >
-            <Text style={styles.addButtonText}>Add Product</Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          iconName="cube-outline"
+          title="No products yet"
+          subtitle="Products you manage or interact with will appear here."
+          ctaLabel="Add product"
+          onCtaPress={() => navigation.navigate('CreateProduct' as never)}
+          testID="empty-business-products"
+        />
       );
     }
 

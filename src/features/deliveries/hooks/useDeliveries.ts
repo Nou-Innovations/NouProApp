@@ -177,9 +177,9 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
     return result;
   }, [deliveries, viewType, statusFilter, search]);
   
-  // Count new deliveries
+  // Count new deliveries (NOT_ASSIGNED status)
   const newDeliveriesCount = useMemo(() => {
-    return filteredDeliveries.filter(d => d.deliveryStatus === 'new').length;
+    return filteredDeliveries.filter(d => d.deliveryStatus === 'NOT_ASSIGNED').length;
   }, [filteredDeliveries]);
   
   // Update delivery status

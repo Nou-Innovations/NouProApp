@@ -37,6 +37,7 @@ import FilterBar from '@/features/search/components/FilterBar';
 import MessageCard from '@/features/inbox/components/MessageCard';
 import NewChatModalList from '@/features/inbox/components/NewChatModalList';
 import { MessageSquare, Pencil } from '@/shared/utils/icons';
+import { EmptyState } from '@/shared/components/ui';
 import { getActivityFeed, type ActivityItem } from '@/features/business/activity.service';
 import { getChats } from '@/features/inbox/inbox.service';
 import type { Chat } from '@/shared/types/inbox';
@@ -556,29 +557,18 @@ export default function BusinessInboxScreen() {
 
   // Render empty state
   const renderEmptyState = () => (
-    <View style={styles.emptyListContainer}>
-      <MessageSquare
-        size={40}
-        color={appTheme.colors.iconColor}
-        strokeWidth={1.5}
-      />
-      <Text style={[styles.emptyListTitle, { color: appTheme.colors.text }]}>
-        No conversation yet
-      </Text>
-      <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textSecondary }]}>
-        {filter !== 'all'
+    <EmptyState
+      iconName="chatbubbles-outline"
+      title="No conversations yet"
+      subtitle={
+        filter !== 'all'
           ? `No ${filter} conversations found`
-          : 'Start a conversation with a client or partner'
-        }
-      </Text>
-      <View style={styles.emptyListButtonContainer}>
-        <AppButton
-          title="Start a conversation"
-          onPress={handleNewChat}
-          variant="primary"
-        />
-      </View>
-    </View>
+          : 'Start chatting with partners, clients, or your team.'
+      }
+      ctaLabel="New conversation"
+      onCtaPress={handleNewChat}
+      testID="empty-business-inbox"
+    />
   );
 
 

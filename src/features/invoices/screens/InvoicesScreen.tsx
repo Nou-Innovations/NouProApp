@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
+import { EmptyState } from '@/shared/components/ui';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/features/search/components/FilterBar';
 import InvoiceCard from '@/features/invoices/components/InvoiceCard';
@@ -201,19 +202,21 @@ export default function InvoicesScreen() {
             )}
           </>
         }
-        ListEmptyComponent={() => (
-          <View style={styles.emptyListContainer}>
-            {/* Loading State */}
-            {loading ? (
-              <>
+        ListEmptyComponent={() => {
+          if (loading) {
+            return (
+              <View style={styles.emptyListContainer}>
                 <ActivityIndicator size="large" color={appTheme.colors.primary} />
                 <Text style={[styles.loadingText, { color: appTheme.colors.textSecondary }]}>
                   Loading {activeTab}...
                 </Text>
-              </>
-            ) : error ? (
-              /* Error State */
-              <>
+              </View>
+            );
+          }
+          
+          if (error) {
+            return (
+              <View style={styles.emptyListContainer}>
                 <Icon name="alert-circle-outline" size={48} color={appTheme.colors.error} />
                 <Text style={[styles.errorText, { color: appTheme.colors.error }]}>{error}</Text>
                 <TouchableOpacity 
@@ -222,37 +225,28 @@ export default function InvoicesScreen() {
                 >
                   <Text style={styles.retryButtonText}>Retry</Text>
                 </TouchableOpacity>
-              </>
-            ) : (
-              /* Empty State */
-              <>
-                <Icon 
-                  name={activeTab === 'invoices' ? 'document-text-outline' : 'clipboard-outline'} 
-                  size={60} 
-                  color={appTheme.colors.textLight} 
-                />
-                <Text style={[styles.emptyListText, { color: appTheme.colors.textLight }]}>
-                  No {activeTab} found
-                </Text>
-                {selectedLocationId && (
-                  <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textLight }]}>
-                    Try selecting "All Locations" to see more {activeTab}
-                  </Text>
-                )}
-                {hasManagePermission && (
-                  <TouchableOpacity 
-                    style={[styles.createButtonInline, { backgroundColor: appTheme.colors.primary }]}
-                    onPress={handleCreateNew}
-                  >
-                    <Text style={styles.createButtonInlineText}>
-                      Create {activeTab === 'invoices' ? 'Invoice' : 'Estimate'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            )}
-          </View>
-        )}
+              </View>
+            );
+          }
+          
+          const isEstimates = activeTab === 'estimates';
+          return (
+            <EmptyState
+              iconName={isEstimates ? 'clipboard-outline' : 'document-text-outline'}
+              title={isEstimates ? 'No estimates created' : 'No invoices yet'}
+              subtitle={
+                selectedLocationId
+                  ? `Try selecting "All Locations" to see more ${activeTab}`
+                  : isEstimates
+                  ? 'Create estimates to send pricing proposals to clients.'
+                  : 'Issued and received invoices will be stored here.'
+              }
+              ctaLabel={hasManagePermission ? (isEstimates ? 'Create estimate' : 'Create invoice') : undefined}
+              onCtaPress={hasManagePermission ? handleCreateNew : undefined}
+              testID="empty-invoices"
+            />
+          );
+        }}
         contentContainerStyle={{ flexGrow: 1 }}
         style={{ flex: 1 }}
       />

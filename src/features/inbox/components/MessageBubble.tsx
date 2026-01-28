@@ -24,6 +24,7 @@ import {
   StyleSheet,
   Linking,
   Alert,
+  Platform,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -558,156 +559,8 @@ export function MessageBubble({
     );
   };
   
-  const renderOrderMessage = () => {
-    if (message.type !== 'order') return null;
-    
-    const isImport = message.isOutgoing;
-    const importExportLabel = isImport ? 'Import' : 'Export';
-    const importExportColor = isImport ? appTheme.colors.statusImport : appTheme.colors.statusExport;
-    const showMarkPaymentDone = isImport && message.paymentStatus === 'Unpaid';
-    const showConfirmPayment = !isImport && message.paymentStatus === 'Payment Pending Confirmation';
-    const showMarkDeliveryDone = !isImport && (message.orderStatus === 'Ongoing' || message.orderStatus === 'New');
-    const showConfirmDelivery = isImport && message.orderStatus === 'Delivery Pending Confirmation';
-    const showSeeInvoice = message.paymentStatus === 'Paid';
-    
-    const orderBgColor = isOutgoing ? appTheme.colors.primary : appTheme.colors.cardBackground;
-    const orderTextColor = isOutgoing ? appTheme.colors.textInverse : appTheme.colors.text;
-    const orderSubTextColor = isOutgoing ? appTheme.colors.textMuted : appTheme.colors.textSecondary;
-    
-    return (
-      <>
-        <View style={[
-          styles.row, 
-          isGrouped && styles.rowGrouped,
-          isImport ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
-        ]}> 
-          {!isImport && isGroupChat && (
-            showAvatar && message.sender.avatar ? (
-              <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
-            ) : (
-              <View style={styles.avatarPlaceholder} />
-            )
-          )}
-          <View style={bubbleContainerStyle}>
-            <TouchableOpacity 
-              activeOpacity={0.7}
-              onPress={() => onOrderPress?.(message.orderId)}
-              onLongPress={handleLongPress}
-              delayLongPress={500}
-              style={[
-                styles.specialMessageBubble,
-                { backgroundColor: orderBgColor },
-              ]}
-            >
-              {showSenderName && !isImport && (
-                <Text style={[styles.senderName, { color: senderNameColor }]}>
-                  {message.sender.name}
-                </Text>
-              )}
-              {/* Header with Icon, Order ID, and Badge */}
-              <View style={styles.orderHeader}>
-                <View style={styles.orderHeaderLeft}>
-                  <Icon name="cube-outline" size={18} color={importExportColor} />
-                  <Text style={[styles.orderIdText, { color: orderTextColor, marginLeft: 8 }]}>
-                    #{message.orderId}
-                  </Text>
-                </View>
-                <View style={[styles.orderTypeBadge, { backgroundColor: importExportColor }]}>
-                  <Text style={[styles.orderTypeBadgeText, { color: appTheme.colors.textInverse }]}>{importExportLabel}</Text>
-                </View>
-              </View>
-              
-              {/* Order Details */}
-              <View style={styles.orderDetailsContainer}>
-                <View style={styles.orderDetailRow}>
-                  <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Items</Text>
-                  <Text style={[styles.orderDetailValueBold, { color: orderTextColor }]}>{message.itemCount}</Text>
-                </View>
-                <View style={styles.orderDetailRow}>
-                  <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Total</Text>
-                  <Text style={[styles.orderDetailValueBold, { color: orderTextColor }]}>
-                    ${message.totalAmount.toFixed(2)}
-                  </Text>
-                </View>
-                <View style={styles.orderDetailRow}>
-                  <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Status</Text>
-                  <Text style={[styles.orderDetailValueBold, { color: getOrderStatusColor(message.orderStatus) }]}>
-                    {message.orderStatus}
-                  </Text>
-                </View>
-                <View style={styles.orderDetailRow}>
-                  <Text style={[styles.orderDetailLabel, { color: orderSubTextColor }]}>Payment</Text>
-                  <Text style={[styles.orderDetailValueBold, { color: getPaymentStatusColor(message.paymentStatus) }]}>
-                    {message.paymentStatus}
-                  </Text>
-                </View>
-              </View>
-              
-              {/* Action Buttons */}
-              {(showMarkPaymentDone || showConfirmPayment || showMarkDeliveryDone || showConfirmDelivery || showSeeInvoice) && (
-                <View style={styles.orderActionsContainer}>
-                  {showMarkPaymentDone && (
-                    <AppButton
-                      title="Mark Payment Done"
-                      size="small"
-                      variant={isOutgoing ? 'secondary' : 'primary'}
-                      onPress={() => onOrderAction?.('payment', message)}
-                      style={styles.orderActionBtnSpacing}
-                    />
-                  )}
-                  {showConfirmPayment && (
-                    <AppButton
-                      title="Confirm Payment"
-                      size="small"
-                      variant={isOutgoing ? 'secondary' : 'primary'}
-                      onPress={() => onOrderAction?.('payment', message)}
-                      style={styles.orderActionBtnSpacing}
-                    />
-                  )}
-                  {showMarkDeliveryDone && (
-                    <AppButton
-                      title="Mark Delivery Done"
-                      size="small"
-                      variant={isOutgoing ? 'secondary' : 'primary'}
-                      onPress={() => onOrderAction?.('delivery', message)}
-                      style={styles.orderActionBtnSpacing}
-                    />
-                  )}
-                  {showConfirmDelivery && (
-                    <AppButton
-                      title="Confirm Delivery"
-                      size="small"
-                      variant={isOutgoing ? 'secondary' : 'primary'}
-                      onPress={() => onOrderAction?.('delivery', message)}
-                      style={styles.orderActionBtnSpacing}
-                    />
-                  )}
-                  {showSeeInvoice && (
-                    <AppButton
-                      title="See Invoice"
-                      size="small"
-                      variant={isOutgoing ? 'secondary' : 'primary'}
-                      onPress={() => onOrderAction?.('invoice', message)}
-                      style={styles.orderActionBtnSpacing}
-                    />
-                  )}
-                </View>
-              )}
-              
-              {renderTimestamp(message.timestamp, message.status)}
-            </TouchableOpacity>
-          </View>
-        </View>
-        <AppBottomSheet
-          visible={showOptionsSheet}
-          onClose={() => setShowOptionsSheet(false)}
-          title="Message Options"
-          items={messageOptions}
-          onSelectItem={handleOptionSelect}
-        />
-      </>
-    );
-  };
+  // NOTE: renderOrderMessage was removed - it was dead code.
+  // Both 'order' and 'order_event' message types are handled by renderOrderEventMessage().
   
   const renderEventMessage = () => {
     if (message.type !== 'event') return null;
@@ -747,14 +600,198 @@ export function MessageBubble({
     );
   };
   
+  const renderLocationMessage = () => {
+    if (message.type !== 'location') return null;
+    
+    const locationMessage = message as any;
+    const { latitude, longitude, address, locationName } = locationMessage;
+    
+    // Open location in maps app
+    const handleOpenMaps = () => {
+      const label = locationName || address || 'Shared Location';
+      const url = Platform.select({
+        ios: `maps:0,0?q=${label}@${latitude},${longitude}`,
+        android: `geo:0,0?q=${latitude},${longitude}(${label})`,
+      });
+      
+      if (url) {
+        Linking.canOpenURL(url).then((supported) => {
+          if (supported) {
+            Linking.openURL(url);
+          } else {
+            // Fallback to Google Maps web
+            Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`);
+          }
+        });
+      }
+    };
+    
+    return (
+      <>
+        <View style={[
+          styles.row, 
+          isGrouped && styles.rowGrouped,
+          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
+        ]}>
+          {!isOutgoing && isGroupChat && (
+            showAvatar && message.sender.avatar ? (
+              <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
+            ) : (
+              <View style={styles.avatarPlaceholder} />
+            )
+          )}
+          <View style={bubbleContainerStyle}>
+            {showSenderName && !isOutgoing && (
+              <Text style={[styles.senderName, { color: senderColor }]} numberOfLines={1}>
+                {message.sender.name}
+              </Text>
+            )}
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              onPress={handleOpenMaps}
+              onLongPress={handleLongPress}
+              delayLongPress={500}
+              style={bubbleStyle}
+            >
+              {/* Location Icon and Title */}
+              <View style={styles.locationHeader}>
+                <Icon name="map-pin" size={20} color={isOutgoing ? appTheme.colors.textInverse : appTheme.colors.primary} />
+                <Text style={[textStyle, { marginLeft: 8, fontWeight: '600' }]}>
+                  {locationName || 'Shared Location'}
+                </Text>
+              </View>
+              
+              {/* Address */}
+              {address && (
+                <Text style={[
+                  { fontSize: 14, marginTop: 4 },
+                  { color: isOutgoing ? 'rgba(255,255,255,0.8)' : appTheme.colors.textSecondary }
+                ]} numberOfLines={2}>
+                  {address}
+                </Text>
+              )}
+              
+              {/* Map Preview Placeholder - Could be replaced with actual map image */}
+              <View style={[
+                styles.locationMapPreview,
+                { backgroundColor: isOutgoing ? 'rgba(255,255,255,0.1)' : appTheme.colors.surface }
+              ]}>
+                <Icon name="map" size={32} color={isOutgoing ? 'rgba(255,255,255,0.5)' : appTheme.colors.textMuted} />
+                <Text style={[
+                  { fontSize: 12, marginTop: 4 },
+                  { color: isOutgoing ? 'rgba(255,255,255,0.5)' : appTheme.colors.textMuted }
+                ]}>
+                  Tap to open in Maps
+                </Text>
+              </View>
+              
+              {/* Timestamp */}
+              <View style={styles.timestampContainer}>
+                <Text style={[styles.timestamp, { color: isOutgoing ? 'rgba(255,255,255,0.7)' : appTheme.colors.textMuted }]}>
+                  {formatMessageTimestamp(message.timestamp)}
+                </Text>
+                {isOutgoing && renderMessageStatus()}
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <AppBottomSheet
+          visible={showOptionsSheet}
+          onClose={() => setShowOptionsSheet(false)}
+          title="Message Options"
+          items={messageOptions}
+          onSelectItem={handleOptionSelect}
+        />
+      </>
+    );
+  };
+  
+  const renderImageMessage = () => {
+    if (message.type !== 'image') return null;
+    
+    const imageMessage = message as any;
+    const { imageUrl, width = 300, height = 300 } = imageMessage;
+    
+    // Calculate display dimensions (max width 250, maintain aspect ratio)
+    const maxWidth = 250;
+    const aspectRatio = width / height;
+    const displayWidth = Math.min(width, maxWidth);
+    const displayHeight = displayWidth / aspectRatio;
+    
+    return (
+      <>
+        <View style={[
+          styles.row, 
+          isGrouped && styles.rowGrouped,
+          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
+        ]}>
+          {!isOutgoing && isGroupChat && (
+            showAvatar && message.sender.avatar ? (
+              <Image source={{ uri: message.sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
+            ) : (
+              <View style={styles.avatarPlaceholder} />
+            )
+          )}
+          <View style={[bubbleContainerStyle, { maxWidth: displayWidth + 8 }]}>
+            {showSenderName && !isOutgoing && (
+              <Text style={[styles.senderName, { color: senderColor }]} numberOfLines={1}>
+                {message.sender.name}
+              </Text>
+            )}
+            <TouchableOpacity 
+              activeOpacity={0.9}
+              onLongPress={handleLongPress}
+              delayLongPress={500}
+              style={[
+                styles.imageBubble,
+                { 
+                  backgroundColor: isOutgoing ? appTheme.colors.primary : appTheme.colors.surface,
+                  borderColor: appTheme.colors.borderColor,
+                }
+              ]}
+            >
+              <Image 
+                source={{ uri: imageUrl }} 
+                style={[
+                  styles.imageContent,
+                  { 
+                    width: displayWidth,
+                    height: displayHeight,
+                  }
+                ]}
+                resizeMode="cover"
+              />
+              {/* Timestamp overlay on image */}
+              <View style={styles.imageTimestampOverlay}>
+                <Text style={[styles.imageTimestamp, { color: '#fff', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }]}>
+                  {formatMessageTimestamp(message.timestamp)}
+                </Text>
+                {isOutgoing && (
+                  <View style={styles.messageStatusContainer}>
+                    {renderMessageStatus()}
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <AppBottomSheet
+          visible={showOptionsSheet}
+          onClose={() => setShowOptionsSheet(false)}
+          title="Message Options"
+          items={messageOptions}
+          onSelectItem={handleOptionSelect}
+        />
+      </>
+    );
+  };
+  
   const renderUnsupportedMessage = () => {
-    // image, voice, location, contact - Not in V1
-    if (!['image', 'voice', 'location', 'contact'].includes(message.type)) return null;
+    // voice, contact - Not yet implemented (image and location are now supported)
+    if (!['voice', 'contact'].includes(message.type)) return null;
     
     const labels: Record<string, string> = {
-      image: '🖼️ Image',
       voice: '🎤 Voice note',
-      location: '📍 Location',
       contact: '👤 Contact',
     };
     
@@ -888,9 +925,11 @@ export function MessageBubble({
       return renderEventMessage();
     case 'deleted':
       return renderDeletedMessage();
-    case 'image':
-    case 'voice':
     case 'location':
+      return renderLocationMessage();
+    case 'image':
+      return renderImageMessage();
+    case 'voice':
     case 'contact':
       return renderUnsupportedMessage();
     default:
@@ -980,6 +1019,43 @@ const styles = StyleSheet.create({
   },
   linkText: {
     textDecorationLine: 'underline',
+  },
+  // Location message styles
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  locationMapPreview: {
+    marginTop: 8,
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 80,
+  },
+  // Image message styles
+  imageBubble: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  imageContent: {
+    borderRadius: 12,
+  },
+  imageTimestampOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  imageTimestamp: {
+    fontSize: 11,
   },
   iconTextRow: {
     flexDirection: 'row',

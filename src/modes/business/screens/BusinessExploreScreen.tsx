@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { EmptyState } from '@/shared/components/ui';
 
 // Feed Post Components (reuse from Personal mode)
 import {
@@ -557,7 +558,20 @@ export default function BusinessExploreScreen() {
             tintColor={appTheme.colors.primary}
           />
         }
-        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={() => (
+          <EmptyState
+            iconName="search-outline"
+            title="Discover businesses"
+            subtitle="Explore suppliers, partners, and opportunities for your business."
+            ctaLabel="Explore businesses"
+            onCtaPress={onRefresh}
+            testID="empty-business-explore"
+          />
+        )}
+        contentContainerStyle={[
+          styles.listContent,
+          mockFeedPosts.length === 0 && { flex: 1 }
+        ]}
       />
     </SafeAreaView>
   );

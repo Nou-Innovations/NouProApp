@@ -14,6 +14,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { EmptyState } from '@/shared/components/ui';
 import type { RootStackParamList } from '@/shared/types/navigation';
 import type { Suggestion } from '../types';
 
@@ -213,23 +214,14 @@ export default function FeedbackListScreen() {
             ))}
           </View>
         ) : (
-          <View style={styles.emptyState}>
-            <Icon name="chatbubble-outline" size={64} color={appTheme.colors.textMuted} />
-            <Text style={[styles.emptyStateTitle, { color: appTheme.colors.text }]}>
-              No suggestions yet
-            </Text>
-            <Text style={[styles.emptyStateText, { color: appTheme.colors.textSecondary }]}>
-              Be the first to share your ideas!
-            </Text>
-            <TouchableOpacity
-              style={[styles.addFirstButton, { backgroundColor: appTheme.colors.primary }]}
-              onPress={handleAddSuggestion}
-              activeOpacity={0.7}
-            >
-              <Icon name="add" size={20} color="#FFFFFF" />
-              <Text style={styles.addFirstButtonText}>Add suggestion</Text>
-            </TouchableOpacity>
-          </View>
+          <EmptyState
+            iconName="chatbubble-ellipses-outline"
+            title="No suggestions yet"
+            subtitle="Be the first to share ideas, feature requests, or improvements."
+            ctaLabel="Add suggestion"
+            onCtaPress={handleAddSuggestion}
+            testID="empty-feedback"
+          />
         )}
       </ScrollView>
     </SafeAreaView>

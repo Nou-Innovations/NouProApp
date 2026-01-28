@@ -208,25 +208,32 @@ export default function BusinessBasicInfoScreen({ navigation, route }: Props) {
         visible={showTypeSheet}
         onClose={() => setShowTypeSheet(false)}
         title="Select Business Type"
+        fullHeight
       >
-        <ScrollView style={styles.typeListContainer} showsVerticalScrollIndicator={false}>
-          {BUSINESS_TYPES.map((type, index) => (
-            <ListItemCard
-              key={type}
-              avatar={{
-                type: 'icon',
-                icon: 'business-outline',
-                iconColor: appTheme.colors.text,
-                backgroundColor: appTheme.colors.surface,
-              }}
-              title={type}
-              onPress={() => handleSelectType(type)}
-              selected={businessType === type}
-              showCheckmark
-              showDivider={index < BUSINESS_TYPES.length - 1}
-            />
-          ))}
-        </ScrollView>
+        <View style={styles.bottomSheetContentFullHeight}>
+          <ScrollView 
+            style={styles.modalScrollListFullHeight} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: insets.bottom }}
+          >
+            {BUSINESS_TYPES.map((type, index) => (
+              <ListItemCard
+                key={type}
+                avatar={{
+                  type: 'icon',
+                  icon: 'business-outline',
+                  iconColor: appTheme.colors.text,
+                  backgroundColor: appTheme.colors.surface,
+                }}
+                title={type}
+                onPress={() => handleSelectType(type)}
+                selected={businessType === type}
+                showCheckmark
+                showDivider={index < BUSINESS_TYPES.length - 1}
+              />
+            ))}
+          </ScrollView>
+        </View>
       </AppBottomSheet>
     </View>
   );
@@ -287,8 +294,11 @@ const styles = StyleSheet.create({
   bottomContainer: {
     paddingHorizontal: 16,
   },
-  typeListContainer: {
-    maxHeight: 400,
+  bottomSheetContentFullHeight: {
+    flex: 1,
+  },
+  modalScrollListFullHeight: {
+    flex: 1,
   },
   typeOption: {
     flexDirection: 'row',

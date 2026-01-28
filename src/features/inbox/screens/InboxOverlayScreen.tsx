@@ -5,7 +5,7 @@
  * Used for both Personal and Business modes
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,9 +16,10 @@ import {
   Dimensions,
   Platform,
   Keyboard,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MessageSquare } from '@/shared/utils/icons';
 import AppSearchBar, { AppSearchBarRef } from '@/shared/components/ui/AppSearchBar';
 import AppButton from '@/shared/components/ui/AppButton';
@@ -26,9 +27,12 @@ import FilterBar from '@/features/search/components/FilterBar';
 import MessageCard from '@/features/inbox/components/MessageCard';
 import NewChatModalList from '@/features/inbox/components/NewChatModalList';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { EmptyState } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { useProfileStore } from '@/shared/store/profileStore';
+import { getChats, getUserChats } from '../inbox.service';
+import type { Chat } from '@/shared/types/inbox';
 import theme from '@/shared/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -227,6 +231,11 @@ export default function InboxOverlayScreen() {
   const { setInboxUnreadCount } = useNotifications();
   const searchBarRef = useRef<AppSearchBarRef>(null);
   const keyboardHeightAnim = useRef(new Animated.Value(0)).current;
+  
+  // API state for business mode
+  const [apiChats, setApiChats] = useState<Chat[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Track keyboard visibility for empty state centering with smooth animation
   useEffect(() => {
@@ -259,19 +268,81 @@ export default function InboxOverlayScreen() {
   
   // Detect if we're in personal or business mode
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
+  const currentUser = useProfileStore((state) => state.currentUser);
   const isPersonalMode = !activeBusiness;
   
   // Use profileStore for role checks
   const isAdmin = useProfileStore((state) => state.isAdmin);
+  
+  // Fetch chats from API for both business and personal modes
+  const fetchChats = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setLoadError(null);
+      
+      if (isPersonalMode) {
+        // Personal mode: fetch user chats
+        if (currentUser?.id) {
+          const chats = await getUserChats({ userId: currentUser.id });
+          setApiChats(chats);
+        }
+        // If no user ID, will fall back to mock data
+      } else if (activeBusiness?.id) {
+        // Business mode: fetch company chats
+        const chats = await getChats({ companyId: activeBusiness.id });
+        setApiChats(chats);
+      }
+    } catch (error) {
+      console.error('Failed to fetch chats from API:', error);
+      setLoadError('Failed to load chats');
+      // Keep any existing apiChats as fallback
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeBusiness?.id, currentUser?.id, isPersonalMode]);
+  
+  // Fetch chats on mount and when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      fetchChats();
+    }, [fetchChats])
+  );
+
+  // Transform API chats to UI format
+  const transformApiChats = (chats: Chat[]): any[] => {
+    return chats.map(chat => ({
+      id: chat.id,
+      name: chat.name,
+      type: chat.type,
+      lastMessage: chat.lastMessage?.content || '',
+      messageType: chat.lastMessage?.type || 'text',
+      timestamp: chat.lastMessage?.timestamp || chat.updatedAt,
+      unreadCount: chat.unreadCount,
+      avatar: chat.avatar,
+      companyId: chat.companyId,
+      locationId: chat.locationId,
+      status: chat.lastMessage?.status || 'sent',
+      isOutgoing: chat.lastMessage?.isOutgoing || false,
+      isGroup: chat.type === 'internal',
+    }));
+  };
 
   // Filter chats based on mode, company, filter, and search
   const filteredChats = useMemo(() => {
     // Select the appropriate chat list based on mode
-    let chats: any[] = isPersonalMode ? mockPersonalChats : mockBusinessChats;
-
-    // Filter by company only in business mode (personal chats don't have companyId)
-    if (!isPersonalMode && activeBusiness) {
-      chats = chats.filter((chat: any) => chat.companyId === activeBusiness.id);
+    let chats: any[];
+    
+    if (isPersonalMode) {
+      // Personal mode: use mock data (until backend endpoints are added)
+      chats = mockPersonalChats;
+    } else if (apiChats.length > 0) {
+      // Business mode with API data
+      chats = transformApiChats(apiChats);
+    } else {
+      // Business mode fallback to mock data (while loading or on error)
+      chats = mockBusinessChats.filter((chat: any) => 
+        !activeBusiness || chat.companyId === activeBusiness.id
+      );
     }
 
     // Apply type filter - handle differently for personal vs business mode
@@ -295,12 +366,12 @@ export default function InboxOverlayScreen() {
     if (search) {
       chats = chats.filter(chat =>
         chat.name.toLowerCase().includes(search.toLowerCase()) ||
-        chat.lastMessage.toLowerCase().includes(search.toLowerCase())
+        (chat.lastMessage && chat.lastMessage.toLowerCase().includes(search.toLowerCase()))
       );
     }
 
     return chats;
-  }, [search, filter, activeBusiness, isPersonalMode]);
+  }, [search, filter, activeBusiness, isPersonalMode, apiChats]);
 
   // Calculate unread chats count
   const unreadChatsCount = filteredChats.filter(chat => chat.unreadCount > 0).length;
@@ -413,10 +484,17 @@ export default function InboxOverlayScreen() {
       />
 
       {/* Chat List */}
+      {isLoading && apiChats.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={appTheme.colors.primary} />
+        </View>
+      ) : (
       <FlatList
         data={filteredChats}
         keyExtractor={(item) => item.id}
         onScrollBeginDrag={handleScroll}
+        onRefresh={fetchChats}
+        refreshing={isLoading}
         renderItem={({ item }: { item: any }) => {
           // Use the messageType from mock data if available, otherwise detect from content
           let messageType = item.messageType || 'text';
@@ -451,32 +529,24 @@ export default function InboxOverlayScreen() {
         }}
         ListEmptyComponent={() => (
           <Animated.View style={[styles.emptyListContainer, { paddingBottom: keyboardHeightAnim }]}>
-            <MessageSquare
-              size={40}
-              color={appTheme.colors.iconColor}
-              strokeWidth={1.5}
-            />
-            <Text style={[styles.emptyListTitle, { color: appTheme.colors.text }]}>
-              No conversation yet
-            </Text>
-            <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textSecondary }]}>
-              {filter !== 'all'
-                ? `No ${filter} conversations found`
-                : 'Start a conversation with a client or partner'
+            <EmptyState
+              iconName="chatbubble-outline"
+              title="No conversations yet"
+              subtitle={
+                filter !== 'all'
+                  ? `No ${filter} conversations found`
+                  : 'Start a conversation to connect, collaborate, or ask questions.'
               }
-            </Text>
-            <View style={styles.emptyListButtonContainer}>
-              <AppButton
-                title="Start a conversation"
-                onPress={handleNewChat}
-                variant="primary"
-              />
-            </View>
+              ctaLabel="Start a new chat"
+              onCtaPress={handleNewChat}
+              testID="empty-inbox-overlay"
+            />
           </Animated.View>
         )}
         style={{ flex: 1 }}
         contentContainerStyle={styles.listContent}
       />
+      )}
 
       {/* New Chat Modal */}
       <NewChatModalList
@@ -509,6 +579,11 @@ const styles = StyleSheet.create({
   listContent: {
     flexGrow: 1,
     paddingBottom: theme.spacing.lg,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyListContainer: {
     flex: 1,

@@ -15,7 +15,7 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import SecondaryHeader from '@/shared/components/layout/headers/SecondaryHeader';
 import AppButton from '@/shared/components/ui/AppButton';
@@ -57,6 +57,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CreateInvoice'>;
 
 export default function CreateInvoiceScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
+  const insets = useSafeAreaInsets();
   const initialDocumentType = route.params?.type || 'Invoice';
   const [documentType, setDocumentType] = useState(initialDocumentType);
   const isInvoice = documentType === 'Invoice';
@@ -881,6 +882,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
               style={styles.modalScrollListFullHeight} 
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: insets.bottom }}
             >
               {filteredProducts.map((product, index) => {
                 const quantity = getItemQuantity(product.id);

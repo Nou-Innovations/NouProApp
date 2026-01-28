@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import { ListItemCard } from '@/shared/components/ui';
+import { ListItemCard, EmptyState } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 
 interface NewChatModalListProps {
@@ -283,15 +283,15 @@ export default function NewChatModalList({
   };
 
   const renderEmptyState = (): ReactNode => (
-    <View style={styles.emptyState}>
-      <Icon name="search" size={48} color={appTheme.colors.textLight} />
-      <Text style={[styles.emptyStateText, { color: appTheme.colors.textLight }]}>
-        No results found
-      </Text>
-      <Text style={[styles.emptyStateSubtext, { color: appTheme.colors.textLight }]}>
-        Try searching with different keywords
-      </Text>
-    </View>
+    <EmptyState
+      iconName="people-outline"
+      title="No contacts available"
+      subtitle="Add businesses or team members to start conversations."
+      ctaLabel="Invite contacts"
+      onCtaPress={onNewContact}
+      compact
+      testID="empty-new-chat-list"
+    />
   );
 
   // Check if we have non-action items to show

@@ -20,6 +20,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import Avatar from '@/shared/components/ui/Avatar';
+import { EmptyState } from '@/shared/components/ui';
 import { RootStackParamList } from '@/shared/types/navigation';
 
 type ConnectionsScreenRouteProp = RouteProp<RootStackParamList, 'Connections'>;
@@ -355,38 +356,38 @@ export default function ConnectionsScreen() {
 
   // Empty state - design.json: connectionsScreen.emptyState
   const renderEmptyState = () => {
-    let emptyMessage = 'Connect with users and companies to grow your network';
     let emptyTitle = 'No connections yet';
-    let emptyIcon: keyof typeof Icon.glyphMap = 'people-outline';
+    let emptyMessage = 'Build your professional network by connecting with others.';
+    let emptyIcon = 'person-add-outline';
+    let ctaLabel: string | undefined = 'Find people';
+    let ctaAction: (() => void) | undefined = () => navigation.navigate('Explore' as never);
     
     if (searchQuery) {
       emptyTitle = 'No results found';
       emptyMessage = `No connections matching "${searchQuery}"`;
       emptyIcon = 'search-outline';
+      ctaLabel = undefined;
+      ctaAction = undefined;
     } else if (activeFilter === 'users') {
       emptyTitle = 'No user connections';
       emptyMessage = 'Connect with other users to grow your network';
       emptyIcon = 'person-outline';
     } else if (activeFilter === 'companies') {
-      emptyTitle = 'No company connections';
-      emptyMessage = 'Connect with companies to expand your business network';
+      emptyTitle = 'No business connections';
+      emptyMessage = 'Connect with suppliers, retailers, and partners.';
       emptyIcon = 'business-outline';
+      ctaLabel = 'Find businesses';
     }
 
     return (
-      <View style={styles.emptyState}>
-        <Icon 
-          name={emptyIcon} 
-          size={60} 
-          color={appTheme.colors.textMuted} 
-        />
-        <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>
-          {emptyTitle}
-        </Text>
-        <Text style={[styles.emptySubtitle, { color: appTheme.colors.secondary }]}>
-          {emptyMessage}
-        </Text>
-      </View>
+      <EmptyState
+        iconName={emptyIcon}
+        title={emptyTitle}
+        subtitle={emptyMessage}
+        ctaLabel={ctaLabel}
+        onCtaPress={ctaAction}
+        testID="empty-connections"
+      />
     );
   };
 

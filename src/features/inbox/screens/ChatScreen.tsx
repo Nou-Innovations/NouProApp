@@ -13,7 +13,11 @@ import {
   Alert,
   Keyboard,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
+import * as Location from 'expo-location';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { Icon } from '@/shared/utils/icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -25,7 +29,16 @@ import AppButton from '@/shared/components/ui/AppButton';
 import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
 import { ListItemCard } from '@/shared/components/ui/ListItemCard';
 import { getMessagesForChat } from '@/shared/data/mockChatMessages';
-import { getMessages, sendMessage, markChatAsRead } from '../inbox.service';
+import { 
+  getMessages, 
+  sendMessage, 
+  markChatAsRead,
+  getUserMessages,
+  sendUserMessage,
+  markUserChatAsRead,
+  deleteMessage,
+  deleteUserMessage,
+} from '../inbox.service';
 import { MessageBubble } from '../components/MessageBubble';
 import type { Message, OrderMessage, TextMessage, EventMessage, DeletedMessage } from '@/shared/types/inbox';
 
@@ -80,54 +93,92 @@ export default function ChatScreen() {
   
   const { id, name, avatar, isGroup, partnerId, partnerType, highlightMessage, searchQuery, scrollToMessage, unreadCount = 0 } = route.params;
   
-  // Get active business from store
+  // Get active business and current user from store
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
+  const currentUser = useProfileStore((state) => state.currentUser);
+  
+  // Get the current user ID for determining outgoing messages
+  // Falls back to 'current-user' for backwards compatibility with mock data
+  const currentUserId = currentUser?.id || 'current-user';
+  
+  /**
+   * Normalize isOutgoing on messages based on sender.id matching current user
+   * This ensures messages display correctly regardless of backend support
+   */
+  const normalizeMessages = (msgs: Message[]): Message[] => {
+    return msgs.map(msg => ({
+      ...msg,
+      isOutgoing: msg.sender?.id === currentUserId || 
+                  msg.sender?.name === 'You' || 
+                  msg.isOutgoing === true,
+    }));
+  };
   
   // Load messages from API or fallback to mock
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(true);
   
+  // Determine if we're in personal mode (no active business)
+  const isPersonalMode = !activeBusiness;
+  
   // Fetch messages from API
   useEffect(() => {
     const fetchChatMessages = async () => {
-      if (!activeBusiness?.id) {
-        // No active business - use mock data
-        const mockMessages = getMessagesForChat(id) as Message[];
-        setMessages(mockMessages);
-        setLoadingMessages(false);
-        return;
-      }
-      
       try {
         setLoadingMessages(true);
-        const result = await getMessages({
-          companyId: activeBusiness.id,
-          chatId: id,
-          limit: 50,
-        });
-        setMessages(result.messages);
         
-        // Mark chat as read
-        await markChatAsRead(activeBusiness.id, id);
+        if (isPersonalMode) {
+          // Personal mode: use user API if user ID is available
+          if (currentUser?.id) {
+            const result = await getUserMessages({
+              userId: currentUser.id,
+              chatId: id,
+              limit: 50,
+            });
+            setMessages(normalizeMessages(result.messages));
+            await markUserChatAsRead(currentUser.id, id);
+          } else {
+            // No user ID - use mock data
+            const mockMessages = getMessagesForChat(id) as Message[];
+            setMessages(normalizeMessages(mockMessages));
+          }
+        } else if (activeBusiness?.id) {
+          // Business mode: use company API
+          const result = await getMessages({
+            companyId: activeBusiness.id,
+            chatId: id,
+            limit: 50,
+          });
+          setMessages(normalizeMessages(result.messages));
+          await markChatAsRead(activeBusiness.id, id);
+        } else {
+          // Fallback to mock data
+          const mockMessages = getMessagesForChat(id) as Message[];
+          setMessages(normalizeMessages(mockMessages));
+        }
       } catch (error) {
         console.error('Failed to load messages from API, falling back to mock:', error);
         // Fallback to mock data
         const mockMessages = getMessagesForChat(id) as Message[];
-        setMessages(mockMessages);
+        setMessages(normalizeMessages(mockMessages));
       } finally {
         setLoadingMessages(false);
       }
     };
     
     fetchChatMessages();
-  }, [id, activeBusiness?.id]);
+  }, [id, activeBusiness?.id, currentUser?.id, isPersonalMode, currentUserId]);
   
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false); // Track if we've already marked this chat as read
   const [showParticipantsSheet, setShowParticipantsSheet] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState<{ id: string; name: string; avatar: string; role: string; isCurrentUser?: boolean } | null>(null);
   const [showParticipantOptionsSheet, setShowParticipantOptionsSheet] = useState(false);
+  const [showAttachmentSheet, setShowAttachmentSheet] = useState(false);
+  // Reply state
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const inputRef = useRef<TextInput>(null);
 
   const flatListRef = useRef<FlatList>(null);
   
@@ -138,9 +189,9 @@ export default function ChatScreen() {
     
     // Add current user first
     participantMap.set('You', {
-      id: 'current-user',
-      name: 'You',
-      avatar: '',
+      id: currentUserId,
+      name: currentUser?.displayName || 'You',
+      avatar: currentUser?.profileImage || '',
       role: 'user',
       isCurrentUser: true,
     });
@@ -160,7 +211,7 @@ export default function ChatScreen() {
     });
     
     return Array.from(participantMap.values());
-  }, [messages]);
+  }, [messages, currentUserId, currentUser]);
   
   // Detect if this is a group chat (3+ participants including "You", or explicitly marked as group)
   // participants.length > 2 means You + 2+ others = group chat
@@ -370,6 +421,14 @@ export default function ChatScreen() {
   const handleSend = async () => {
     if (!inputText.trim()) return;
     
+    // Capture reply info before clearing
+    const replyToId = replyingTo?.id;
+    const replyContext = replyingTo ? {
+      senderName: replyingTo.sender?.name || 'Unknown',
+      messageSnippet: getReplyPreviewText(replyingTo),
+      messageId: replyingTo.id,
+    } : undefined;
+    
     // Optimistic update - add message immediately
     const tempId = `temp-${Date.now()}`;
     const optimisticMessage: TextMessage = {
@@ -379,35 +438,54 @@ export default function ChatScreen() {
       text: inputText,
       isOutgoing: true,
       sender: { 
-        id: 'current-user', 
-        name: 'You', 
-        avatar: '', 
-        role: 'business' 
+        id: currentUserId, 
+        name: currentUser?.displayName || 'You', 
+        avatar: currentUser?.profileImage || '', 
+        role: isPersonalMode ? 'user' : 'business' 
       },
       timestamp: new Date().toISOString(),
       status: 'sending',
+      ...(replyContext && { replyingTo: replyContext }),
     };
 
     setMessages(prevMessages => [optimisticMessage, ...prevMessages]);
     const messageText = inputText;
     setInputText('');
+    setReplyingTo(null); // Clear reply state
     Keyboard.dismiss();
     if (flatListRef.current) {
       flatListRef.current.scrollToOffset({ offset: 0, animated: true });
     }
 
-    // Send to API if business is active
-    if (activeBusiness?.id) {
+    // Send to API
+    const canSendToApi = isPersonalMode ? !!currentUser?.id : !!activeBusiness?.id;
+    
+    if (canSendToApi) {
       try {
-        const sentMessage = await sendMessage(activeBusiness.id, id, {
-          type: 'text',
-          content: messageText,
-        });
+        let sentMessage: Message;
         
-        // Replace optimistic message with real one
+        if (isPersonalMode && currentUser?.id) {
+          // Personal mode: use user API
+          sentMessage = await sendUserMessage(currentUser.id, id, {
+            type: 'text',
+            content: messageText,
+            replyToId,
+          });
+        } else if (activeBusiness?.id) {
+          // Business mode: use company API
+          sentMessage = await sendMessage(activeBusiness.id, id, {
+            type: 'text',
+            content: messageText,
+            replyToId,
+          });
+        } else {
+          throw new Error('No valid context for sending message');
+        }
+        
+        // Replace optimistic message with real one, ensuring isOutgoing is preserved
         setMessages(prevMessages => 
           prevMessages.map(msg => 
-            msg.id === tempId ? sentMessage : msg
+            msg.id === tempId ? { ...sentMessage, isOutgoing: true } : msg
           )
         );
       } catch (error) {
@@ -421,7 +499,7 @@ export default function ChatScreen() {
         Alert.alert('Error', 'Failed to send message. Please try again.');
       }
     } else {
-      // No active business - simulate delivery for mock mode
+      // No active context - simulate delivery for mock mode
       setTimeout(() => {
         setMessages(prevMessages => 
           prevMessages.map(msg => 
@@ -555,7 +633,12 @@ export default function ChatScreen() {
     );
   };
 
-  const handleDeleteMessage = (messageId: string) => {
+  const handleDeleteMessage = async (messageId: string) => {
+    // Find the original message for potential rollback
+    const originalMessage = messages.find(msg => msg.id === messageId);
+    if (!originalMessage) return;
+    
+    // Optimistic update - immediately show as deleted
     setMessages(currentMessages => 
       currentMessages.map(msg => {
         if (msg.id === messageId) {
@@ -573,16 +656,62 @@ export default function ChatScreen() {
         return msg;
       })
     );
+    
+    // Call API to delete
+    const canDeleteFromApi = isPersonalMode ? !!currentUser?.id : !!activeBusiness?.id;
+    
+    if (canDeleteFromApi) {
+      try {
+        if (isPersonalMode && currentUser?.id) {
+          await deleteUserMessage(currentUser.id, id, messageId);
+        } else if (activeBusiness?.id) {
+          await deleteMessage(activeBusiness.id, id, messageId);
+        }
+        // Success - message already shown as deleted
+      } catch (error) {
+        console.error('Failed to delete message:', error);
+        // Rollback on error
+        setMessages(currentMessages =>
+          currentMessages.map(msg =>
+            msg.id === messageId ? originalMessage : msg
+          )
+        );
+        Alert.alert('Error', 'Failed to delete message. Please try again.');
+      }
+    }
+    // If no API context, the optimistic update stays (mock mode)
   };
 
   const handleReplyMessage = (messageId: string) => {
     // Find the message to reply to
     const messageToReply = messages.find(msg => msg.id === messageId);
-    if (messageToReply && messageToReply.type === 'text') {
-      // TODO: Implement reply functionality - set reply context in input area
-      Alert.alert('Reply', `Replying to: "${messageToReply.text.substring(0, 50)}..."`);
-    } else {
-      Alert.alert('Reply', 'Replying to this message');
+    if (messageToReply) {
+      setReplyingTo(messageToReply);
+      // Focus the input field
+      inputRef.current?.focus();
+    }
+  };
+  
+  // Cancel reply
+  const handleCancelReply = () => {
+    setReplyingTo(null);
+  };
+  
+  // Get reply preview text
+  const getReplyPreviewText = (msg: Message): string => {
+    switch (msg.type) {
+      case 'text':
+        return (msg as any).text || '';
+      case 'image':
+        return '📷 Photo';
+      case 'pdf':
+        return `📄 ${(msg as any).fileName || 'Document'}`;
+      case 'location':
+        return `📍 ${(msg as any).locationName || 'Location'}`;
+      case 'voice':
+        return '🎤 Voice note';
+      default:
+        return 'Message';
     }
   };
 
@@ -616,6 +745,395 @@ export default function ChatScreen() {
     // TODO: Implement order event actions (confirm delivery, confirm payment, etc.)
     Alert.alert('Order Action', `Action "${actionId}" for order ${orderId}`);
   };
+
+  // State for attachments
+  const [isSharingLocation, setIsSharingLocation] = useState(false);
+  const [isPickingDocument, setIsPickingDocument] = useState(false);
+  
+  // Handle document picking and sending
+  const handlePickDocument = async () => {
+    try {
+      setIsPickingDocument(true);
+      
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        copyToCacheDirectory: true,
+      });
+      
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+      
+      const document = result.assets[0];
+      const fileName = document.name || 'Document';
+      const fileUri = document.uri;
+      const fileSize = document.size || 0;
+      
+      // For now, we'll use the local URI as the attachment URL
+      // In production, you would upload to a server and get a URL back
+      const attachmentUrl = fileUri;
+      
+      // Create optimistic PDF message
+      const tempId = `temp-${Date.now()}`;
+      const optimisticMessage: Message = {
+        id: tempId,
+        chatId: id,
+        type: 'pdf',
+        fileName,
+        fileUrl: attachmentUrl,
+        fileSize,
+        isOutgoing: true,
+        sender: {
+          id: currentUserId,
+          name: currentUser?.displayName || 'You',
+          avatar: currentUser?.profileImage || '',
+          role: isPersonalMode ? 'user' : 'business',
+        },
+        timestamp: new Date().toISOString(),
+        status: 'sending',
+      } as Message;
+      
+      setMessages(prevMessages => [optimisticMessage, ...prevMessages]);
+      
+      if (flatListRef.current) {
+        flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+      }
+      
+      // Send to API
+      const canSendToApi = isPersonalMode ? !!currentUser?.id : !!activeBusiness?.id;
+      
+      if (canSendToApi) {
+        try {
+          let sentMessage: Message;
+          
+          if (isPersonalMode && currentUser?.id) {
+            sentMessage = await sendUserMessage(currentUser.id, id, {
+              type: 'pdf',
+              content: fileName,
+              attachmentUrl,
+              metadata: { fileSize },
+            });
+          } else if (activeBusiness?.id) {
+            sentMessage = await sendMessage(activeBusiness.id, id, {
+              type: 'pdf',
+              content: fileName,
+              attachmentUrl,
+              metadata: { fileSize },
+            });
+          } else {
+            throw new Error('No valid context for sending message');
+          }
+          
+          // Replace optimistic message with real one
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === tempId ? { ...sentMessage, isOutgoing: true } : msg
+            )
+          );
+        } catch (error) {
+          console.error('Failed to send document:', error);
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === tempId ? { ...msg, status: 'failed' } as Message : msg
+            )
+          );
+          Alert.alert('Error', 'Failed to send document. Please try again.');
+        }
+      } else {
+        // Mock mode - simulate delivery
+        setTimeout(() => {
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === tempId ? { ...msg, status: 'delivered' } as Message : msg
+            )
+          );
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Document picking error:', error);
+      Alert.alert('Error', 'Failed to pick document. Please try again.');
+    } finally {
+      setIsPickingDocument(false);
+    }
+  };
+  
+  // Handle media picking (photos/videos)
+  const handlePickMedia = async () => {
+    try {
+      // Request permission
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Please allow access to your photos to share images.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]
+        );
+        return;
+      }
+      
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+        allowsMultipleSelection: false,
+      });
+      
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+      
+      const asset = result.assets[0];
+      const imageUri = asset.uri;
+      const width = asset.width || 300;
+      const height = asset.height || 300;
+      
+      // Create optimistic image message
+      const tempId = `temp-${Date.now()}`;
+      const optimisticMessage: Message = {
+        id: tempId,
+        chatId: id,
+        type: 'image',
+        imageUrl: imageUri,
+        width,
+        height,
+        isOutgoing: true,
+        sender: {
+          id: currentUserId,
+          name: currentUser?.displayName || 'You',
+          avatar: currentUser?.profileImage || '',
+          role: isPersonalMode ? 'user' : 'business',
+        },
+        timestamp: new Date().toISOString(),
+        status: 'sending',
+      } as Message;
+      
+      setMessages(prevMessages => [optimisticMessage, ...prevMessages]);
+      
+      if (flatListRef.current) {
+        flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+      }
+      
+      // Send to API
+      const canSendToApi = isPersonalMode ? !!currentUser?.id : !!activeBusiness?.id;
+      
+      if (canSendToApi) {
+        try {
+          let sentMessage: Message;
+          
+          if (isPersonalMode && currentUser?.id) {
+            sentMessage = await sendUserMessage(currentUser.id, id, {
+              type: 'image',
+              content: 'Photo',
+              attachmentUrl: imageUri,
+              metadata: { width, height },
+            });
+          } else if (activeBusiness?.id) {
+            sentMessage = await sendMessage(activeBusiness.id, id, {
+              type: 'image',
+              content: 'Photo',
+              attachmentUrl: imageUri,
+              metadata: { width, height },
+            });
+          } else {
+            throw new Error('No valid context for sending message');
+          }
+          
+          // Replace optimistic message with real one
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === tempId ? { ...sentMessage, isOutgoing: true } : msg
+            )
+          );
+        } catch (error) {
+          console.error('Failed to send image:', error);
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === tempId ? { ...msg, status: 'failed' } as Message : msg
+            )
+          );
+          Alert.alert('Error', 'Failed to send image. Please try again.');
+        }
+      } else {
+        // Mock mode - simulate delivery
+        setTimeout(() => {
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === tempId ? { ...msg, status: 'delivered' } as Message : msg
+            )
+          );
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Media picking error:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+  
+  // Handle location sharing
+  const handleShareLocation = async () => {
+    try {
+      setIsSharingLocation(true);
+      
+      // Request location permissions
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Location permission is required to share your location. Please enable it in Settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]
+        );
+        return;
+      }
+      
+      // Get current location
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      
+      const { latitude, longitude } = location.coords;
+      
+      // Try to get address (reverse geocoding)
+      let address = '';
+      let locationName = '';
+      try {
+        const [geocodeResult] = await Location.reverseGeocodeAsync({ latitude, longitude });
+        if (geocodeResult) {
+          const parts = [];
+          if (geocodeResult.street) parts.push(geocodeResult.street);
+          if (geocodeResult.city) parts.push(geocodeResult.city);
+          if (geocodeResult.region) parts.push(geocodeResult.region);
+          address = parts.join(', ');
+          locationName = geocodeResult.name || geocodeResult.street || 'Current Location';
+        }
+      } catch (geocodeError) {
+        console.warn('Reverse geocoding failed:', geocodeError);
+        address = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        locationName = 'Current Location';
+      }
+      
+      // Create optimistic location message
+      const tempId = `temp-${Date.now()}`;
+      const optimisticMessage: Message = {
+        id: tempId,
+        chatId: id,
+        type: 'location',
+        latitude,
+        longitude,
+        address,
+        locationName,
+        isOutgoing: true,
+        sender: {
+          id: currentUserId,
+          name: currentUser?.displayName || 'You',
+          avatar: currentUser?.profileImage || '',
+          role: isPersonalMode ? 'user' : 'business',
+        },
+        timestamp: new Date().toISOString(),
+        status: 'sending',
+      } as Message;
+      
+      setMessages(prevMessages => [optimisticMessage, ...prevMessages]);
+      
+      if (flatListRef.current) {
+        flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+      }
+      
+      // Send to API
+      const canSendToApi = isPersonalMode ? !!currentUser?.id : !!activeBusiness?.id;
+      
+      if (canSendToApi) {
+        try {
+          let sentMessage: Message;
+          
+          if (isPersonalMode && currentUser?.id) {
+            sentMessage = await sendUserMessage(currentUser.id, id, {
+              type: 'location',
+              content: locationName,
+              metadata: { latitude, longitude, address, locationName },
+            });
+          } else if (activeBusiness?.id) {
+            sentMessage = await sendMessage(activeBusiness.id, id, {
+              type: 'location',
+              content: locationName,
+              metadata: { latitude, longitude, address, locationName },
+            });
+          } else {
+            throw new Error('No valid context for sending message');
+          }
+          
+          // Replace optimistic message with real one
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === tempId ? { ...sentMessage, isOutgoing: true } : msg
+            )
+          );
+        } catch (error) {
+          console.error('Failed to send location:', error);
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === tempId ? { ...msg, status: 'failed' } as Message : msg
+            )
+          );
+          Alert.alert('Error', 'Failed to share location. Please try again.');
+        }
+      } else {
+        // Mock mode - simulate delivery
+        setTimeout(() => {
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === tempId ? { ...msg, status: 'delivered' } as Message : msg
+            )
+          );
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Location sharing error:', error);
+      Alert.alert('Error', 'Failed to get your location. Please try again.');
+    } finally {
+      setIsSharingLocation(false);
+    }
+  };
+
+  // Handle attachment option selection
+  const handleAttachmentSelect = (item: { id: string; title: string }) => {
+    setShowAttachmentSheet(false);
+    switch (item.id) {
+      case 'pdf':
+        handlePickDocument();
+        break;
+      case 'media':
+        handlePickMedia();
+        break;
+      case 'location':
+        handleShareLocation();
+        break;
+    }
+  };
+
+  // Attachment options for the bottom sheet
+  const attachmentOptions = [
+    {
+      id: 'pdf',
+      title: 'Document',
+      avatar: { type: 'icon' as const, icon: 'file-text' },
+    },
+    {
+      id: 'media',
+      title: 'Photos & Videos',
+      avatar: { type: 'icon' as const, icon: 'image' },
+    },
+    {
+      id: 'location',
+      title: 'Location',
+      avatar: { type: 'icon' as const, icon: 'map-pin' },
+    },
+  ];
 
   // Function to get input colors based on state (matching AppSearchBar)
   const getInputColors = () => {
@@ -682,8 +1200,27 @@ export default function ChatScreen() {
           style={{ backgroundColor: appTheme.colors.surface }}
         />
 
+        {/* Reply Preview */}
+        {replyingTo && (
+          <View style={[styles.replyPreviewContainer, { backgroundColor: appTheme.colors.background, borderTopColor: appTheme.colors.borderColor }]}>
+            <View style={[styles.replyPreviewBar, { backgroundColor: appTheme.colors.primary }]} />
+            <View style={styles.replyPreviewContent}>
+              <Text style={[styles.replyPreviewSender, { color: appTheme.colors.primary }]} numberOfLines={1}>
+                {replyingTo.isOutgoing ? 'You' : replyingTo.sender?.name || 'Unknown'}
+              </Text>
+              <Text style={[styles.replyPreviewText, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
+                {getReplyPreviewText(replyingTo)}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={handleCancelReply} style={styles.replyPreviewClose}>
+              <Icon name="x" size={20} color={appTheme.colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        )}
+        
         <View style={[styles.inputContainer, { borderTopColor: appTheme.colors.borderColor, backgroundColor: appTheme.colors.background }]}>
           <TextInput
+            ref={inputRef}
             style={[
               styles.input, 
               { 
@@ -701,21 +1238,36 @@ export default function ChatScreen() {
             onBlur={() => setIsInputFocused(false)}
             multiline
           />
+          {/* Show + button when not focused and no text, otherwise show send button */}
+          {!isInputFocused && inputText.trim().length === 0 ? (
+            <TouchableOpacity 
+              onPress={() => setShowAttachmentSheet(true)}
+              style={[
+                styles.sendButton, 
+                { 
+                  backgroundColor: appTheme.colors.textMuted,
+                }
+              ]}
+            >
+              <Icon name="plus" size={24} color={appTheme.colors.textInverse} />
+            </TouchableOpacity>
+          ) : (
             <TouchableOpacity 
               onPress={handleSend} 
-            disabled={inputText.trim().length === 0}
+              disabled={inputText.trim().length === 0}
               style={[
                 styles.sendButton, 
                 { 
                   backgroundColor: inputText.trim().length > 0 
                     ? appTheme.colors.primary 
-                  : appTheme.colors.textMuted,
-                opacity: inputText.trim().length > 0 ? 1 : 0.5,
+                    : appTheme.colors.textMuted,
+                  opacity: inputText.trim().length > 0 ? 1 : 0.5,
                 }
               ]}
             >
               <Icon name="send" size={20} color={appTheme.colors.textInverse} />
             </TouchableOpacity>
+          )}
         </View>
       </KeyboardAvoidingView>
       
@@ -825,6 +1377,15 @@ export default function ChatScreen() {
             );
           }
         }}
+      />
+      
+      {/* Attachment Options Bottom Sheet */}
+      <AppBottomSheet
+        visible={showAttachmentSheet}
+        onClose={() => setShowAttachmentSheet(false)}
+        title="Add Attachment"
+        items={attachmentOptions}
+        onSelectItem={handleAttachmentSelect}
       />
     </SafeAreaView>
   );
@@ -1067,6 +1628,34 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderTopWidth: 1,
+  },
+  replyPreviewContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderTopWidth: 1,
+  },
+  replyPreviewBar: {
+    width: 3,
+    height: '100%',
+    borderRadius: 2,
+    marginRight: 10,
+  },
+  replyPreviewContent: {
+    flex: 1,
+  },
+  replyPreviewSender: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  replyPreviewText: {
+    fontSize: 14,
+  },
+  replyPreviewClose: {
+    padding: 4,
+    marginLeft: 8,
   },
   imageBubbleContainer: {
     maxWidth: '80%',

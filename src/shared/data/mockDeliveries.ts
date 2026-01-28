@@ -1,67 +1,28 @@
 /**
- * Normalized delivery status values
- * - 'new': Just received, not yet processed
- * - 'pending': Acknowledged, awaiting pickup/dispatch
- * - 'ongoing': In transit
- * - 'delivered': Completed successfully
- * - 'canceled': Canceled by either party
+ * Mock Deliveries Data
+ * 
+ * Uses types from @/shared/types/delivery for consistency with Prisma schema.
+ * Status values match the DeliveryStatus enum:
+ * - NOT_ASSIGNED: Just received, not yet processed
+ * - ASSIGNED: Staff assigned, awaiting pickup/dispatch  
+ * - PACKED: Items packed and ready
+ * - OUT_FOR_DELIVERY: In transit
+ * - DELIVERED: Completed successfully
+ * - FAILED: Delivery attempt failed
+ * - CANCELED: Canceled by either party
  */
-export type DeliveryStatus = 'new' | 'pending' | 'ongoing' | 'delivered' | 'canceled';
-export type PaymentStatus = 'Paid' | 'Unpaid' | 'Pending Confirmation';
-export type ItemStatus = 'Available' | 'In Stock' | 'Out of Stock' | 'In Production' | 'Discontinued';
+import type { 
+  Delivery, 
+  DeliveryItem, 
+  Staff, 
+  TransportMode,
+  DeliveryStatus,
+  PaymentStatus,
+  ItemStatus 
+} from '@/shared/types/delivery';
 
-export interface DeliveryItem {
-  id: string;
-  productId: string;
-  name: string;
-  image: string;
-  price: number;
-  quantityOrdered: number;
-  isLoaded: boolean;
-  status: ItemStatus;
-  warehouseStock?: { [key: string]: number };
-}
-
-export interface Delivery {
-  id: string;
-  type?: 'delivery' | 'transfer'; // Field to distinguish delivery types
-  direction?: 'incoming' | 'outgoing'; // Direction relative to the current business
-  locationId?: string; // Location this delivery belongs to (for filtering)
-  clientId?: string;
-  clientCompanyLogo?: string;
-  clientCompanyName: string;
-  clientAddress: string;
-  clientEmail?: string;
-  clientPhone?: string;
-  clientNotes?: string;
-  distributorNotes?: string;
-  orderTime: string;
-  expectedDeliveryDateTime: string;
-  itemCount: number;
-  items?: DeliveryItem[];
-  totalAmount?: number;
-  trackingNumber?: string;
-  deliveryStatus: DeliveryStatus;
-  paymentStatus: PaymentStatus;
-  assignedStaffId?: string;
-  transportMode?: string;
-  // For transfers - location information
-  fromLocation?: string;
-  toLocation?: string;
-}
-
-export interface Staff {
-  id: string;
-  name: string;
-  role: string;
-  avatar?: string;
-}
-
-export interface TransportMode {
-  id: string;
-  name: string;
-  icon: string;
-}
+// Re-export types for backward compatibility
+export type { DeliveryStatus, PaymentStatus, ItemStatus, DeliveryItem, Delivery, Staff, TransportMode };
 
 export const mockStaff: Staff[] = [
   { id: 'S001', name: 'John Doe', role: 'Delivery Driver', avatar: 'https://picsum.photos/seed/staff1/100/100' },
@@ -190,7 +151,7 @@ const mockDeliveries: Delivery[] = [
     ],
     totalAmount: 1250.75,
     trackingNumber: 'TRK12345XYZ',
-    deliveryStatus: 'new',
+    deliveryStatus: 'NOT_ASSIGNED',
     paymentStatus: 'Unpaid',
   },
   {
@@ -214,7 +175,7 @@ const mockDeliveries: Delivery[] = [
     ],
     totalAmount: 345.00,
     trackingNumber: 'TRK67890ABC',
-    deliveryStatus: 'ongoing',
+    deliveryStatus: 'OUT_FOR_DELIVERY',
     paymentStatus: 'Paid',
     assignedStaffId: 'S001',
     transportMode: 'T002',
@@ -242,7 +203,7 @@ const mockDeliveries: Delivery[] = [
     ],
     totalAmount: 2800.50,
     trackingNumber: 'TRK24680DEF',
-    deliveryStatus: 'delivered',
+    deliveryStatus: 'DELIVERED',
     paymentStatus: 'Paid',
     assignedStaffId: 'S003',
     transportMode: 'T001',
@@ -265,7 +226,7 @@ const mockDeliveries: Delivery[] = [
       mockItemsData[2],
     ],
     trackingNumber: 'TRK13579GHI',
-    deliveryStatus: 'canceled',
+    deliveryStatus: 'CANCELED',
     paymentStatus: 'Unpaid',
   },
   // Incoming deliveries (receiving from suppliers)
@@ -291,7 +252,7 @@ const mockDeliveries: Delivery[] = [
     ],
     totalAmount: 5200.00,
     trackingNumber: 'TRK-INC-001',
-    deliveryStatus: 'pending',
+    deliveryStatus: 'ASSIGNED',
     paymentStatus: 'Unpaid',
   },
   {
@@ -314,7 +275,7 @@ const mockDeliveries: Delivery[] = [
     ],
     totalAmount: 8500.00,
     trackingNumber: 'TRK-INC-002',
-    deliveryStatus: 'delivered',
+    deliveryStatus: 'DELIVERED',
     paymentStatus: 'Paid',
     assignedStaffId: 'S002',
     transportMode: 'T001',
@@ -338,7 +299,7 @@ const mockDeliveries: Delivery[] = [
     ],
     totalAmount: 150.00,
     trackingNumber: 'TRF98765XYZ',
-    deliveryStatus: 'pending',
+    deliveryStatus: 'PACKED',
     paymentStatus: 'Paid',
     assignedStaffId: 'S002',
     transportMode: 'T002',
@@ -362,7 +323,7 @@ const mockDeliveries: Delivery[] = [
     ],
     totalAmount: 420.00,
     trackingNumber: 'TRF54321ABC',
-    deliveryStatus: 'ongoing',
+    deliveryStatus: 'OUT_FOR_DELIVERY',
     paymentStatus: 'Paid',
     assignedStaffId: 'S004',
     transportMode: 'T001',

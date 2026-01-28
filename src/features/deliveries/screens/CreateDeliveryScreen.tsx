@@ -22,7 +22,7 @@ import {
   Easing,
 } from 'react-native';
 import AppTextField from '@/shared/components/ui/AppTextField';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 
@@ -157,6 +157,7 @@ export default function CreateDeliveryScreen() {
   const navigation = useNavigation();
   const route = useRoute<CreateDeliveryRouteProp>();
   const { theme: appTheme } = useTheme();
+  const insets = useSafeAreaInsets();
   
   // Get mode from route params
   const mode = route.params?.mode || 'delivery';
@@ -768,6 +769,7 @@ export default function CreateDeliveryScreen() {
             style={styles.modalScrollListFullHeight} 
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: insets.bottom }}
           >
             {filteredProducts.map((product, index) => {
               const quantity = getItemQuantity(product.id);

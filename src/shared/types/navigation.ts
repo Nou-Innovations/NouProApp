@@ -11,6 +11,17 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
 
+// ========== Delivery Detail View Types ==========
+
+/**
+ * View type for DeliveryDetailScreen routing
+ * - client: Business that made the order (read-only view)
+ * - supplier: Business fulfilling the order (full control)
+ * - self: Manual order for self-delivery (full control, no other party)
+ * - staff: Staff assigned to the delivery (limited operational view)
+ */
+export type DeliveryDetailViewType = 'client' | 'supplier' | 'self' | 'staff';
+
 // ========== Shared Types for Registration Flow ==========
 
 /**
@@ -155,7 +166,13 @@ export type RootStackParamList = {
   };
   
   // Delivery screens
-  DeliveryDetail: { deliveryId: string };
+  DeliveryDetail: { 
+    deliveryId: string;
+    /** Optional override for view type detection */
+    viewAs?: 'client' | 'supplier' | 'self' | 'staff';
+    /** If true, shows Accept/Reject buttons for pending order requests */
+    requireAccept?: boolean;
+  };
   CreateDelivery: { orderId?: string; mode?: 'delivery' | 'transfer' };
   PersonalDeliveryDetail: { taskId: string; businessId: string; hasFullAccess: boolean };
   

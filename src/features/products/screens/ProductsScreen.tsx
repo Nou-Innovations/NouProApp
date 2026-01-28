@@ -23,6 +23,7 @@ import AppButton from '@/shared/components/ui/AppButton';
 import IconButton from '@/shared/components/ui/IconButton';
 import { AppModal } from '@/shared/components/ui';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { EmptyState } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { useBusinessStore } from '@/shared/store/businessStore';
@@ -326,11 +327,54 @@ const ProductsScreen: React.FC = () => {
             )}
           </>
         }
-        ListEmptyComponent={() => (
-          <View style={styles.emptyListComponent}>
-            <Text style={styles.emptyListText}>No brands or products found</Text>
-          </View>
-        )}
+        ListEmptyComponent={() => {
+          // Determine empty state content based on view type
+          const getEmptyStateContent = () => {
+            switch (currentViewTitle) {
+              case 'My Products':
+                return {
+                  icon: 'cube-outline',
+                  title: "You haven't added any products",
+                  subtitle: 'Create your own products to manage stock and sales.',
+                  ctaLabel: 'Create product',
+                };
+              case 'Imported':
+                return {
+                  icon: 'download-outline',
+                  title: 'No imported products',
+                  subtitle: 'Products imported from partners will appear here.',
+                  ctaLabel: 'Import products',
+                };
+              case 'Displayed':
+                return {
+                  icon: 'eye-outline',
+                  title: 'No products on display',
+                  subtitle: 'Display products to make them visible to other businesses.',
+                  ctaLabel: 'Display products',
+                };
+              default:
+                return {
+                  icon: 'cube-outline',
+                  title: 'No products yet',
+                  subtitle: 'Products you manage or interact with will appear here.',
+                  ctaLabel: 'Add product',
+                };
+            }
+          };
+          
+          const { icon, title, subtitle, ctaLabel } = getEmptyStateContent();
+          
+          return (
+            <EmptyState
+              iconName={icon}
+              title={title}
+              subtitle={subtitle}
+              ctaLabel={hasEditPermission ? ctaLabel : undefined}
+              onCtaPress={hasEditPermission ? handleOpenCreateOptions : undefined}
+              testID="empty-products"
+            />
+          );
+        }}
         contentContainerStyle={{ flexGrow: 1 }}
         style={{ flex: 1 }}
         extraData={{ editMode: isEditing, expandedBrand: expandedBrandName, edits: editedProducts, currentView: currentViewTitle }}

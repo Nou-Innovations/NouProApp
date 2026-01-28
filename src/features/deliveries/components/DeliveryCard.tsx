@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
-import { Delivery, DeliveryStatus, PaymentStatus } from '@/shared/types/delivery';
+import { Delivery, DeliveryStatus, PaymentStatus, DELIVERY_STATUS_LABELS } from '@/shared/types/delivery';
 import Pill from '@/shared/components/ui/Pill';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -13,16 +13,17 @@ interface DeliveryCardProps {
   onPress?: () => void;
 }
 
-// Status color functions using theme
+// Status color functions using theme (matching Prisma DeliveryStatus enum)
 const getDeliveryStatusColorFromTheme = (status: DeliveryStatus | undefined, colors: typeof theme.colors) => {
   if (!status) return colors.neutral;
-  switch (status.toLowerCase()) {
-    case 'new': return colors.error;
-    case 'new order': return colors.error;
-    case 'pending': return colors.warning;
-    case 'ongoing': return colors.info;
-    case 'delivered': return colors.success;
-    case 'canceled': return colors.neutral;
+  switch (status) {
+    case 'NOT_ASSIGNED': return colors.error;
+    case 'ASSIGNED': return colors.warning;
+    case 'PACKED': return colors.info;
+    case 'OUT_FOR_DELIVERY': return colors.info;
+    case 'DELIVERED': return colors.success;
+    case 'FAILED': return colors.error;
+    case 'CANCELED': return colors.neutral;
     default: return colors.neutral;
   }
 };
@@ -51,8 +52,8 @@ const DeliveryCard: React.FC<DeliveryCardProps> = ({ delivery, isUserAdmin = fal
   const { theme: appTheme } = useTheme();
   const { isItemViewed } = useNotifications();
   
-  // Check if this is a new delivery (status === 'new') and hasn't been viewed
-  const isNewDelivery = delivery.deliveryStatus === 'new' && !isItemViewed(delivery.id);
+  // Check if this is a new delivery (NOT_ASSIGNED status) and hasn't been viewed
+  const isNewDelivery = delivery.deliveryStatus === 'NOT_ASSIGNED' && !isItemViewed(delivery.id);
   const isTransfer = delivery.type === 'transfer';
   
   return (
@@ -151,13 +152,13 @@ const DeliveryCard: React.FC<DeliveryCardProps> = ({ delivery, isUserAdmin = fal
           <View style={styles.statusContainer}>
             {delivery.deliveryStatus && (
               <Pill 
-                text={delivery.deliveryStatus.toLowerCase()}
+                text={DELIVERY_STATUS_LABELS[delivery.deliveryStatus] || delivery.deliveryStatus}
                 color={getDeliveryStatusColorFromTheme(delivery.deliveryStatus, appTheme.colors)}
               />
             )}
             {delivery.paymentStatus && (
               <Pill 
-                text={delivery.paymentStatus.toLowerCase()}
+                text={delivery.paymentStatus}
                 color={getPaymentStatusColorFromTheme(delivery.paymentStatus, appTheme.colors)}
               />
             )}

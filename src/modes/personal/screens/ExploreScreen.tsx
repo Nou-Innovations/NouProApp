@@ -20,6 +20,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import AppSearchBar, { AppSearchBarRef } from '@/shared/components/ui/AppSearchBar';
+import { EmptyState } from '@/shared/components/ui';
 import BusinessListCard from '@/features/profile/components/BusinessListCard';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
 
@@ -247,17 +248,18 @@ export default function ExploreScreen() {
   );
 
   const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Icon name="search" size={60} color={appTheme.colors.textLight} />
-      <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>
-        No businesses found
-      </Text>
-      <Text style={[styles.emptySubtitle, { color: appTheme.colors.textLight }]}>
-        {search
-          ? `No results for "${search}"`
-          : 'Try a different category or search term'}
-      </Text>
-    </View>
+    <EmptyState
+      iconName="compass-outline"
+      title={search ? 'No results found' : 'Nothing to explore yet'}
+      subtitle={
+        search
+          ? `No businesses match "${search}". Try a different search term.`
+          : 'Discover professionals, businesses, and content tailored to you.'
+      }
+      ctaLabel={search ? undefined : 'Refresh explore'}
+      onCtaPress={search ? undefined : onRefresh}
+      testID="empty-explore"
+    />
   );
 
   return (

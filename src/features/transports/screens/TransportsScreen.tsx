@@ -20,7 +20,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { AppSearchBar, Avatar, AppButton } from '@/shared/components/ui';
+import { AppSearchBar, Avatar, AppButton, EmptyState } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import { deleteTransport, getTransports } from '@/features/transports/transports.service';
@@ -383,26 +383,18 @@ export default function TransportsScreen() {
           </Text>
         </View>
       ) : filteredTransports.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Icon name="car-outline" size={60} color={appTheme.colors.textLight} />
-          <Text style={[styles.emptyText, { color: appTheme.colors.text }]}>
-            {searchQuery ? 'No vehicles found' : 'No vehicles yet'}
-          </Text>
-          <Text style={[styles.emptySubtext, { color: appTheme.colors.textLight }]}>
-            {searchQuery
-              ? 'Try adjusting your search criteria'
-              : 'Add your first vehicle to manage your delivery fleet'
-            }
-          </Text>
-          {!searchQuery && (
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: appTheme.colors.primary }]}
-              onPress={handleAddTransport}
-            >
-              <Text style={styles.addButtonText}>Add Vehicle</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <EmptyState
+          iconName="car-outline"
+          title={searchQuery ? 'No vehicles found' : 'No transport added'}
+          subtitle={
+            searchQuery
+              ? 'Try adjusting your search criteria.'
+              : 'Add vehicles or transport options to manage deliveries efficiently.'
+          }
+          ctaLabel={searchQuery ? undefined : 'Add transport'}
+          onCtaPress={searchQuery ? undefined : handleAddTransport}
+          testID="empty-transports"
+        />
       ) : (
         <FlatList
           data={[1]} // Single item to render sections

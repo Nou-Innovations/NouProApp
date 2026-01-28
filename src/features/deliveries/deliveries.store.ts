@@ -171,19 +171,20 @@ export const selectDeliveriesByStatus = (status: DeliveryStatus) => (state: Deli
   state.deliveries.filter((d) => d.deliveryStatus === status);
 
 /**
- * Get new deliveries count (for badge)
+ * Get new deliveries count (for badge) - NOT_ASSIGNED status
  */
 export const selectNewDeliveriesCount = (state: DeliveriesState) =>
-  state.deliveries.filter((d) => d.deliveryStatus === 'new').length;
+  state.deliveries.filter((d) => d.deliveryStatus === 'NOT_ASSIGNED').length;
 
 /**
- * Get pending deliveries count (new + pending + ongoing)
+ * Get pending deliveries count (NOT_ASSIGNED + ASSIGNED + PACKED + OUT_FOR_DELIVERY)
  */
 export const selectPendingDeliveriesCount = (state: DeliveriesState) =>
   state.deliveries.filter((d) => 
-    d.deliveryStatus === 'new' || 
-    d.deliveryStatus === 'pending' ||
-    d.deliveryStatus === 'ongoing'
+    d.deliveryStatus === 'NOT_ASSIGNED' || 
+    d.deliveryStatus === 'ASSIGNED' ||
+    d.deliveryStatus === 'PACKED' ||
+    d.deliveryStatus === 'OUT_FOR_DELIVERY'
   ).length;
 
 /**

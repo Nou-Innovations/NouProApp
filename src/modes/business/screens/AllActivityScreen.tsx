@@ -19,7 +19,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import SecondaryHeader from '@/shared/components/layout/headers/SecondaryHeader';
-import { ListItemCard } from '@/shared/components/ui';
+import { ListItemCard, EmptyState } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 import { getActivityFeed, ActivityItem as APIActivityItem, formatActivityTime } from '@/features/business/activity.service';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -155,15 +155,16 @@ export default function AllActivityScreen() {
 
   // Render empty state
   const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Icon name="search" size={48} color={appTheme.colors.textMuted} />
-      <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>
-        No results found
-      </Text>
-      <Text style={[styles.emptySubtitle, { color: appTheme.colors.textSecondary }]}>
-        Try adjusting your search terms
-      </Text>
-    </View>
+    <EmptyState
+      iconName={search ? 'search-outline' : 'time-outline'}
+      title={search ? 'No results found' : 'No recent activity'}
+      subtitle={
+        search
+          ? 'Try adjusting your search terms.'
+          : 'Updates from orders, messages, and events will appear here.'
+      }
+      testID="empty-all-activity"
+    />
   );
 
   return (

@@ -3046,7 +3046,7 @@ app.get('/api/companies/:companyId/chats/:chatId/messages', async (req, res) => 
     const cursor = req.query.cursor;
 
     const chat = await repos.chatRepo.getById(chatId);
-    if (!chat || (chat.businessId !== companyId && chat.companyId !== companyId)) {
+    if (!chat || chat.companyId !== companyId) {
       return res.status(404).json({ success: false, message: 'Chat not found' });
     }
 
@@ -3086,7 +3086,7 @@ app.post('/api/companies/:companyId/chats/:chatId/read', requireAuth, async (req
     const { companyId, chatId } = req.params;
 
     const chat = await repos.chatRepo.getById(chatId);
-    if (!chat || (chat.businessId !== companyId && chat.companyId !== companyId)) {
+    if (!chat || chat.companyId !== companyId) {
       return res.status(404).json({ success: false, message: 'Chat not found' });
     }
 
@@ -3109,7 +3109,7 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, async 
     const { type, content, replyToId, attachmentUrl, metadata } = req.body;
 
     const chat = await repos.chatRepo.getById(chatId);
-    if (!chat || (chat.businessId !== companyId && chat.companyId !== companyId)) {
+    if (!chat || chat.companyId !== companyId) {
       return res.status(404).json({ success: false, message: 'Chat not found' });
     }
 
@@ -3134,6 +3134,11 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, async 
       newMessage.fileUrl = attachmentUrl;
     } else if (type === 'image') {
       newMessage.imageUrl = attachmentUrl || content;
+    } else if (type === 'location') {
+      newMessage.latitude = metadata?.latitude;
+      newMessage.longitude = metadata?.longitude;
+      newMessage.address = metadata?.address;
+      newMessage.locationName = metadata?.locationName;
     }
 
     // Add reply context if replying (for Prisma mode, we'd need to fetch from repo)
@@ -3156,6 +3161,286 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, async 
   } catch (e) {
     console.error('Error sending message:', e);
     res.status(500).json(errorResponse('Failed to send message'));
+  }
+});
+
+// Delete a message (soft delete)
+app.delete('/api/companies/:companyId/chats/:chatId/messages/:messageId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, chatId, messageId } = req.params;
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat || chat.companyId !== companyId) {
+      return res.status(404).json({ success: false, message: 'Chat not found' });
+    }
+
+    // Get the message to check ownership
+    const message = await repos.chatRepo.getMessage(chatId, messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    // Check if the user owns the message (optional: admins can delete any)
+    const senderId = req.user?.id;
+    if (message.sender?.id && message.sender.id !== senderId) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own messages' });
+    }
+
+    const deletedMessage = await repos.chatRepo.deleteMessage(chatId, messageId);
+    if (!deletedMessage) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    res.json(successResponse(deletedMessage));
+  } catch (e) {
+    console.error('Error deleting message:', e);
+    res.status(500).json(errorResponse('Failed to delete message'));
+  }
+});
+
+
+// ============================================================================
+// USER CHAT ROUTES (Personal Mode)
+// ============================================================================
+
+// Get all chats for a user (personal mode)
+app.get('/api/users/:userId/chats', requireAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Verify the requesting user matches the userId
+    if (req.user?.id && req.user.id !== userId) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+    
+    let userChats = await repos.chatRepo.getByUserId(userId);
+
+    // Apply filters
+    const { type, search } = req.query;
+
+    if (type) {
+      userChats = userChats.filter(c => c.type === type);
+    }
+
+    if (search) {
+      const searchLower = search.toLowerCase();
+      userChats = userChats.filter(c => 
+        (c.name || '').toLowerCase().includes(searchLower) ||
+        (c.lastMessage && (c.lastMessage.content || '').toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Sort by updatedAt (most recent first)
+    userChats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    res.json(successResponse(userChats));
+  } catch (e) {
+    console.error('Error fetching user chats:', e);
+    res.status(500).json(errorResponse('Failed to load chats'));
+  }
+});
+
+// Get messages for a specific user chat
+app.get('/api/users/:userId/chats/:chatId/messages', requireAuth, async (req, res) => {
+  try {
+    const { userId, chatId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit || '50', 10), 100);
+    const cursor = req.query.cursor;
+
+    // Verify the requesting user matches the userId
+    if (req.user?.id && req.user.id !== userId) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat) {
+      return res.status(404).json({ success: false, message: 'Chat not found' });
+    }
+    
+    // Verify user is a participant in the chat
+    const isParticipant = chat.userId === userId || 
+      (chat.participants && chat.participants.includes(userId));
+    if (!isParticipant) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    let chatMessages = await repos.chatRepo.getMessages(chatId);
+
+    // Sort by timestamp (newest first for inverted list)
+    chatMessages = [...chatMessages].sort((a, b) => 
+      new Date(b.timestamp) - new Date(a.timestamp)
+    );
+
+    // Apply cursor-based pagination
+    let startIndex = 0;
+    if (cursor) {
+      const idx = chatMessages.findIndex(m => m.id === cursor);
+      startIndex = idx >= 0 ? idx + 1 : 0;
+    }
+
+    const page = chatMessages.slice(startIndex, startIndex + limit);
+    const nextCursor = page.length ? page[page.length - 1].id : null;
+    const hasMore = (startIndex + limit) < chatMessages.length;
+
+    res.json({
+      success: true,
+      data: page,
+      nextCursor: hasMore ? nextCursor : null,
+      message: 'Messages retrieved'
+    });
+  } catch (e) {
+    console.error('Error fetching user chat messages:', e);
+    res.status(500).json(errorResponse('Failed to load messages'));
+  }
+});
+
+// Mark user chat as read
+app.post('/api/users/:userId/chats/:chatId/read', requireAuth, async (req, res) => {
+  try {
+    const { userId, chatId } = req.params;
+
+    // Verify the requesting user matches the userId
+    if (req.user?.id && req.user.id !== userId) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat) {
+      return res.status(404).json({ success: false, message: 'Chat not found' });
+    }
+    
+    // Verify user is a participant
+    const isParticipant = chat.userId === userId || 
+      (chat.participants && chat.participants.includes(userId));
+    if (!isParticipant) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    const updatedChat = await repos.chatRepo.update(chatId, {
+      unreadCount: 0,
+      lastMessage: chat.lastMessage ? { ...chat.lastMessage, isRead: true } : null
+    });
+
+    res.json(successResponse(updatedChat));
+  } catch (e) {
+    console.error('Error marking user chat as read:', e);
+    res.status(500).json(errorResponse('Failed to mark chat as read'));
+  }
+});
+
+// Send message to user chat
+app.post('/api/users/:userId/chats/:chatId/messages', requireAuth, async (req, res) => {
+  try {
+    const { userId, chatId } = req.params;
+    const { type, content, replyToId, attachmentUrl, metadata } = req.body;
+
+    // Verify the requesting user matches the userId
+    if (req.user?.id && req.user.id !== userId) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat) {
+      return res.status(404).json({ success: false, message: 'Chat not found' });
+    }
+    
+    // Verify user is a participant
+    const isParticipant = chat.userId === userId || 
+      (chat.participants && chat.participants.includes(userId));
+    if (!isParticipant) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    // Create message
+    const senderId = req.user?.id || userId;
+    const senderName = req.user?.name || 'You';
+    const newMessage = {
+      id: `msg-${Date.now()}`,
+      chatId,
+      type: type || 'text',
+      sender: { id: senderId, name: senderName, avatar: '', role: 'user' },
+      timestamp: new Date().toISOString(),
+      status: 'sent'
+    };
+
+    // Add type-specific fields
+    if (type === 'text') {
+      newMessage.text = content;
+    } else if (type === 'pdf') {
+      newMessage.fileName = content;
+      newMessage.fileUrl = attachmentUrl;
+    } else if (type === 'image') {
+      newMessage.imageUrl = attachmentUrl || content;
+    } else if (type === 'location') {
+      newMessage.latitude = metadata?.latitude;
+      newMessage.longitude = metadata?.longitude;
+      newMessage.address = metadata?.address;
+      newMessage.locationName = metadata?.locationName;
+    }
+
+    // Add reply context if replying
+    if (replyToId) {
+      const chatMsgs = await repos.chatRepo.getMessages(chatId);
+      const replyTo = chatMsgs.find(m => m.id === replyToId);
+      if (replyTo) {
+        newMessage.replyingTo = {
+          senderName: replyTo.sender?.name || replyTo.senderName,
+          messageSnippet: replyTo.text || replyTo.content || replyTo.fileName || replyTo.event || '[Media]',
+          messageId: replyTo.id
+        };
+      }
+    }
+
+    const created = await repos.chatRepo.addMessage(chatId, newMessage);
+    res.json(successResponse(created));
+  } catch (e) {
+    console.error('Error sending user message:', e);
+    res.status(500).json(errorResponse('Failed to send message'));
+  }
+});
+
+// Delete a message from user chat (soft delete)
+app.delete('/api/users/:userId/chats/:chatId/messages/:messageId', requireAuth, async (req, res) => {
+  try {
+    const { userId, chatId, messageId } = req.params;
+
+    // Verify the requesting user matches the userId
+    if (req.user?.id && req.user.id !== userId) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat) {
+      return res.status(404).json({ success: false, message: 'Chat not found' });
+    }
+    
+    // Verify user is a participant
+    const isParticipant = chat.userId === userId || 
+      (chat.participants && chat.participants.includes(userId));
+    if (!isParticipant) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    // Get the message to check ownership
+    const message = await repos.chatRepo.getMessage(chatId, messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    // Check if the user owns the message
+    if (message.sender?.id && message.sender.id !== userId) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own messages' });
+    }
+
+    const deletedMessage = await repos.chatRepo.deleteMessage(chatId, messageId);
+    if (!deletedMessage) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    res.json(successResponse(deletedMessage));
+  } catch (e) {
+    console.error('Error deleting user message:', e);
+    res.status(500).json(errorResponse('Failed to delete message'));
   }
 });
 

@@ -330,7 +330,6 @@ export default function AppBottomSheet({
             <View style={[
               styles.content, 
               fullHeight && styles.contentFullHeight,
-              fullHeight && { paddingBottom: insets.bottom }
             ]}>
               {children}
             </View>

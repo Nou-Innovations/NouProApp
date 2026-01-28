@@ -12,7 +12,6 @@ import {
   StyleSheet,
   FlatList,
   RefreshControl,
-  TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +24,7 @@ import { get } from '@/shared/services/api';
 import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
 import FilterBar from '@/features/search/components/FilterBar';
 import TaskCard, { TaskType, TaskStatus } from '@/features/tasks/components/TaskCard';
+import { EmptyState } from '@/shared/components/ui';
 
 // Filter options
 const FILTER_OPTIONS = ['All', 'New', 'Assigned', 'Ongoing', 'Delivered'];
@@ -173,25 +173,18 @@ export default function ActivityScreen() {
   );
 
   const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Icon name="checkbox-outline" size={60} color={appTheme.colors.textLight} />
-      <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>
-        {filter === 'All' ? 'No deliveries assigned' : `No ${filter.toLowerCase()} deliveries`}
-      </Text>
-      <Text style={[styles.emptySubtitle, { color: appTheme.colors.textLight }]}>
-        {userBusinesses.length > 0
-          ? 'Deliveries assigned to you will appear here'
-          : 'Join a business to receive deliveries'}
-      </Text>
-      {userBusinesses.length === 0 && (
-        <TouchableOpacity
-          style={[styles.joinButton, { backgroundColor: appTheme.colors.primary }]}
-          onPress={() => navigation.navigate('Explore' as never)}
-        >
-          <Text style={styles.joinButtonText}>Explore Businesses</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+    <EmptyState
+      iconName="pulse-outline"
+      title={filter === 'All' ? 'No recent activity' : `No ${filter.toLowerCase()} deliveries`}
+      subtitle={
+        userBusinesses.length > 0
+          ? 'Your interactions and actions will appear here once you get started.'
+          : 'Join a business to receive deliveries and see your activity.'
+      }
+      ctaLabel={userBusinesses.length === 0 ? 'Explore Businesses' : undefined}
+      onCtaPress={userBusinesses.length === 0 ? () => navigation.navigate('Explore' as never) : undefined}
+      testID="empty-activity"
+    />
   );
 
   const renderLoading = () => (

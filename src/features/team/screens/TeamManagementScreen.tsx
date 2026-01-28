@@ -13,7 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { AppSearchBar, StaffCard, StaffMember, StaffRole as StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard } from '@/shared/components/ui';
+import { AppSearchBar, StaffCard, StaffMember, StaffRole as StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard, EmptyState } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import LocationDropdown from '@/features/company/components/LocationDropdown';
 import theme from '@/shared/theme';
@@ -626,18 +626,19 @@ export default function TeamManagementScreen() {
                 
                 <View style={styles.sectionContent}>
                   {filteredUsers.length === 0 ? (
-                    <View style={styles.sectionEmptyState}>
-                      <Icon name="people-outline" size={32} color={appTheme.colors.textMuted} />
-                      <Text style={[styles.sectionEmptyText, { color: appTheme.colors.textLight }]}>
-                        {searchQuery ? 'No staff members found' : 'No staff members yet'}
-                      </Text>
-                      <Text style={[styles.sectionEmptySubtext, { color: appTheme.colors.textMuted }]}>
-                        {searchQuery 
-                          ? 'Try adjusting your search criteria'
-                          : 'Invite your first staff member to get started'
-                        }
-                      </Text>
-                    </View>
+                    <EmptyState
+                      iconName="people-outline"
+                      title={searchQuery ? 'No staff members found' : 'No team members yet'}
+                      subtitle={
+                        searchQuery 
+                          ? 'Try adjusting your search criteria.'
+                          : 'Invite staff to manage operations and collaborate.'
+                      }
+                      ctaLabel={searchQuery ? undefined : 'Invite staff'}
+                      onCtaPress={searchQuery ? undefined : () => navigation.navigate('InviteStaff' as never)}
+                      compact
+                      testID="empty-team"
+                    />
                   ) : (
                     filteredUsers.map((user, index) => (
                       <StaffCard

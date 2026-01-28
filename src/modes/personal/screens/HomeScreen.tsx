@@ -20,8 +20,8 @@ import {
   StyleSheet,
   FlatList,
   RefreshControl,
-  TouchableOpacity,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -38,6 +38,7 @@ import {
   CompanyPresentationPost,
   NewProductPost,
 } from '../components';
+import { EmptyState } from '@/shared/components/ui';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -260,21 +261,14 @@ export default function HomeScreen() {
   };
 
   const renderEmptyFeed = () => (
-    <View style={styles.emptyState}>
-      <Icon name="newspaper-outline" size={60} color={appTheme.colors.textLight} />
-      <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>
-        No updates yet
-      </Text>
-      <Text style={[styles.emptySubtitle, { color: appTheme.colors.textLight }]}>
-        Connect with businesses to see their updates here
-      </Text>
-      <TouchableOpacity
-        style={[styles.exploreButton, { backgroundColor: appTheme.colors.primary }]}
-        onPress={() => navigation.navigate('Explore' as never)}
-      >
-        <Text style={styles.exploreButtonText}>Explore Businesses</Text>
-      </TouchableOpacity>
-    </View>
+    <EmptyState
+      iconName="sparkles-outline"
+      title="Welcome to your workspace"
+      subtitle="This is where updates, activity, and recommendations will appear as you start using NouPro."
+      ctaLabel="Explore NouPro"
+      onCtaPress={() => navigation.navigate('Explore' as never)}
+      testID="empty-home-feed"
+    />
   );
 
   return (

@@ -29,7 +29,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/features/search/components/FilterBar';
-import { AppModal, ListItemCard } from '@/shared/components/ui';
+import { AppModal, ListItemCard, EmptyState } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import theme from '@/shared/theme';
 import { getNotifications, markNotificationRead, Notification as APINotification } from '../notifications.service';
@@ -496,19 +496,16 @@ export default function NotificationsScreen() {
             />
           }
           ListEmptyComponent={() => (
-            <View style={styles.emptyContainer}>
-              <Icon
-                name="notifications-off-outline"
-                size={60}
-                color={appTheme.colors.textMuted}
-              />
-              <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>
-                No notifications
-              </Text>
-              <Text style={[styles.emptySubtitle, { color: appTheme.colors.textSecondary }]}>
-                {search ? 'No matching notifications found' : "You're all caught up! Check back later for updates."}
-              </Text>
-            </View>
+            <EmptyState
+              iconName="notifications-off-outline"
+              title="You're all caught up"
+              subtitle={
+                search
+                  ? 'No matching notifications found'
+                  : 'Notifications about messages, activity, and updates will appear here.'
+              }
+              testID="empty-notifications"
+            />
           )}
           contentContainerStyle={styles.listContent}
           style={{ flex: 1 }}

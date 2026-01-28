@@ -24,6 +24,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import Avatar from '@/shared/components/ui/Avatar';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { DemoModeBadge } from '@/shared/components/ui/DemoModeBadge';
@@ -39,16 +40,37 @@ export default function PersonalSettingsScreen() {
   const userBusinesses = useProfileStore((state) => state.userBusinesses);
   const updateCurrentUser = useProfileStore((state) => state.updateCurrentUser);
   const switchToBusiness = useProfileStore((state) => state.switchToBusiness);
+  const setLocation = useBusinessStore((state) => state.setLocation);
 
   // Local state
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     currentUser?.notifications_on ?? true
   );
   const [isProfileSwitcherVisible, setIsProfileSwitcherVisible] = useState(false);
+  const [isAddBusinessOptionsVisible, setIsAddBusinessOptionsVisible] = useState(false);
+  const [expandedBusinessId, setExpandedBusinessId] = useState<string | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+
+  // Mock locations data - in real app this would come from the store/API
+  const mockBusinessLocations: Record<string, Array<{ id: string; name: string; address: string; is_primary: boolean }>> = {
+    'biz-001': [
+      { id: 'loc-001', name: 'Main Warehouse', address: 'Port Louis', is_primary: true },
+      { id: 'loc-002', name: 'Rose Hill Branch', address: 'Rose Hill', is_primary: false },
+      { id: 'loc-003', name: 'Curepipe Store', address: 'Curepipe', is_primary: false },
+    ],
+    'biz-002': [
+      { id: 'loc-004', name: 'Head Office', address: 'Ebene', is_primary: true },
+      { id: 'loc-005', name: 'Quatre Bornes', address: 'Quatre Bornes', is_primary: false },
+    ],
+  };
 
   // Animation for modal
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const modalTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
+  // Animation for add business options modal
+  const addOptionsOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const addOptionsModalTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
   const handleNotificationsToggle = (value: boolean) => {
     setNotificationsEnabled(value);
@@ -121,6 +143,93 @@ export default function PersonalSettingsScreen() {
     } catch (error) {
       console.error('Error switching business:', error);
     }
+  };
+
+  const handleBusinessPress = (businessId: string) => {
+    const locations = mockBusinessLocations[businessId];
+    if (locations && locations.length > 1) {
+      // Toggle expansion if business has multiple locations
+      setExpandedBusinessId(expandedBusinessId === businessId ? null : businessId);
+    } else {
+      // Switch directly if single location or no locations
+      handleBusinessSelect(businessId);
+    }
+  };
+
+  const handleLocationSelect = async (businessId: string, locationId: string) => {
+    try {
+      // Set selected location and switch business
+      setSelectedLocationId(locationId);
+      await switchToBusiness(businessId);
+      closeProfileSwitcher();
+      const selectedLocation = mockBusinessLocations[businessId]?.find(
+        (location) => location.id === locationId
+      );
+      if (selectedLocation) {
+        setLocation({
+          id: selectedLocation.id,
+          companyId: businessId,
+          name: selectedLocation.name,
+          address: selectedLocation.address,
+          phone: undefined,
+          email: undefined,
+          latitude: undefined,
+          longitude: undefined,
+        });
+      }
+    } catch (error) {
+      console.error('Error switching to location:', error);
+    }
+  };
+
+  // Add business options modal functions
+  const openAddBusinessOptions = () => {
+    setIsAddBusinessOptionsVisible(true);
+    Animated.parallel([
+      Animated.timing(addOptionsOverlayOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(addOptionsModalTranslateY, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closeAddBusinessOptions = () => {
+    Animated.parallel([
+      Animated.timing(addOptionsOverlayOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(addOptionsModalTranslateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setIsAddBusinessOptionsVisible(false);
+    });
+  };
+
+  const handleCreateNewBusiness = () => {
+    closeAddBusinessOptions();
+    setTimeout(() => {
+      // @ts-ignore
+      navigation.navigate('BusinessBasicInfo', { fromProfileSwitcher: true });
+    }, 100);
+  };
+
+  const handleJoinBusiness = () => {
+    closeAddBusinessOptions();
+    setTimeout(() => {
+      // @ts-ignore
+      navigation.navigate('CompanySearch', { query: '', mode: 'join' });
+    }, 100);
   };
 
 
@@ -279,87 +388,249 @@ export default function PersonalSettingsScreen() {
           </View>
 
           <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
-            {/* Personal Profile - Active */}
-            <Text style={[styles.modalSectionTitle, { color: appTheme.colors.textLight }]}>
+            {/* Personal Profile Section */}
+            <Text style={[styles.modalSectionTitle, { color: appTheme.colors.primary }]}>
               Personal
             </Text>
             <View style={[styles.profileRow, styles.profileRowActive]}>
-              <View style={styles.profileRowAvatar}>
-                <Icon name="person" size={24} color="#6B7280" />
-              </View>
+              <Avatar
+                userId={currentUser?.id || '1'}
+                userName={currentUser?.name || 'User'}
+                imageUri={currentUser?.avatar_url}
+                size={48}
+              />
               <View style={styles.profileRowInfo}>
-                <Text style={[styles.profileRowName, { color: appTheme.colors.text }]}>
+                <Text style={[styles.profileRowName, { color: '#FFFFFF' }]}>
                   {currentUser?.name || 'Personal Profile'}
                 </Text>
-                <Text style={[styles.profileRowSubtitle, { color: appTheme.colors.textLight }]}>
+                <Text style={[styles.profileRowSubtitle, { color: 'rgba(255,255,255,0.7)' }]}>
                   Personal
                 </Text>
               </View>
-              <Icon name="checkmark-circle" size={24} color="#22C55E" />
             </View>
 
-            {/* Business Profiles */}
+            {/* Business Profiles Section - only shown when user has businesses */}
             {userBusinesses.length > 0 && (
-              <>
-                <Text style={[styles.modalSectionTitle, { color: appTheme.colors.textLight }]}>
+              <View style={styles.sectionTitleRow}>
+                <Text style={[styles.modalSectionTitle, { color: appTheme.colors.primary }]}>
                   Businesses
                 </Text>
-                {userBusinesses.map((ub) => (
+                <TouchableOpacity
+                  style={styles.addBusinessButton}
+                  onPress={() => {
+                    closeProfileSwitcher();
+                    setTimeout(openAddBusinessOptions, 300);
+                  }}
+                >
+                  <Icon name="add" size={20} color={appTheme.colors.primary} />
+                </TouchableOpacity>
+              </View>
+            )}
+            {userBusinesses.map((ub) => {
+              const locations = mockBusinessLocations[ub.business.id];
+              const hasLocations = locations && locations.length > 0;
+              const isExpanded = expandedBusinessId === ub.business.id;
+              // Find if this business has a selected location
+              const selectedLocation = hasLocations ? locations.find(loc => loc.id === selectedLocationId) : null;
+              // Show all locations if expanded, or just the selected one if collapsed
+              const showAllLocations = hasLocations && isExpanded;
+              const showSelectedLocationOnly = !isExpanded && selectedLocation;
+              
+              return (
+                <View key={ub.business.id}>
                   <TouchableOpacity
-                    key={ub.business.id}
                     style={styles.profileRow}
-                    onPress={() => handleBusinessSelect(ub.business.id)}
+                    onPress={() => handleBusinessPress(ub.business.id)}
                   >
                     <Avatar
                       userId={ub.business.id}
                       userName={ub.business.name}
                       imageUri={ub.business.logo_url}
-                      size={40}
+                      size={48}
                     />
                     <View style={styles.profileRowInfo}>
-                      <Text style={[styles.profileRowName, { color: appTheme.colors.text }]}>
+                      <Text style={[styles.profileRowName, { color: appTheme.colors.primary }]}>
                         {ub.business.name}
                       </Text>
-                      <Text style={[styles.profileRowSubtitle, { color: appTheme.colors.textLight }]}>
+                      <Text style={[styles.profileRowSubtitle, { color: appTheme.colors.textSecondary }]}>
                         {getRoleDisplayName(ub.role)}
+                        {hasLocations && ` • ${locations.length} location${locations.length > 1 ? 's' : ''}`}
                       </Text>
                     </View>
+                    {hasLocations && (
+                      <Icon 
+                        name={isExpanded ? "chevron-up" : "chevron-down"} 
+                        size={20} 
+                        color={appTheme.colors.textLight} 
+                      />
+                    )}
                   </TouchableOpacity>
-                ))}
-              </>
-            )}
-
-            {/* Actions Section */}
-            <View style={styles.actionsSection}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => {
-                  closeProfileSwitcher();
-                  // @ts-ignore
-                  navigation.navigate('CreateBusiness');
-                }}
-              >
-                <View style={styles.actionIconContainer}>
-                  <Icon name="add" size={20} color="#6B7280" />
+                  
+                  {/* Selected location only - shown when collapsed but has selection */}
+                  {showSelectedLocationOnly && (
+                    <TouchableOpacity
+                      style={[styles.locationRow, styles.locationRowActive]}
+                      onPress={() => setExpandedBusinessId(ub.business.id)}
+                    >
+                      <View style={[styles.locationIconContainer, styles.locationIconContainerActive]}>
+                        <Icon name="location-outline" size={20} color="#FFFFFF" />
+                      </View>
+                      <View style={styles.locationInfo}>
+                        <Text style={[styles.locationName, { color: '#FFFFFF' }]}>
+                          {selectedLocation.name}
+                        </Text>
+                        <Text style={[styles.locationAddress, { color: 'rgba(255,255,255,0.7)' }]}>
+                          {selectedLocation.address}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {/* All location options - shown when expanded */}
+                  {showAllLocations && (
+                    <View style={styles.locationsContainer}>
+                      {locations.map((location) => {
+                        const isLocationSelected = selectedLocationId === location.id;
+                        return (
+                          <TouchableOpacity
+                            key={location.id}
+                            style={[
+                              styles.locationRow,
+                              isLocationSelected && styles.locationRowActive,
+                            ]}
+                            onPress={() => handleLocationSelect(ub.business.id, location.id)}
+                          >
+                            <View style={[
+                              styles.locationIconContainer,
+                              isLocationSelected && styles.locationIconContainerActive,
+                            ]}>
+                              <Icon 
+                                name="location-outline" 
+                                size={20} 
+                                color={isLocationSelected ? '#FFFFFF' : appTheme.colors.textSecondary} 
+                              />
+                            </View>
+                            <View style={styles.locationInfo}>
+                              <Text style={[
+                                styles.locationName, 
+                                { color: isLocationSelected ? '#FFFFFF' : appTheme.colors.primary }
+                              ]}>
+                                {location.name}
+                              </Text>
+                              <Text style={[
+                                styles.locationAddress, 
+                                { color: isLocationSelected ? 'rgba(255,255,255,0.7)' : appTheme.colors.textSecondary }
+                              ]}>
+                                {location.address}
+                              </Text>
+                            </View>
+                            {location.is_primary && !isLocationSelected && (
+                              <View style={styles.primaryBadge}>
+                                <Text style={styles.primaryBadgeText}>Primary</Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
                 </View>
-                <Text style={[styles.actionText, { color: appTheme.colors.text }]}>Create New Business</Text>
-              </TouchableOpacity>
+              );
+            })}
 
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => {
-                  closeProfileSwitcher();
-                  // @ts-ignore
-                  navigation.navigate('CompanySearch', { query: '' });
-                }}
-              >
-                <View style={styles.actionIconContainer}>
-                  <Icon name="people" size={20} color="#6B7280" />
-                </View>
-                <Text style={[styles.actionText, { color: appTheme.colors.text }]}>Join Existing Business</Text>
-              </TouchableOpacity>
-            </View>
+            {/* Add New Business Button */}
+            <TouchableOpacity
+              style={styles.addNewBusinessButton}
+              onPress={() => {
+                closeProfileSwitcher();
+                setTimeout(openAddBusinessOptions, 300);
+              }}
+            >
+              <View style={{ marginRight: 8 }}>
+                <Icon name="add" size={20} color="#FFFFFF" />
+              </View>
+              <Text style={styles.addNewBusinessButtonText}>Add New Business</Text>
+            </TouchableOpacity>
           </ScrollView>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+
+  // Add Business Options Modal
+  const renderAddBusinessOptionsModal = () => (
+    <Modal
+      transparent={true}
+      visible={isAddBusinessOptionsVisible}
+      onRequestClose={closeAddBusinessOptions}
+      animationType="none"
+    >
+      <Animated.View
+        style={[
+          styles.modalOverlay,
+          { opacity: addOptionsOverlayOpacity }
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlayTouchable}
+          activeOpacity={1}
+          onPress={closeAddBusinessOptions}
+        />
+
+        <Animated.View
+          style={[
+            styles.addOptionsBottomSheet,
+            {
+              backgroundColor: appTheme.colors.surface,
+              transform: [{ translateY: addOptionsModalTranslateY }]
+            }
+          ]}
+        >
+          {/* Modal Header */}
+          <View style={[styles.modalHeader, { borderBottomColor: appTheme.colors.borderColor }]}>
+            <Text style={[styles.modalTitle, { color: appTheme.colors.text }]}>Add Business</Text>
+            <TouchableOpacity onPress={closeAddBusinessOptions} style={styles.modalCloseButton}>
+              <Icon name="close" size={24} color={appTheme.colors.textLight} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.addOptionsContent}>
+            <TouchableOpacity
+              style={styles.addOptionRow}
+              onPress={handleCreateNewBusiness}
+            >
+              <View style={[styles.addOptionIconContainer, { backgroundColor: appTheme.colors.surface }]}>
+                <Icon name="add-circle-outline" size={24} color={appTheme.colors.primary} />
+              </View>
+              <View style={styles.addOptionInfo}>
+                <Text style={[styles.addOptionTitle, { color: appTheme.colors.primary }]}>
+                  Create New Business
+                </Text>
+                <Text style={[styles.addOptionSubtitle, { color: appTheme.colors.textSecondary }]}>
+                  Start a new business from scratch
+                </Text>
+              </View>
+              <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.addOptionRow}
+              onPress={handleJoinBusiness}
+            >
+              <View style={[styles.addOptionIconContainer, { backgroundColor: appTheme.colors.surface }]}>
+                <Icon name="people-outline" size={24} color={appTheme.colors.primary} />
+              </View>
+              <View style={styles.addOptionInfo}>
+                <Text style={[styles.addOptionTitle, { color: appTheme.colors.primary }]}>
+                  Join a Business
+                </Text>
+                <Text style={[styles.addOptionSubtitle, { color: appTheme.colors.textSecondary }]}>
+                  Search and join an existing business
+                </Text>
+              </View>
+              <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+            </TouchableOpacity>
+          </View>
         </Animated.View>
       </Animated.View>
     </Modal>
@@ -392,6 +663,7 @@ export default function PersonalSettingsScreen() {
       </View>
 
       {renderProfileSwitcherModal()}
+      {renderAddBusinessOptionsModal()}
     </SafeAreaView>
   );
 }
@@ -497,35 +769,50 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   modalScrollView: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     marginTop: 8,
   },
   modalSectionTitle: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
+    fontSize: 18,
+    fontFamily: theme.fonts.primary.bold,
     marginTop: 16,
     marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  addBusinessButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 0,
+    marginHorizontal: 0,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#E1E4EA',
   },
   profileRowActive: {
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
+    backgroundColor: '#000000',
+    borderRadius: 0,
+    borderBottomWidth: 0,
+    marginHorizontal: -12,
+    paddingHorizontal: 12,
   },
   profileRowAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
@@ -536,39 +823,119 @@ const styles = StyleSheet.create({
   },
   profileRowName: {
     fontSize: 16,
-    fontFamily: theme.fonts.primary.medium,
+    fontFamily: theme.fonts.primary.bold,
   },
   profileRowSubtitle: {
     fontSize: 14,
-    fontFamily: theme.fonts.primary.regular,
+    fontFamily: theme.fonts.primary.semiBold,
     marginTop: 2,
   },
-  actionsSection: {
-    marginTop: 24,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+  // Location styles
+  locationsContainer: {
+    // No left line, just a container for locations
   },
-  actionButton: {
+  locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 12,
-    borderRadius: 12,
-    marginBottom: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#E1E4EA',
   },
-  actionIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#F3F4F6',
+  locationRowActive: {
+    backgroundColor: '#000000',
+    borderBottomWidth: 0,
+    marginHorizontal: -12,
+    paddingHorizontal: 12,
+  },
+  locationIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F6F7F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  actionText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.medium,
+  locationIconContainerActive: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  locationInfo: {
+    flex: 1,
     marginLeft: 12,
+  },
+  locationName: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.semiBold,
+  },
+  locationAddress: {
+    fontSize: 12,
+    fontFamily: theme.fonts.primary.regular,
+    marginTop: 2,
+  },
+  primaryBadge: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  primaryBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.fonts.primary.semiBold,
+    color: '#2E7D32',
+  },
+  addNewBusinessButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+    borderRadius: 8,
+    height: 56,
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  addNewBusinessButtonText: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.semiBold,
+    color: '#FFFFFF',
+  },
+  // Add Business Options Modal styles
+  addOptionsBottomSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  addOptionsContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  addOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 72,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: '#F9FAFB',
+  },
+  addOptionIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addOptionInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  addOptionTitle: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.bold,
+  },
+  addOptionSubtitle: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.regular,
+    marginTop: 2,
   },
 });
 

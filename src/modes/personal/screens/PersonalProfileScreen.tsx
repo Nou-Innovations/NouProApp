@@ -270,7 +270,7 @@ export default function PersonalProfileScreen() {
     closeAddBusinessOptions();
     setTimeout(() => {
       // @ts-ignore
-      navigation.navigate('CreateBusiness');
+      navigation.navigate('BusinessBasicInfo', { fromProfileSwitcher: true });
     }, 100);
   };
 

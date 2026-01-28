@@ -23,6 +23,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { Icon } from '@/shared/utils/icons';
+import { EmptyState } from '@/shared/components/ui';
 import {
   canViewDeliveries,
   canManageDeliveries,
@@ -33,8 +34,17 @@ import {
 import { useDeliveries } from '../hooks/useDeliveries';
 import { Delivery, DeliveryStatus, DeliveryViewType } from '@/shared/types/delivery';
 
-// Status filter options
-const DELIVERY_STATUSES: (DeliveryStatus | 'all')[] = ['all', 'new', 'pending', 'ongoing', 'delivered', 'canceled'];
+// Status filter options (matching Prisma DeliveryStatus enum)
+const DELIVERY_STATUSES: (DeliveryStatus | 'all')[] = [
+  'all', 
+  'NOT_ASSIGNED', 
+  'ASSIGNED', 
+  'PACKED', 
+  'OUT_FOR_DELIVERY', 
+  'DELIVERED', 
+  'FAILED',
+  'CANCELED'
+];
 
 export default function DeliveryScreen() {
   const navigation = useNavigation();
@@ -219,34 +229,65 @@ export default function DeliveryScreen() {
             onPress={() => (navigation as any).navigate('DeliveryDetail', { deliveryId: (item as Delivery).id })}
           />
         )}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyListContainer}>
-            {loading ? (
-              <>
+        ListEmptyComponent={() => {
+          if (loading) {
+            return (
+              <View style={styles.emptyListContainer}>
                 <ActivityIndicator size="large" color={appTheme.colors.primary} />
                 <Text style={[styles.emptyListText, { color: appTheme.colors.textLight, marginTop: 16 }]}>
                   Loading deliveries...
                 </Text>
-              </>
-            ) : (
-              <>
-                <Icon 
-                  name={activeTab === 'incoming' ? 'arrow-down-circle-outline' : activeTab === 'outgoing' ? 'arrow-up-circle-outline' : 'car-outline'} 
-                  size={48} 
-                  color={appTheme.colors.textLight} 
-                />
-                <Text style={[styles.emptyListText, { color: appTheme.colors.textLight }]}>
-                  No {activeTab === 'all' ? 'deliveries' : activeTab === 'transfers' ? 'transfers' : `${activeTab} deliveries`} found
-                </Text>
-                {selectedLocationId && (
-                  <Text style={[styles.emptyListSubtext, { color: appTheme.colors.textLight }]}>
-                    Try selecting "All Locations" to see more
-                  </Text>
-                )}
-              </>
-            )}
-          </View>
-        )}
+              </View>
+            );
+          }
+          
+          // Determine empty state content based on active tab
+          const getEmptyStateContent = () => {
+            switch (activeTab) {
+              case 'outgoing':
+                return {
+                  icon: 'arrow-up-circle-outline',
+                  title: 'No outgoing deliveries',
+                  subtitle: 'Track shipments sent to your clients or partners.',
+                  ctaLabel: 'Create outgoing delivery',
+                };
+              case 'incoming':
+                return {
+                  icon: 'arrow-down-circle-outline',
+                  title: 'No incoming deliveries',
+                  subtitle: 'Incoming deliveries from suppliers will appear here.',
+                  ctaLabel: undefined,
+                };
+              case 'transfers':
+                return {
+                  icon: 'swap-horizontal-outline',
+                  title: 'No transfers recorded',
+                  subtitle: 'Internal stock or location transfers will appear here.',
+                  ctaLabel: 'Create transfer',
+                };
+              default:
+                return {
+                  icon: 'car-outline',
+                  title: 'No deliveries yet',
+                  subtitle: 'All your incoming and outgoing deliveries will be listed here.',
+                  ctaLabel: 'Create delivery',
+                };
+            }
+          };
+          
+          const { icon, title, subtitle, ctaLabel } = getEmptyStateContent();
+          
+          return (
+            <EmptyState
+              iconName={icon}
+              title={title}
+              subtitle={selectedLocationId ? 'Try selecting "All Locations" to see more.' : subtitle}
+              ctaLabel={hasManagePermission ? ctaLabel : undefined}
+              onCtaPress={hasManagePermission ? handleCreateNew : undefined}
+              testID="empty-deliveries"
+            />
+          );
+        }}
         contentContainerStyle={filteredDeliveries.length === 0 ? { flex: 1 } : { flexGrow: 1 }}
         style={{ flex: 1 }}
       />
