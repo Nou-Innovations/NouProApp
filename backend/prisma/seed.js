@@ -24,6 +24,7 @@ async function main() {
         email: u.email,
         avatar: u.avatar,
         phone: u.phone,
+        description: u.description,
         lastLoginAt: u.lastLoginAt ? new Date(u.lastLoginAt) : null,
         createdAt: new Date(u.createdAt),
       },
@@ -32,6 +33,7 @@ async function main() {
         email: u.email,
         avatar: u.avatar,
         phone: u.phone,
+        description: u.description,
         lastLoginAt: u.lastLoginAt ? new Date(u.lastLoginAt) : null,
       },
     });

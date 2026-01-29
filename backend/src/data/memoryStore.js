@@ -1168,9 +1168,10 @@ let users = [
   {
     id: 'usr-001',
     email: 'admin@noupro.com',
-    name: 'Admin User',
+    name: 'Arnaud Labonne',
     avatar: 'https://picsum.photos/seed/admin/100/100',
     phone: '+230-5123-4567',
+    description: 'Founder & CEO of NouPro Distribution. Passionate about streamlining supply chain operations and building innovative distribution solutions.',
     createdAt: '2024-01-01T00:00:00Z',
     lastLoginAt: '2025-01-15T08:00:00Z'
   },
