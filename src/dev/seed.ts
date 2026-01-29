@@ -15,16 +15,16 @@ import { UserBusiness, Business, BusinessStaff } from '@/shared/types/business';
  */
 export const mockUser: User = {
   id: 'usr-001',
-  name: 'John Doe',
-  email: 'john@noupro.com',
+  name: 'Arnaud Labonne',
+  email: 'admin@noupro.com',
   phone: '+230 5123 4567',
   address: 'Rose Hill, Mauritius',
   language: 'EN',
   notifications_on: true,
-  job_title: 'Distribution Manager',
-  description: 'Experienced distribution professional with a passion for logistics and supply chain management. Specializing in FMCG distribution across Mauritius.',
+  job_title: 'Founder & CEO',
+  description: 'Founder & CEO of NouPro Distribution. Passionate about streamlining supply chain operations and building innovative distribution solutions.',
   connections_count: 128,
-  avatar_url: 'https://picsum.photos/seed/johndoe/200/200',
+  avatar_url: 'https://picsum.photos/seed/arnaud/200/200',
   created_at: new Date().toISOString(),
 };
 

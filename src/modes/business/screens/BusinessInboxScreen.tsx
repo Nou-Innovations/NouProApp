@@ -25,7 +25,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { GestureHandlerRootView, TouchableOpacity } from 'react-native-gesture-handler';
-import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
+import BottomSheet from '@gorhom/bottom-sheet';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useNotifications } from '@/shared/context/NotificationContext';
@@ -652,7 +652,7 @@ export default function BusinessInboxScreen() {
               )}
               enablePanDownToClose={false}
             >
-              <BottomSheetFlatList
+              <FlatList
                 data={filteredChats}
                 keyExtractor={(item) => item.id}
                 renderItem={renderChatItem}

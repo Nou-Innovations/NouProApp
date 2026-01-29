@@ -52,7 +52,7 @@ export async function getNotifications(
   if (filter && filter !== 'all') params.append('filter', filter);
   
   const response = await api.get(
-    `/api/users/${userId}/notifications?${params}`
+    `/users/${userId}/notifications?${params}`
   );
   return response.data.data.notifications;
 }
@@ -65,7 +65,7 @@ export async function markNotificationRead(
   notificationId: string
 ): Promise<void> {
   await api.post(
-    `/api/users/${userId}/notifications/${notificationId}/read`
+    `/users/${userId}/notifications/${notificationId}/read`
   );
 }
 

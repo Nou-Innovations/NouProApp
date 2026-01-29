@@ -2,37 +2,37 @@ import { User, Business } from '@/shared/types/store';
 
 export const mockUser: User = {
   id: 'usr-001',
-  name: 'Jane Doe',
-  email: 'jane.doe@email.com',
-  role: 'staff',
-  avatar: '',
+  name: 'Arnaud Labonne',
+  email: 'admin@noupro.com',
+  role: 'super_admin',
+  avatar: 'https://picsum.photos/seed/arnaud/200/200',
 };
 
 export const mockUserCompany: Business = {
   id: 'biz-001',
-  name: 'The Burning Distributor',
-  logo: 'https://picsum.photos/80/80',
+  name: 'NouPro Distribution Inc.',
+  logo: 'https://picsum.photos/seed/biz001/100/100',
   locations: [
     {
       id: 'loc-001',
-      name: 'Main HQ',
-      address: 'ShopName, XYZ Road, Beau Bassin, Mauritius',
-      phone: '412 3456',
-      email: 'info@burningdistributor.com',
+      name: 'Warehouse A - Port Louis',
+      address: '123 Royal Road, Port Louis, Mauritius',
+      phone: '+230-5123-4567',
+      email: 'warehouse-a@noupro.mu',
     },
   ],
   settings: {
     taxRate: 15,
-    currency: 'Rs',
+    currency: 'MUR',
     invoicePrefix: 'INV',
   },
 };
 
 export const mockUserProfileDetails = {
   phone: '+230 5123 4567',
-  position: 'Sales Executive',
+  position: 'Founder & CEO',
   about:
-    'Passionate about connecting people with the best products. Always ready to help and support clients.',
+    'Founder & CEO of NouPro Distribution. Passionate about streamlining supply chain operations and building innovative distribution solutions.',
   address: 'Rose Hill, Mauritius',
-  joined: '2022-01-15',
+  joined: '2024-01-01',
 }; 

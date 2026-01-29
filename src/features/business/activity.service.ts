@@ -40,7 +40,7 @@ export async function getActivityFeed(
   if (options?.limit) params.append('limit', options.limit.toString());
   
   const response = await api.get(
-    `/api/companies/${companyId}/activity-feed?${params}`
+    `/companies/${companyId}/activity-feed?${params}`
   );
   return response.data.data.activities;
 }
