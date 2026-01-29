@@ -487,14 +487,7 @@ const AppWithTheme = () => {
   const accessToken = useProfileStore((state) => state.accessToken);
   const logout = useProfileStore((state) => state.logout);
   
-  // TEMPORARY: Force logout on app start to test real backend login
-  // Remove this once you've successfully tested login with Render backend
-  useEffect(() => {
-    if (accessToken || currentUser) {
-      console.log('[DEBUG] Force logout to test backend login');
-      logout();
-    }
-  }, []); // Empty deps = run once on mount
+  // Force logout removed - JWT auth is now properly implemented
   
   // Determine if user is signed in
   const isSignedIn = Boolean(accessToken && currentUser);

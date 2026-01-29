@@ -28,7 +28,7 @@ const repos = getRepos();
 const { orderStatus: orderStatusService, eventMessages } = require('./src/services');
 
 // Authentication middleware
-const { requireAuth, optionalAuth } = require('./src/middleware/auth');
+const { requireAuth, optionalAuth, generateToken, verifyToken } = require('./src/middleware/auth');
 
 console.log(`📦 Data source: ${getDataSource()}`);
 
@@ -1508,10 +1508,23 @@ app.post('/api/auth/login', (req, res) => {
       };
     }).filter(ub => ub.business); // Filter out any null businesses
     
+    // Generate real JWT tokens
+    const token = generateToken({ 
+      sub: user.id, 
+      email: user.email,
+      name: user.name 
+    });
+    const refreshToken = generateToken({ 
+      sub: user.id, 
+      type: 'refresh' 
+    }, { expiresIn: '30d' });
+    
+    console.log('[Login] Generated JWT for user:', user.id);
+    
     res.json(successResponse({
       user,
-      token: 'mock-jwt-token-' + Date.now(),
-      refreshToken: 'mock-refresh-token-' + Date.now(),
+      token,
+      refreshToken,
       businesses: userBusinesses
     }));
   } else {
@@ -1570,20 +1583,43 @@ app.post('/api/auth/register', (req, res) => {
 
 // Get current user
 app.get('/api/auth/me', (req, res) => {
-  // In a real app, extract user ID from JWT token
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json(errorResponse('Not authenticated'));
   }
   
-  // For mock purposes, return the first user or a default
-  // In production, decode JWT and find the user by ID
-  const user = users[0];
+  // Verify JWT and extract user ID
+  const result = verifyToken(authHeader);
+  if (result.error) {
+    return res.status(401).json(errorResponse(result.error));
+  }
+  
+  // Find user by ID from token
+  const user = users.find(u => u.id === result.user.id);
   if (!user) {
     return res.status(404).json(errorResponse('User not found'));
   }
   
-  res.json(successResponse({ user }));
+  // Get user's businesses
+  const userMemberships = businessMembers.filter(m => 
+    m.userId === user.id && m.status === 'accepted'
+  );
+  
+  const userBusinesses = userMemberships.map(membership => {
+    const business = companies.find(c => c.id === membership.businessId);
+    return {
+      business,
+      role: membership.role,
+      staff_entry: {
+        id: membership.id,
+        status: membership.status,
+        role_type: membership.roleType || null,
+        joinedAt: membership.joinedAt,
+      }
+    };
+  }).filter(ub => ub.business);
+  
+  res.json(successResponse({ user, businesses: userBusinesses }));
 });
 
 // ============================================================================
