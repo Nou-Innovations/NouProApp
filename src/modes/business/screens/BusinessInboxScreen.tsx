@@ -615,6 +615,7 @@ export default function BusinessInboxScreen() {
                 index={0}
                 snapPoints={snapPoints}
                 onChange={handleSheetChange}
+                style={{ zIndex: 50, elevation: 50 }}
                 backgroundComponent={({ style }) => (
                   <Animated.View 
                     style={[
@@ -721,6 +722,7 @@ const styles = StyleSheet.create({
     // Fully interactive as background content
     marginTop: 8,
     paddingBottom: theme.spacing.md,
+    zIndex: 0, // Keep below BottomSheet
   },
   bottomSheetBackground: {
     borderTopLeftRadius: 20,
