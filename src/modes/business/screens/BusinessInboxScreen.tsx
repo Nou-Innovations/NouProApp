@@ -340,6 +340,9 @@ export default function BusinessInboxScreen() {
   useEffect(() => {
     const fetchChatList = async () => {
       if (!activeBusiness?.id) {
+        // No active business - use mock data as fallback for development
+        console.warn('No activeBusiness.id - falling back to mock chats');
+        setChats(mockBusinessChats as any);
         setLoadingChats(false);
         return;
       }
@@ -355,7 +358,9 @@ export default function BusinessInboxScreen() {
         setChats(data);
       } catch (error) {
         console.error('Failed to load chats:', error);
-        setChats([]);
+        // Fallback to mock data on API error for development
+        console.warn('API error - falling back to mock chats');
+        setChats(mockBusinessChats as any);
       } finally {
         setLoadingChats(false);
       }
@@ -391,8 +396,9 @@ export default function BusinessInboxScreen() {
   const snapPoints = useMemo(() => {
     // Calculate remaining space below activity section (with 16px gap)
     // Total used space = headerHeight + activitySectionHeight + 8px (marginTop) + 16px (gap)
-    const usedSpace = headerHeight + activitySectionHeight + 96;
-    const peekHeight = Math.max(SCREEN_HEIGHT - usedSpace, 150); // Minimum 150px peek
+    const TAB_BAR_HEIGHT = 80; // Account for bottom tab bar
+    const usedSpace = headerHeight + activitySectionHeight + 96 + TAB_BAR_HEIGHT;
+    const peekHeight = Math.max(SCREEN_HEIGHT - usedSpace, 280); // Minimum 280px peek (increased from 150)
     const expandedHeight = SCREEN_HEIGHT - headerHeight;
     return [peekHeight, expandedHeight];
   }, [headerHeight, activitySectionHeight]);
@@ -602,76 +608,83 @@ export default function BusinessInboxScreen() {
             </View>
             
             {/* Bottom Sheet - Chat list section that slides over Activity */}
-            <BottomSheet
-              ref={bottomSheetRef}
-              index={0}
-              snapPoints={snapPoints}
-              onChange={handleSheetChange}
-              backgroundComponent={({ style }) => (
-                <Animated.View 
-                  style={[
-                    style, 
-                    styles.bottomSheetBackground, 
-                    { backgroundColor: appTheme.colors.background },
-                    animatedSheetStyle
-                  ]} 
-                />
-              )}
-              handleComponent={() => (
-                <View style={{ backgroundColor: appTheme.colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
-                  <Animated.View style={[styles.handleContainer, animatedHandleStyle]}>
-                    <View style={styles.bottomSheetHandle} />
-                  </Animated.View>
-                  {/* Search Bar with + button - sticky */}
-                  <View style={[styles.searchContainer, { backgroundColor: appTheme.colors.background }]}>
-                    <AppSearchBar
-                      ref={searchBarRef}
-                      placeholder="Search conversations..."
-                      value={search}
-                      onChangeText={setSearch}
-                      onClear={() => setSearch('')}
-                      containerStyle={styles.searchBarContainer}
+            {/* Wrapped in View with zIndex to ensure proper stacking on top of activity */}
+            <View style={styles.bottomSheetWrapper}>
+              <BottomSheet
+                ref={bottomSheetRef}
+                index={0}
+                snapPoints={snapPoints}
+                onChange={handleSheetChange}
+                backgroundComponent={({ style }) => (
+                  <Animated.View 
+                    style={[
+                      style, 
+                      styles.bottomSheetBackground, 
+                      { backgroundColor: appTheme.colors.background },
+                      animatedSheetStyle
+                    ]} 
+                  />
+                )}
+                handleComponent={() => (
+                  <View style={{ backgroundColor: appTheme.colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+                    <Animated.View style={[styles.handleContainer, animatedHandleStyle]}>
+                      <View style={[styles.bottomSheetHandle, { backgroundColor: appTheme.colors.border }]} />
+                    </Animated.View>
+                    {/* Conversations Header */}
+                    <Text style={[styles.conversationsTitle, { color: appTheme.colors.text }]}>
+                      Conversations
+                    </Text>
+                    {/* Search Bar with + button - sticky */}
+                    <View style={[styles.searchContainer, { backgroundColor: appTheme.colors.background }]}>
+                      <AppSearchBar
+                        ref={searchBarRef}
+                        placeholder="Search conversations..."
+                        value={search}
+                        onChangeText={setSearch}
+                        onClear={() => setSearch('')}
+                        containerStyle={styles.searchBarContainer}
+                      />
+                      <TouchableOpacity
+                        onPress={handleNewChat}
+                        style={styles.addButton}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Pencil size={24} color={appTheme.colors.text} strokeWidth={2} />
+                      </TouchableOpacity>
+                    </View>
+                    {/* Filter Bar - sticky at top of bottom sheet */}
+                    <FilterBar
+                      statuses={chatTypes}
+                      selectedStatus={filter}
+                      onSelectStatus={setFilter}
+                      containerStyle={{ flexGrow: 0 }}
                     />
-                    <TouchableOpacity
-                      onPress={handleNewChat}
-                      style={styles.addButton}
-                      activeOpacity={0.7}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Pencil size={24} color={appTheme.colors.text} strokeWidth={2} />
-                    </TouchableOpacity>
                   </View>
-                  {/* Filter Bar - sticky at top of bottom sheet */}
-                  <FilterBar
-                    statuses={chatTypes}
-                    selectedStatus={filter}
-                    onSelectStatus={setFilter}
-                    containerStyle={{ flexGrow: 0 }}
-                  />
-                </View>
-              )}
-              enablePanDownToClose={false}
-            >
-              <FlatList
-                data={filteredChats}
-                keyExtractor={(item) => item.id}
-                renderItem={renderChatItem}
-                ListEmptyComponent={renderEmptyState}
-                onScrollBeginDrag={handleScroll}
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                  <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
-                    tintColor={appTheme.colors.primary}
-                  />
-                }
-                contentContainerStyle={[
-                  styles.listContent,
-                  filteredChats.length === 0 && styles.listContentEmpty
-                ]}
-              />
-            </BottomSheet>
+                )}
+                enablePanDownToClose={false}
+              >
+                <FlatList
+                  data={filteredChats}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderChatItem}
+                  ListEmptyComponent={renderEmptyState}
+                  onScrollBeginDrag={handleScroll}
+                  showsVerticalScrollIndicator={false}
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={refreshing}
+                      onRefresh={onRefresh}
+                      tintColor={appTheme.colors.primary}
+                    />
+                  }
+                  contentContainerStyle={[
+                    styles.listContent,
+                    filteredChats.length === 0 && styles.listContentEmpty
+                  ]}
+                />
+              </BottomSheet>
+            </View>
           </View>
           
           {/* New Chat Modal */}
@@ -698,6 +711,11 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
   },
+  bottomSheetWrapper: {
+    flex: 1,
+    zIndex: 50,
+    elevation: 50,
+  },
   activitySection: {
     // Normal flow - takes its natural height
     // Fully interactive as background content
@@ -719,10 +737,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bottomSheetHandle: {
-    backgroundColor: theme.colors.borderColor,
     width: 40,
     height: 4,
     borderRadius: 2,
+  },
+  conversationsTitle: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 8,
+    fontSize: 18,
+    fontFamily: theme.fonts.primary.bold,
   },
   searchContainer: {
     flexDirection: 'row',

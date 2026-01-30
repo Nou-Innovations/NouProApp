@@ -428,7 +428,7 @@ const ProductsScreen: React.FC = () => {
         onClose={() => setShowPaywall(false)}
         onUpgrade={() => {
           setShowPaywall(false);
-          (navigation as any).navigate('Subscription');
+          (navigation as any).navigate('SubscriptionPlans');
         }}
         requiredPlan="pro"
         featureName={paywallFeature}
