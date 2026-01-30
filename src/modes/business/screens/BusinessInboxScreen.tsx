@@ -24,7 +24,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { GestureHandlerRootView, TouchableOpacity } from 'react-native-gesture-handler';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
@@ -392,16 +392,12 @@ export default function BusinessInboxScreen() {
     }
   };
 
-  // Bottom sheet snap points - showing peek of chats, then expanded to top
+  // Bottom sheet snap points - using fixed percentages for reliability
+  // The dynamic calculation was causing the sheet to be positioned incorrectly
   const snapPoints = useMemo(() => {
-    // Calculate remaining space below activity section (with 16px gap)
-    // Total used space = headerHeight + activitySectionHeight + 8px (marginTop) + 16px (gap)
-    const TAB_BAR_HEIGHT = 80; // Account for bottom tab bar
-    const usedSpace = headerHeight + activitySectionHeight + 96 + TAB_BAR_HEIGHT;
-    const peekHeight = Math.max(SCREEN_HEIGHT - usedSpace, 280); // Minimum 280px peek (increased from 150)
-    const expandedHeight = SCREEN_HEIGHT - headerHeight;
-    return [peekHeight, expandedHeight];
-  }, [headerHeight, activitySectionHeight]);
+    // Fixed percentages: 45% peek (shows conversations), 92% expanded (full screen minus header)
+    return ['45%', '92%'];
+  }, []);
   
   // Handle bottom sheet changes - animate with ease-in-out
   const handleSheetChange = useCallback((index: number) => {
@@ -579,7 +575,6 @@ export default function BusinessInboxScreen() {
 
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={[styles.container, { backgroundColor: appTheme.colors.surface }]}>
         {/* Safe area for top - animated background */}
         <Animated.View style={[{ height: insets.top }, animatedHeaderStyle]} />
@@ -697,7 +692,6 @@ export default function BusinessInboxScreen() {
             canManageExternal={canManageExternalContacts}
           />
         </View>
-    </GestureHandlerRootView>
   );
 }
 
@@ -713,7 +707,12 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   bottomSheetWrapper: {
-    flex: 1,
+    // Absolutely position to overlay the activity section
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 50,
     elevation: 50,
   },

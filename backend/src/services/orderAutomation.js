@@ -13,7 +13,12 @@
  * single source of truth.
  */
 
-const { prisma } = require('../db/prisma');
+// Conditionally load Prisma only if using database mode
+const dataSource = process.env.DATA_SOURCE || 'memory';
+let prisma = null;
+if (dataSource === 'prisma') {
+  prisma = require('../db/prisma').prisma;
+}
 const { 
   ORDER_STATUS, 
   ORDER_STATUS_META,
@@ -54,6 +59,12 @@ const DEFAULT_SETTINGS = {
  * @returns {Promise<Array>} Orders to auto-cancel
  */
 async function getStaleNewOrders(hoursThreshold = DEFAULT_SETTINGS.autoCancelNewAfterHours) {
+  // Automation only runs in prisma mode (production)
+  if (!prisma) {
+    console.log('[OrderAutomation] Skipping getStaleNewOrders - running in memory mode');
+    return [];
+  }
+  
   const thresholdDate = new Date();
   thresholdDate.setHours(thresholdDate.getHours() - hoursThreshold);
   
@@ -81,6 +92,12 @@ async function getStaleNewOrders(hoursThreshold = DEFAULT_SETTINGS.autoCancelNew
  * @returns {Promise<Array>} Stuck pending orders
  */
 async function getStuckPendingOrders(hoursThreshold = DEFAULT_SETTINGS.pendingReminderAfterHours) {
+  // Automation only runs in prisma mode (production)
+  if (!prisma) {
+    console.log('[OrderAutomation] Skipping getStuckPendingOrders - running in memory mode');
+    return [];
+  }
+  
   const thresholdDate = new Date();
   thresholdDate.setHours(thresholdDate.getHours() - hoursThreshold);
   
@@ -189,6 +206,12 @@ function getActiveStatuses() {
  * @returns {Promise<Array>} Inactive orders grouped by status
  */
 async function getInactiveOrdersByStatus(hoursThreshold = 24) {
+  // Automation only runs in prisma mode (production)
+  if (!prisma) {
+    console.log('[OrderAutomation] Skipping getInactiveOrdersByStatus - running in memory mode');
+    return { total: 0, byStatus: {}, orders: [] };
+  }
+  
   const thresholdDate = new Date();
   thresholdDate.setHours(thresholdDate.getHours() - hoursThreshold);
   
