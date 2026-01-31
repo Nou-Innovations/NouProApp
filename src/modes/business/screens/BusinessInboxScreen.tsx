@@ -13,19 +13,18 @@ import {
   StyleSheet,
   RefreshControl,
   Dimensions,
-  FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  interpolateColor,
+  interpolate,
   withTiming,
   Easing,
 } from 'react-native-reanimated';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-import BottomSheet from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useNotifications } from '@/shared/context/NotificationContext';
@@ -263,6 +262,9 @@ export default function BusinessInboxScreen() {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const searchBarRef = useRef<AppSearchBarRef>(null);
   
+  // Track expansion progress for animations (0 = collapsed, 1 = expanded)
+  const expandProgress = useSharedValue(0);
+  
   // Chat filter types
   const chatTypes = ['all', 'unread', 'direct', 'group'];
   
@@ -274,14 +276,6 @@ export default function BusinessInboxScreen() {
     setActivitySectionHeight(event.nativeEvent.layout.height);
   }, []);
   
-  // Track if chat list is in sticky mode (expanded to top) - 0 = collapsed, 1 = expanded
-  const expandProgress = useSharedValue(0);
-  
-  // Timing config for smooth ease-in-out animation
-  const timingConfig = {
-    duration: 100,
-    easing: Easing.inOut(Easing.ease),
-  };
   
   // Navigation handlers
   const navigateToExplore = useCallback(() => {
@@ -392,44 +386,37 @@ export default function BusinessInboxScreen() {
     }
   };
 
-  // Bottom sheet snap points - using fixed percentages for reliability
-  // The dynamic calculation was causing the sheet to be positioned incorrectly
+  // Snap points for bottom sheet - stable calculation with minimum peek height
   const snapPoints = useMemo(() => {
-    // Fixed percentages: 45% peek (shows conversations), 92% expanded (full screen minus header)
-    return ['45%', '92%'];
-  }, []);
+    const TAB_BAR_EST = 84;
+    const EXTRA_PADDING = 110;
+    const usedSpace = headerHeight + activitySectionHeight + EXTRA_PADDING;
+    const rawPeek = SCREEN_HEIGHT - usedSpace - TAB_BAR_EST;
+    const peek = Math.max(rawPeek, 280);
+    return [peek, '92%'];
+  }, [headerHeight, activitySectionHeight]);
   
-  // Handle bottom sheet changes - animate with ease-in-out
+  // Handle bottom sheet index changes
   const handleSheetChange = useCallback((index: number) => {
-    expandProgress.value = withTiming(index === 1 ? 1 : 0, timingConfig);
-  }, [expandProgress, timingConfig]);
+    expandProgress.value = withTiming(index === 1 ? 1 : 0, {
+      duration: 200,
+      easing: Easing.inOut(Easing.ease),
+    });
+  }, [expandProgress]);
   
-  // Animated header background style - becomes white when chat list is sticky
+  // Animated header style
   const animatedHeaderStyle = useAnimatedStyle(() => {
     return {
-      backgroundColor: interpolateColor(
-        expandProgress.value,
-        [0, 1],
-        [appTheme.colors.surface, appTheme.colors.background]
-      ),
+      backgroundColor: appTheme.colors.surface,
     };
   });
   
-  // Animated bottom sheet background style - border radius transitions with ease-in-out
+  // Animated border radius for sheet - rounds when collapsed, flat when expanded
   const animatedSheetStyle = useAnimatedStyle(() => {
-    const radius = 20 * (1 - expandProgress.value); // 20 when collapsed, 0 when expanded
+    const radius = interpolate(expandProgress.value, [0, 1], [20, 0]);
     return {
       borderTopLeftRadius: radius,
       borderTopRightRadius: radius,
-    };
-  });
-  
-  // Animated handle container style - padding above handle transitions with ease-in-out
-  const animatedHandleStyle = useAnimatedStyle(() => {
-    const padding = 12 * (1 - expandProgress.value); // 12 when collapsed, 0 when expanded
-    return {
-      paddingTop: padding,
-      paddingBottom: 8,
     };
   });
   
@@ -586,7 +573,7 @@ export default function BusinessInboxScreen() {
           
           {/* Main content area */}
           <View style={styles.mainContent}>
-            {/* Activity Section - FULLY INTERACTIVE background content */}
+            {/* Activity Section */}
             <View 
               style={[styles.activitySection, { backgroundColor: appTheme.colors.surface }]}
               onLayout={onActivitySectionLayout}
@@ -602,85 +589,77 @@ export default function BusinessInboxScreen() {
               />
             </View>
             
-            {/* Bottom Sheet - Chat list section that slides over Activity */}
-            {/* Wrapped in View with zIndex to ensure proper stacking on top of activity */}
-            <View style={styles.bottomSheetWrapper}>
-              <BottomSheet
-                ref={bottomSheetRef}
-                index={0}
-                snapPoints={snapPoints}
-                onChange={handleSheetChange}
-                style={{ zIndex: 50, elevation: 50 }}
-                backgroundComponent={({ style }) => (
-                  <Animated.View 
-                    style={[
-                      style, 
-                      styles.bottomSheetBackground, 
-                      { backgroundColor: appTheme.colors.background },
-                      animatedSheetStyle
-                    ]} 
-                  />
-                )}
-                handleComponent={() => (
-                  <View style={{ backgroundColor: appTheme.colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
-                    <Animated.View style={[styles.handleContainer, animatedHandleStyle]}>
-                      <View style={[styles.bottomSheetHandle, { backgroundColor: appTheme.colors.border }]} />
-                    </Animated.View>
-                    {/* Conversations Header */}
-                    <Text style={[styles.conversationsTitle, { color: appTheme.colors.text }]}>
-                      Conversations
-                    </Text>
-                    {/* Search Bar with + button - sticky */}
-                    <View style={[styles.searchContainer, { backgroundColor: appTheme.colors.background }]}>
-                      <AppSearchBar
-                        ref={searchBarRef}
-                        placeholder="Search conversations..."
-                        value={search}
-                        onChangeText={setSearch}
-                        onClear={() => setSearch('')}
-                        containerStyle={styles.searchBarContainer}
-                      />
-                      <TouchableOpacity
-                        onPress={handleNewChat}
-                        style={styles.addButton}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      >
-                        <Pencil size={24} color={appTheme.colors.text} strokeWidth={2} />
-                      </TouchableOpacity>
-                    </View>
-                    {/* Filter Bar - sticky at top of bottom sheet */}
-                    <FilterBar
-                      statuses={chatTypes}
-                      selectedStatus={filter}
-                      onSelectStatus={setFilter}
-                      containerStyle={{ flexGrow: 0 }}
-                    />
-                  </View>
-                )}
-                enablePanDownToClose={false}
-              >
-                <FlatList
-                  data={filteredChats}
-                  keyExtractor={(item) => item.id}
-                  renderItem={renderChatItem}
-                  ListEmptyComponent={renderEmptyState}
-                  onScrollBeginDrag={handleScroll}
-                  showsVerticalScrollIndicator={false}
-                  refreshControl={
-                    <RefreshControl
-                      refreshing={refreshing}
-                      onRefresh={onRefresh}
-                      tintColor={appTheme.colors.primary}
-                    />
-                  }
-                  contentContainerStyle={[
-                    styles.listContent,
-                    filteredChats.length === 0 && styles.listContentEmpty
-                  ]}
+            {/* Messages BottomSheet */}
+            <BottomSheet
+              ref={bottomSheetRef}
+              index={0}
+              snapPoints={snapPoints}
+              onChange={handleSheetChange}
+              style={{ zIndex: 50, elevation: 50 }}
+              enablePanDownToClose={false}
+              backgroundComponent={({ style }) => (
+                <Animated.View 
+                  style={[style, styles.sheetBackground, { backgroundColor: appTheme.colors.background }, animatedSheetStyle]} 
                 />
-              </BottomSheet>
-            </View>
+              )}
+              handleComponent={() => (
+                <View style={[styles.sheetHeader, { backgroundColor: appTheme.colors.background }]}>
+                  {/* Handle bar */}
+                  <View style={styles.handleContainer}>
+                    <View style={[styles.handle, { backgroundColor: appTheme.colors.borderColor }]} />
+                  </View>
+                  
+                  {/* Search Bar with + button */}
+                  <View style={styles.searchContainer}>
+                    <AppSearchBar
+                      ref={searchBarRef}
+                      placeholder="Search conversations..."
+                      value={search}
+                      onChangeText={setSearch}
+                      onClear={() => setSearch('')}
+                      containerStyle={styles.searchBarContainer}
+                    />
+                    <TouchableOpacity
+                      onPress={handleNewChat}
+                      style={styles.addButton}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Pencil size={24} color={appTheme.colors.text} strokeWidth={2} />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {/* Filter Bar */}
+                  <FilterBar
+                    statuses={chatTypes}
+                    selectedStatus={filter}
+                    onSelectStatus={setFilter}
+                    containerStyle={{ flexGrow: 0 }}
+                  />
+                </View>
+              )}
+            >
+              {/* Chat List using BottomSheetFlatList for proper gesture integration */}
+              <BottomSheetFlatList
+                data={filteredChats}
+                keyExtractor={(item) => item.id}
+                renderItem={renderChatItem}
+                ListEmptyComponent={renderEmptyState}
+                onScrollBeginDrag={handleScroll}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={appTheme.colors.primary}
+                  />
+                }
+                contentContainerStyle={[
+                  styles.listContent,
+                  filteredChats.length === 0 && styles.listContentEmpty
+                ]}
+              />
+            </BottomSheet>
           </View>
           
           {/* New Chat Modal */}
@@ -706,48 +685,35 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
   },
-  bottomSheetWrapper: {
-    // Absolutely position to overlay the activity section
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 50,
-    elevation: 50,
+  sheetBackground: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  sheetHeader: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   activitySection: {
-    // Normal flow - takes its natural height
-    // Fully interactive as background content
     marginTop: 8,
     paddingBottom: theme.spacing.md,
     zIndex: 0, // Keep below BottomSheet
   },
-  bottomSheetBackground: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    // Shadow to create depth illusion
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 10,
-  },
   handleContainer: {
+    paddingTop: 8,
+    paddingBottom: 0,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  bottomSheetHandle: {
-    width: 40,
+  handle: {
+    width: 36,
     height: 4,
     borderRadius: 2,
-  },
-  conversationsTitle: {
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 8,
-    fontSize: 18,
-    fontFamily: theme.fonts.primary.bold,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    marginBottom: 8,
   },
   searchContainer: {
     flexDirection: 'row',
