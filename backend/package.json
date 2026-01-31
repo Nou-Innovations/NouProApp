@@ -6,12 +6,12 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate dev --schema ./prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema ./prisma/schema.prisma",
     "prisma:seed": "node prisma/seed.js",
-    "prisma:studio": "prisma studio",
-    "db:reset": "prisma migrate reset --force && npm run prisma:seed"
+    "prisma:studio": "prisma studio --schema ./prisma/schema.prisma",
+    "db:reset": "prisma migrate reset --force --schema ./prisma/schema.prisma && npm run prisma:seed"
   },
   "dependencies": {
     "@prisma/client": "^6.19.1",
