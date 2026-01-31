@@ -129,9 +129,9 @@ model Stock {
 }
 
 model Order {
-  id                    String      @id
+  id                    String          @id
   businessId            String
-  soldByScope           OrderScope  @default(PARENT)
+  soldByScope           OrderScope      @default(PARENT)
   soldByLocationId      String?
   fulfillmentLocationId String?
   customerId            String?
@@ -140,14 +140,15 @@ model Order {
   customerPhone         String?
   items                 Json
   totalAmount           Float?
-  status                OrderStatus @default(NEW)
+  status                OrderStatus     @default(NEW)
   paymentStatus         String?
   notes                 String?
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
-  business              Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  fulfillmentLocation   Location?   @relation("OrdersFulfilledByLocation", fields: [fulfillmentLocationId], references: [id])
-  soldByLocation        Location?   @relation("OrdersSoldByLocation", fields: [soldByLocationId], references: [id])
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  deliveryStatus        DeliveryStatus? @default(NOT_ASSIGNED)
+  business              Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  fulfillmentLocation   Location?       @relation("OrdersFulfilledByLocation", fields: [fulfillmentLocationId], references: [id])
+  soldByLocation        Location?       @relation("OrdersSoldByLocation", fields: [soldByLocationId], references: [id])
 
   @@index([businessId])
   @@index([soldByLocationId])
@@ -155,9 +156,9 @@ model Order {
 }
 
 model Invoice {
-  id                 String       @id
+  id                 String         @id
   businessId         String
-  issuedByScope      InvoiceScope @default(PARENT)
+  issuedByScope      InvoiceScope   @default(PARENT)
   issuedByLocationId String?
   orderId            String?
   invoiceNumber      String?
@@ -166,16 +167,16 @@ model Invoice {
   amount             Float?
   taxAmount          Float?
   totalAmount        Float?
-  status             String?
   type               String?
   issueDate          String?
   dueDate            String?
   items              Json
   notes              String?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-  business           Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  location           Location?    @relation(fields: [issuedByLocationId], references: [id])
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  status             InvoiceStatus? @default(DRAFT)
+  business           Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location           Location?      @relation(fields: [issuedByLocationId], references: [id])
 
   @@index([businessId])
   @@index([issuedByLocationId])
@@ -251,7 +252,7 @@ model LocationMember {
 }
 
 model Delivery {
-  id                       String    @id
+  id                       String          @id
   businessId               String
   locationId               String?
   direction                String?
@@ -272,15 +273,15 @@ model Delivery {
   items                    Json?
   totalAmount              Float?
   trackingNumber           String?
-  deliveryStatus           String?
-  paymentStatus            String?
   assignedStaffId          String?
   assignedTo               String?
   transportMode            String?
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
-  business                 Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  location                 Location? @relation(fields: [locationId], references: [id])
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+  deliveryStatus           DeliveryStatus? @default(NOT_ASSIGNED)
+  paymentStatus            PaymentStatus?  @default(UNPAID)
+  business                 Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location                 Location?       @relation(fields: [locationId], references: [id])
 
   @@index([businessId])
   @@index([locationId])
@@ -298,6 +299,16 @@ model FeedPost {
 
   @@index([businessId])
   @@index([type])
+}
+
+model NotificationRead {
+  id              String   @id
+  userId          String
+  notificationKey String
+  readAt          DateTime @default(now())
+
+  @@unique([userId, notificationKey])
+  @@index([userId])
 }
 
 enum SubscriptionTier {
@@ -342,4 +353,41 @@ enum OrderScope {
 enum InvoiceScope {
   PARENT
   LOCATION
+}
+
+enum DeliveryStatus {
+  NOT_ASSIGNED
+  ASSIGNED
+  PACKED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  CANCELED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELED
+  VOID
+  REFUNDED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  PAYMENT_PENDING
+  PENDING_CONFIRMATION
+  PROCESSING
+  OVERDUE
+  DUE_TODAY
+  FAILED
+  CANCELED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  DISPUTED
 }
