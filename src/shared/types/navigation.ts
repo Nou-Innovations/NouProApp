@@ -87,8 +87,9 @@ export interface PendingAuthData {
  */
 export type PersonalTabParamList = {
   Home: undefined;
+  Inbox: undefined;
   Explore: undefined;
-  Activity: undefined;
+  Activities: undefined;
   PersonalProfile: undefined;
 };
 

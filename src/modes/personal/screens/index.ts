@@ -1,5 +1,6 @@
 // Personal mode screens
 export { default as HomeScreen } from './HomeScreen';
+export { default as PersonalInboxScreen } from './PersonalInboxScreen';
 export { default as ExploreScreen } from './ExploreScreen';
 export { default as ActivityScreen } from './ActivityScreen';
 export { default as PersonalProfileScreen } from './PersonalProfileScreen';

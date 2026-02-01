@@ -6,8 +6,7 @@
  * Screen only handles display and navigation, not data fetching.
  * 
  * Features:
- * - Header with Notifications and Inbox icons (with badges)
- * - Swipe left to open Inbox overlay
+ * - Fixed header with white background and Notifications icon
  * - Feed posts from connected businesses (via API)
  * - Pull-to-refresh
  * - Infinite scroll
@@ -46,7 +45,7 @@ export default function HomeScreen() {
   const currentUser = useProfileStore((state) => state.currentUser);
   const isNewUser = useProfileStore((state) => state.isNewUser);
   const clearNewUserFlag = useProfileStore((state) => state.clearNewUserFlag);
-  const { unreadCount, inboxUnreadCount } = useNotifications();
+  const { unreadCount } = useNotifications();
   
   // Clear new user flag after showing welcome message (after a delay)
   useEffect(() => {
@@ -74,11 +73,6 @@ export default function HomeScreen() {
   } = useFeed();
 
   // Navigation handlers
-  const navigateToInbox = useCallback(() => {
-    // @ts-ignore
-    navigation.navigate('InboxOverlay');
-  }, [navigation]);
-  
   const navigateToNotifications = useCallback(() => {
     // @ts-ignore
     navigation.navigate('Notifications');
@@ -140,7 +134,7 @@ export default function HomeScreen() {
   };
 
   const renderHeader = () => (
-    <View style={[styles.header, { backgroundColor: appTheme.colors.background }]}>
+    <View style={[styles.header, { backgroundColor: '#FFFFFF' }]}>
       <View style={{ width: 40 }} />
       <View style={styles.headerActions}>
         {/* Notifications Button */}
@@ -156,21 +150,6 @@ export default function HomeScreen() {
             color={appTheme.colors.text} 
           />
           {renderBadge(unreadCount)}
-        </TouchableOpacity>
-        
-        {/* Inbox Button */}
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={navigateToInbox}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Icon 
-            name="mail-outline" 
-            size={24} 
-            color={appTheme.colors.text} 
-          />
-          {renderBadge(inboxUnreadCount)}
         </TouchableOpacity>
       </View>
     </View>
@@ -273,9 +252,12 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: appTheme.colors.background }]}
+      style={[styles.container, { backgroundColor: '#FFFFFF' }]}
       edges={['top']}
     >
+      {/* Fixed Header */}
+      {renderHeader()}
+      
       {/* Loading State */}
       {loading && (
         <View style={styles.loadingContainer}>
@@ -291,7 +273,6 @@ export default function HomeScreen() {
           renderItem={renderFeedPost}
           ListHeaderComponent={
             <>
-              {renderHeader()}
               {renderGreeting()}
               {/* Mock Data Indicator (DEV only) */}
               {__DEV__ && isMockData && (

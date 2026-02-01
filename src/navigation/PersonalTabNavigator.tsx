@@ -2,13 +2,12 @@
  * Personal Tab Navigator
  * Navigation for Personal Profile mode
  * 
- * Updated navigation structure:
+ * Navigation structure:
  * - Home: Feed & updates from businesses, suggestions
+ * - Inbox: Personal messages and conversations
  * - Explore: Discover businesses, browse categories, search
  * - Activity: All orders/tasks placed as a person
  * - Profile: Personal settings, switch/manage business profiles
- * 
- * Note: Inbox is now accessed via overlay from Home header (not a tab)
  */
 
 import React from 'react';
@@ -16,6 +15,7 @@ import { View, Text, StyleSheet, Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { 
   Home, 
+  Mail,
   Search,
   List,
 } from 'lucide-react-native';
@@ -27,6 +27,7 @@ import { PersonalTabParamList } from '@/shared/types/navigation';
 
 // Import screens from modes
 import HomeScreen from '@/modes/personal/screens/HomeScreen';
+import PersonalInboxScreen from '@/modes/personal/screens/PersonalInboxScreen';
 import ExploreScreen from '@/modes/personal/screens/ExploreScreen';
 import ActivityScreen from '@/modes/personal/screens/ActivityScreen';
 import PersonalProfileScreen from '@/modes/personal/screens/PersonalProfileScreen';
@@ -40,9 +41,6 @@ export function PersonalTabNavigator() {
   const { theme: appTheme } = useTheme();
   const currentUser = useProfileStore((state) => state.currentUser);
   const { unreadCount, inboxUnreadCount } = useNotifications();
-  
-  // Combined count for Home tab badge (notifications + inbox)
-  const totalUnreadCount = unreadCount + inboxUnreadCount;
 
   /**
    * Render user profile picture or fallback icon (24x24px, border radius 4px)
@@ -100,10 +98,39 @@ export function PersonalTabNavigator() {
           tabBarIcon: ({ color, focused }) => (
             <View style={{ position: 'relative' }}>
               <Home size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-              {totalUnreadCount > 0 && (
+              {unreadCount > 0 && (
                 <View style={styles.notificationBadge}>
                   <Text style={styles.notificationBadgeText}>
-                    {totalUnreadCount > 9 ? '9+' : totalUnreadCount.toString()}
+                    {unreadCount > 9 ? '9+' : unreadCount.toString()}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
+        }}
+      />
+      
+      {/* Inbox Tab */}
+      <Tab.Screen
+        name="Inbox"
+        component={PersonalInboxScreen}
+        options={{
+          tabBarLabel: ({ focused, color }) => (
+            <Text style={{
+              fontSize: theme.fontSize.xs,
+              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
+              color: color,
+            }}>
+              Inbox
+            </Text>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{ position: 'relative' }}>
+              <Mail size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+              {inboxUnreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {inboxUnreadCount > 9 ? '9+' : inboxUnreadCount.toString()}
                   </Text>
                 </View>
               )}
@@ -132,9 +159,9 @@ export function PersonalTabNavigator() {
         }}
       />
       
-      {/* Activity Tab */}
+      {/* Activities Tab */}
       <Tab.Screen
-        name="Activity"
+        name="Activities"
         component={ActivityScreen}
         options={{
           tabBarLabel: ({ focused, color }) => (
@@ -143,7 +170,7 @@ export function PersonalTabNavigator() {
               fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
               color: color,
             }}>
-              Activity
+              Activities
             </Text>
           ),
           tabBarIcon: ({ color, focused }) => (

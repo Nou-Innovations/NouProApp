@@ -12,7 +12,7 @@ export const personalModeConfig = {
     { name: 'Home', icon: 'home' },
     { name: 'Explore', icon: 'search' },
     { name: 'PersonalInbox', icon: 'mail', label: 'Inbox' },
-    { name: 'Activity', icon: 'list' },
+    { name: 'Activities', icon: 'list' },
     { name: 'PersonalProfile', icon: 'person', label: 'Profile' },
   ],
   // Screens accessible in personal mode (stack screens)

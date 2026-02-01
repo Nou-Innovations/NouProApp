@@ -174,7 +174,7 @@ export default function ActivityScreen() {
 
   const renderEmptyState = () => (
     <EmptyState
-      iconName="pulse-outline"
+      iconName="list"
       title={filter === 'All' ? 'No recent activity' : `No ${filter.toLowerCase()} deliveries`}
       subtitle={
         userBusinesses.length > 0
@@ -202,7 +202,7 @@ export default function ActivityScreen() {
         style={[styles.container, { backgroundColor: appTheme.colors.background }]}
         edges={['top']}
       >
-        <PrimaryHeader title="Activity" />
+        <PrimaryHeader title="Activities" />
         {renderLoading()}
       </SafeAreaView>
     );
@@ -213,7 +213,7 @@ export default function ActivityScreen() {
       style={[styles.container, { backgroundColor: appTheme.colors.background }]}
       edges={['top']}
     >
-      <PrimaryHeader title="Activity" />
+      <PrimaryHeader title="Activities" />
       {renderStatsCards()}
       <FilterBar
         statuses={FILTER_OPTIONS}
