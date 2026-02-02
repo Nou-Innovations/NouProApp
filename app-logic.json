@@ -399,7 +399,7 @@
       "currency": "MUR",
       "period": "month",
       "targetUser": "For small teams",
-      "freeTrialDays": 14,
+      "freeTrialDays": 7,
       "limits": {
         "staff": 3,
         "locations": 1,
@@ -435,7 +435,7 @@
       "currency": "MUR",
       "period": "month",
       "targetUser": "Most popular",
-      "freeTrialDays": 31,
+      "freeTrialDays": 7,
       "limits": {
         "staff": 9,
         "locations": 7,
@@ -469,7 +469,7 @@
       "currency": "MUR",
       "period": "month",
       "targetUser": "Full control",
-      "freeTrialDays": 31,
+      "freeTrialDays": 14,
       "limits": {
         "staff": "unlimited",
         "locations": "unlimited",

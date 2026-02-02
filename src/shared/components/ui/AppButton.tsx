@@ -105,9 +105,31 @@ const AppButton: React.FC<AppButtonProps> = ({
 
   const { button: variantButtonStyle, text: variantTextStyle } = getButtonStyles();
   const isDisabled = disabled || loading || variant === 'disabled';
-  const spinnerColor = variant === 'primary' || variant === 'alert' || variant === 'confirm'
-    ? appTheme.colors.textInverse 
-    : appTheme.colors.primary;
+  
+  // Determine spinner color based on variant
+  // Primary buttons: white spinner (since they have colored background)
+  // Outline/Secondary buttons: primary color spinner (since they have light/transparent background)
+  const getSpinnerColor = () => {
+    const actualVariant = disabled && variant !== 'disabled' ? 'disabled' : variant;
+    
+    switch (actualVariant) {
+      case 'primary':
+        return appTheme.colors.background; // White on primary background
+      case 'secondary':
+      case 'outline':
+        return appTheme.colors.primary; // Primary color on light/transparent background
+      case 'alert':
+        return appTheme.colors.textInverse; // White on alert background
+      case 'confirm':
+        return appTheme.colors.textInverse; // White on confirm background
+      case 'disabled':
+        return appTheme.colors.textMuted; // Muted color for disabled state
+      default:
+        return appTheme.colors.background; // Default to white
+    }
+  };
+  
+  const spinnerColor = getSpinnerColor();
 
   const sizeStyles = size === 'small' ? styles.smallButton : styles.defaultButton;
   const iconSize = 24;

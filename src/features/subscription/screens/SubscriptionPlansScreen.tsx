@@ -102,8 +102,8 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, isCurrentPlan, on
           styles.planCard,
           { 
             backgroundColor: appTheme.colors.background,
-            borderColor: isSelected ? planColor : appTheme.colors.borderColor,
-            borderWidth: isSelected ? 2 : 1,
+            borderColor: isCurrentPlan ? '#22C55E' : (isSelected ? planColor : appTheme.colors.borderColor),
+            borderWidth: isCurrentPlan ? 2 : (isSelected ? 2 : 1),
           },
         ]}
         onPress={onSelect}
@@ -117,13 +117,8 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, isCurrentPlan, on
             <Text style={styles.topBadgeText}>⭐ Most Popular</Text>
           </View>
         )}
-        {billingPeriod === 'yearly' && plan !== 'free' && !isCurrentPlan && (
-          <View style={[styles.topBadge, plan === 'business' ? styles.topBadgeRight : styles.topBadgeLeft, { backgroundColor: '#22C55E' }]}>
-            <Text style={styles.topBadgeText}>Best value</Text>
-          </View>
-        )}
         {isCurrentPlan && (
-          <View style={[styles.topBadge, (plan === 'business' || (billingPeriod === 'yearly' && plan !== 'free')) ? styles.topBadgeRight : styles.topBadgeLeft, { backgroundColor: appTheme.colors.success }]}>
+          <View style={[styles.topBadge, plan === 'business' ? styles.topBadgeRight : styles.topBadgeLeft, { backgroundColor: '#22C55E' }]}>
             <Text style={styles.topBadgeText}>Current Plan</Text>
           </View>
         )}
@@ -165,23 +160,25 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, isCurrentPlan, on
           </Text>
         )}
 
-        {/* Savings badge for yearly billing */}
-        {billingPeriod === 'yearly' && plan !== 'free' && savings > 0 && (
-          <View style={[styles.savingsBadge, { backgroundColor: '#22C55E15' }]}>
-            <Text style={[styles.savingsText, { color: '#22C55E' }]}>
-              Save {CURRENCY.symbol}{savings.toLocaleString()}/year
-            </Text>
+        {/* Badges Row - Savings and Free Trial */}
+        {(billingPeriod === 'yearly' && plan !== 'free' && savings > 0) || FREE_TRIAL_DAYS[plan] > 0 ? (
+          <View style={styles.badgesRow}>
+            {billingPeriod === 'yearly' && plan !== 'free' && savings > 0 && (
+              <View style={[styles.savingsBadge, { backgroundColor: '#22C55E' }]}>
+                <Text style={[styles.savingsText, { color: '#ffffff' }]}>
+                  Save {CURRENCY.symbol}{savings.toLocaleString()}/year
+                </Text>
+              </View>
+            )}
+            {FREE_TRIAL_DAYS[plan] > 0 && (
+              <View style={[styles.freeTrialBadge, { backgroundColor: planColor }]}>
+                <Text style={styles.freeTrialBadgeText}>
+                  {FREE_TRIAL_DAYS[plan]} days free
+                </Text>
+              </View>
+            )}
           </View>
-        )}
-
-        {/* Free Trial Badge for paid plans */}
-        {FREE_TRIAL_DAYS[plan] > 0 && (
-          <View style={[styles.freeTrialBadge, { backgroundColor: planColor }]}>
-            <Text style={styles.freeTrialBadgeText}>
-              {FREE_TRIAL_DAYS[plan]} days free
-            </Text>
-          </View>
-        )}
+        ) : null}
 
         {/* Limits */}
         <View style={styles.limitsContainer}>
@@ -299,47 +296,39 @@ export default function SubscriptionPlansScreen() {
 
         {/* Billing Period Toggle */}
         <View style={styles.billingToggleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.billingToggleButton,
-              billingPeriod === 'monthly' && styles.billingToggleButtonActive,
-              { 
-                backgroundColor: billingPeriod === 'monthly' ? '#0075FF' : appTheme.colors.surface,
-                borderColor: appTheme.colors.borderColor,
-              }
-            ]}
-            onPress={() => setBillingPeriod('monthly')}
-          >
-            <Text style={[
-              styles.billingToggleText,
-              { color: billingPeriod === 'monthly' ? '#FFFFFF' : appTheme.colors.text }
-            ]}>
-              Monthly
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.billingToggleButton,
-              billingPeriod === 'yearly' && styles.billingToggleButtonActive,
-              { 
-                backgroundColor: billingPeriod === 'yearly' ? '#0075FF' : appTheme.colors.surface,
-                borderColor: appTheme.colors.borderColor,
-              }
-            ]}
-            onPress={() => setBillingPeriod('yearly')}
-          >
-            <Text style={[
-              styles.billingToggleText,
-              { color: billingPeriod === 'yearly' ? '#FFFFFF' : appTheme.colors.text }
-            ]}>
-              Yearly
-            </Text>
-            {billingPeriod === 'yearly' && (
-              <View style={styles.bestValuePill}>
-                <Text style={styles.bestValueText}>Save up to 11%</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={styles.buttonWrapper}>
+            <AppButton
+              title="Monthly"
+              onPress={() => setBillingPeriod('monthly')}
+              variant={billingPeriod === 'monthly' ? 'primary' : 'outline'}
+              style={styles.billingToggleButton}
+            />
+          </View>
+          <View style={styles.buttonWrapper}>
+            <TouchableOpacity
+              style={[
+                styles.customYearlyButton,
+                billingPeriod === 'yearly' 
+                  ? { backgroundColor: appTheme.colors.primary }
+                  : styles.yearlyButtonOutline,
+                { borderColor: appTheme.colors.primary }
+              ]}
+              onPress={() => setBillingPeriod('yearly')}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.yearlyMainText,
+                { color: billingPeriod === 'yearly' ? appTheme.colors.background : appTheme.colors.primary }
+              ]}>
+                Yearly
+              </Text>
+              {billingPeriod === 'yearly' && (
+                <Text style={styles.yearlySaveText}>
+                  Save up to 11%
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Plans Grid */}
@@ -366,10 +355,17 @@ export default function SubscriptionPlansScreen() {
           disabled={selectedPlan === currentPlan}
         />
         {selectedPlan !== 'free' && selectedPlan !== currentPlan && (
-          <Text style={[styles.ctaSubtext, { color: appTheme.colors.textSecondary }]}>
-            {CURRENCY.symbol}{selectedPrice.toLocaleString()}/month
-            {billingPeriod === 'yearly' && ' (billed yearly)'}
-          </Text>
+          <>
+            {billingPeriod === 'yearly' ? (
+              <Text style={[styles.ctaSubtext, { color: '#22C55E' }]}>
+                Save {CURRENCY.symbol}{getYearlySavings(selectedPlan).toLocaleString()}/year
+              </Text>
+            ) : (
+              <Text style={[styles.ctaSubtext, { color: appTheme.colors.textSecondary }]}>
+                {CURRENCY.symbol}{selectedPrice.toLocaleString()}/month
+              </Text>
+            )}
+          </>
         )}
         {selectedPlan !== 'free' && selectedPlan !== currentPlan && (
           <Text style={[styles.ctaNote, { color: appTheme.colors.textSecondary }]}>
@@ -412,37 +408,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginHorizontal: 24,
     marginBottom: 24,
-    gap: 12,
+    gap: 8,
+  },
+  buttonWrapper: {
+    flex: 1,
   },
   billingToggleButton: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    borderWidth: 1,
+    width: '100%',
+  },
+  customYearlyButton: {
+    height: 56,
+    borderRadius: 8,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
+    width: '100%',
   },
-  billingToggleButtonActive: {
-    borderWidth: 2,
+  yearlyButtonOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
   },
-  billingToggleText: {
+  yearlyMainText: {
     fontSize: 16,
-    fontFamily: theme.fonts.primary.semibold,
+    fontFamily: theme.fonts.primary.semiBold,
   },
-  bestValuePill: {
-    position: 'absolute',
-    top: -10,
-    right: 8,
-    backgroundColor: '#22C55E',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  bestValueText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontFamily: theme.fonts.primary.bold,
+  yearlySaveText: {
+    fontSize: 11,
+    fontFamily: theme.fonts.primary.semiBold,
+    color: '#22C55E',
+    marginTop: 2,
   },
   plansContainer: {
     paddingHorizontal: 16,
@@ -477,15 +471,13 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.bold,
   },
   freeTrialBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
   freeTrialBadgeText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: theme.fonts.primary.bold,
   },
   planHeader: {
@@ -533,20 +525,24 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   billedYearlyText: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: theme.fonts.primary.regular,
     marginTop: -8,
     marginBottom: 12,
   },
+  badgesRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
   savingsBadge: {
-    alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
-    marginBottom: 12,
   },
   savingsText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: theme.fonts.primary.semiBold,
   },
   limitsContainer: {
@@ -601,8 +597,8 @@ const styles = StyleSheet.create({
     borderTopColor: '#E1E4EA',
   },
   ctaSubtext: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.bold,
     textAlign: 'center',
     marginTop: 8,
   },

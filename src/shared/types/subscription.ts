@@ -296,9 +296,9 @@ export const VAT = {
  */
 export const FREE_TRIAL_DAYS: Record<SubscriptionPlan, number> = {
   free: 0,
-  pro: 14,
-  business: 31,
-  enterprise: 31,
+  pro: 7,
+  business: 7,
+  enterprise: 14,
 };
 
 /**
