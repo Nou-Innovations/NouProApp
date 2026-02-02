@@ -40,8 +40,15 @@ import {
   hasAnalytics,
   getMaxStaffCount,
   getMaxLocations,
+  getMaxProducts,
   isStaffLimitExceeded,
   isLocationLimitExceeded,
+  isProductLimitExceeded,
+  canUseBusinessSpecificPricing,
+  canUseAdvancedPermissions,
+  canUseAPI,
+  getAnalyticsType,
+  shouldShowNouProBranding,
   getBusinessTabVisibility,
   checkPaywall,
   TabVisibility,
@@ -91,12 +98,19 @@ export interface Permissions {
   canPublishProducts: boolean;
   hasPricePrivacy: boolean;
   hasAnalytics: boolean;
+  canUseBusinessSpecificPricing: boolean;
+  canUseAdvancedPermissions: boolean;
+  canUseAPI: boolean;
+  analyticsType: 'none' | 'basic_7day' | 'full';
+  showNouProBranding: boolean;
   
   // Limits
   maxStaffCount: number | 'unlimited';
   maxLocations: number | 'unlimited';
+  maxProducts: number | 'unlimited';
   isStaffLimitExceeded: (currentCount: number) => boolean;
   isLocationLimitExceeded: (currentCount: number) => boolean;
+  isProductLimitExceeded: (currentCount: number) => boolean;
   
   // Tab visibility
   tabVisibility: TabVisibility;
@@ -179,12 +193,19 @@ export function usePermissions(): Permissions {
     canPublishProducts: canPublishProducts(plan),
     hasPricePrivacy: hasPricePrivacy(plan),
     hasAnalytics: hasAnalytics(plan),
+    canUseBusinessSpecificPricing: canUseBusinessSpecificPricing(plan),
+    canUseAdvancedPermissions: canUseAdvancedPermissions(plan),
+    canUseAPI: canUseAPI(plan),
+    analyticsType: getAnalyticsType(plan),
+    showNouProBranding: shouldShowNouProBranding(plan),
     
     // Limits
     maxStaffCount: getMaxStaffCount(plan),
     maxLocations: getMaxLocations(plan),
+    maxProducts: getMaxProducts(plan),
     isStaffLimitExceeded: (currentCount: number) => isStaffLimitExceeded(plan, currentCount),
     isLocationLimitExceeded: (currentCount: number) => isLocationLimitExceeded(plan, currentCount),
+    isProductLimitExceeded: (currentCount: number) => isProductLimitExceeded(plan, currentCount),
     
     // Tab visibility
     tabVisibility: getBusinessTabVisibility(currentUserRole, plan, currentStaffRoleType ?? undefined, customPermissions),

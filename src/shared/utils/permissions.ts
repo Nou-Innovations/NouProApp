@@ -362,6 +362,66 @@ export const isLocationLimitExceeded = (
   return currentLocationCount >= maxLocations;
 };
 
+/**
+ * Get maximum products count for plan
+ */
+export const getMaxProducts = (plan: SubscriptionPlan | null): number | 'unlimited' => {
+  if (!plan) return 20;
+  return PLAN_LIMITS[plan].products;
+};
+
+/**
+ * Check if product limit is exceeded
+ */
+export const isProductLimitExceeded = (
+  plan: SubscriptionPlan | null,
+  currentProductCount: number
+): boolean => {
+  const maxProducts = getMaxProducts(plan);
+  if (maxProducts === 'unlimited') return false;
+  return currentProductCount >= maxProducts;
+};
+
+/**
+ * Check if plan allows business-specific pricing
+ */
+export const canUseBusinessSpecificPricing = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return PLAN_FEATURES[plan].business_specific_pricing;
+};
+
+/**
+ * Check if plan allows advanced permissions
+ */
+export const canUseAdvancedPermissions = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return PLAN_FEATURES[plan].advanced_permissions;
+};
+
+/**
+ * Check if plan allows API access
+ */
+export const canUseAPI = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return PLAN_FEATURES[plan].api_access;
+};
+
+/**
+ * Get analytics type for plan
+ */
+export const getAnalyticsType = (plan: SubscriptionPlan | null): 'none' | 'basic_7day' | 'full' => {
+  if (!plan) return 'none';
+  return PLAN_FEATURES[plan].analytics_type;
+};
+
+/**
+ * Check if NouPro branding should be shown
+ */
+export const shouldShowNouProBranding = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return true;
+  return PLAN_FEATURES[plan].show_noupro_branding;
+};
+
 // ========== Tab Visibility Checks ==========
 
 /**
@@ -469,6 +529,42 @@ export const checkPaywall = (
           message: 'Upgrade to Pro to create and manage deliveries',
         };
       }
+      break;
+
+    case 'business_specific_pricing':
+      if (!PLAN_FEATURES[plan].business_specific_pricing) {
+        return {
+          allowed: false,
+          requiredPlan: 'business',
+          message: 'Upgrade to Business to use business-specific pricing',
+        };
+      }
+      break;
+
+    case 'advanced_permissions':
+      if (!PLAN_FEATURES[plan].advanced_permissions) {
+        return {
+          allowed: false,
+          requiredPlan: 'enterprise',
+          message: 'Upgrade to Enterprise to use advanced permissions',
+        };
+      }
+      break;
+
+    case 'api_access':
+      if (!PLAN_FEATURES[plan].api_access) {
+        return {
+          allowed: false,
+          requiredPlan: 'enterprise',
+          message: 'Upgrade to Enterprise to access the API',
+        };
+      }
+      break;
+
+    case 'create_product':
+      // Check product limit
+      // Note: This requires additional context (current product count)
+      // which should be passed separately or checked before calling this
       break;
   }
 

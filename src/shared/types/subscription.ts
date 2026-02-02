@@ -9,6 +9,11 @@
 export type SubscriptionPlan = 'free' | 'pro' | 'business' | 'enterprise';
 
 /**
+ * Billing period types
+ */
+export type BillingPeriod = 'monthly' | 'yearly';
+
+/**
  * Subscription status
  */
 export type SubscriptionStatus = 'active' | 'grace' | 'expired';
@@ -23,14 +28,42 @@ export const SUBSCRIPTION_STATUS_COLORS: Record<SubscriptionStatus, string> = {
 };
 
 /**
- * Plan pricing (in MUR - Mauritian Rupee)
+ * Plan pricing - Monthly (in MUR - Mauritian Rupee)
  */
-export const PLAN_PRICES: Record<SubscriptionPlan, number> = {
+export const PLAN_PRICES_MONTHLY: Record<SubscriptionPlan, number> = {
+  free: 0,
+  pro: 899,
+  business: 2699,
+  enterprise: 4399,
+};
+
+/**
+ * Plan pricing - Yearly (in MUR - Mauritian Rupee)
+ * Total billed annually
+ */
+export const PLAN_PRICES_YEARLY: Record<SubscriptionPlan, number> = {
+  free: 0,
+  pro: 9588,
+  business: 28788,
+  enterprise: 46788,
+};
+
+/**
+ * Plan pricing - Yearly effective monthly rate
+ * For display purposes (billed yearly)
+ */
+export const PLAN_PRICES_YEARLY_MONTHLY: Record<SubscriptionPlan, number> = {
   free: 0,
   pro: 799,
-  business: 1999,
-  enterprise: 3999,
+  business: 2399,
+  enterprise: 3899,
 };
+
+/**
+ * Legacy plan prices (kept for backwards compatibility)
+ * Defaults to monthly pricing
+ */
+export const PLAN_PRICES: Record<SubscriptionPlan, number> = PLAN_PRICES_MONTHLY;
 
 /**
  * Plan limits
@@ -38,14 +71,20 @@ export const PLAN_PRICES: Record<SubscriptionPlan, number> = {
 export interface PlanLimits {
   staff: number | 'unlimited';
   locations: number | 'unlimited';
+  products: number | 'unlimited';
 }
 
 export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
-  free: { staff: 1, locations: 1 },
-  pro: { staff: 3, locations: 3 },
-  business: { staff: 9, locations: 8 },
-  enterprise: { staff: 'unlimited', locations: 'unlimited' },
+  free: { staff: 1, locations: 1, products: 20 },
+  pro: { staff: 3, locations: 1, products: 500 },
+  business: { staff: 9, locations: 7, products: 5000 },
+  enterprise: { staff: 'unlimited', locations: 'unlimited', products: 'unlimited' },
 };
+
+/**
+ * Analytics types
+ */
+export type AnalyticsType = 'none' | 'basic_7day' | 'full';
 
 /**
  * Plan features
@@ -62,8 +101,13 @@ export interface PlanFeatures {
   create_deliveries: boolean;
   accept_staff: boolean;
   price_privacy: boolean;
-  analytics: boolean;
+  analytics: boolean; // Legacy field
+  analytics_type: AnalyticsType;
   priority_support: boolean;
+  business_specific_pricing: boolean;
+  advanced_permissions: boolean;
+  api_access: boolean;
+  show_noupro_branding: boolean;
 }
 
 export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
@@ -80,7 +124,12 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     accept_staff: false,
     price_privacy: false,
     analytics: false,
+    analytics_type: 'none',
     priority_support: false,
+    business_specific_pricing: false,
+    advanced_permissions: false,
+    api_access: false,
+    show_noupro_branding: true,
   },
   pro: {
     create_business: true,
@@ -93,9 +142,14 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     publish_business_page: true,
     create_deliveries: true,
     accept_staff: true,
-    price_privacy: true, // on LaBoutik Rouz
+    price_privacy: true,
     analytics: false,
+    analytics_type: 'none',
     priority_support: false,
+    business_specific_pricing: false,
+    advanced_permissions: false,
+    api_access: false,
+    show_noupro_branding: false,
   },
   business: {
     create_business: true,
@@ -108,9 +162,14 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     publish_business_page: true,
     create_deliveries: true,
     accept_staff: true,
-    price_privacy: true, // full
-    analytics: true, // 1-week
+    price_privacy: true,
+    analytics: true,
+    analytics_type: 'basic_7day',
     priority_support: false,
+    business_specific_pricing: true,
+    advanced_permissions: false,
+    api_access: false,
+    show_noupro_branding: false,
   },
   enterprise: {
     create_business: true,
@@ -124,8 +183,13 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     create_deliveries: true,
     accept_staff: true,
     price_privacy: true,
-    analytics: true, // full
+    analytics: true,
+    analytics_type: 'full',
     priority_support: true,
+    business_specific_pricing: true,
+    advanced_permissions: true,
+    api_access: true,
+    show_noupro_branding: false,
   },
 };
 
@@ -147,54 +211,62 @@ export const PLAN_INFO: Record<SubscriptionPlan, PlanInfo> = {
     price: 0,
     period: '',
     description: 'Get started with basic features',
-    targetUser: 'Small businesses',
+    targetUser: 'Get started',
     highlights: [
       'Create a business profile',
-      'Create products (private only)',
+      'Up to 20 products (private only)',
       'Manage basic stock',
       'Use business Inbox',
+      'Request orders',
     ],
   },
   pro: {
     name: 'Pro Plan',
-    price: 799,
+    price: 899,
     period: '/month',
     description: 'For small teams getting serious',
-    targetUser: 'Startups',
+    targetUser: 'For small teams',
     highlights: [
       'All Free features',
-      'Full product management',
-      'Selling orders',
-      'Invoices & estimates',
+      'Up to 500 products',
+      'Create selling orders',
+      'Invoices & estimates (send & export PDF)',
       'Delivery workflow',
       'Publish public page',
       'Up to 3 staff members',
-      'Up to 3 locations',
+      '1 location',
     ],
   },
   business: {
     name: 'Business Plan',
-    price: 1999,
+    price: 2699,
     period: '/month',
-    description: 'For growing businesses',
-    targetUser: 'Growing businesses',
+    description: 'Scale + visibility',
+    targetUser: 'Most popular',
     highlights: [
       'All Pro features',
+      'Up to 5,000 products',
       'Product & price privacy',
-      'Analytics dashboard',
+      'Business-specific pricing',
+      'Analytics dashboard (7 days)',
+      'Published on feed',
       'Up to 9 staff members',
-      'Up to 8 locations',
+      'Up to 7 locations',
     ],
   },
   enterprise: {
     name: 'Enterprise Plan',
-    price: 3999,
+    price: 4399,
     period: '/month',
-    description: 'For large operations',
-    targetUser: 'Large organizations',
+    description: 'Autonomy, control, and power',
+    targetUser: 'Full control',
     highlights: [
       'All Business features',
+      'Unlimited products',
+      'Independent locations',
+      'Advanced permissions & roles',
       'Full analytics (real-time + history)',
+      'API access',
       'Unlimited staff',
       'Unlimited locations',
       'Priority support',
@@ -219,8 +291,36 @@ export const VAT = {
   description: 'Standard VAT rate in Mauritius',
 };
 
+/**
+ * Free trial days per plan
+ */
+export const FREE_TRIAL_DAYS: Record<SubscriptionPlan, number> = {
+  free: 0,
+  pro: 14,
+  business: 31,
+  enterprise: 31,
+};
 
+/**
+ * Get plan price based on billing period
+ */
+export function getPlanPrice(plan: SubscriptionPlan, billingPeriod: BillingPeriod): number {
+  return billingPeriod === 'yearly' ? PLAN_PRICES_YEARLY[plan] : PLAN_PRICES_MONTHLY[plan];
+}
 
+/**
+ * Get plan price per month display value
+ * For yearly billing, shows the effective monthly rate
+ */
+export function getPlanPricePerMonth(plan: SubscriptionPlan, billingPeriod: BillingPeriod): number {
+  return billingPeriod === 'yearly' ? PLAN_PRICES_YEARLY_MONTHLY[plan] : PLAN_PRICES_MONTHLY[plan];
+}
 
+/**
+ * Calculate savings for yearly billing
+ */
+export function getYearlySavings(plan: SubscriptionPlan): number {
+  return PLAN_PRICES_MONTHLY[plan] * 12 - PLAN_PRICES_YEARLY[plan];
+}
 
 

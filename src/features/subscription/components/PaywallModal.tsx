@@ -16,7 +16,7 @@ import {
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { SubscriptionPlan, PLAN_INFO, PLAN_PRICES } from '@/shared/types/subscription';
+import { SubscriptionPlan, PLAN_INFO, PLAN_PRICES_MONTHLY, CURRENCY } from '@/shared/types/subscription';
 
 interface PaywallModalProps {
   visible: boolean;
@@ -79,7 +79,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
               </Text>
               <View style={styles.planPrice}>
                 <Text style={[styles.priceAmount, { color: appTheme.colors.text }]}>
-                  Rs {PLAN_PRICES[requiredPlan]}
+                  {CURRENCY.symbol}{PLAN_PRICES_MONTHLY[requiredPlan].toLocaleString()}
                 </Text>
                 <Text style={[styles.pricePeriod, { color: appTheme.colors.textLight }]}>
                   /month
@@ -97,6 +97,10 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
                 </View>
               ))}
             </View>
+
+            <Text style={[styles.billingNote, { color: appTheme.colors.textSecondary }]}>
+              Choose monthly or yearly billing on upgrade
+            </Text>
           </View>
 
           {/* Buttons */}
@@ -210,6 +214,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.fonts.primary.regular,
     flex: 1,
+  },
+  billingNote: {
+    fontSize: 12,
+    fontFamily: theme.fonts.primary.regular,
+    textAlign: 'center',
+    marginTop: 8,
   },
   buttons: {
     width: '100%',

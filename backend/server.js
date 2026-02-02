@@ -163,6 +163,7 @@ const LOCATION_MODES = {
 function deriveCapabilities(business) {
   const tier = business.subscriptionTier || SUBSCRIPTION_TIERS.FREE;
   const isEnterprise = tier === SUBSCRIPTION_TIERS.ENTERPRISE;
+  const isBusiness = tier === SUBSCRIPTION_TIERS.BUSINESS;
   const isPaidTier = tier !== SUBSCRIPTION_TIERS.FREE;
   
   return {
@@ -170,6 +171,11 @@ function deriveCapabilities(business) {
     canChooseLocationMode: isEnterprise,
     canHaveIndependentLocations: isEnterprise,
     canEnablePublicLocationPages: isEnterprise,
+    canUseAdvancedPermissions: isEnterprise,
+    canUseAPI: isEnterprise,
+    
+    // Business & Enterprise capabilities
+    canUseBusinessSpecificPricing: isBusiness || isEnterprise,
     
     // Paid tier capabilities
     canCreateOrders: isPaidTier,
@@ -177,13 +183,24 @@ function deriveCapabilities(business) {
     canPublishBusinessPage: isPaidTier,
     canHaveStaff: isPaidTier,
     
+    // Analytics
+    analyticsType: tier === SUBSCRIPTION_TIERS.FREE ? 'none' :
+                   tier === SUBSCRIPTION_TIERS.PRO ? 'none' :
+                   tier === SUBSCRIPTION_TIERS.BUSINESS ? 'basic_7day' : 'full',
+    
+    // Branding
+    showNouProBranding: tier === SUBSCRIPTION_TIERS.FREE,
+    
     // Tier-based limits
     maxLocations: tier === SUBSCRIPTION_TIERS.FREE ? 1 : 
-                  tier === SUBSCRIPTION_TIERS.PRO ? 3 : 
-                  tier === SUBSCRIPTION_TIERS.BUSINESS ? 10 : 999,
-    maxStaff: tier === SUBSCRIPTION_TIERS.FREE ? 0 : 
+                  tier === SUBSCRIPTION_TIERS.PRO ? 1 : 
+                  tier === SUBSCRIPTION_TIERS.BUSINESS ? 7 : 999,
+    maxStaff: tier === SUBSCRIPTION_TIERS.FREE ? 1 : 
               tier === SUBSCRIPTION_TIERS.PRO ? 3 : 
-              tier === SUBSCRIPTION_TIERS.BUSINESS ? 20 : 999,
+              tier === SUBSCRIPTION_TIERS.BUSINESS ? 9 : 999,
+    maxProducts: tier === SUBSCRIPTION_TIERS.FREE ? 20 :
+                 tier === SUBSCRIPTION_TIERS.PRO ? 500 :
+                 tier === SUBSCRIPTION_TIERS.BUSINESS ? 5000 : 999999,
   };
 }
 

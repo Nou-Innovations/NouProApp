@@ -29,6 +29,8 @@ model Business {
   phone            String?
   email            String?
   subscriptionTier SubscriptionTier  @default(FREE)
+  billingPeriod    BillingPeriod     @default(MONTHLY)
+  currentPeriodEnd DateTime?
   settings         Json?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -316,6 +318,11 @@ enum SubscriptionTier {
   PRO
   BUSINESS
   ENTERPRISE
+}
+
+enum BillingPeriod {
+  MONTHLY
+  YEARLY
 }
 
 enum LocationMode {

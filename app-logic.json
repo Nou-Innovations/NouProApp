@@ -358,86 +358,133 @@
   "subscriptionPlans": {
     "free": {
       "name": "Free Plan",
-      "price": 0,
+      "monthlyPrice": 0,
+      "yearlyPrice": 0,
       "currency": "MUR",
-      "targetUser": "Very small / testing businesses",
+      "targetUser": "Get started",
       "limits": {
         "users": 1,
         "locations": 1,
-        "staff": 0
+        "staff": 1,
+        "products": 20
       },
       "features": {
         "included": [
           "Create a business profile",
-          "Create/edit/delete products (private only)",
+          "Up to 20 products (private only)",
           "Manage basic stock",
-          "Use business Inbox"
+          "Use business Inbox",
+          "Request orders"
         ],
         "excluded": [
           "Create selling orders",
           "Generate invoices/estimates",
+          "Send invoices & export PDF",
           "Publish public business page",
-          "Receive order requests",
           "Create deliveries and transfers",
           "Accept staff join requests",
-          "Price privacy"
+          "Price privacy",
+          "Business-specific pricing",
+          "Analytics dashboard",
+          "Advanced permissions & roles",
+          "API access"
         ]
       }
     },
     "pro": {
       "name": "Pro Plan",
-      "price": 799,
+      "monthlyPrice": 899,
+      "yearlyPrice": 9588,
+      "effectiveMonthlyYearly": 799,
       "currency": "MUR",
       "period": "month",
-      "targetUser": "Small teams",
+      "targetUser": "For small teams",
+      "freeTrialDays": 14,
       "limits": {
         "staff": 3,
-        "locations": 3
+        "locations": 1,
+        "products": 500
       },
       "features": {
         "included": [
           "All Free features",
-          "Full product management",
-          "Selling orders",
-          "Invoices & estimates",
+          "Up to 500 products",
+          "Create selling orders",
+          "Invoices & estimates (send & export PDF)",
+          "Payment status tracking",
           "Delivery workflow",
           "Publish public business page",
-          "Price privacy on LaBoutik Rouz"
+          "Up to 3 staff members",
+          "1 location"
+        ],
+        "excluded": [
+          "Business-specific pricing",
+          "Analytics dashboard",
+          "Advanced permissions & roles",
+          "Independent locations",
+          "API access",
+          "Priority support"
         ]
       }
     },
     "business": {
       "name": "Business Plan",
-      "price": 1999,
+      "monthlyPrice": 2699,
+      "yearlyPrice": 28788,
+      "effectiveMonthlyYearly": 2399,
       "currency": "MUR",
       "period": "month",
-      "targetUser": "Growing businesses",
+      "targetUser": "Most popular",
+      "freeTrialDays": 31,
       "limits": {
         "staff": 9,
-        "locations": 8
+        "locations": 7,
+        "products": 5000
       },
       "features": {
         "included": [
           "All Pro features",
+          "Up to 5,000 products",
           "Product & price privacy",
-          "Informational dashboard (1-week analytics)"
+          "Business-specific pricing (per client)",
+          "Analytics dashboard (7 days)",
+          "Business profile published on feed",
+          "Brands & products published on feed",
+          "Up to 9 staff members",
+          "Up to 7 locations"
+        ],
+        "excluded": [
+          "Advanced permissions & roles",
+          "Independent locations",
+          "API access",
+          "Priority support"
         ]
       }
     },
     "enterprise": {
       "name": "Enterprise Plan",
-      "price": 3999,
+      "monthlyPrice": 4399,
+      "yearlyPrice": 46788,
+      "effectiveMonthlyYearly": 3899,
       "currency": "MUR",
       "period": "month",
-      "targetUser": "Large teams",
+      "targetUser": "Full control",
+      "freeTrialDays": 31,
       "limits": {
         "staff": "unlimited",
-        "locations": "unlimited"
+        "locations": "unlimited",
+        "products": "unlimited"
       },
       "features": {
         "included": [
           "All Business features",
+          "Unlimited products",
+          "Independent locations",
+          "Advanced permissions & roles",
           "Full analytics dashboard (real-time + history)",
+          "API access / future integrations",
+          "Unlimited staff",
+          "Unlimited locations",
           "Priority support"
         ]
       }
