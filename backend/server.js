@@ -288,6 +288,17 @@ function isBusinessMember(businessId, userId) {
   );
 }
 
+// Middleware to require company membership for chat routes
+function requireCompanyMember(req, res, next) {
+  const { companyId } = req.params;
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json(errorResponse('Unauthorized'));
+  if (!isBusinessMember(companyId, userId)) {
+    return res.status(403).json(errorResponse('You are not a member of this business'));
+  }
+  next();
+}
+
 // Check if user is a super admin of business
 function isBusinessSuperAdmin(businessId, userId) {
   return businessMembers.some(m => 
@@ -2922,11 +2933,25 @@ app.post('/api/businesses/:businessId/invoices', requireAuth, async (req, res) =
     }
 
     const capabilities = deriveCapabilities(business);
-    if (!capabilities.canCreateInvoices) {
+    
+    // Allow all tiers to create invoice drafts
+    if (!capabilities.canCreateInvoiceDraft) {
       return res.status(403).json(errorResponse(
-        'Creating invoices requires a paid subscription.',
+        'Cannot create invoices',
         'CAPABILITY_REQUIRED'
       ));
+    }
+    
+    // If trying to create as SENT directly, check canSendInvoice (Pro+ only)
+    if (req.body.status === 'SENT' && !capabilities.canSendInvoice) {
+      return res.status(403).json({
+        error: {
+          code: 'PAYWALL',
+          triggerId: 'send_invoice',
+          requiredPlan: 'pro',
+          message: 'Upgrade to Pro to send invoices'
+        }
+      });
     }
 
     // Get existing invoice count for numbering
@@ -3052,11 +3077,24 @@ app.post('/api/locations/:locationId/invoices', requireAuth, async (req, res) =>
       });
     }
 
-    if (!capabilities.canCreateInvoices) {
+    // Allow all tiers to create invoice drafts
+    if (!capabilities.canCreateInvoiceDraft) {
       return res.status(403).json(errorResponse(
-        'Creating invoices requires a paid subscription.',
+        'Cannot create invoices',
         'CAPABILITY_REQUIRED'
       ));
+    }
+    
+    // If trying to create as SENT directly, check canSendInvoice (Pro+ only)
+    if (req.body.status === 'SENT' && !capabilities.canSendInvoice) {
+      return res.status(403).json({
+        error: {
+          code: 'PAYWALL',
+          triggerId: 'send_invoice',
+          requiredPlan: 'pro',
+          message: 'Upgrade to Pro to send invoices'
+        }
+      });
     }
 
     // Generate location-specific invoice number
@@ -3221,7 +3259,7 @@ app.get('/api/companies/:companyId/invoices/:invoiceId', async (req, res) => {
 // Chat Routes
 
 // Create a new chat
-app.post('/api/companies/:companyId/chats', requireAuth, async (req, res) => {
+app.post('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, async (req, res) => {
   try {
     const { companyId } = req.params;
     const { type, name, participants, partnerId, partnerType, locationId } = req.body;
@@ -3253,7 +3291,7 @@ app.post('/api/companies/:companyId/chats', requireAuth, async (req, res) => {
 });
 
 // List chats for a company
-app.get('/api/companies/:companyId/chats', requireAuth, async (req, res) => {
+app.get('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, async (req, res) => {
   try {
     const { companyId } = req.params;
     let companyChats = await repos.chatRepo.getByCompanyId(companyId);
@@ -3288,7 +3326,7 @@ app.get('/api/companies/:companyId/chats', requireAuth, async (req, res) => {
 });
 
 // Get messages for a specific chat
-app.get('/api/companies/:companyId/chats/:chatId/messages', requireAuth, async (req, res) => {
+app.get('/api/companies/:companyId/chats/:chatId/messages', requireAuth, requireCompanyMember, async (req, res) => {
   try {
     const { companyId, chatId } = req.params;
     const limit = Math.min(parseInt(req.query.limit || '50', 10), 100);
@@ -3330,7 +3368,7 @@ app.get('/api/companies/:companyId/chats/:chatId/messages', requireAuth, async (
 });
 
 // Mark chat as read
-app.post('/api/companies/:companyId/chats/:chatId/read', requireAuth, async (req, res) => {
+app.post('/api/companies/:companyId/chats/:chatId/read', requireAuth, requireCompanyMember, async (req, res) => {
   try {
     const { companyId, chatId } = req.params;
 
@@ -3352,7 +3390,7 @@ app.post('/api/companies/:companyId/chats/:chatId/read', requireAuth, async (req
 });
 
 // Send message to chat
-app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, async (req, res) => {
+app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, requireCompanyMember, async (req, res) => {
   try {
     const { chatId, companyId } = req.params;
     const { type, content, replyToId, attachmentUrl, metadata } = req.body;
@@ -3403,7 +3441,11 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, async 
       }
     }
 
-    const created = await repos.chatRepo.addMessage(chatId, newMessage);
+    // Add message to sender's chat with isOutgoing=true and don't increment unread for sender
+    const created = await repos.chatRepo.addMessage(chatId, {
+      ...newMessage,
+      isOutgoing: true  // Sender's copy is outgoing
+    }, { incrementUnread: false });  // Don't increment unread for sender
 
     // Update chat's last message is handled by chatRepo.addMessage
     res.json(successResponse(created));
@@ -3414,7 +3456,7 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, async 
 });
 
 // Delete a message (soft delete)
-app.delete('/api/companies/:companyId/chats/:chatId/messages/:messageId', requireAuth, async (req, res) => {
+app.delete('/api/companies/:companyId/chats/:chatId/messages/:messageId', requireAuth, requireCompanyMember, async (req, res) => {
   try {
     const { companyId, chatId, messageId } = req.params;
 

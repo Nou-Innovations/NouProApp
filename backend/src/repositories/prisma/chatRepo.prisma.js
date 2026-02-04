@@ -152,15 +152,76 @@ async function addMessage(chatId, message, options = {}) {
   return newMessage;
 }
 
+/**
+ * Get a specific message by ID
+ * @param {string} chatId - The chat ID
+ * @param {string} messageId - The message ID
+ * @returns {object|null} The message or null if not found
+ */
+async function getMessage(chatId, messageId) {
+  const msg = await prisma.message.findFirst({
+    where: { id: messageId, chatId }
+  });
+  if (!msg) return null;
+  return {
+    ...msg,
+    sender: msg.senderId ? { id: msg.senderId, name: msg.senderName } : null,
+    text: msg.content
+  };
+}
+
+/**
+ * Soft delete a message (mark as deleted)
+ * @param {string} chatId - The chat ID
+ * @param {string} messageId - The message ID to delete
+ * @returns {object|null} The updated message or null if not found
+ */
+async function deleteMessage(chatId, messageId) {
+  const existing = await prisma.message.findFirst({
+    where: { id: messageId, chatId }
+  });
+  if (!existing) return null;
+
+  const updated = await prisma.message.update({
+    where: { id: messageId },
+    data: {
+      content: '[deleted]',
+      type: 'deleted',
+      status: 'deleted',
+      meta: { ...(existing.meta || {}), deletedAt: new Date().toISOString() }
+    }
+  });
+
+  // Update chat.lastMessage if this was the last message
+  const chat = await prisma.chat.findUnique({ where: { id: chatId } });
+  if (chat?.lastMessage?.id === messageId) {
+    await prisma.chat.update({
+      where: { id: chatId },
+      data: {
+        lastMessage: { ...chat.lastMessage, content: '[deleted]', type: 'deleted' },
+        updatedAt: new Date()
+      }
+    });
+  }
+
+  return {
+    ...updated,
+    sender: updated.senderId ? { id: updated.senderId, name: updated.senderName } : null,
+    text: updated.content
+  };
+}
+
 module.exports = { 
   list, 
   getById, 
-  getByCompanyId, // Renamed from getByBusinessId
+  getByCompanyId,
   getByLocationId, 
   create, 
   update, 
   delete: remove,
   getMessages,
-  addMessage
+  addMessage,
+  getMessage,
+  deleteMessage
 };
 
