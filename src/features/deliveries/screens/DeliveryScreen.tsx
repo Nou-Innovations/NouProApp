@@ -30,6 +30,7 @@ import {
   canUpdateDeliveryStatus,
   canCreateDeliveries,
   checkPaywall,
+  PaywallCheck,
 } from '@/shared/utils/permissions';
 import { useDeliveries } from '../hooks/useDeliveries';
 import { Delivery, DeliveryStatus, DeliveryViewType } from '@/shared/types/delivery';
@@ -51,6 +52,7 @@ export default function DeliveryScreen() {
   const [showViewDropdown, setShowViewDropdown] = useState<boolean>(false);
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
+  const [paywallCheckResult, setPaywallCheckResult] = useState<PaywallCheck | null>(null);
   const { theme: appTheme } = useTheme();
   const { setDeliveriesUnreadCount, isItemViewed } = useNotifications();
   
@@ -108,10 +110,11 @@ export default function DeliveryScreen() {
       return;
     }
     
-    // Check if plan allows deliveries
+    // Check if plan allows deliveries (deliveries are part of selling orders workflow)
     if (!planAllowsDeliveries) {
-      const paywallCheck = checkPaywall('create_delivery', activeBusiness?.plan || null);
-      if (!paywallCheck.allowed) {
+      const check = checkPaywall('create_selling_order', activeBusiness?.plan || null);
+      if (!check.allowed) {
+        setPaywallCheckResult(check);
         setShowPaywall(true);
         return;
       }
@@ -316,8 +319,10 @@ export default function DeliveryScreen() {
           setShowPaywall(false);
           (navigation as any).navigate('SubscriptionPlans');
         }}
-        requiredPlan="pro"
-        featureName="creating deliveries"
+        requiredPlan={paywallCheckResult?.requiredPlan || 'pro'}
+        modalType={paywallCheckResult?.modalType}
+        title={paywallCheckResult?.title}
+        description={paywallCheckResult?.description}
       />
     </SafeAreaView>
   );

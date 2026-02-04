@@ -1,5 +1,5 @@
 import React, { useState, useMemo, ReactNode } from 'react';
-import { View, StyleSheet, Text, ScrollView } from 'react-native';
+import { View, StyleSheet, Text, ScrollView, Alert } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useNavigation } from '@react-navigation/native';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
@@ -7,6 +7,7 @@ import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { ListItemCard, EmptyState } from '@/shared/components/ui';
 import theme from '@/shared/theme';
+import { createChat } from '../inbox.service';
 
 interface NewChatModalListProps {
   visible: boolean;
@@ -14,6 +15,7 @@ interface NewChatModalListProps {
   onNewGroup: () => void;
   onNewContact: () => void;
   canManageExternal?: boolean;
+  companyId?: string;
 }
 
 // Item type for the list
@@ -119,10 +121,12 @@ export default function NewChatModalList({
   onNewGroup,
   onNewContact,
   canManageExternal = false,
+  companyId,
 }: NewChatModalListProps) {
   const { theme: appTheme } = useTheme();
   const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
   // Convert data to list item format and combine with action options
   const modalItems = useMemo(() => {
@@ -201,7 +205,7 @@ export default function NewChatModalList({
     });
   }, [modalItems, searchQuery]);
 
-  const handleItemSelect = (item: ChatListItem) => {
+  const handleItemSelect = async (item: ChatListItem) => {
     // Handle action items
     if (item.isAction) {
       if (item.id === 'new-group') {
@@ -217,30 +221,66 @@ export default function NewChatModalList({
     const originalData = item.originalData;
     if (!originalData) return;
 
-    if (item.type === 'company') {
-      // Navigate to chat with company
-      (navigation as any).navigate('Chat', {
-        id: originalData.id,
-        name: originalData.name,
-        isGroup: false,
-        avatar: originalData.logo,
-        partnerId: originalData.id,
-        partnerType: 'business',
-        unreadCount: 0,
-      });
-    } else if (item.type === 'contact') {
-      // Navigate to chat with contact
-      (navigation as any).navigate('Chat', {
-        id: originalData.id,
-        name: originalData.name,
-        isGroup: false,
-        avatar: originalData.avatar,
-        partnerId: originalData.id,
-        partnerType: 'user',
-        unreadCount: 0,
-      });
+    // If no companyId provided, fall back to navigation-only (mock mode)
+    if (!companyId) {
+      if (item.type === 'company') {
+        (navigation as any).navigate('Chat', {
+          id: originalData.id,
+          name: originalData.name,
+          isGroup: false,
+          avatar: originalData.logo,
+          partnerId: originalData.id,
+          partnerType: 'business',
+          unreadCount: 0,
+        });
+      } else if (item.type === 'contact') {
+        (navigation as any).navigate('Chat', {
+          id: originalData.id,
+          name: originalData.name,
+          isGroup: false,
+          avatar: originalData.avatar,
+          partnerId: originalData.id,
+          partnerType: 'user',
+          unreadCount: 0,
+        });
+      }
+      onClose();
+      return;
     }
-    onClose();
+
+    // Create chat via API
+    setIsCreating(true);
+    try {
+      const chatType = item.type === 'company' ? 'supplier' : 'client';
+      const partnerType = item.type === 'company' ? 'business' : 'user';
+      
+      const newChat = await createChat({
+        companyId,
+        type: chatType,
+        name: originalData.name,
+        participants: [originalData.id],
+        partnerId: originalData.id,
+        partnerType,
+      });
+
+      onClose();
+      
+      // Navigate to the newly created chat
+      (navigation as any).navigate('Chat', {
+        id: newChat.id,
+        name: newChat.name,
+        isGroup: false,
+        avatar: item.type === 'company' ? originalData.logo : originalData.avatar,
+        partnerId: originalData.id,
+        partnerType,
+        unreadCount: 0,
+      });
+    } catch (error) {
+      console.error('Failed to create chat:', error);
+      Alert.alert('Error', 'Failed to create chat. Please try again.');
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const renderItem = (item: ChatListItem, index: number): ReactNode => {

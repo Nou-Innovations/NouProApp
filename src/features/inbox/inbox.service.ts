@@ -23,6 +23,7 @@
  */
 
 import { get, getFullResponse, post, del } from '@/shared/services/api';
+import apiClient from '@/shared/services/api';
 import { 
   Chat, 
   Message, 
@@ -68,9 +69,27 @@ export interface MessagesResult {
   nextCursor: string | null;
 }
 
+export interface CreateChatParams {
+  companyId: string;
+  type?: 'client' | 'supplier' | 'internal' | 'direct';
+  name: string;
+  participants?: string[];
+  partnerId?: string;
+  partnerType?: 'business' | 'user';
+  locationId?: string;
+}
+
 // ============================================================================
 // Service Methods
 // ============================================================================
+
+/**
+ * Create a new chat
+ */
+export async function createChat(params: CreateChatParams): Promise<Chat> {
+  const { companyId, ...body } = params;
+  return post<Chat>(`/companies/${companyId}/chats`, body);
+}
 
 /**
  * Get all chats for a company
@@ -210,11 +229,62 @@ export async function deleteUserMessage(
 }
 
 // ============================================================================
+// File Upload
+// ============================================================================
+
+/**
+ * Get MIME type from file extension
+ */
+function getMimeType(fileName: string): string {
+  const ext = fileName.toLowerCase().split('.').pop();
+  const mimeTypes: Record<string, string> = {
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+  };
+  return mimeTypes[ext || ''] || 'application/octet-stream';
+}
+
+/**
+ * Upload an attachment file to the server
+ * @param fileUri - Local file URI (file:// or content://)
+ * @param fileName - Original file name
+ * @returns Public URL of the uploaded file
+ */
+export async function uploadAttachment(fileUri: string, fileName: string): Promise<string> {
+  const formData = new FormData();
+  
+  formData.append('file', {
+    uri: fileUri,
+    name: fileName,
+    type: getMimeType(fileName),
+  } as any);
+  
+  const response = await apiClient.post<{ success: boolean; data: { url: string } }>(
+    '/upload',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+  
+  return response.data.data.url;
+}
+
+// ============================================================================
 // Export as namespace
 // ============================================================================
 
 const inboxService = {
   // Business mode
+  createChat,
   getChats,
   getMessages,
   sendMessage,
@@ -226,6 +296,8 @@ const inboxService = {
   sendUserMessage,
   deleteUserMessage,
   markUserChatAsRead,
+  // Upload
+  uploadAttachment,
 };
 
 export default inboxService;

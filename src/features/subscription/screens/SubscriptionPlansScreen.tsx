@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Animated,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -21,6 +22,8 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppButton from '@/shared/components/ui/AppButton';
 import theme from '@/shared/theme';
+import { useProfileStore } from '@/shared/store/profileStore';
+import { API_BASE_URL } from '@/config/env';
 import {
   SubscriptionPlan,
   BillingPeriod,
@@ -71,10 +74,10 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, isCurrentPlan, on
   const scaleAnim = useRef(new Animated.Value(1)).current;
   
   // Get pricing based on billing period
-  const pricePerMonth = billingPeriod === 'yearly' 
+  const pricePerMonth = billingPeriod === 'YEARLY' 
     ? PLAN_PRICES_YEARLY_MONTHLY[plan] 
     : PLAN_PRICES_MONTHLY[plan];
-  const savings = billingPeriod === 'yearly' ? getYearlySavings(plan) : 0;
+  const savings = billingPeriod === 'YEARLY' ? getYearlySavings(plan) : 0;
   
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
@@ -148,22 +151,22 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, isCurrentPlan, on
           </Text>
           {plan !== 'free' && (
             <Text style={[styles.pricePeriod, { color: appTheme.colors.textSecondary }]}>
-              {billingPeriod === 'yearly' ? '/month' : '/month'}
+              {billingPeriod === 'YEARLY' ? '/month' : '/month'}
             </Text>
           )}
         </View>
 
         {/* Billing period note for yearly */}
-        {billingPeriod === 'yearly' && plan !== 'free' && (
+        {billingPeriod === 'YEARLY' && plan !== 'free' && (
           <Text style={[styles.billedYearlyText, { color: appTheme.colors.textSecondary }]}>
             billed yearly
           </Text>
         )}
 
         {/* Badges Row - Savings and Free Trial */}
-        {(billingPeriod === 'yearly' && plan !== 'free' && savings > 0) || FREE_TRIAL_DAYS[plan] > 0 ? (
+        {(billingPeriod === 'YEARLY' && plan !== 'free' && savings > 0) || FREE_TRIAL_DAYS[plan] > 0 ? (
           <View style={styles.badgesRow}>
-            {billingPeriod === 'yearly' && plan !== 'free' && savings > 0 && (
+            {billingPeriod === 'YEARLY' && plan !== 'free' && savings > 0 && (
               <View style={[styles.savingsBadge, { backgroundColor: '#22C55E' }]}>
                 <Text style={[styles.savingsText, { color: '#ffffff' }]}>
                   Save {CURRENCY.symbol}{savings.toLocaleString()}/year
@@ -236,10 +239,12 @@ export default function SubscriptionPlansScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>('business');
-  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('yearly'); // Default to yearly
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('YEARLY'); // Default to yearly
+  const [isUpdating, setIsUpdating] = useState(false);
   
-  // Mock current plan - in real app, get from business store
-  const currentPlan: SubscriptionPlan = 'free';
+  // Get active business from store
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
+  const currentPlan: SubscriptionPlan = activeBusiness?.plan || 'free';
   
   const plans: SubscriptionPlan[] = ['free', 'pro', 'business', 'enterprise'];
   
@@ -247,19 +252,75 @@ export default function SubscriptionPlansScreen() {
     setSelectedPlan(plan);
   };
   
-  const handleContinue = () => {
-    if (selectedPlan === currentPlan) {
+  const handleContinue = async () => {
+    if (selectedPlan === currentPlan || !activeBusiness?.id) {
       return;
     }
-    // Navigate to payment or confirmation
-    // For now, show success feedback
-    console.log(`Selected plan: ${selectedPlan}, billing: ${billingPeriod}`);
+    
+    // Get access token for authentication
+    const accessToken = useProfileStore.getState().accessToken;
+    if (!accessToken) {
+      Alert.alert('Error', 'Please log in again to update your subscription.');
+      return;
+    }
+    
+    setIsUpdating(true);
+    
+    try {
+      // Call API to update subscription
+      const response = await fetch(
+        `${API_BASE_URL}/businesses/${activeBusiness.id}/subscription`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            subscriptionTier: selectedPlan.toUpperCase(),
+            billingPeriod: billingPeriod, // Already UPPERCASE
+          }),
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to update subscription');
+      }
+      
+      const result = await response.json();
+      
+      // Update the store with the new subscription data
+      useProfileStore.getState().updateUserBusiness(activeBusiness.id, {
+        plan: selectedPlan,
+      });
+      
+      // Show success message
+      Alert.alert(
+        'Success',
+        `Subscription updated to ${PLAN_INFO[selectedPlan].name}`,
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Subscription update error:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to update subscription. Please try again.'
+      );
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const isUpgrade = selectedPlan !== 'free' && selectedPlan !== currentPlan;
   
   // Get pricing for selected plan based on billing period
-  const selectedPrice = billingPeriod === 'yearly' 
+  const selectedPrice = billingPeriod === 'YEARLY' 
     ? PLAN_PRICES_YEARLY_MONTHLY[selectedPlan] 
     : PLAN_PRICES_MONTHLY[selectedPlan];
   
@@ -299,8 +360,8 @@ export default function SubscriptionPlansScreen() {
           <View style={styles.buttonWrapper}>
             <AppButton
               title="Monthly"
-              onPress={() => setBillingPeriod('monthly')}
-              variant={billingPeriod === 'monthly' ? 'primary' : 'outline'}
+              onPress={() => setBillingPeriod('MONTHLY')}
+              variant={billingPeriod === 'MONTHLY' ? 'primary' : 'outline'}
               style={styles.billingToggleButton}
             />
           </View>
@@ -308,21 +369,21 @@ export default function SubscriptionPlansScreen() {
             <TouchableOpacity
               style={[
                 styles.customYearlyButton,
-                billingPeriod === 'yearly' 
+                billingPeriod === 'YEARLY' 
                   ? { backgroundColor: appTheme.colors.primary }
                   : styles.yearlyButtonOutline,
                 { borderColor: appTheme.colors.primary }
               ]}
-              onPress={() => setBillingPeriod('yearly')}
+              onPress={() => setBillingPeriod('YEARLY')}
               activeOpacity={0.7}
             >
               <Text style={[
                 styles.yearlyMainText,
-                { color: billingPeriod === 'yearly' ? appTheme.colors.background : appTheme.colors.primary }
+                { color: billingPeriod === 'YEARLY' ? appTheme.colors.background : appTheme.colors.primary }
               ]}>
                 Yearly
               </Text>
-              {billingPeriod === 'yearly' && (
+              {billingPeriod === 'YEARLY' && (
                 <Text style={styles.yearlySaveText}>
                   Save up to 11%
                 </Text>
@@ -352,11 +413,12 @@ export default function SubscriptionPlansScreen() {
           title={buttonText}
           onPress={handleContinue}
           variant={selectedPlan === currentPlan ? 'disabled' : isUpgrade ? 'primary' : 'outline'}
-          disabled={selectedPlan === currentPlan}
+          disabled={selectedPlan === currentPlan || isUpdating}
+          loading={isUpdating}
         />
         {selectedPlan !== 'free' && selectedPlan !== currentPlan && (
           <>
-            {billingPeriod === 'yearly' ? (
+            {billingPeriod === 'YEARLY' ? (
               <Text style={[styles.ctaSubtext, { color: '#22C55E' }]}>
                 Save {CURRENCY.symbol}{getYearlySavings(selectedPlan).toLocaleString()}/year
               </Text>

@@ -38,6 +38,7 @@ import {
   markUserChatAsRead,
   deleteMessage,
   deleteUserMessage,
+  uploadAttachment,
 } from '../inbox.service';
 import { MessageBubble } from '../components/MessageBubble';
 import type { Message, OrderMessage, TextMessage, EventMessage, DeletedMessage } from '@/shared/types/inbox';
@@ -769,18 +770,14 @@ export default function ChatScreen() {
       const fileUri = document.uri;
       const fileSize = document.size || 0;
       
-      // For now, we'll use the local URI as the attachment URL
-      // In production, you would upload to a server and get a URL back
-      const attachmentUrl = fileUri;
-      
-      // Create optimistic PDF message
+      // Create optimistic PDF message with local URI
       const tempId = `temp-${Date.now()}`;
       const optimisticMessage: Message = {
         id: tempId,
         chatId: id,
         type: 'pdf',
         fileName,
-        fileUrl: attachmentUrl,
+        fileUrl: fileUri, // Show local URI while uploading
         fileSize,
         isOutgoing: true,
         sender: {
@@ -804,6 +801,16 @@ export default function ChatScreen() {
       
       if (canSendToApi) {
         try {
+          // Upload file first to get public URL
+          let attachmentUrl: string;
+          try {
+            attachmentUrl = await uploadAttachment(fileUri, fileName);
+          } catch (uploadError) {
+            console.error('Upload failed:', uploadError);
+            // Fall back to local URI if upload fails (works on same device)
+            attachmentUrl = fileUri;
+          }
+          
           let sentMessage: Message;
           
           if (isPersonalMode && currentUser?.id) {
@@ -890,13 +897,16 @@ export default function ChatScreen() {
       const width = asset.width || 300;
       const height = asset.height || 300;
       
-      // Create optimistic image message
+      // Get file name from URI
+      const fileName = imageUri.split('/').pop() || `image_${Date.now()}.jpg`;
+      
+      // Create optimistic image message with local URI
       const tempId = `temp-${Date.now()}`;
       const optimisticMessage: Message = {
         id: tempId,
         chatId: id,
         type: 'image',
-        imageUrl: imageUri,
+        imageUrl: imageUri, // Show local URI while uploading
         width,
         height,
         isOutgoing: true,
@@ -921,20 +931,30 @@ export default function ChatScreen() {
       
       if (canSendToApi) {
         try {
+          // Upload image first to get public URL
+          let attachmentUrl: string;
+          try {
+            attachmentUrl = await uploadAttachment(imageUri, fileName);
+          } catch (uploadError) {
+            console.error('Upload failed:', uploadError);
+            // Fall back to local URI if upload fails (works on same device)
+            attachmentUrl = imageUri;
+          }
+          
           let sentMessage: Message;
           
           if (isPersonalMode && currentUser?.id) {
             sentMessage = await sendUserMessage(currentUser.id, id, {
               type: 'image',
               content: 'Photo',
-              attachmentUrl: imageUri,
+              attachmentUrl,
               metadata: { width, height },
             });
           } else if (activeBusiness?.id) {
             sentMessage = await sendMessage(activeBusiness.id, id, {
               type: 'image',
               content: 'Photo',
-              attachmentUrl: imageUri,
+              attachmentUrl,
               metadata: { width, height },
             });
           } else {

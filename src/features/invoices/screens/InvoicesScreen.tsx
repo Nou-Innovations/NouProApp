@@ -32,6 +32,7 @@ import {
   canManageInvoices,
   canGenerateInvoices,
   checkPaywall,
+  PaywallCheck,
 } from '@/shared/utils/permissions';
 
 export default function InvoicesScreen() {
@@ -43,6 +44,7 @@ export default function InvoicesScreen() {
   const [showViewDropdown, setShowViewDropdown] = useState<boolean>(false);
   const [showActionsModal, setShowActionsModal] = useState<boolean>(false);
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
+  const [paywallCheck, setPaywallCheck] = useState<PaywallCheck | null>(null);
   const { theme: appTheme } = useTheme();
   const { setInvoicesUnreadCount, isItemViewed } = useNotifications();
   const { currentLocation } = useBusinessStore();
@@ -103,8 +105,9 @@ export default function InvoicesScreen() {
     if (!hasManagePermission) {
       // Check if it's a role issue or plan issue
       if (!planAllowsInvoices) {
-        const paywallCheck = checkPaywall('create_invoice', activeBusiness?.plan || null);
-        if (!paywallCheck.allowed) {
+        const check = checkPaywall('send_invoice', activeBusiness?.plan || null);
+        if (!check.allowed) {
+          setPaywallCheck(check);
           setShowPaywall(true);
           return;
         }
@@ -306,8 +309,10 @@ export default function InvoicesScreen() {
           setShowPaywall(false);
           (navigation as any).navigate('SubscriptionPlans');
         }}
-        requiredPlan="pro"
-        featureName="creating invoices and estimates"
+        requiredPlan={paywallCheck?.requiredPlan || 'pro'}
+        modalType={paywallCheck?.modalType}
+        title={paywallCheck?.title}
+        description={paywallCheck?.description}
       />
     </SafeAreaView>
   );

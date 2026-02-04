@@ -33,6 +33,7 @@ import {
   canEditProducts,
   canPublishProducts,
   checkPaywall,
+  PaywallCheck,
 } from '@/shared/utils/permissions';
 import { useProducts, DisplayBrand } from '../hooks/useProducts';
 import { 
@@ -93,7 +94,7 @@ const ProductsScreen: React.FC = () => {
   const [showViewDropdown, setShowViewDropdown] = useState<boolean>(false);
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
-  const [paywallFeature, setPaywallFeature] = useState<string>('');
+  const [paywallCheckResult, setPaywallCheckResult] = useState<PaywallCheck | null>(null);
   const hasEditedProducts = Object.keys(editedProducts).length > 0;
 
   const listData: ListItem[] = useMemo(() => {
@@ -166,10 +167,10 @@ const ProductsScreen: React.FC = () => {
   const handlePublishToggle = useCallback((productId: string, currentPublishState: boolean) => {
     // Only check paywall when trying to publish (not unpublish)
     if (!currentPublishState && !canPublish) {
-      // Check paywall
-      const paywallCheck = checkPaywall('publish_product', activeBusiness?.plan || null);
-      if (!paywallCheck.allowed) {
-        setPaywallFeature('publishing products');
+      // Check paywall using new trigger ID
+      const check = checkPaywall('publish_business_page', activeBusiness?.plan || null);
+      if (!check.allowed) {
+        setPaywallCheckResult(check);
         setShowPaywall(true);
         return;
       }
@@ -430,8 +431,10 @@ const ProductsScreen: React.FC = () => {
           setShowPaywall(false);
           (navigation as any).navigate('SubscriptionPlans');
         }}
-        requiredPlan="pro"
-        featureName={paywallFeature}
+        requiredPlan={paywallCheckResult?.requiredPlan || 'pro'}
+        modalType={paywallCheckResult?.modalType}
+        title={paywallCheckResult?.title}
+        description={paywallCheckResult?.description}
       />
     </SafeAreaView>
   );

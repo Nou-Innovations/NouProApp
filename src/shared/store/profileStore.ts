@@ -14,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@/shared/types/user';
 import { Business, BusinessStaff, StaffRole, StaffRoleType, UserBusiness } from '@/shared/types/business';
 import { ProfileMode } from '@/shared/types/roles';
-import { SubscriptionPlan } from '@/shared/types/subscription';
+import { SubscriptionPlan, PLAN_FEATURES } from '@/shared/types/subscription';
 
 /**
  * Profile Store State
@@ -492,13 +492,13 @@ export const useProfileStore = create<ProfileStore>()(
         const plan = state.activeBusiness?.plan;
         const role = state.currentUserRole;
         
-        // Must be on paid plan
-        const isPaidPlan = plan !== undefined && plan !== null && plan !== 'free';
+        // Must have plan with publish_business_page capability
+        const canPublishPage = plan ? PLAN_FEATURES[plan].publish_business_page : false;
         
         // Must be admin or super_admin
         const hasRole = role === 'admin' || role === 'super_admin';
         
-        return isPaidPlan && hasRole;
+        return canPublishPage && hasRole;
       },
     }),
     {

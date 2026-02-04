@@ -49,10 +49,14 @@ import {
   canUseAPI,
   getAnalyticsType,
   shouldShowNouProBranding,
+  canPublishOnFeed,
+  canPublishProductsOnFeed,
   getBusinessTabVisibility,
   checkPaywall,
+  getLimitTriggerId,
   TabVisibility,
   PaywallCheck,
+  PaywallModalType,
 } from '@/shared/utils/permissions';
 import { SubscriptionPlan } from '@/shared/types/subscription';
 
@@ -101,6 +105,8 @@ export interface Permissions {
   canUseBusinessSpecificPricing: boolean;
   canUseAdvancedPermissions: boolean;
   canUseAPI: boolean;
+  canPublishOnFeed: boolean;
+  canPublishProductsOnFeed: boolean;
   analyticsType: 'none' | 'basic_7day' | 'full';
   showNouProBranding: boolean;
   
@@ -115,8 +121,11 @@ export interface Permissions {
   // Tab visibility
   tabVisibility: TabVisibility;
   
-  // Paywall checker
-  checkPaywall: (action: string) => PaywallCheck;
+  // Paywall checker - uses trigger IDs from app-logic.json
+  checkPaywall: (triggerId: string, context?: { currentCount?: number }) => PaywallCheck;
+  
+  // Get the appropriate limit trigger ID for current plan
+  getLimitTriggerId: (limitType: 'products' | 'staff' | 'locations') => string;
   
   // Role info
   isSuperAdmin: boolean;
@@ -132,15 +141,24 @@ export interface Permissions {
  * 
  * Usage:
  * ```tsx
- * const { canEditProducts, canPublishProducts, checkPaywall } = usePermissions();
+ * const { canEditProducts, canPublishProducts, checkPaywall, getLimitTriggerId } = usePermissions();
  * 
  * if (!canEditProducts) {
  *   return <AccessDenied />;
  * }
  * 
- * const paywallResult = checkPaywall('publish_product');
+ * // Feature gate check
+ * const paywallResult = checkPaywall('publish_business_page');
  * if (!paywallResult.allowed) {
- *   showPaywall(paywallResult.requiredPlan);
+ *   // paywallResult includes: requiredPlan, modalType, title, description
+ *   showPaywall(paywallResult);
+ * }
+ * 
+ * // Limit check with context
+ * const limitTriggerId = getLimitTriggerId('products');
+ * const limitCheck = checkPaywall(limitTriggerId, { currentCount: productCount });
+ * if (!limitCheck.allowed) {
+ *   showPaywall(limitCheck); // Shows limit_reached modal with currentLimit
  * }
  * ```
  */
@@ -196,6 +214,8 @@ export function usePermissions(): Permissions {
     canUseBusinessSpecificPricing: canUseBusinessSpecificPricing(plan),
     canUseAdvancedPermissions: canUseAdvancedPermissions(plan),
     canUseAPI: canUseAPI(plan),
+    canPublishOnFeed: canPublishOnFeed(plan),
+    canPublishProductsOnFeed: canPublishProductsOnFeed(plan),
     analyticsType: getAnalyticsType(plan),
     showNouProBranding: shouldShowNouProBranding(plan),
     
@@ -210,8 +230,11 @@ export function usePermissions(): Permissions {
     // Tab visibility
     tabVisibility: getBusinessTabVisibility(currentUserRole, plan, currentStaffRoleType ?? undefined, customPermissions),
     
-    // Paywall checker
-    checkPaywall: (action: string) => checkPaywall(action, plan),
+    // Paywall checker - uses trigger IDs from app-logic.json
+    checkPaywall: (triggerId: string, context?: { currentCount?: number }) => checkPaywall(triggerId, plan, context),
+    
+    // Get the appropriate limit trigger ID for current plan
+    getLimitTriggerId: (limitType: 'products' | 'staff' | 'locations') => getLimitTriggerId(limitType, plan),
     
     // Role info
     isSuperAdmin: currentUserRole === 'super_admin',

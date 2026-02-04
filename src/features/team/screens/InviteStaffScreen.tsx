@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,9 +16,11 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { post } from '@/shared/services/api';
+import { post, get } from '@/shared/services/api';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { AppSearchBar, Avatar } from '@/shared/components/ui';
+import PaywallModal from '@/features/subscription/components/PaywallModal';
+import { checkPaywall, getLimitTriggerId, PaywallCheck } from '@/shared/utils/permissions';
 
 // Mock users for demonstration - in real app, fetch from API
 const MOCK_CONNECTED_USERS = [
@@ -54,6 +56,26 @@ export default function InviteStaffScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Paywall state
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallCheckResult, setPaywallCheckResult] = useState<PaywallCheck | null>(null);
+  const [currentStaffCount, setCurrentStaffCount] = useState(0);
+  
+  // Fetch current staff count
+  useEffect(() => {
+    const fetchStaffCount = async () => {
+      if (!activeBusiness?.id) return;
+      try {
+        const response = await get<{ data: any[] }>(`/companies/${activeBusiness.id}/staff`);
+        setCurrentStaffCount(response.data?.length || 0);
+      } catch (error) {
+        // Default to 0 if fetch fails
+        console.error('Error fetching staff count:', error);
+      }
+    };
+    fetchStaffCount();
+  }, [activeBusiness?.id]);
 
   // Generate invite link
   const inviteLink = `https://noupro.app/join/${activeBusiness?.id || 'company'}`;
@@ -123,13 +145,24 @@ export default function InviteStaffScreen() {
       Alert.alert('Error', 'No active business selected');
       return;
     }
+    
+    // Check staff limit before inviting
+    const validEmails = emails.filter(email => email.trim() !== '' && email.includes('@'));
+    const totalNewInvites = validEmails.length + sentRequests.size;
+    const newStaffCount = currentStaffCount + totalNewInvites;
+    
+    const triggerId = getLimitTriggerId('staff', activeBusiness?.plan || null);
+    const check = checkPaywall(triggerId, activeBusiness?.plan || null, { currentCount: newStaffCount - 1 });
+    if (!check.allowed) {
+      setPaywallCheckResult(check);
+      setShowPaywall(true);
+      return;
+    }
 
     setIsSubmitting(true);
     
     try {
       // Send email invites
-      const validEmails = emails.filter(email => email.trim() !== '' && email.includes('@'));
-      
       for (const email of validEmails) {
         await post(`/companies/${activeBusiness.id}/users/invite`, {
           email: email.trim(),
@@ -342,6 +375,21 @@ export default function InviteStaffScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Paywall Modal for Staff Limit */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onUpgrade={() => {
+          setShowPaywall(false);
+          (navigation as any).navigate('SubscriptionPlans');
+        }}
+        requiredPlan={paywallCheckResult?.requiredPlan || 'pro'}
+        modalType={paywallCheckResult?.modalType}
+        title={paywallCheckResult?.title}
+        description={paywallCheckResult?.description}
+        currentLimit={paywallCheckResult?.currentLimit}
+      />
     </SafeAreaView>
   );
 }

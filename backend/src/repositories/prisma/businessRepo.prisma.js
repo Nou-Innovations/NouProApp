@@ -45,11 +45,26 @@ async function remove(id) {
   }
 }
 
+async function updateSubscription(id, data) {
+  // Allow updating subscription-related fields
+  const { subscriptionTier, billingPeriod, currentPeriodEnd } = data;
+  
+  return prisma.business.update({
+    where: { id },
+    data: {
+      ...(subscriptionTier && { subscriptionTier }),
+      ...(billingPeriod && { billingPeriod }),
+      ...(currentPeriodEnd && { currentPeriodEnd }),
+    },
+  });
+}
+
 module.exports = { 
   list, 
   getById, 
   create, 
   update, 
-  delete: remove 
+  delete: remove,
+  updateSubscription,
 };
 

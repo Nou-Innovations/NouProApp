@@ -17,6 +17,10 @@ import ImagePlaceholder from '@/shared/components/ui/ImagePlaceholder';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
+import PaywallModal from '@/features/subscription/components/PaywallModal';
+import { checkPaywall, getLimitTriggerId, PaywallCheck } from '@/shared/utils/permissions';
+import { useProfileStore } from '@/shared/store/profileStore';
+import { useProducts } from '../hooks/useProducts';
 import theme from '@/shared/theme';
 
 const availableStatuses: ProductStatus[] = ['Available', 'Out of Stock', 'In Production', 'Inactive', 'Discontinued'];
@@ -42,6 +46,15 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
   const [productImages, setProductImages] = useState<string[]>([]);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const { theme: appTheme } = useTheme();
+  
+  // Paywall state
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallCheckResult, setPaywallCheckResult] = useState<PaywallCheck | null>(null);
+  
+  // Get current plan and product count for limit checking
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
+  const { products } = useProducts();
+  const currentProductCount = products?.length || 0;
 
   // Status color helper
   const getStatusColor = (statusValue: ProductStatus) => {
@@ -103,6 +116,17 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [productName, brand, price, category, unit, stock]);
 
   const handleSave = () => {
+    // Check product limit before creating (not when editing)
+    if (!isEditMode) {
+      const triggerId = getLimitTriggerId('products', activeBusiness?.plan || null);
+      const check = checkPaywall(triggerId, activeBusiness?.plan || null, { currentCount: currentProductCount });
+      if (!check.allowed) {
+        setPaywallCheckResult(check);
+        setShowPaywall(true);
+        return;
+      }
+    }
+    
     const productData = {
       name: productName,
       brand,
@@ -344,6 +368,21 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
           );
         })}
       </AppBottomSheet>
+
+      {/* Paywall Modal for Product Limit */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onUpgrade={() => {
+          setShowPaywall(false);
+          navigation.navigate('SubscriptionPlans' as never);
+        }}
+        requiredPlan={paywallCheckResult?.requiredPlan || 'pro'}
+        modalType={paywallCheckResult?.modalType}
+        title={paywallCheckResult?.title}
+        description={paywallCheckResult?.description}
+        currentLimit={paywallCheckResult?.currentLimit}
+      />
     </SafeAreaView>
   );
 };

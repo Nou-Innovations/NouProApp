@@ -1,8 +1,44 @@
 {
   "$schema": "https://noupro.app/app-logic/v1",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "logicVersion": "2026-02-03",
+  "schemaVersion": 2,
+  "lastUpdatedBy": "subscription-system-overhaul",
+  "lastUpdatedDate": "2026-02-03",
   "name": "NouPro App Logic",
   "description": "Complete application logic, business rules, and data structures for the NouPro B2B distribution management platform. This serves as the single source of truth for AI-assisted development.",
+  
+  "changelog": [
+    {
+      "version": "2.0.0",
+      "date": "2026-02-03",
+      "changes": [
+        "Added billing period support (monthly/yearly)",
+        "Added product limits per tier (20/500/5000/unlimited)",
+        "Updated location limits (Pro: 1, Business: 7)",
+        "Fixed Free tier to allow receiving orders",
+        "Fixed Pro tier price privacy (now Business+ only)",
+        "Added feed publishing flags (Business+ only)",
+        "Split order capabilities (receive/request/sell)",
+        "Added new feature flags: business_specific_pricing, advanced_permissions, api_access",
+        "Added analytics types: none/basic_7day/full",
+        "Added branding control flag",
+        "Updated free trial days: Pro 7d, Business 7d, Enterprise 14d",
+        "Added pricing policy documentation",
+        "Added location mode constraints",
+        "Added invoice features breakdown",
+        "Added featureKeys to all subscription plans",
+        "Added complete capabilities mapping with tier-specific values"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-01-01",
+      "changes": [
+        "Initial app-logic.json structure"
+      ]
+    }
+  ],
 
   "product": {
     "name": "NouPro",
@@ -374,7 +410,8 @@
           "Up to 20 products (private only)",
           "Manage basic stock",
           "Use business Inbox",
-          "Request orders"
+          "Request orders",
+          "Receive orders"
         ],
         "excluded": [
           "Create selling orders",
@@ -388,6 +425,33 @@
           "Analytics dashboard",
           "Advanced permissions & roles",
           "API access"
+        ]
+      },
+      "featureKeys": {
+        "included": [
+          "create_business",
+          "create_products",
+          "manage_stock",
+          "use_inbox",
+          "receive_orders",
+          "request_orders"
+        ],
+        "excluded": [
+          "create_selling_orders",
+          "generate_invoices",
+          "send_invoices_export_pdf",
+          "payment_status_tracking",
+          "publish_business_page",
+          "publish_on_feed",
+          "publish_products_on_feed",
+          "create_deliveries",
+          "accept_staff",
+          "price_privacy",
+          "business_specific_pricing",
+          "analytics",
+          "advanced_permissions",
+          "api_access",
+          "independent_locations"
         ]
       }
     },
@@ -425,6 +489,33 @@
           "API access",
           "Priority support"
         ]
+      },
+      "featureKeys": {
+        "included": [
+          "create_business",
+          "create_products",
+          "manage_stock",
+          "use_inbox",
+          "receive_orders",
+          "request_orders",
+          "create_selling_orders",
+          "generate_invoices",
+          "send_invoices_export_pdf",
+          "payment_status_tracking",
+          "publish_business_page",
+          "create_deliveries",
+          "accept_staff"
+        ],
+        "excluded": [
+          "publish_on_feed",
+          "publish_products_on_feed",
+          "price_privacy",
+          "business_specific_pricing",
+          "analytics",
+          "advanced_permissions",
+          "api_access",
+          "independent_locations"
+        ]
       }
     },
     "business": {
@@ -459,6 +550,22 @@
           "API access",
           "Priority support"
         ]
+      },
+      "featureKeys": {
+        "included": [
+          "all_pro_features",
+          "price_privacy",
+          "business_specific_pricing",
+          "analytics_basic_7day",
+          "publish_on_feed",
+          "publish_products_on_feed"
+        ],
+        "excluded": [
+          "advanced_permissions",
+          "api_access",
+          "independent_locations",
+          "analytics_full"
+        ]
       }
     },
     "enterprise": {
@@ -487,42 +594,510 @@
           "Unlimited locations",
           "Priority support"
         ]
+      },
+      "featureKeys": {
+        "included": [
+          "all_business_features",
+          "advanced_permissions",
+          "api_access",
+          "independent_locations",
+          "analytics_full",
+          "priority_support"
+        ],
+        "excluded": []
+      }
+    }
+  },
+
+  "pricingPolicy": {
+    "description": "Rules for subscription pricing display and billing",
+    "defaultBillingPeriod": "YEARLY",
+    "billingPeriods": {
+      "MONTHLY": {
+        "description": "Higher price for flexibility",
+        "displayFormat": "Rs {price} / month"
+      },
+      "YEARLY": {
+        "description": "Lower effective monthly rate, billed annually",
+        "displayFormat": "Rs {effectiveMonthly} / month (billed yearly)",
+        "badgeText": "Best value",
+        "showSavings": true,
+        "savingsFormat": "Save Rs {amount} / year"
+      }
+    },
+    "discountPercentage": "11-12%",
+    "displayRules": {
+      "defaultToggle": "yearly",
+      "showYearlyAsMonthly": true,
+      "showTotalYearlyCost": false,
+      "highlightSavings": true,
+      "discountBadge": false,
+      "ctaNote": "Cancel anytime • No hidden fees • Local support"
+    },
+    "calculations": {
+      "yearlyDiscount": "Monthly × 12 - Yearly = Savings",
+      "effectiveMonthly": "Yearly ÷ 12 = Effective monthly rate"
+    },
+    "yearlySavings": {
+      "pro": 1200,
+      "business": 3600,
+      "enterprise": 6000
+    }
+  },
+
+  "analyticsConfiguration": {
+    "description": "Analytics capabilities per subscription tier",
+    "types": {
+      "none": {
+        "tiers": ["FREE", "PRO"],
+        "description": "No analytics dashboard access",
+        "features": []
+      },
+      "basic_7day": {
+        "tiers": ["BUSINESS"],
+        "description": "Limited analytics with 7-day data retention",
+        "features": [
+          "Sales overview (7 days)",
+          "Top products (7 days)",
+          "Order trends (7 days)"
+        ],
+        "dataRetentionDays": 7
+      },
+      "full": {
+        "tiers": ["ENTERPRISE"],
+        "description": "Full analytics with unlimited history",
+        "features": [
+          "Real-time sales dashboard",
+          "Unlimited historical data",
+          "Custom date ranges",
+          "Export analytics reports",
+          "Product performance tracking",
+          "Customer insights"
+        ],
+        "dataRetentionDays": null
+      }
+    }
+  },
+
+  "locationModeRules": {
+    "description": "Operating mode constraints per subscription tier",
+    "modes": {
+      "DEPENDENT": {
+        "description": "Location operates under parent business",
+        "allowedTiers": ["FREE", "PRO", "BUSINESS", "ENTERPRISE"],
+        "capabilities": {
+          "canHavePublicPage": false,
+          "canCreateIndependentOrders": false,
+          "canHaveOwnBranding": false
+        }
+      },
+      "INDEPENDENT": {
+        "description": "Location operates as separate entity",
+        "allowedTiers": ["ENTERPRISE"],
+        "capabilities": {
+          "canHavePublicPage": true,
+          "canCreateIndependentOrders": true,
+          "canHaveOwnBranding": true,
+          "canSetOwnPricing": true
+        }
+      }
+    },
+    "tierConstraints": {
+      "FREE": {
+        "maxLocations": 1,
+        "allowedModes": ["DEPENDENT"]
+      },
+      "PRO": {
+        "maxLocations": 1,
+        "allowedModes": ["DEPENDENT"]
+      },
+      "BUSINESS": {
+        "maxLocations": 7,
+        "allowedModes": ["DEPENDENT"]
+      },
+      "ENTERPRISE": {
+        "maxLocations": 999,
+        "allowedModes": ["DEPENDENT", "INDEPENDENT"]
+      }
+    }
+  },
+
+  "invoiceFeatures": {
+    "description": "Invoice capabilities broken down by tier",
+    "tiers": {
+      "FREE": {
+        "canPreview": true,
+        "canCreate": true,
+        "canCreateDraftOnly": true,
+        "canSend": false,
+        "canExportPDF": false,
+        "showNouProBranding": true
+      },
+      "PRO": {
+        "canPreview": true,
+        "canCreate": true,
+        "canSend": true,
+        "canExportPDF": true,
+        "showNouProBranding": false,
+        "canTrackPaymentStatus": true
+      },
+      "BUSINESS": {
+        "canPreview": true,
+        "canCreate": true,
+        "canSend": true,
+        "canExportPDF": true,
+        "showNouProBranding": false,
+        "canTrackPaymentStatus": true
+      },
+      "ENTERPRISE": {
+        "canPreview": true,
+        "canCreate": true,
+        "canSend": true,
+        "canExportPDF": true,
+        "showNouProBranding": false,
+        "canTrackPaymentStatus": true,
+        "canCustomizeBranding": true
       }
     }
   },
 
   "paywallTriggers": {
-    "description": "Actions that require upgrade from Free plan",
+    "version": "2026-02-03",
+    "description": "Single source of truth for paywall UI modals, feature gating, and limit enforcement",
+    "defaultModal": "feature_gate",
+    
+    "modalTemplates": {
+      "feature_gate": {
+        "description": "Default for locked features",
+        "titleFormat": "Unlock {featureName}",
+        "subtitleFormat": "Available on {requiredPlan} and above.",
+        "primaryCTA": "Upgrade to {requiredPlan}",
+        "secondaryCTA": "Not now",
+        "icon": "lock-closed",
+        "blocking": true
+      },
+      "limit_reached": {
+        "description": "For quota exceeded scenarios",
+        "titleFormat": "You've reached the {limitName} limit",
+        "subtitleFormat": "Your plan allows up to {currentLimit}. Upgrade to add more.",
+        "primaryCTA": "Upgrade",
+        "secondaryCTA": "Manage {limitName}",
+        "icon": "alert-circle",
+        "blocking": true
+      },
+      "enterprise_control": {
+        "description": "For enterprise-only control systems",
+        "titleFormat": "Enterprise feature",
+        "subtitleFormat": "{featureName} is available on Enterprise for advanced control.",
+        "primaryCTA": "Upgrade to Enterprise",
+        "secondaryCTA": "Contact sales",
+        "icon": "shield-checkmark",
+        "blocking": true
+      },
+      "soft_upsell": {
+        "description": "Non-blocking inline banner nudge",
+        "titleFormat": "Unlock with {requiredPlan}",
+        "subtitleFormat": null,
+        "primaryCTA": "Learn more",
+        "secondaryCTA": null,
+        "icon": "sparkles",
+        "blocking": false
+      }
+    },
+    
+    "freeOperationalCapabilities": {
+      "description": "What Free tier CAN do - provides real value without full operations",
+      "orders": {
+        "canReceive": true,
+        "canAcceptReject": true,
+        "canUpdateStatus": true,
+        "canViewIncoming": true,
+        "canCreateRequest": true,
+        "canCreateSelling": false,
+        "canAssignTransport": false
+      },
+      "invoices": {
+        "canPreview": true,
+        "canCreateDraft": true,
+        "canSend": false,
+        "canExportPDF": false
+      },
+      "deliveries": {
+        "canViewIncoming": true,
+        "canUpdateStatus": true
+      },
+      "products": {
+        "canCreate": true,
+        "maxProducts": 20
+      },
+      "staff": {
+        "canInvite": false,
+        "maxStaff": 1
+      },
+      "locations": {
+        "canAdd": true,
+        "maxLocations": 1
+      }
+    },
+    
     "triggers": [
       {
-        "action": "Accept staff join request",
-        "allowedOnFree": false,
-        "behavior": "Show upgrade modal: needs Paid plan"
+        "id": "create_selling_order",
+        "featureKey": "create_selling_orders",
+        "action": "orders.create_selling",
+        "requiredPlan": "pro",
+        "appliesTo": ["free"],
+        "modalType": "feature_gate",
+        "title": "Create selling orders",
+        "description": "Create and send selling orders with Pro."
       },
       {
-        "action": "Publish business page",
-        "allowedOnFree": false,
-        "behavior": "Show upgrade modal"
+        "id": "assign_transport",
+        "featureKey": "assign_transport",
+        "action": "orders.assign_transport",
+        "requiredPlan": "pro",
+        "appliesTo": ["free"],
+        "modalType": "feature_gate",
+        "title": "Assign transport",
+        "description": "Assign drivers or transport details with Pro."
       },
       {
-        "action": "Publish product",
-        "allowedOnFree": false,
-        "behavior": "Show upgrade modal"
+        "id": "send_invoice",
+        "featureKey": "invoice_send",
+        "action": "invoices.send",
+        "requiredPlan": "pro",
+        "appliesTo": ["free"],
+        "modalType": "feature_gate",
+        "title": "Send invoices",
+        "description": "Send invoices to clients with Pro."
       },
       {
-        "action": "Receive incoming orders",
-        "allowedOnFree": false,
-        "behavior": "Block — inform user that orders require Paid plan"
+        "id": "export_invoice_pdf",
+        "featureKey": "invoice_export_pdf",
+        "action": "invoices.export_pdf",
+        "requiredPlan": "pro",
+        "appliesTo": ["free"],
+        "modalType": "feature_gate",
+        "title": "Export invoice PDF",
+        "description": "Export and share invoice PDFs with Pro."
       },
       {
-        "action": "Create invoices/estimates",
-        "allowedOnFree": false,
-        "behavior": "Show upgrade modal"
+        "id": "remove_branding",
+        "featureKey": "remove_branding",
+        "action": "documents.remove_branding",
+        "requiredPlan": "pro",
+        "appliesTo": ["free"],
+        "modalType": "feature_gate",
+        "title": "Remove NouPro branding",
+        "description": "Remove NouPro branding from documents with Pro."
       },
       {
-        "action": "Exceed staff limit on paid tier",
-        "allowedOnFree": false,
-        "behavior": "Prompt to move to higher tier"
+        "id": "product_limit_reached_free",
+        "limitKey": "maxProducts",
+        "action": "products.create",
+        "requiredPlan": "pro",
+        "appliesTo": ["free"],
+        "currentLimit": 20,
+        "modalType": "limit_reached",
+        "title": "Product limit reached",
+        "description": "Upgrade to Pro to add up to 500 products."
+      },
+      {
+        "id": "product_limit_reached_pro",
+        "limitKey": "maxProducts",
+        "action": "products.create",
+        "requiredPlan": "business",
+        "appliesTo": ["pro"],
+        "currentLimit": 500,
+        "modalType": "limit_reached",
+        "title": "Product limit reached",
+        "description": "Upgrade to Business to add up to 5,000 products."
+      },
+      {
+        "id": "product_limit_reached_business",
+        "limitKey": "maxProducts",
+        "action": "products.create",
+        "requiredPlan": "enterprise",
+        "appliesTo": ["business"],
+        "currentLimit": 5000,
+        "modalType": "limit_reached",
+        "title": "Product limit reached",
+        "description": "Upgrade to Enterprise for unlimited products."
+      },
+      {
+        "id": "staff_limit_reached_free",
+        "limitKey": "maxStaff",
+        "action": "staff.invite",
+        "requiredPlan": "pro",
+        "appliesTo": ["free"],
+        "currentLimit": 1,
+        "modalType": "limit_reached",
+        "title": "Staff limit reached",
+        "description": "Upgrade to Pro to add up to 3 staff members."
+      },
+      {
+        "id": "staff_limit_reached_pro",
+        "limitKey": "maxStaff",
+        "action": "staff.invite",
+        "requiredPlan": "business",
+        "appliesTo": ["pro"],
+        "currentLimit": 3,
+        "modalType": "limit_reached",
+        "title": "Staff limit reached",
+        "description": "Upgrade to Business to add up to 9 staff members."
+      },
+      {
+        "id": "staff_limit_reached_business",
+        "limitKey": "maxStaff",
+        "action": "staff.invite",
+        "requiredPlan": "enterprise",
+        "appliesTo": ["business"],
+        "currentLimit": 9,
+        "modalType": "limit_reached",
+        "title": "Staff limit reached",
+        "description": "Upgrade to Enterprise for unlimited staff."
+      },
+      {
+        "id": "location_limit_reached",
+        "limitKey": "maxLocations",
+        "action": "locations.add",
+        "requiredPlan": "business",
+        "appliesTo": ["free", "pro"],
+        "currentLimit": 1,
+        "modalType": "limit_reached",
+        "title": "Location limit reached",
+        "description": "Upgrade to Business to manage up to 7 locations."
+      },
+      {
+        "id": "location_limit_reached_business",
+        "limitKey": "maxLocations",
+        "action": "locations.add",
+        "requiredPlan": "enterprise",
+        "appliesTo": ["business"],
+        "currentLimit": 7,
+        "modalType": "limit_reached",
+        "title": "Location limit reached",
+        "description": "Upgrade to Enterprise for unlimited locations."
+      },
+      {
+        "id": "business_specific_pricing",
+        "featureKey": "business_specific_pricing",
+        "action": "pricing.set_per_client",
+        "requiredPlan": "business",
+        "appliesTo": ["free", "pro"],
+        "modalType": "feature_gate",
+        "title": "Business-specific pricing",
+        "description": "Set different prices per client with Business."
+      },
+      {
+        "id": "price_privacy",
+        "featureKey": "price_privacy",
+        "action": "products.set_privacy",
+        "requiredPlan": "business",
+        "appliesTo": ["free", "pro"],
+        "modalType": "feature_gate",
+        "title": "Product & price privacy",
+        "description": "Control product and price visibility with Business."
+      },
+      {
+        "id": "publish_on_feed",
+        "featureKey": "publish_on_feed",
+        "action": "business.publish_feed",
+        "requiredPlan": "business",
+        "appliesTo": ["free", "pro"],
+        "modalType": "feature_gate",
+        "title": "Publish on feed",
+        "description": "Publish your business and products on the feed with Business."
+      },
+      {
+        "id": "publish_products_on_feed",
+        "featureKey": "publish_products_on_feed",
+        "action": "products.publish_feed",
+        "requiredPlan": "business",
+        "appliesTo": ["free", "pro"],
+        "modalType": "feature_gate",
+        "title": "Publish products on feed",
+        "description": "Showcase your products on the Explore feed with Business."
+      },
+      {
+        "id": "analytics_access",
+        "featureKey": "analytics_access",
+        "action": "analytics.open",
+        "requiredPlan": "business",
+        "appliesTo": ["free", "pro"],
+        "modalType": "feature_gate",
+        "title": "Analytics dashboard",
+        "description": "Access analytics insights with Business."
+      },
+      {
+        "id": "analytics_extended_range",
+        "featureKey": "analytics_full",
+        "action": "analytics.select_range_extended",
+        "requiredPlan": "enterprise",
+        "appliesTo": ["business"],
+        "modalType": "soft_upsell",
+        "title": "Full analytics access",
+        "description": "Unlock full historical analytics with Enterprise."
+      },
+      {
+        "id": "independent_locations",
+        "featureKey": "independent_locations",
+        "action": "locations.enable_independent_mode",
+        "requiredPlan": "enterprise",
+        "appliesTo": ["free", "pro", "business"],
+        "modalType": "enterprise_control",
+        "title": "Independent locations",
+        "description": "Manage independent locations with Enterprise."
+      },
+      {
+        "id": "advanced_permissions",
+        "featureKey": "advanced_permissions",
+        "action": "permissions.configure_advanced",
+        "requiredPlan": "enterprise",
+        "appliesTo": ["free", "pro", "business"],
+        "modalType": "enterprise_control",
+        "title": "Advanced permissions & roles",
+        "description": "Configure granular permissions with Enterprise."
+      },
+      {
+        "id": "api_access",
+        "featureKey": "api_access",
+        "action": "integrations.open_api",
+        "requiredPlan": "enterprise",
+        "appliesTo": ["free", "pro", "business"],
+        "modalType": "enterprise_control",
+        "title": "API access",
+        "description": "Access NouPro APIs and integrations with Enterprise."
+      },
+      {
+        "id": "priority_support",
+        "featureKey": "priority_support",
+        "action": "support.priority",
+        "requiredPlan": "enterprise",
+        "appliesTo": ["free", "pro", "business"],
+        "modalType": "enterprise_control",
+        "title": "Priority support",
+        "description": "Get priority support with Enterprise."
+      },
+      {
+        "id": "publish_business_page",
+        "featureKey": "publish_business_page",
+        "action": "business.publish_page",
+        "requiredPlan": "pro",
+        "appliesTo": ["free"],
+        "modalType": "feature_gate",
+        "title": "Publish business page",
+        "description": "Make your business page public with Pro."
+      },
+      {
+        "id": "accept_staff",
+        "featureKey": "accept_staff",
+        "action": "staff.accept_request",
+        "requiredPlan": "pro",
+        "appliesTo": ["free"],
+        "modalType": "feature_gate",
+        "title": "Accept staff requests",
+        "description": "Accept staff join requests with Pro."
       }
     ]
   },
@@ -570,7 +1145,7 @@
       },
       "receiveOrders": {
         "personalProfile": false,
-        "freePlan": false,
+        "freePlan": true,
         "paidPlan": true
       },
       "placeOrders": {
@@ -612,6 +1187,56 @@
         "superAdmin": true
       },
       "publishBusinessPage": {
+        "personalProfile": false,
+        "staff": false,
+        "admin": "paid only",
+        "superAdmin": "paid only"
+      },
+      "useBusinessSpecificPricing": {
+        "personalProfile": false,
+        "staff": false,
+        "admin": "business+ only",
+        "superAdmin": "business+ only"
+      },
+      "useAdvancedPermissions": {
+        "personalProfile": false,
+        "staff": false,
+        "admin": "enterprise only",
+        "superAdmin": "enterprise only"
+      },
+      "accessAPI": {
+        "personalProfile": false,
+        "staff": false,
+        "admin": "enterprise only",
+        "superAdmin": "enterprise only"
+      },
+      "accessAnalytics": {
+        "personalProfile": false,
+        "staff": false,
+        "admin": "business+",
+        "superAdmin": "business+",
+        "businessPlan": "7 days",
+        "enterprisePlan": "full"
+      },
+      "toggleIndependentLocations": {
+        "personalProfile": false,
+        "staff": false,
+        "admin": "enterprise only",
+        "superAdmin": "enterprise only"
+      },
+      "togglePricePrivacy": {
+        "personalProfile": false,
+        "staff": false,
+        "admin": "business+ only",
+        "superAdmin": "business+ only"
+      },
+      "publishOnFeed": {
+        "personalProfile": false,
+        "staff": false,
+        "admin": "business+ only",
+        "superAdmin": "business+ only"
+      },
+      "removeBranding": {
         "personalProfile": false,
         "staff": false,
         "admin": "paid only",
@@ -1256,17 +1881,17 @@
     "subscriptionTierCapabilities": {
       "free": {
         "maxLocations": 1,
-        "maxStaff": 0,
+        "maxStaff": 1,
         "canChooseLocationMode": false,
         "canHaveIndependentLocations": false,
         "canEnablePublicLocationPages": false,
         "canCreateOrders": false,
         "canCreateInvoices": false,
         "canPublishBusinessPage": false,
-        "canHaveStaff": false
+        "canHaveStaff": true
       },
       "pro": {
-        "maxLocations": 3,
+        "maxLocations": 1,
         "maxStaff": 3,
         "canChooseLocationMode": false,
         "canHaveIndependentLocations": false,
@@ -1277,8 +1902,8 @@
         "canHaveStaff": true
       },
       "business": {
-        "maxLocations": 10,
-        "maxStaff": 20,
+        "maxLocations": 7,
+        "maxStaff": 9,
         "canChooseLocationMode": false,
         "canHaveIndependentLocations": false,
         "canEnablePublicLocationPages": false,
@@ -1590,9 +2215,19 @@
           "default": "free",
           "description": "Determines capabilities via deriveCapabilities()"
         },
+        "billingPeriod": {
+          "type": "Enum",
+          "values": ["MONTHLY", "YEARLY"],
+          "default": "MONTHLY",
+          "description": "Billing frequency for subscription"
+        },
+        "currentPeriodEnd": {
+          "type": "DateTime",
+          "required": false,
+          "description": "End date of current subscription period"
+        },
         "is_published": { "type": "Boolean", "default": false, "description": "Public page visible or not" },
         "subscription_status": { "type": "Enum", "values": ["active", "grace", "expired"] },
-        "next_billing_date": { "type": "Date" },
         "settings": {
           "type": "Object",
           "description": "Business-level settings",
@@ -1612,7 +2247,107 @@
       "computed": {
         "capabilities": {
           "description": "Derived from subscriptionTier via deriveCapabilities()",
-          "fields": ["canChooseLocationMode", "canHaveIndependentLocations", "canCreateOrders", "canCreateInvoices", "maxLocations", "maxStaff"]
+          "fields": [
+            "canChooseLocationMode",
+            "canHaveIndependentLocations",
+            "canEnablePublicLocationPages",
+            "canUseAdvancedPermissions",
+            "canUseAPI",
+            "canUseBusinessSpecificPricing",
+            "canReceiveOrders",
+            "canRequestOrders",
+            "canCreateSellingOrders",
+            "canCreateInvoices",
+            "canPublishBusinessPage",
+            "canHaveStaff",
+            "analyticsType",
+            "showNouProBranding",
+            "maxLocations",
+            "maxStaff",
+            "maxProducts"
+          ],
+          "mapping": {
+            "FREE": {
+              "maxLocations": 1,
+              "maxStaff": 1,
+              "maxProducts": 20,
+              "canReceiveOrders": true,
+              "canRequestOrders": true,
+              "canCreateSellingOrders": false,
+              "canCreateInvoices": false,
+              "canPublishBusinessPage": false,
+              "canHaveStaff": false,
+              "analyticsType": "none",
+              "showNouProBranding": true,
+              "canChooseLocationMode": false,
+              "canHaveIndependentLocations": false,
+              "canEnablePublicLocationPages": false,
+              "canUseAdvancedPermissions": false,
+              "canUseAPI": false,
+              "canUseBusinessSpecificPricing": false
+            },
+            "PRO": {
+              "maxLocations": 1,
+              "maxStaff": 3,
+              "maxProducts": 500,
+              "canReceiveOrders": true,
+              "canRequestOrders": true,
+              "canCreateSellingOrders": true,
+              "canCreateInvoices": true,
+              "canPublishBusinessPage": true,
+              "canHaveStaff": true,
+              "analyticsType": "none",
+              "showNouProBranding": false,
+              "canChooseLocationMode": false,
+              "canHaveIndependentLocations": false,
+              "canEnablePublicLocationPages": false,
+              "canUseAdvancedPermissions": false,
+              "canUseAPI": false,
+              "canUseBusinessSpecificPricing": false
+            },
+            "BUSINESS": {
+              "maxLocations": 7,
+              "maxStaff": 9,
+              "maxProducts": 5000,
+              "canReceiveOrders": true,
+              "canRequestOrders": true,
+              "canCreateSellingOrders": true,
+              "canCreateInvoices": true,
+              "canPublishBusinessPage": true,
+              "canHaveStaff": true,
+              "analyticsType": "basic_7day",
+              "showNouProBranding": false,
+              "canChooseLocationMode": false,
+              "canHaveIndependentLocations": false,
+              "canEnablePublicLocationPages": true,
+              "canUseAdvancedPermissions": false,
+              "canUseAPI": false,
+              "canUseBusinessSpecificPricing": true,
+              "publishOnFeed": true,
+              "publishProductsOnFeed": true
+            },
+            "ENTERPRISE": {
+              "maxLocations": 999,
+              "maxStaff": 999,
+              "maxProducts": 999999,
+              "canReceiveOrders": true,
+              "canRequestOrders": true,
+              "canCreateSellingOrders": true,
+              "canCreateInvoices": true,
+              "canPublishBusinessPage": true,
+              "canHaveStaff": true,
+              "analyticsType": "full",
+              "showNouProBranding": false,
+              "canChooseLocationMode": true,
+              "canHaveIndependentLocations": true,
+              "canEnablePublicLocationPages": true,
+              "canUseAdvancedPermissions": true,
+              "canUseAPI": true,
+              "canUseBusinessSpecificPricing": true,
+              "publishOnFeed": true,
+              "publishProductsOnFeed": true
+            }
+          }
         }
       }
     },

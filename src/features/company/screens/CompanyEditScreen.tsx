@@ -456,7 +456,9 @@ export default function CompanyEditScreen() {
   );
 
   const renderUpgradeSection = () => {
-    if (businessPlan !== 'free') return null;
+    // Only show upgrade CTA for free plan users
+    const isFreePlan = !businessPlan || businessPlan === 'free';
+    if (!isFreePlan) return null;
     
     return (
       <View style={styles.upgradeSection}>

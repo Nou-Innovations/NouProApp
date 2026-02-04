@@ -9,6 +9,8 @@ import {
   FlatList,
   ScrollView,
   TextInput,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import Avatar from '@/shared/components/ui/Avatar';
 import theme from '@/shared/theme';
+import { createChat } from '../inbox.service';
 
 interface NewChatModalProps {
   visible: boolean;
@@ -23,6 +26,7 @@ interface NewChatModalProps {
   onNewGroup: () => void;
   onNewContact: () => void;
   canManageExternal?: boolean;
+  companyId?: string;
 }
 
 // Mock data for companies
@@ -114,10 +118,12 @@ export default function NewChatModal({
   onNewGroup,
   onNewContact,
   canManageExternal = false,
+  companyId,
 }: NewChatModalProps) {
   const { theme: appTheme } = useTheme();
   const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
   
   // Animation values - slide up from bottom to very top
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -170,31 +176,67 @@ export default function NewChatModal({
     handleClose();
   };
 
-  const handleItemPress = (item: any) => {
-    if (item.type === 'company') {
-      // Navigate to chat with company
-      (navigation as any).navigate('Chat', {
-        id: item.id,
-        name: item.name,
-        isGroup: false,
-        avatar: item.logo,
-        partnerId: item.id,
-        partnerType: 'business',
-        unreadCount: 0,
-      });
-    } else if (item.type === 'contact') {
-      // Navigate to chat with contact
-      (navigation as any).navigate('Chat', {
-        id: item.id,
-        name: item.name,
-        isGroup: false,
-        avatar: item.avatar,
-        partnerId: item.id,
-        partnerType: 'user',
-        unreadCount: 0,
-      });
+  const handleItemPress = async (item: any) => {
+    // If no companyId provided, fall back to navigation-only (mock mode)
+    if (!companyId) {
+      if (item.type === 'company') {
+        (navigation as any).navigate('Chat', {
+          id: item.id,
+          name: item.name,
+          isGroup: false,
+          avatar: item.logo,
+          partnerId: item.id,
+          partnerType: 'business',
+          unreadCount: 0,
+        });
+      } else if (item.type === 'contact') {
+        (navigation as any).navigate('Chat', {
+          id: item.id,
+          name: item.name,
+          isGroup: false,
+          avatar: item.avatar,
+          partnerId: item.id,
+          partnerType: 'user',
+          unreadCount: 0,
+        });
+      }
+      handleClose();
+      return;
     }
-    handleClose();
+
+    // Create chat via API
+    setIsCreating(true);
+    try {
+      const chatType = item.type === 'company' ? 'supplier' : 'client';
+      const partnerType = item.type === 'company' ? 'business' : 'user';
+      
+      const newChat = await createChat({
+        companyId,
+        type: chatType,
+        name: item.name,
+        participants: [item.id],
+        partnerId: item.id,
+        partnerType,
+      });
+
+      handleClose();
+      
+      // Navigate to the newly created chat
+      (navigation as any).navigate('Chat', {
+        id: newChat.id,
+        name: newChat.name,
+        isGroup: false,
+        avatar: item.type === 'company' ? item.logo : item.avatar,
+        partnerId: item.id,
+        partnerType,
+        unreadCount: 0,
+      });
+    } catch (error) {
+      console.error('Failed to create chat:', error);
+      Alert.alert('Error', 'Failed to create chat. Please try again.');
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   // Combine and sort all items by name descending

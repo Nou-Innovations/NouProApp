@@ -555,6 +555,7 @@ export default function InboxOverlayScreen() {
         onNewGroup={handleNewGroup}
         onNewContact={handleNewContact}
         canManageExternal={canManageExternalContacts}
+        companyId={activeBusiness?.id}
       />
     </SafeAreaView>
   );

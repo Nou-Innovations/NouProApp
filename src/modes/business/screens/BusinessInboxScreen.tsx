@@ -38,204 +38,13 @@ import NewChatModalList from '@/features/inbox/components/NewChatModalList';
 import { MessageSquare, Pencil } from '@/shared/utils/icons';
 import { EmptyState } from '@/shared/components/ui';
 import { getActivityFeed, type ActivityItem } from '@/features/business/activity.service';
-import { getChats } from '@/features/inbox/inbox.service';
-import type { Chat } from '@/shared/types/inbox';
+import { useInbox } from '@/features/inbox/hooks/useInbox';
+import type { Chat, ChatFilter } from '@/shared/types/inbox';
 
 // Pro Home Components
 import { ProActivityTimeline } from '../components';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-// Mock data for BUSINESS/PRO mode - Clients, suppliers, internal teams
-const mockBusinessChats = [
-  {
-    id: '1',
-    name: '📋 Message Types Showcase',
-    type: 'client' as const,
-    lastMessage: 'View all chat bubble types here',
-    messageType: 'text' as const,
-    timestamp: '2025-01-16T10:30:00Z',
-    unreadCount: 10,
-    avatar: 'https://picsum.photos/seed/showcase/40/40',
-    companyId: 'biz-001',
-    locationId: null,
-    status: 'delivered' as const,
-    isOutgoing: false,
-  },
-  {
-    id: '2',
-    name: 'Sarah Johnson',
-    type: 'client' as const,
-    lastMessage: 'Photo',
-    messageType: 'photo' as const,
-    timestamp: '2025-01-16T10:15:00Z',
-    unreadCount: 1,
-    avatar: 'https://picsum.photos/seed/sarah/40/40',
-    companyId: 'biz-001',
-    locationId: null,
-    status: 'delivered' as const,
-    isOutgoing: false,
-  },
-  {
-    id: '3',
-    name: 'XYZ Suppliers',
-    type: 'supplier' as const,
-    lastMessage: 'New_Products_Catalog.pdf',
-    messageType: 'pdf' as const,
-    timestamp: '2025-01-16T09:15:00Z',
-    unreadCount: 1,
-    avatar: 'https://picsum.photos/seed/xyz/40/40',
-    companyId: 'biz-001',
-    locationId: null,
-    status: 'seen' as const,
-    isOutgoing: false,
-  },
-  {
-    id: '4',
-    name: 'Mike Chen',
-    type: 'client' as const,
-    lastMessage: 'Estimate for project',
-    messageType: 'estimate' as const,
-    timestamp: '2025-01-16T09:00:00Z',
-    unreadCount: 0,
-    avatar: 'https://picsum.photos/seed/mike/40/40',
-    companyId: 'biz-001',
-    locationId: null,
-    status: 'delivered' as const,
-    isOutgoing: true,
-  },
-  {
-    id: '5',
-    name: 'Warehouse A Team',
-    type: 'internal' as const,
-    lastMessage: 'Inventory_Report_Jan2025.pdf',
-    messageType: 'pdf' as const,
-    timestamp: '2025-01-16T08:45:00Z',
-    unreadCount: 0,
-    avatar: null,
-    companyId: 'biz-001',
-    locationId: 'loc-001',
-    status: 'sent' as const,
-    isOutgoing: true,
-  },
-  {
-    id: '6',
-    name: 'Tech Solutions Inc',
-    type: 'client' as const,
-    lastMessage: 'Invoice #INV-2025-001',
-    messageType: 'invoice' as const,
-    timestamp: '2025-01-15T16:20:00Z',
-    unreadCount: 3,
-    avatar: 'https://picsum.photos/seed/tech/40/40',
-    companyId: 'biz-001',
-    locationId: null,
-    status: 'delivered' as const,
-    isOutgoing: true,
-  },
-  {
-    id: '7',
-    name: 'Global Distributors',
-    type: 'client' as const,
-    lastMessage: '',
-    messageType: 'order' as const,
-    orderStatus: 'new_order_received' as const,
-    timestamp: '2025-01-15T15:45:00Z',
-    unreadCount: 1,
-    avatar: 'https://picsum.photos/seed/global/40/40',
-    companyId: 'biz-001',
-    locationId: null,
-    status: 'sent' as const,
-    isOutgoing: false,
-  },
-  {
-    id: '8',
-    name: 'Emma Williams',
-    type: 'client' as const,
-    lastMessage: 'Hey, I wanted to follow up on our conversation about the bulk order. Can you please confirm the delivery date and let me know if there are any changes to the pricing?',
-    messageType: 'text' as const,
-    timestamp: '2025-01-15T14:30:00Z',
-    unreadCount: 0,
-    avatar: 'https://picsum.photos/seed/emma/40/40',
-    companyId: 'biz-001',
-    locationId: null,
-    status: 'delivered' as const,
-    isOutgoing: false,
-  },
-  {
-    id: '9',
-    name: 'David Brown',
-    type: 'client' as const,
-    lastMessage: 'Thanks for the update!',
-    messageType: 'text' as const,
-    timestamp: '2025-01-15T13:00:00Z',
-    unreadCount: 0,
-    avatar: 'https://picsum.photos/seed/david/40/40',
-    companyId: 'biz-001',
-    locationId: null,
-    status: 'seen' as const,
-    isOutgoing: true,
-  },
-  {
-    id: '10',
-    name: 'Lisa Anderson',
-    type: 'client' as const,
-    lastMessage: 'The package arrived safely, thank you!',
-    messageType: 'text' as const,
-    timestamp: '2025-01-15T11:45:00Z',
-    unreadCount: 0,
-    avatar: 'https://picsum.photos/seed/lisa/40/40',
-    companyId: 'biz-001',
-    locationId: null,
-    status: 'delivered' as const,
-    isOutgoing: false,
-  },
-  {
-    id: '11',
-    name: 'James Wilson',
-    type: 'client' as const,
-    lastMessage: 'Please confirm the order details',
-    messageType: 'text' as const,
-    timestamp: '2025-01-15T10:30:00Z',
-    unreadCount: 0,
-    avatar: 'https://picsum.photos/seed/james/40/40',
-    companyId: 'biz-001',
-    locationId: null,
-    status: 'failed' as const,
-    isOutgoing: true,
-  },
-  {
-    id: '12',
-    name: 'Warehouse B',
-    type: 'internal' as const,
-    lastMessage: '',
-    messageType: 'transfer' as const,
-    transferStatus: 'new_transfer_received' as const,
-    transferDirection: 'incoming' as const,
-    timestamp: '2025-01-15T09:00:00Z',
-    unreadCount: 2,
-    avatar: null,
-    companyId: 'biz-001',
-    locationId: 'loc-002',
-    status: 'delivered' as const,
-    isOutgoing: false,
-  },
-  {
-    id: '13',
-    name: 'Branch Office',
-    type: 'internal' as const,
-    lastMessage: '',
-    messageType: 'transfer' as const,
-    transferStatus: 'transfer_ongoing' as const,
-    transferDirection: 'outgoing' as const,
-    timestamp: '2025-01-15T08:30:00Z',
-    unreadCount: 0,
-    avatar: null,
-    companyId: 'biz-001',
-    locationId: 'loc-003',
-    status: 'sent' as const,
-    isOutgoing: true,
-  },
-];
 
 export default function BusinessInboxScreen() {
   const navigation = useNavigation();
@@ -247,16 +56,28 @@ export default function BusinessInboxScreen() {
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const isAdmin = useProfileStore((state) => state.isAdmin);
   
-  // State
-  const [refreshing, setRefreshing] = useState(false);
+  // Use the unified inbox hook for chats
+  const {
+    chats,
+    filteredChats,
+    loading: loadingChats,
+    refreshing,
+    error: chatError,
+    filter,
+    search,
+    unreadChatsCount,
+    setFilter: setInboxFilter,
+    setSearch: setInboxSearch,
+    refresh: refreshChats,
+    markAsRead,
+  } = useInbox();
+  
+  // Local State
   const [activitySectionHeight, setActivitySectionHeight] = useState(0);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all');
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(true);
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [loadingChats, setLoadingChats] = useState(true);
+  const [localRefreshing, setLocalRefreshing] = useState(false);
   
   // Refs
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -288,21 +109,6 @@ export default function BusinessInboxScreen() {
     navigation.navigate('Notifications');
   }, [navigation]);
 
-  // Filter chats for unread count
-  const filteredChats = useMemo(() => {
-    let filtered = chats;
-
-    // Apply unread filter
-    if (filter === 'unread') {
-      filtered = filtered.filter(chat => chat.unreadCount > 0);
-    }
-
-    return filtered;
-  }, [chats, filter]);
-
-  // Calculate unread chats count
-  const unreadChatsCount = filteredChats.filter(chat => chat.unreadCount > 0).length;
-
   // Update the inbox unread count when component mounts or data changes
   useEffect(() => {
     setInboxUnreadCount(unreadChatsCount);
@@ -330,38 +136,7 @@ export default function BusinessInboxScreen() {
     fetchActivity();
   }, [activeBusiness?.id]);
 
-  // Fetch chats from API
-  useEffect(() => {
-    const fetchChatList = async () => {
-      if (!activeBusiness?.id) {
-        // No active business - use mock data as fallback for development
-        console.warn('No activeBusiness.id - falling back to mock chats');
-        setChats(mockBusinessChats as any);
-        setLoadingChats(false);
-        return;
-      }
-      
-      try {
-        setLoadingChats(true);
-        const data = await getChats({
-          companyId: activeBusiness.id,
-          locationId: undefined, // Can add location filter later
-          type: filter === 'direct' ? 'client' : filter === 'group' ? 'internal' : undefined,
-          search: search || undefined,
-        });
-        setChats(data);
-      } catch (error) {
-        console.error('Failed to load chats:', error);
-        // Fallback to mock data on API error for development
-        console.warn('API error - falling back to mock chats');
-        setChats(mockBusinessChats as any);
-      } finally {
-        setLoadingChats(false);
-      }
-    };
-    
-    fetchChatList();
-  }, [activeBusiness?.id, filter, search]);
+  // Note: Chat fetching is now handled by useInbox hook
 
   // Helper function to format timestamps
   const formatTime = (timestamp: string) => {
@@ -422,32 +197,26 @@ export default function BusinessInboxScreen() {
   
   // Refresh handler
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
+    setLocalRefreshing(true);
     
     // Refresh both activity and chats
     const promises = [];
     
+    // Refresh chats via the unified inbox hook
+    promises.push(refreshChats());
+    
+    // Refresh activity feed
     if (activeBusiness?.id) {
       promises.push(
         getActivityFeed(activeBusiness.id, { limit: 5 })
           .then(setActivityItems)
           .catch(err => console.error('Failed to refresh activities:', err))
       );
-      
-      promises.push(
-        getChats({
-          companyId: activeBusiness.id,
-          type: filter === 'direct' ? 'client' : filter === 'group' ? 'internal' : undefined,
-          search: search || undefined,
-        })
-          .then(setChats)
-          .catch(err => console.error('Failed to refresh chats:', err))
-      );
     }
     
     await Promise.all(promises);
-    setRefreshing(false);
-  }, [activeBusiness?.id, filter, search]);
+    setLocalRefreshing(false);
+  }, [activeBusiness?.id, refreshChats]);
 
   // Chat handlers
   const handleChatPress = (chat: Chat) => {
@@ -615,8 +384,8 @@ export default function BusinessInboxScreen() {
                       ref={searchBarRef}
                       placeholder="Search conversations..."
                       value={search}
-                      onChangeText={setSearch}
-                      onClear={() => setSearch('')}
+                      onChangeText={setInboxSearch}
+                      onClear={() => setInboxSearch('')}
                       containerStyle={styles.searchBarContainer}
                     />
                     <TouchableOpacity
@@ -633,7 +402,7 @@ export default function BusinessInboxScreen() {
                   <FilterBar
                     statuses={chatTypes}
                     selectedStatus={filter}
-                    onSelectStatus={setFilter}
+                    onSelectStatus={(status) => setInboxFilter(status as ChatFilter)}
                     containerStyle={{ flexGrow: 0 }}
                   />
                 </View>
@@ -649,7 +418,7 @@ export default function BusinessInboxScreen() {
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                   <RefreshControl
-                    refreshing={refreshing}
+                    refreshing={refreshing || localRefreshing}
                     onRefresh={onRefresh}
                     tintColor={appTheme.colors.primary}
                   />
@@ -669,6 +438,7 @@ export default function BusinessInboxScreen() {
             onNewGroup={handleNewGroup}
             onNewContact={handleNewContact}
             canManageExternal={canManageExternalContacts}
+            companyId={activeBusiness?.id}
           />
         </View>
   );

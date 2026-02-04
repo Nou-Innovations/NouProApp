@@ -10,8 +10,9 @@ export type SubscriptionPlan = 'free' | 'pro' | 'business' | 'enterprise';
 
 /**
  * Billing period types
+ * Uses UPPERCASE to match DB enum and backend
  */
-export type BillingPeriod = 'monthly' | 'yearly';
+export type BillingPeriod = 'MONTHLY' | 'YEARLY';
 
 /**
  * Subscription status
@@ -96,18 +97,29 @@ export interface PlanFeatures {
   use_inbox: boolean;
   receive_orders: boolean;
   create_selling_orders: boolean;
-  generate_invoices: boolean;
-  publish_business_page: boolean;
+  generate_invoices: boolean; // Full invoice capability (Pro+) - includes send/export
+  invoice_create_draft: boolean; // Can create invoice drafts (Free+)
+  publish_business_page: boolean; // Public profile page
+  publish_on_feed: boolean; // Appear in Explore/Feed
+  publish_products_on_feed: boolean; // Products/brands visible in feed
   create_deliveries: boolean;
   accept_staff: boolean;
   price_privacy: boolean;
-  analytics: boolean; // Legacy field
+  analytics: boolean; // Legacy field - derive from analytics_type !== 'none'
   analytics_type: AnalyticsType;
   priority_support: boolean;
   business_specific_pricing: boolean;
   advanced_permissions: boolean;
   api_access: boolean;
   show_noupro_branding: boolean;
+  // Paywall-specific capabilities (match trigger IDs)
+  independent_locations: boolean;
+  assign_transport: boolean;
+  invoice_send: boolean;
+  invoice_export_pdf: boolean;
+  remove_branding: boolean; // Inverse of show_noupro_branding (for trigger alignment)
+  analytics_access: boolean; // Business+ can access analytics (analytics_type !== 'none')
+  analytics_full: boolean; // Enterprise has full analytics (analytics_type === 'full')
 }
 
 export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
@@ -116,10 +128,13 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     create_products: true, // private only
     manage_stock: true,
     use_inbox: true,
-    receive_orders: false,
+    receive_orders: true, // Free can receive B2B order requests
     create_selling_orders: false,
-    generate_invoices: false,
+    generate_invoices: false, // Full invoice capability (send/export)
+    invoice_create_draft: true, // Free can create drafts (but not send/export)
     publish_business_page: false,
+    publish_on_feed: false,
+    publish_products_on_feed: false,
     create_deliveries: false,
     accept_staff: false,
     price_privacy: false,
@@ -130,6 +145,14 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     advanced_permissions: false,
     api_access: false,
     show_noupro_branding: true,
+    // Paywall-specific
+    independent_locations: false,
+    assign_transport: false,
+    invoice_send: false,
+    invoice_export_pdf: false,
+    remove_branding: false,
+    analytics_access: false,
+    analytics_full: false,
   },
   pro: {
     create_business: true,
@@ -139,10 +162,13 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     receive_orders: true,
     create_selling_orders: true,
     generate_invoices: true,
+    invoice_create_draft: true,
     publish_business_page: true,
+    publish_on_feed: false, // Business+ only
+    publish_products_on_feed: false, // Business+ only
     create_deliveries: true,
     accept_staff: true,
-    price_privacy: true,
+    price_privacy: false, // Business+ only
     analytics: false,
     analytics_type: 'none',
     priority_support: false,
@@ -150,6 +176,14 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     advanced_permissions: false,
     api_access: false,
     show_noupro_branding: false,
+    // Paywall-specific
+    independent_locations: false,
+    assign_transport: true,
+    invoice_send: true,
+    invoice_export_pdf: true,
+    remove_branding: true,
+    analytics_access: false,
+    analytics_full: false,
   },
   business: {
     create_business: true,
@@ -159,7 +193,10 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     receive_orders: true,
     create_selling_orders: true,
     generate_invoices: true,
+    invoice_create_draft: true,
     publish_business_page: true,
+    publish_on_feed: true,
+    publish_products_on_feed: true,
     create_deliveries: true,
     accept_staff: true,
     price_privacy: true,
@@ -170,6 +207,14 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     advanced_permissions: false,
     api_access: false,
     show_noupro_branding: false,
+    // Paywall-specific
+    independent_locations: false,
+    assign_transport: true,
+    invoice_send: true,
+    invoice_export_pdf: true,
+    remove_branding: true,
+    analytics_access: true,
+    analytics_full: false,
   },
   enterprise: {
     create_business: true,
@@ -179,7 +224,10 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     receive_orders: true,
     create_selling_orders: true,
     generate_invoices: true,
+    invoice_create_draft: true,
     publish_business_page: true,
+    publish_on_feed: true,
+    publish_products_on_feed: true,
     create_deliveries: true,
     accept_staff: true,
     price_privacy: true,
@@ -190,6 +238,14 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     advanced_permissions: true,
     api_access: true,
     show_noupro_branding: false,
+    // Paywall-specific
+    independent_locations: true,
+    assign_transport: true,
+    invoice_send: true,
+    invoice_export_pdf: true,
+    remove_branding: true,
+    analytics_access: true,
+    analytics_full: true,
   },
 };
 
@@ -217,6 +273,7 @@ export const PLAN_INFO: Record<SubscriptionPlan, PlanInfo> = {
       'Up to 20 products (private only)',
       'Manage basic stock',
       'Use business Inbox',
+      'Receive orders',
       'Request orders',
     ],
   },
@@ -305,7 +362,7 @@ export const FREE_TRIAL_DAYS: Record<SubscriptionPlan, number> = {
  * Get plan price based on billing period
  */
 export function getPlanPrice(plan: SubscriptionPlan, billingPeriod: BillingPeriod): number {
-  return billingPeriod === 'yearly' ? PLAN_PRICES_YEARLY[plan] : PLAN_PRICES_MONTHLY[plan];
+  return billingPeriod === 'YEARLY' ? PLAN_PRICES_YEARLY[plan] : PLAN_PRICES_MONTHLY[plan];
 }
 
 /**
@@ -313,7 +370,7 @@ export function getPlanPrice(plan: SubscriptionPlan, billingPeriod: BillingPerio
  * For yearly billing, shows the effective monthly rate
  */
 export function getPlanPricePerMonth(plan: SubscriptionPlan, billingPeriod: BillingPeriod): number {
-  return billingPeriod === 'yearly' ? PLAN_PRICES_YEARLY_MONTHLY[plan] : PLAN_PRICES_MONTHLY[plan];
+  return billingPeriod === 'YEARLY' ? PLAN_PRICES_YEARLY_MONTHLY[plan] : PLAN_PRICES_MONTHLY[plan];
 }
 
 /**

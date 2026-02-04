@@ -177,11 +177,27 @@ function deriveCapabilities(business) {
     // Business & Enterprise capabilities
     canUseBusinessSpecificPricing: isBusiness || isEnterprise,
     
-    // Paid tier capabilities
-    canCreateOrders: isPaidTier,
-    canCreateInvoices: isPaidTier,
-    canPublishBusinessPage: isPaidTier,
+    // Order capabilities (granular)
+    canReceiveOrders: true, // All tiers can receive B2B order requests
+    canRequestOrders: true, // All tiers can create purchase order requests
+    canCreateSellingOrders: isPaidTier, // Only paid tiers can create selling orders
+    
+    // Invoice capabilities (granular)
+    canCreateInvoiceDraft: true, // All tiers can create drafts
+    canSendInvoice: isPaidTier, // Only paid tiers can send invoices
+    canExportInvoicePDF: isPaidTier, // Only paid tiers can export PDFs
+    canCreateInvoices: isPaidTier, // Full invoice capability (legacy, use granular instead)
+    
+    // Delivery capabilities
+    canCreateDeliveries: isPaidTier,
+    canAssignTransport: isPaidTier,
+    
+    // Staff capabilities
+    canInviteStaff: isPaidTier,
     canHaveStaff: isPaidTier,
+    
+    // Other paid tier capabilities
+    canPublishBusinessPage: isPaidTier,
     
     // Analytics
     analyticsType: tier === SUBSCRIPTION_TIERS.FREE ? 'none' :
@@ -190,6 +206,7 @@ function deriveCapabilities(business) {
     
     // Branding
     showNouProBranding: tier === SUBSCRIPTION_TIERS.FREE,
+    canRemoveBranding: isPaidTier,
     
     // Tier-based limits
     maxLocations: tier === SUBSCRIPTION_TIERS.FREE ? 1 : 
@@ -241,14 +258,11 @@ function getPublicDisabledReason(business, location) {
 // IMPORTANT: We have inconsistent naming between `companyId` and `businessId`.
 // Before migrating to MongoDB/Prisma, normalize ALL entities to use `businessId`.
 // 
-// Current state:
-//   - locations[].companyId → should be businessId
-//   - products[].companyId → should be businessId  
-//   - deliveries[].companyId → should be businessId
-//   - chats[].companyId → should be businessId
-//   - Legacy routes use /api/companies/* → migrate to /api/businesses/*
-//
-// Rule: ALL NEW CODE should use `businessId`. Legacy code will be batch-migrated.
+// Naming Convention:
+//   - API contract uses `companyId` as the canonical field for company/business associations
+//   - Prisma schema uses `businessId` internally
+//   - Repository layer maps `businessId` ↔ `companyId` transparently
+//   - All API routes and frontend code should use `companyId`
 // ============================================================================
 
 // ============================================================================
@@ -336,6 +350,21 @@ function findLocationMember(companyId, locationId, userId) {
 function findUserByEmail(email) {
   if (!email) return null;
   return users.find(u => (u.email || '').toLowerCase() === String(email).toLowerCase());
+}
+
+// Find business by ID (sync version using in-memory data)
+function findBusiness(companyId) {
+  // This is a mock - in production, use repos.businessRepo.getById
+  // For now, return a mock business object with the tier from the first business member
+  const bm = businessMembers.find(m => m.businessId === companyId);
+  if (!bm) return null;
+  // Return a mock business - the tier would come from the actual business record
+  return { id: companyId, subscriptionTier: 'FREE' };
+}
+
+// Get staff count for a business
+function getStaffCount(companyId) {
+  return businessMembers.filter(m => m.businessId === companyId && m.status !== 'suspended').length;
 }
 
 // Validation functions (throw on invalid)
@@ -1688,6 +1717,54 @@ app.patch('/api/businesses/:businessId', requireAuth, async (req, res) => {
   }));
 });
 
+// Update business subscription
+app.patch('/api/businesses/:businessId/subscription', requireAuth, async (req, res) => {
+  // PERMISSION: Require business membership
+  if (!requireBusinessMembership(req, res, req.params.businessId)) return;
+
+  const existing = await repos.businessRepo.getById(req.params.businessId);
+  if (!existing) {
+    return res.status(404).json(errorResponse('Business not found'));
+  }
+
+  const { subscriptionTier, billingPeriod } = req.body;
+  
+  // Validate inputs
+  const validTiers = ['FREE', 'PRO', 'BUSINESS', 'ENTERPRISE'];
+  const validPeriods = ['MONTHLY', 'YEARLY'];
+  
+  if (subscriptionTier && !validTiers.includes(subscriptionTier)) {
+    return res.status(400).json(errorResponse('Invalid subscription tier'));
+  }
+  
+  if (billingPeriod && !validPeriods.includes(billingPeriod)) {
+    return res.status(400).json(errorResponse('Invalid billing period'));
+  }
+  
+  // Calculate period end (simple: +30 days for monthly, +365 for yearly)
+  let currentPeriodEnd = null;
+  if (billingPeriod) {
+    const days = billingPeriod === 'MONTHLY' ? 30 : 365;
+    currentPeriodEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  }
+  
+  // Update business
+  const updateData = {};
+  if (subscriptionTier) updateData.subscriptionTier = subscriptionTier;
+  if (billingPeriod) updateData.billingPeriod = billingPeriod;
+  if (currentPeriodEnd) updateData.currentPeriodEnd = currentPeriodEnd;
+  
+  const updated = await repos.businessRepo.updateSubscription(
+    req.params.businessId,
+    updateData
+  );
+  
+  res.json(successResponse({
+    ...updated,
+    capabilities: deriveCapabilities(updated),
+  }));
+});
+
 // Legacy company routes (for backwards compatibility)
 app.get('/api/companies', async (req, res) => {
   const businesses = await repos.businessRepo.list();
@@ -1877,6 +1954,17 @@ app.post('/api/companies/:companyId/locations', requireAuth, async (req, res) =>
   const business = await repos.businessRepo.getById(req.params.companyId);
   const capabilities = business ? deriveCapabilities(business) : {};
   
+  // Check location limit
+  if (business) {
+    const existingLocations = await repos.locationRepo.getByBusinessId(req.params.companyId);
+    if (existingLocations.length >= capabilities.maxLocations) {
+      return res.status(403).json(errorResponse(
+        `Location limit reached (${capabilities.maxLocations}). Upgrade your subscription to add more locations.`,
+        'LOCATION_LIMIT_REACHED'
+      ));
+    }
+  }
+  
   let operatingMode = req.body.operatingMode || LOCATION_MODES.DEPENDENT;
   if (!capabilities.canChooseLocationMode) {
     operatingMode = LOCATION_MODES.DEPENDENT;
@@ -1999,6 +2087,43 @@ app.get('/api/companies/:companyId/products/:productId', async (req, res) => {
   } catch (e) {
     console.error('Error fetching product:', e);
     res.status(500).json(errorResponse('Failed to load product'));
+  }
+});
+
+// Create a new product
+app.post('/api/companies/:companyId/products', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const productData = req.body;
+
+    // Get business and check product limit
+    const business = await repos.businessRepo.getById(companyId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found'));
+    }
+
+    const capabilities = deriveCapabilities(business);
+    const currentProducts = await repos.productRepo.getByBusinessId(companyId);
+    const currentProductCount = currentProducts.length;
+
+    if (currentProductCount >= capabilities.maxProducts) {
+      return res.status(403).json(errorResponse(
+        `Product limit reached (${capabilities.maxProducts}). Upgrade your plan to add more products.`
+      ));
+    }
+
+    // Create the product
+    const newProduct = await repos.productRepo.create({
+      ...productData,
+      businessId: companyId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    res.status(201).json(successResponse(newProduct));
+  } catch (e) {
+    console.error('Error creating product:', e);
+    res.status(500).json(errorResponse('Failed to create product'));
   }
 });
 
@@ -2710,6 +2835,25 @@ app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =
   try {
     const { companyId } = req.params;
 
+    // Get business to check capabilities
+    const business = await repos.businessRepo.getById(companyId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found'));
+    }
+    
+    // Check plan capability
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canCreateDeliveries) {
+      return res.status(403).json({
+        error: {
+          code: 'PAYWALL',
+          triggerId: 'create_deliveries',
+          requiredPlan: 'pro',
+          message: 'Upgrade to Pro to create deliveries'
+        }
+      });
+    }
+
     const created = await repos.deliveryRepo.create({
       id: uuidv4(),
       businessId: companyId,
@@ -2976,6 +3120,24 @@ app.patch('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
     const wasNotSent = invoice.status === 'DRAFT' || !invoice.status;
     const isBeingSent = req.body.status === 'SENT';
 
+    // Check plan capability when sending invoice
+    if (wasNotSent && isBeingSent) {
+      const business = await repos.businessRepo.getById(invoice.businessId);
+      if (business) {
+        const capabilities = deriveCapabilities(business);
+        if (!capabilities.canSendInvoice) {
+          return res.status(403).json({
+            error: {
+              code: 'PAYWALL',
+              triggerId: 'send_invoice',
+              requiredPlan: 'pro',
+              message: 'Upgrade to Pro to send invoices'
+            }
+          });
+        }
+      }
+    }
+
     const updated = await repos.invoiceRepo.update(req.params.invoiceId, req.body);
 
     // Create event message when invoice/estimate is sent
@@ -3057,10 +3219,44 @@ app.get('/api/companies/:companyId/invoices/:invoiceId', async (req, res) => {
 });
 
 // Chat Routes
-app.get('/api/companies/:companyId/chats', async (req, res) => {
+
+// Create a new chat
+app.post('/api/companies/:companyId/chats', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
-    let companyChats = await repos.chatRepo.getByBusinessId(companyId);
+    const { type, name, participants, partnerId, partnerType, locationId } = req.body;
+
+    // Validate required fields
+    if (!name) {
+      return res.status(400).json(errorResponse('Chat name is required'));
+    }
+
+    const newChat = await repos.chatRepo.create({
+      id: uuidv4(),
+      companyId, // Canonical field (repos map to businessId internally for Prisma)
+      locationId: locationId || null,
+      type: type || 'direct',
+      name,
+      participants: participants || [],
+      partnerId: partnerId || null,
+      partnerType: partnerType || null,
+      unreadCount: 0,
+      avatar: null,
+      lastMessage: null
+    });
+
+    res.status(201).json(successResponse(newChat));
+  } catch (e) {
+    console.error('Error creating chat:', e);
+    res.status(500).json(errorResponse('Failed to create chat'));
+  }
+});
+
+// List chats for a company
+app.get('/api/companies/:companyId/chats', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    let companyChats = await repos.chatRepo.getByCompanyId(companyId);
 
     // Apply filters
     const { locationId, type, search } = req.query;
@@ -3092,7 +3288,7 @@ app.get('/api/companies/:companyId/chats', async (req, res) => {
 });
 
 // Get messages for a specific chat
-app.get('/api/companies/:companyId/chats/:chatId/messages', async (req, res) => {
+app.get('/api/companies/:companyId/chats/:chatId/messages', requireAuth, async (req, res) => {
   try {
     const { companyId, chatId } = req.params;
     const limit = Math.min(parseInt(req.query.limit || '50', 10), 100);
@@ -4105,6 +4301,32 @@ app.post('/api/companies/:companyId/users/invite', requireAuth, (req, res) => {
       if (!loc) return res.status(404).json(errorResponse(`Location not found for this business: ${locId}`));
     }
 
+    // Check plan capability and staff limit
+    const business = findBusiness(companyId);
+    if (business) {
+      const capabilities = deriveCapabilities(business);
+      
+      // Check if plan allows inviting staff
+      if (!capabilities.canInviteStaff) {
+        return res.status(403).json({
+          error: {
+            code: 'PAYWALL',
+            triggerId: 'accept_staff',
+            requiredPlan: 'pro',
+            message: 'Upgrade to Pro to invite staff members'
+          }
+        });
+      }
+      
+      // Check staff limit
+      const currentStaffCount = getStaffCount(companyId);
+      if (currentStaffCount >= capabilities.maxStaff) {
+        return res.status(403).json(errorResponse(
+          `Staff limit reached (${capabilities.maxStaff}). Upgrade your plan to add more staff.`
+        ));
+      }
+    }
+
     // Find or create user
     let user = findUserByEmail(email);
     if (!user) {
@@ -4478,12 +4700,30 @@ app.patch('/api/businesses/:businessId/role-requests/:requestId', requireAuth, (
 // Assign a delivery to a user (staff/admin)
 // PATCH /api/companies/:companyId/deliveries/:deliveryId/assign
 // Body: { userId }
-app.patch('/api/companies/:companyId/deliveries/:deliveryId/assign', requireAuth, (req, res) => {
+app.patch('/api/companies/:companyId/deliveries/:deliveryId/assign', requireAuth, async (req, res) => {
   try {
     const { companyId, deliveryId } = req.params;
     const { userId } = req.body;
     if (!userId) {
       return res.status(400).json(errorResponse('userId is required'));
+    }
+
+    // Check plan capability for assigning transport
+    const business = await repos.businessRepo.getById(companyId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found'));
+    }
+    
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canAssignTransport) {
+      return res.status(403).json({
+        error: {
+          code: 'PAYWALL',
+          triggerId: 'assign_transport',
+          requiredPlan: 'pro',
+          message: 'Upgrade to Pro to assign transport'
+        }
+      });
     }
 
     const delivery = deliveries.find(d => d.id === deliveryId && d.companyId === companyId);

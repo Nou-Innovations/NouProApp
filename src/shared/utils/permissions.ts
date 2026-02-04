@@ -91,15 +91,15 @@ export const canChangeSubscription = (role: StaffRole | null): boolean => {
 
 /**
  * Check if user can publish business page
- * Requires Admin/Super Admin AND paid plan
+ * Requires Admin/Super Admin AND plan with publish_business_page feature
  */
 export const canPublishBusinessPage = (
   role: StaffRole | null,
   plan: SubscriptionPlan | null
 ): boolean => {
   const hasRole = role === 'admin' || role === 'super_admin';
-  const hasPlan = plan && plan !== 'free';
-  return hasRole && !!hasPlan;
+  if (!plan) return false;
+  return hasRole && PLAN_FEATURES[plan].publish_business_page;
 };
 
 /**
@@ -213,28 +213,28 @@ export const canUpdateDeliveryStatus = (
 
 /**
  * Check if user can view invoices
- * Requires Admin/Super Admin AND paid plan
+ * Requires Admin/Super Admin AND plan with invoice_create_draft (Free+ can view their drafts)
  */
 export const canViewInvoices = (
   role: StaffRole | null,
   plan: SubscriptionPlan | null
 ): boolean => {
   const hasRole = role === 'admin' || role === 'super_admin';
-  const hasPlan = plan && plan !== 'free';
-  return hasRole && !!hasPlan;
+  if (!plan) return false;
+  return hasRole && PLAN_FEATURES[plan].invoice_create_draft;
 };
 
 /**
- * Check if user can manage invoices
- * Requires Admin/Super Admin AND paid plan
+ * Check if user can manage invoices (send/export)
+ * Requires Admin/Super Admin AND plan with invoice_send capability (Pro+)
  */
 export const canManageInvoices = (
   role: StaffRole | null,
   plan: SubscriptionPlan | null
 ): boolean => {
   const hasRole = role === 'admin' || role === 'super_admin';
-  const hasPlan = plan && plan !== 'free';
-  return hasRole && !!hasPlan;
+  if (!plan) return false;
+  return hasRole && PLAN_FEATURES[plan].invoice_send;
 };
 
 /**
@@ -252,8 +252,8 @@ export const canViewBusinessInbox = (
 // ========== Plan-Based Permission Checks ==========
 
 /**
- * Check if business can receive orders
- * Only paid plans can receive orders
+ * Check if business can receive order requests
+ * Free can receive B2B order requests (but cannot create selling orders)
  */
 export const canReceiveOrders = (plan: SubscriptionPlan | null): boolean => {
   if (!plan) return false;
@@ -297,9 +297,10 @@ export const canGenerateInvoices = (plan: SubscriptionPlan | null): boolean => {
 };
 
 /**
- * Check if business can publish products
- * Free plan: products are private only
- * Paid plans: can publish products
+ * Check if business can have a public page (profile published)
+ * Free plan: no public page
+ * Pro+: can publish business page
+ * @deprecated Use canPublishOnFeed or canPublishProductsOnFeed for feed-specific checks
  */
 export const canPublishProducts = (plan: SubscriptionPlan | null): boolean => {
   if (!plan) return false;
@@ -422,6 +423,94 @@ export const shouldShowNouProBranding = (plan: SubscriptionPlan | null): boolean
   return PLAN_FEATURES[plan].show_noupro_branding;
 };
 
+/**
+ * Check if plan allows publishing on feed
+ */
+export const canPublishOnFeed = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return PLAN_FEATURES[plan].publish_on_feed;
+};
+
+/**
+ * Check if plan allows publishing products on feed
+ */
+export const canPublishProductsOnFeed = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return PLAN_FEATURES[plan].publish_products_on_feed;
+};
+
+/**
+ * Check if plan allows assigning transport to deliveries
+ * Free cannot assign transport/deliverer (Pro+ required)
+ */
+export const canAssignTransport = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return PLAN_FEATURES[plan].assign_transport;
+};
+
+/**
+ * Check if plan allows creating invoice drafts
+ * Free+ can create drafts (all plans)
+ */
+export const canCreateInvoiceDraft = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return PLAN_FEATURES[plan].invoice_create_draft;
+};
+
+/**
+ * Check if plan allows sending invoices
+ * Free can create drafts but cannot send (Pro+ required)
+ */
+export const canSendInvoice = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return PLAN_FEATURES[plan].invoice_send;
+};
+
+/**
+ * Check if plan allows exporting invoice PDFs
+ * Free cannot export PDFs (Pro+ required)
+ */
+export const canExportInvoicePDF = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return PLAN_FEATURES[plan].invoice_export_pdf;
+};
+
+/**
+ * Check if plan allows removing NouPro branding from documents
+ * Inverted from show_noupro_branding - true when branding NOT shown
+ */
+export const canRemoveBranding = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return !PLAN_FEATURES[plan].show_noupro_branding;
+};
+
+/**
+ * Check if plan allows independent locations
+ * Enterprise only
+ */
+export const canUseIndependentLocations = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return PLAN_FEATURES[plan].independent_locations;
+};
+
+/**
+ * Check if plan has analytics access
+ * Business+ only (analytics_type !== 'none')
+ */
+export const hasAnalyticsAccess = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return PLAN_FEATURES[plan].analytics_access;
+};
+
+/**
+ * Check if plan has full analytics (real-time + history)
+ * Enterprise only
+ */
+export const hasFullAnalytics = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return PLAN_FEATURES[plan].analytics_full;
+};
+
 // ========== Tab Visibility Checks ==========
 
 /**
@@ -450,125 +539,439 @@ export const getBusinessTabVisibility = (
   };
 };
 
-// ========== Paywall Trigger Checks ==========
+// ========== Paywall Trigger System ==========
 
 /**
- * Paywall trigger result
+ * Modal types for paywall triggers
+ * Based on app-logic.json paywallTriggers.modalTemplates
+ */
+export type PaywallModalType = 'feature_gate' | 'limit_reached' | 'enterprise_control' | 'soft_upsell';
+
+/**
+ * Paywall trigger configuration
+ * Based on app-logic.json paywallTriggers.triggers structure
+ */
+export interface PaywallTrigger {
+  id: string;
+  featureKey?: string;
+  limitKey?: string;
+  action: string;
+  requiredPlan: SubscriptionPlan;
+  appliesTo: SubscriptionPlan[];
+  modalType: PaywallModalType;
+  title: string;
+  description: string;
+  currentLimit?: number;
+}
+
+/**
+ * Paywall trigger result - enhanced with modal type and trigger info
  */
 export interface PaywallCheck {
   allowed: boolean;
+  triggerId?: string;
   requiredPlan?: SubscriptionPlan;
+  modalType?: PaywallModalType;
+  title?: string;
+  description?: string;
+  currentLimit?: number;
+  /** @deprecated Use description instead */
   message?: string;
 }
 
 /**
+ * All paywall triggers from app-logic.json
+ * Single source of truth for paywall behavior
+ */
+export const PAYWALL_TRIGGERS: PaywallTrigger[] = [
+  // Pro Required (Free blocked)
+  {
+    id: 'create_selling_order',
+    featureKey: 'create_selling_orders',
+    action: 'orders.create_selling',
+    requiredPlan: 'pro',
+    appliesTo: ['free'],
+    modalType: 'feature_gate',
+    title: 'Create selling orders',
+    description: 'Create and send selling orders with Pro.',
+  },
+  {
+    id: 'assign_transport',
+    featureKey: 'assign_transport',
+    action: 'orders.assign_transport',
+    requiredPlan: 'pro',
+    appliesTo: ['free'],
+    modalType: 'feature_gate',
+    title: 'Assign transport',
+    description: 'Assign drivers or transport details with Pro.',
+  },
+  {
+    id: 'send_invoice',
+    featureKey: 'invoice_send',
+    action: 'invoices.send',
+    requiredPlan: 'pro',
+    appliesTo: ['free'],
+    modalType: 'feature_gate',
+    title: 'Send invoices',
+    description: 'Send invoices to clients with Pro.',
+  },
+  {
+    id: 'export_invoice_pdf',
+    featureKey: 'invoice_export_pdf',
+    action: 'invoices.export_pdf',
+    requiredPlan: 'pro',
+    appliesTo: ['free'],
+    modalType: 'feature_gate',
+    title: 'Export invoice PDF',
+    description: 'Export and share invoice PDFs with Pro.',
+  },
+  {
+    id: 'remove_branding',
+    featureKey: 'remove_branding',
+    action: 'documents.remove_branding',
+    requiredPlan: 'pro',
+    appliesTo: ['free'],
+    modalType: 'feature_gate',
+    title: 'Remove NouPro branding',
+    description: 'Remove NouPro branding from documents with Pro.',
+  },
+  {
+    id: 'publish_business_page',
+    featureKey: 'publish_business_page',
+    action: 'business.publish_page',
+    requiredPlan: 'pro',
+    appliesTo: ['free'],
+    modalType: 'feature_gate',
+    title: 'Publish business page',
+    description: 'Make your business page public with Pro.',
+  },
+  {
+    id: 'accept_staff',
+    featureKey: 'accept_staff',
+    action: 'staff.accept_request',
+    requiredPlan: 'pro',
+    appliesTo: ['free'],
+    modalType: 'feature_gate',
+    title: 'Accept staff requests',
+    description: 'Accept staff join requests with Pro.',
+  },
+  // Limit triggers - Free
+  {
+    id: 'product_limit_reached_free',
+    limitKey: 'maxProducts',
+    action: 'products.create',
+    requiredPlan: 'pro',
+    appliesTo: ['free'],
+    currentLimit: 20,
+    modalType: 'limit_reached',
+    title: 'Product limit reached',
+    description: 'Upgrade to Pro to add up to 500 products.',
+  },
+  {
+    id: 'staff_limit_reached_free',
+    limitKey: 'maxStaff',
+    action: 'staff.invite',
+    requiredPlan: 'pro',
+    appliesTo: ['free'],
+    currentLimit: 1,
+    modalType: 'limit_reached',
+    title: 'Staff limit reached',
+    description: 'Upgrade to Pro to add up to 3 staff members.',
+  },
+  // Limit triggers - Pro
+  {
+    id: 'product_limit_reached_pro',
+    limitKey: 'maxProducts',
+    action: 'products.create',
+    requiredPlan: 'business',
+    appliesTo: ['pro'],
+    currentLimit: 500,
+    modalType: 'limit_reached',
+    title: 'Product limit reached',
+    description: 'Upgrade to Business to add up to 5,000 products.',
+  },
+  {
+    id: 'staff_limit_reached_pro',
+    limitKey: 'maxStaff',
+    action: 'staff.invite',
+    requiredPlan: 'business',
+    appliesTo: ['pro'],
+    currentLimit: 3,
+    modalType: 'limit_reached',
+    title: 'Staff limit reached',
+    description: 'Upgrade to Business to add up to 9 staff members.',
+  },
+  {
+    id: 'location_limit_reached',
+    limitKey: 'maxLocations',
+    action: 'locations.add',
+    requiredPlan: 'business',
+    appliesTo: ['free', 'pro'],
+    currentLimit: 1,
+    modalType: 'limit_reached',
+    title: 'Location limit reached',
+    description: 'Upgrade to Business to manage up to 7 locations.',
+  },
+  // Limit triggers - Business
+  {
+    id: 'product_limit_reached_business',
+    limitKey: 'maxProducts',
+    action: 'products.create',
+    requiredPlan: 'enterprise',
+    appliesTo: ['business'],
+    currentLimit: 5000,
+    modalType: 'limit_reached',
+    title: 'Product limit reached',
+    description: 'Upgrade to Enterprise for unlimited products.',
+  },
+  {
+    id: 'staff_limit_reached_business',
+    limitKey: 'maxStaff',
+    action: 'staff.invite',
+    requiredPlan: 'enterprise',
+    appliesTo: ['business'],
+    currentLimit: 9,
+    modalType: 'limit_reached',
+    title: 'Staff limit reached',
+    description: 'Upgrade to Enterprise for unlimited staff.',
+  },
+  {
+    id: 'location_limit_reached_business',
+    limitKey: 'maxLocations',
+    action: 'locations.add',
+    requiredPlan: 'enterprise',
+    appliesTo: ['business'],
+    currentLimit: 7,
+    modalType: 'limit_reached',
+    title: 'Location limit reached',
+    description: 'Upgrade to Enterprise for unlimited locations.',
+  },
+  // Business Required (Free + Pro blocked)
+  {
+    id: 'business_specific_pricing',
+    featureKey: 'business_specific_pricing',
+    action: 'pricing.set_per_client',
+    requiredPlan: 'business',
+    appliesTo: ['free', 'pro'],
+    modalType: 'feature_gate',
+    title: 'Business-specific pricing',
+    description: 'Set different prices per client with Business.',
+  },
+  {
+    id: 'price_privacy',
+    featureKey: 'price_privacy',
+    action: 'products.set_privacy',
+    requiredPlan: 'business',
+    appliesTo: ['free', 'pro'],
+    modalType: 'feature_gate',
+    title: 'Product & price privacy',
+    description: 'Control product and price visibility with Business.',
+  },
+  {
+    id: 'publish_on_feed',
+    featureKey: 'publish_on_feed',
+    action: 'business.publish_feed',
+    requiredPlan: 'business',
+    appliesTo: ['free', 'pro'],
+    modalType: 'feature_gate',
+    title: 'Publish on feed',
+    description: 'Publish your business and products on the feed with Business.',
+  },
+  {
+    id: 'publish_products_on_feed',
+    featureKey: 'publish_products_on_feed',
+    action: 'products.publish_feed',
+    requiredPlan: 'business',
+    appliesTo: ['free', 'pro'],
+    modalType: 'feature_gate',
+    title: 'Publish products on feed',
+    description: 'Showcase your products on the Explore feed with Business.',
+  },
+  {
+    id: 'analytics_access',
+    featureKey: 'analytics_access',
+    action: 'analytics.open',
+    requiredPlan: 'business',
+    appliesTo: ['free', 'pro'],
+    modalType: 'feature_gate',
+    title: 'Analytics dashboard',
+    description: 'Access analytics insights with Business.',
+  },
+  // Enterprise Required (All blocked)
+  {
+    id: 'analytics_extended_range',
+    featureKey: 'analytics_full',
+    action: 'analytics.select_range_extended',
+    requiredPlan: 'enterprise',
+    appliesTo: ['business'],
+    modalType: 'soft_upsell',
+    title: 'Full analytics access',
+    description: 'Unlock full historical analytics with Enterprise.',
+  },
+  {
+    id: 'independent_locations',
+    featureKey: 'independent_locations',
+    action: 'locations.enable_independent_mode',
+    requiredPlan: 'enterprise',
+    appliesTo: ['free', 'pro', 'business'],
+    modalType: 'enterprise_control',
+    title: 'Independent locations',
+    description: 'Manage independent locations with Enterprise.',
+  },
+  {
+    id: 'advanced_permissions',
+    featureKey: 'advanced_permissions',
+    action: 'permissions.configure_advanced',
+    requiredPlan: 'enterprise',
+    appliesTo: ['free', 'pro', 'business'],
+    modalType: 'enterprise_control',
+    title: 'Advanced permissions & roles',
+    description: 'Configure granular permissions with Enterprise.',
+  },
+  {
+    id: 'api_access',
+    featureKey: 'api_access',
+    action: 'integrations.open_api',
+    requiredPlan: 'enterprise',
+    appliesTo: ['free', 'pro', 'business'],
+    modalType: 'enterprise_control',
+    title: 'API access',
+    description: 'Access NouPro APIs and integrations with Enterprise.',
+  },
+  {
+    id: 'priority_support',
+    featureKey: 'priority_support',
+    action: 'support.priority',
+    requiredPlan: 'enterprise',
+    appliesTo: ['free', 'pro', 'business'],
+    modalType: 'enterprise_control',
+    title: 'Priority support',
+    description: 'Get priority support with Enterprise.',
+  },
+];
+
+/**
+ * Get a paywall trigger by ID
+ */
+export const getPaywallTrigger = (triggerId: string): PaywallTrigger | undefined => {
+  return PAYWALL_TRIGGERS.find(t => t.id === triggerId);
+};
+
+/**
+ * Get a paywall trigger by action path
+ */
+export const getTriggerByAction = (action: string): PaywallTrigger | undefined => {
+  return PAYWALL_TRIGGERS.find(t => t.action === action);
+};
+
+/**
+ * Get the appropriate limit trigger ID based on current plan
+ * Returns empty string for enterprise (unlimited) - no limit check needed
+ */
+export const getLimitTriggerId = (
+  limitType: 'products' | 'staff' | 'locations',
+  currentPlan: SubscriptionPlan | null
+): string => {
+  const plan = currentPlan || 'free';
+  
+  // Enterprise has unlimited - no limit triggers apply
+  if (plan === 'enterprise') return '';
+  
+  if (limitType === 'products') {
+    if (plan === 'free') return 'product_limit_reached_free';
+    if (plan === 'pro') return 'product_limit_reached_pro';
+    return 'product_limit_reached_business';
+  }
+  
+  if (limitType === 'staff') {
+    if (plan === 'free') return 'staff_limit_reached_free';
+    if (plan === 'pro') return 'staff_limit_reached_pro';
+    return 'staff_limit_reached_business';
+  }
+  
+  if (limitType === 'locations') {
+    if (plan === 'free' || plan === 'pro') return 'location_limit_reached';
+    return 'location_limit_reached_business';
+  }
+  
+  return '';
+};
+
+/**
  * Check if action triggers a paywall
+ * Uses structured triggers from PAYWALL_TRIGGERS
+ * 
+ * @param triggerId - The trigger ID to check (e.g., 'send_invoice', 'product_limit_reached_free')
+ * @param currentPlan - The user's current subscription plan
+ * @param context - Optional context for limit checks (e.g., { currentCount: 21 })
  */
 export const checkPaywall = (
+  triggerId: string,
+  currentPlan: SubscriptionPlan | null,
+  context?: { currentCount?: number }
+): PaywallCheck => {
+  const plan = currentPlan || 'free';
+  const trigger = getPaywallTrigger(triggerId);
+  
+  // If no trigger found, allow the action
+  if (!trigger) {
+    return { allowed: true };
+  }
+  
+  // Check if this trigger applies to the current plan
+  if (!trigger.appliesTo.includes(plan)) {
+    return { allowed: true };
+  }
+  
+  // For limit triggers, check if the limit is actually exceeded
+  if (trigger.limitKey && context?.currentCount !== undefined) {
+    const limit = trigger.currentLimit || 0;
+    if (context.currentCount < limit) {
+      return { allowed: true };
+    }
+  }
+  
+  // Trigger applies - return paywall info
+  return {
+    allowed: false,
+    triggerId: trigger.id,
+    requiredPlan: trigger.requiredPlan,
+    modalType: trigger.modalType,
+    title: trigger.title,
+    description: trigger.description,
+    currentLimit: trigger.currentLimit,
+    message: trigger.description, // Backwards compatibility
+  };
+};
+
+/**
+ * Legacy check - maps old action strings to new trigger IDs
+ * @deprecated Use checkPaywall with trigger IDs directly
+ */
+export const checkPaywallLegacy = (
   action: string,
   currentPlan: SubscriptionPlan | null
 ): PaywallCheck => {
-  const plan = currentPlan || 'free';
-
-  switch (action) {
-    case 'accept_staff':
-      if (!PLAN_FEATURES[plan].accept_staff) {
-        return {
-          allowed: false,
-          requiredPlan: 'pro',
-          message: 'Upgrade to Pro to accept staff join requests',
-        };
-      }
-      break;
-
-    case 'publish_business':
-      if (!PLAN_FEATURES[plan].publish_business_page) {
-        return {
-          allowed: false,
-          requiredPlan: 'pro',
-          message: 'Upgrade to Pro to publish your business page',
-        };
-      }
-      break;
-
-    case 'publish_product':
-      if (!PLAN_FEATURES[plan].publish_business_page) {
-        return {
-          allowed: false,
-          requiredPlan: 'pro',
-          message: 'Upgrade to Pro to publish products publicly',
-        };
-      }
-      break;
-
-    case 'receive_orders':
-      if (!PLAN_FEATURES[plan].receive_orders) {
-        return {
-          allowed: false,
-          requiredPlan: 'pro',
-          message: 'Upgrade to Pro to receive orders from other businesses',
-        };
-      }
-      break;
-
-    case 'create_invoice':
-      if (!PLAN_FEATURES[plan].generate_invoices) {
-        return {
-          allowed: false,
-          requiredPlan: 'pro',
-          message: 'Upgrade to Pro to create invoices and estimates',
-        };
-      }
-      break;
-
-    case 'create_delivery':
-      if (!PLAN_FEATURES[plan].create_deliveries) {
-        return {
-          allowed: false,
-          requiredPlan: 'pro',
-          message: 'Upgrade to Pro to create and manage deliveries',
-        };
-      }
-      break;
-
-    case 'business_specific_pricing':
-      if (!PLAN_FEATURES[plan].business_specific_pricing) {
-        return {
-          allowed: false,
-          requiredPlan: 'business',
-          message: 'Upgrade to Business to use business-specific pricing',
-        };
-      }
-      break;
-
-    case 'advanced_permissions':
-      if (!PLAN_FEATURES[plan].advanced_permissions) {
-        return {
-          allowed: false,
-          requiredPlan: 'enterprise',
-          message: 'Upgrade to Enterprise to use advanced permissions',
-        };
-      }
-      break;
-
-    case 'api_access':
-      if (!PLAN_FEATURES[plan].api_access) {
-        return {
-          allowed: false,
-          requiredPlan: 'enterprise',
-          message: 'Upgrade to Enterprise to access the API',
-        };
-      }
-      break;
-
-    case 'create_product':
-      // Check product limit
-      // Note: This requires additional context (current product count)
-      // which should be passed separately or checked before calling this
-      break;
+  // Map old action strings to new trigger IDs
+  const actionToTriggerMap: Record<string, string> = {
+    'accept_staff': 'accept_staff',
+    'publish_business': 'publish_business_page',
+    'publish_product': 'publish_business_page',
+    'create_invoice': 'send_invoice',
+    'create_delivery': 'create_selling_order',
+    'business_specific_pricing': 'business_specific_pricing',
+    'advanced_permissions': 'advanced_permissions',
+    'api_access': 'api_access',
+    'publish_on_feed': 'publish_on_feed',
+    'publish_products_on_feed': 'publish_products_on_feed',
+  };
+  
+  const triggerId = actionToTriggerMap[action];
+  if (!triggerId) {
+    return { allowed: true };
   }
-
-  return { allowed: true };
+  
+  return checkPaywall(triggerId, currentPlan);
 };
 
 // ========== Utility Functions ==========

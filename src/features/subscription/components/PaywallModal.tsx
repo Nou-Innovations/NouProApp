@@ -1,7 +1,11 @@
 /**
  * PaywallModal Component
  * Shows upgrade prompt when a feature requires a paid plan
- * Based on app-logic.json paywallTriggers
+ * Supports 4 modal types from app-logic.json paywallTriggers.modalTemplates:
+ * - feature_gate: Default for locked features
+ * - limit_reached: For quota exceeded scenarios
+ * - enterprise_control: For enterprise-only control systems
+ * - soft_upsell: Non-blocking inline nudge (renders as smaller modal)
  */
 
 import React from 'react';
@@ -11,36 +15,122 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  Image,
+  Linking,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { SubscriptionPlan, PLAN_INFO, PLAN_PRICES_MONTHLY, CURRENCY } from '@/shared/types/subscription';
+import { PaywallModalType } from '@/shared/utils/permissions';
 
 interface PaywallModalProps {
   visible: boolean;
   onClose: () => void;
   onUpgrade: () => void;
   requiredPlan?: SubscriptionPlan;
+  modalType?: PaywallModalType;
   title?: string;
+  /** Primary description/message for the modal */
+  description?: string;
+  /** @deprecated Use description instead */
   message?: string;
+  /** @deprecated Use title instead */
   featureName?: string;
+  /** Current limit value for limit_reached modals */
+  currentLimit?: number;
+  /** Callback for "Contact sales" button in enterprise_control modal */
+  onContactSales?: () => void;
 }
+
+/**
+ * Modal configuration per type
+ */
+const MODAL_CONFIG: Record<PaywallModalType, {
+  icon: string;
+  iconColor: string;
+  iconBgColor: string;
+  primaryCTA: string;
+  secondaryCTA: string;
+  showContactSales?: boolean;
+}> = {
+  feature_gate: {
+    icon: 'lock-closed',
+    iconColor: '#F59E0B',
+    iconBgColor: '#FEF3C7',
+    primaryCTA: 'Upgrade Now',
+    secondaryCTA: 'Maybe Later',
+  },
+  limit_reached: {
+    icon: 'alert-circle',
+    iconColor: '#EF4444',
+    iconBgColor: '#FEE2E2',
+    primaryCTA: 'Upgrade',
+    secondaryCTA: 'Manage Limits',
+  },
+  enterprise_control: {
+    icon: 'shield-checkmark',
+    iconColor: '#8B5CF6',
+    iconBgColor: '#EDE9FE',
+    primaryCTA: 'Upgrade to Enterprise',
+    secondaryCTA: 'Contact Sales',
+    showContactSales: true,
+  },
+  soft_upsell: {
+    icon: 'sparkles',
+    iconColor: '#3B82F6',
+    iconBgColor: '#DBEAFE',
+    primaryCTA: 'Learn More',
+    secondaryCTA: 'Not Now',
+  },
+};
 
 const PaywallModal: React.FC<PaywallModalProps> = ({
   visible,
   onClose,
   onUpgrade,
   requiredPlan = 'pro',
-  title = 'Upgrade Required',
+  modalType = 'feature_gate',
+  title,
+  description,
   message,
   featureName = 'this feature',
+  currentLimit,
+  onContactSales,
 }) => {
   const { theme: appTheme, isDarkMode } = useTheme();
   const planInfo = PLAN_INFO[requiredPlan];
+  const config = MODAL_CONFIG[modalType];
 
-  const defaultMessage = `Upgrade to ${planInfo.name} to unlock ${featureName} and more powerful features.`;
+  // Determine the display title
+  const displayTitle = title || (modalType === 'limit_reached' 
+    ? 'Limit Reached' 
+    : modalType === 'enterprise_control'
+    ? 'Enterprise Feature'
+    : 'Upgrade Required');
+
+  // Determine the display message
+  const displayMessage = description || message || 
+    `Upgrade to ${planInfo.name} to unlock ${featureName} and more powerful features.`;
+
+  // Handle contact sales
+  const handleContactSales = () => {
+    if (onContactSales) {
+      onContactSales();
+    } else {
+      // Default: open email
+      Linking.openURL('mailto:sales@noupro.app?subject=Enterprise%20Inquiry');
+    }
+    onClose();
+  };
+
+  // Handle secondary button press
+  const handleSecondaryPress = () => {
+    if (config.showContactSales) {
+      handleContactSales();
+    } else {
+      onClose();
+    }
+  };
 
   return (
     <Modal
@@ -56,20 +146,29 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
             <Icon name="close" size={24} color={appTheme.colors.textLight} />
           </TouchableOpacity>
 
-          {/* Icon */}
-          <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
-            <Icon name="lock-closed" size={32} color="#F59E0B" />
+          {/* Icon - varies by modal type */}
+          <View style={[styles.iconContainer, { backgroundColor: config.iconBgColor }]}>
+            <Icon name={config.icon as any} size={32} color={config.iconColor} />
           </View>
 
           {/* Title */}
           <Text style={[styles.title, { color: appTheme.colors.text }]}>
-            {title}
+            {displayTitle}
           </Text>
 
           {/* Message */}
           <Text style={[styles.message, { color: appTheme.colors.textLight }]}>
-            {message || defaultMessage}
+            {displayMessage}
           </Text>
+
+          {/* Current Limit Info (for limit_reached) */}
+          {modalType === 'limit_reached' && currentLimit !== undefined && (
+            <View style={[styles.limitBadge, { backgroundColor: isDarkMode ? '#374151' : '#F3F4F6' }]}>
+              <Text style={[styles.limitText, { color: appTheme.colors.textLight }]}>
+                Your limit: {currentLimit}
+              </Text>
+            </View>
+          )}
 
           {/* Plan Card */}
           <View style={[styles.planCard, { backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB', borderColor: '#22C55E' }]}>
@@ -109,17 +208,29 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
               style={[styles.upgradeButton, { backgroundColor: '#22C55E' }]}
               onPress={onUpgrade}
             >
-              <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+              <Text style={styles.upgradeButtonText}>{config.primaryCTA}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.laterButton}
-              onPress={onClose}
+              onPress={handleSecondaryPress}
             >
               <Text style={[styles.laterButtonText, { color: appTheme.colors.textLight }]}>
-                Maybe Later
+                {config.secondaryCTA}
               </Text>
             </TouchableOpacity>
+
+            {/* Additional Contact Sales button for enterprise_control */}
+            {modalType === 'enterprise_control' && (
+              <TouchableOpacity
+                style={styles.laterButton}
+                onPress={onClose}
+              >
+                <Text style={[styles.laterButtonText, { color: appTheme.colors.textLight }]}>
+                  Maybe Later
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -168,6 +279,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
+  },
+  limitBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  limitText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.medium,
   },
   planCard: {
     width: '100%',
@@ -250,8 +371,3 @@ const styles = StyleSheet.create({
 });
 
 export default PaywallModal;
-
-
-
-
-

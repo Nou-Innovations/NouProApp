@@ -1,49 +1,89 @@
 /**
  * Chat Repository - Prisma Implementation
+ * 
+ * Note: Prisma schema uses `businessId` but API contract uses `companyId`.
+ * This repo maps businessId → companyId in all responses.
  */
 const { prisma } = require('../../db/prisma');
 
+/**
+ * Map Prisma chat object to API format (businessId → companyId)
+ */
+function mapChatToApi(chat) {
+  if (!chat) return chat;
+  const { businessId, ...rest } = chat;
+  return { ...rest, companyId: businessId };
+}
+
+/**
+ * Map array of Prisma chat objects to API format
+ */
+function mapChatsToApi(chats) {
+  return chats.map(mapChatToApi);
+}
+
 async function list() {
-  return prisma.chat.findMany({
+  const chats = await prisma.chat.findMany({
     orderBy: { updatedAt: 'desc' }
   });
+  return mapChatsToApi(chats);
 }
 
 async function getById(id) {
-  return prisma.chat.findUnique({
+  const chat = await prisma.chat.findUnique({
     where: { id }
   });
+  return mapChatToApi(chat);
 }
 
-async function getByBusinessId(businessId) {
-  return prisma.chat.findMany({
-    where: { businessId },
+/**
+ * Get chats by company ID
+ * @param {string} companyId - The company ID to filter by
+ */
+async function getByCompanyId(companyId) {
+  const chats = await prisma.chat.findMany({
+    where: { businessId: companyId }, // Prisma field is businessId
     orderBy: { updatedAt: 'desc' }
   });
+  return mapChatsToApi(chats);
 }
 
 async function getByLocationId(locationId) {
-  return prisma.chat.findMany({
+  const chats = await prisma.chat.findMany({
     where: { locationId },
     orderBy: { updatedAt: 'desc' }
   });
+  return mapChatsToApi(chats);
 }
 
+/**
+ * Create a new chat
+ * @param {object} data - Chat data with companyId (maps to Prisma businessId)
+ */
 async function create(data) {
-  return prisma.chat.create({
+  // Map companyId to businessId for Prisma
+  const { companyId, ...rest } = data;
+  const chat = await prisma.chat.create({
     data: {
-      ...data,
+      ...rest,
+      businessId: companyId, // Map to Prisma field
       participants: data.participants || [],
       lastMessage: data.lastMessage || null
     }
   });
+  return mapChatToApi(chat);
 }
 
 async function update(id, patch) {
-  return prisma.chat.update({
+  // If patch contains companyId, map to businessId for Prisma
+  const { companyId, ...restPatch } = patch;
+  const prismaData = companyId ? { ...restPatch, businessId: companyId } : restPatch;
+  
+  const chat = await prisma.chat.update({
     where: { id },
-    data: patch
+    data: prismaData
   });
+  return mapChatToApi(chat);
 }
 
 async function remove(id) {
@@ -66,7 +106,9 @@ async function getMessages(chatId) {
   });
 }
 
-async function addMessage(chatId, message) {
+async function addMessage(chatId, message, options = {}) {
+  const { incrementUnread = true } = options;
+  
   const newMessage = await prisma.message.create({
     data: {
       id: message.id,
@@ -82,22 +124,29 @@ async function addMessage(chatId, message) {
     }
   });
   
-  // Update chat's lastMessage
+  // Update chat's lastMessage and optionally increment unread count
+  const updateData = {
+    lastMessage: {
+      id: newMessage.id,
+      content: newMessage.content,
+      type: newMessage.type,
+      senderId: newMessage.senderId,
+      senderName: newMessage.senderName,
+      timestamp: newMessage.timestamp,
+      isOutgoing: newMessage.isOutgoing,
+      status: newMessage.status
+    },
+    updatedAt: new Date()
+  };
+  
+  // Increment unread count (for recipients to see)
+  if (incrementUnread) {
+    updateData.unreadCount = { increment: 1 };
+  }
+  
   await prisma.chat.update({
     where: { id: chatId },
-    data: {
-      lastMessage: {
-        id: newMessage.id,
-        content: newMessage.content,
-        type: newMessage.type,
-        senderId: newMessage.senderId,
-        senderName: newMessage.senderName,
-        timestamp: newMessage.timestamp,
-        isOutgoing: newMessage.isOutgoing,
-        status: newMessage.status
-      },
-      updatedAt: new Date()
-    }
+    data: updateData
   });
   
   return newMessage;
@@ -106,7 +155,7 @@ async function addMessage(chatId, message) {
 module.exports = { 
   list, 
   getById, 
-  getByBusinessId, 
+  getByCompanyId, // Renamed from getByBusinessId
   getByLocationId, 
   create, 
   update, 

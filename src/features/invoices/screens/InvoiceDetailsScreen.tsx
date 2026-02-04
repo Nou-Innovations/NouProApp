@@ -33,6 +33,8 @@ import invoicesService, { Invoice, convertEstimateToInvoice, getInvoicePdfUrl } 
 import { useProfileStore } from '@/shared/store/profileStore';
 import mockInvoicesData from '@/shared/data/mockInvoices';
 import * as FileSystem from 'expo-file-system';
+import PaywallModal from '@/features/subscription/components/PaywallModal';
+import { checkPaywall, PaywallCheck, shouldShowNouProBranding } from '@/shared/utils/permissions';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InvoiceDetails'>;
 
@@ -78,6 +80,10 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showMoreOptions, setShowMoreOptions] = useState(false);
+  
+  // Paywall state
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallCheckResult, setPaywallCheckResult] = useState<PaywallCheck | null>(null);
   
   const { theme, isDarkMode } = useTheme();
   const { setInvoicesUnreadCount, markItemAsViewed } = useNotifications();
@@ -232,6 +238,14 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
   };
 
   const sendDocument = () => {
+    // Check paywall for sending invoice (Pro+ only)
+    const sendCheck = checkPaywall('send_invoice', activeBusiness?.plan || null);
+    if (!sendCheck.allowed) {
+      setPaywallCheckResult(sendCheck);
+      setShowPaywall(true);
+      return;
+    }
+    
     setSuccessMessage(`${isEstimate ? 'Estimate' : 'Invoice'} sent successfully!`);
     setShowSuccessDialog(true);
   };
@@ -241,6 +255,49 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
       Alert.alert('Error', 'No active business selected');
       return;
     }
+
+    // Check paywall for exporting invoice PDF (Pro+ only)
+    const exportCheck = checkPaywall('export_invoice_pdf', activeBusiness?.plan || null);
+    if (!exportCheck.allowed) {
+      setPaywallCheckResult(exportCheck);
+      setShowPaywall(true);
+      return;
+    }
+
+    // For Pro users who can export but still show branding, offer upgrade to remove it
+    const hasBranding = shouldShowNouProBranding(activeBusiness?.plan || null);
+    if (hasBranding) {
+      // Show confirmation that PDF will include branding, with option to upgrade
+      Alert.alert(
+        'Download PDF',
+        'This PDF will include NouPro branding. Upgrade to Pro to remove branding from your documents.',
+        [
+          {
+            text: 'Upgrade',
+            onPress: () => {
+              const check = checkPaywall('remove_branding', activeBusiness?.plan || null);
+              setPaywallCheckResult(check);
+              setShowPaywall(true);
+            },
+          },
+          {
+            text: 'Download Anyway',
+            onPress: () => proceedWithDownload(),
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+        ]
+      );
+      return;
+    }
+
+    proceedWithDownload();
+  };
+
+  const proceedWithDownload = async () => {
+    if (!companyId) return;
 
     setShowDownloadModal(true);
     setIsDownloading(true);
@@ -895,6 +952,20 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
           if (item.id === 'partial') handleAddPartialPayment();
           else if (item.id === 'full') handleMarkFullyPaid();
         }}
+      />
+
+      {/* Paywall Modal for Remove Branding */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onUpgrade={() => {
+          setShowPaywall(false);
+          navigation.navigate('SubscriptionPlans' as never);
+        }}
+        requiredPlan={paywallCheckResult?.requiredPlan || 'pro'}
+        modalType={paywallCheckResult?.modalType}
+        title={paywallCheckResult?.title}
+        description={paywallCheckResult?.description}
       />
     </SafeAreaView>
   );

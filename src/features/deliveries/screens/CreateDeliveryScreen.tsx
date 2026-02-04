@@ -125,6 +125,7 @@ import { formatCurrency } from '@/shared/data/mockOrders';
 import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, TimeSelector, ListItemCard } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { canUseAdvancedPermissions } from '@/shared/utils/permissions';
 import { createDelivery } from '@/features/deliveries/deliveries.service';
 
 type CreateDeliveryRouteProp = RouteProp<RootStackParamList, 'CreateDelivery'>;
@@ -172,8 +173,8 @@ export default function CreateDeliveryScreen() {
   const hasSingleLocation = safeLocations.length === 1;
   const primaryLocation = safeLocations.find(loc => (loc as any).is_primary) || safeLocations[0];
   
-  // Check if user can edit ID (Business or Enterprise plan)
-  const canEditId = activeBusiness?.plan === 'business' || activeBusiness?.plan === 'enterprise';
+  // Check if user can edit ID (Business or Enterprise plan with advanced permissions)
+  const canEditId = canUseAdvancedPermissions(activeBusiness?.plan || null);
   
   // Form state
   const [selectedClient, setSelectedClient] = useState<typeof mockClients[0] | null>(null);

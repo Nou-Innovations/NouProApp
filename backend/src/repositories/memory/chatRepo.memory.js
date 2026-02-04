@@ -1,8 +1,7 @@
 /**
  * Chat Repository - Memory Implementation
  * 
- * Note: Uses companyId consistently to match frontend Chat type.
- * The getByCompanyId function accepts companyId directly.
+ * Note: Uses companyId as the canonical field (matching API contract).
  */
 const { chats, messages } = require('../../data/memoryStore');
 
@@ -23,11 +22,6 @@ async function getByCompanyId(companyId) {
   return chats.filter(c => c.companyId === companyId);
 }
 
-// Legacy alias for backwards compatibility
-async function getByBusinessId(businessId) {
-  return getByCompanyId(businessId);
-}
-
 async function getByLocationId(locationId) {
   return chats.filter(c => c.locationId === locationId);
 }
@@ -45,13 +39,9 @@ async function getByUserId(userId) {
 }
 
 async function create(data) {
-  // Accept both companyId and businessId for backwards compatibility
-  const companyId = data.companyId || data.businessId;
-  const { businessId: _, ...rest } = data;
-  
   const newChat = {
-    ...rest,
-    companyId,
+    ...data,
+    companyId: data.companyId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -69,13 +59,9 @@ async function update(id, patch) {
   const idx = chats.findIndex(c => c.id === id);
   if (idx === -1) return null;
   
-  // Accept both companyId and businessId for backwards compatibility
-  const { businessId, ...restPatch } = patch;
-  const storePatch = businessId ? { ...restPatch, companyId: businessId } : restPatch;
-  
   chats[idx] = { 
     ...chats[idx], 
-    ...storePatch, 
+    ...patch, 
     updatedAt: new Date().toISOString() 
   };
   return chats[idx];
@@ -94,7 +80,9 @@ async function getMessages(chatId) {
   return messages[chatId] || [];
 }
 
-async function addMessage(chatId, message) {
+async function addMessage(chatId, message, options = {}) {
+  const { incrementUnread = true } = options;
+  
   if (!messages[chatId]) {
     messages[chatId] = [];
   }
@@ -106,7 +94,7 @@ async function addMessage(chatId, message) {
   };
   messages[chatId].push(newMessage);
   
-  // Update chat's lastMessage
+  // Update chat's lastMessage and optionally increment unread count
   const chatIdx = chats.findIndex(c => c.id === chatId);
   if (chatIdx !== -1) {
     chats[chatIdx].lastMessage = {
@@ -120,6 +108,11 @@ async function addMessage(chatId, message) {
       status: newMessage.status || 'sent'
     };
     chats[chatIdx].updatedAt = newMessage.timestamp;
+    
+    // Increment unread count (for recipients to see)
+    if (incrementUnread) {
+      chats[chatIdx].unreadCount = (chats[chatIdx].unreadCount || 0) + 1;
+    }
   }
   
   return newMessage;
@@ -168,8 +161,7 @@ async function getMessage(chatId, messageId) {
 module.exports = { 
   list, 
   getById, 
-  getByCompanyId,
-  getByBusinessId, // Legacy alias
+  getByCompanyId, // Renamed from getByBusinessId
   getByUserId,
   getByLocationId, 
   create, 

@@ -37,11 +37,13 @@ import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
 import { AppButton } from '@/shared/components/ui/AppButton';
 import AssignStaffModal from '@/features/team/components/AssignStaffModal';
+import PaywallModal from '@/features/subscription/components/PaywallModal';
 import theme from '@/shared/theme';
 import type { Delivery, DeliveryStatus, PaymentStatus, DeliveryItem } from '@/shared/types/delivery';
 import { mockStaff } from '@/shared/data/mockDeliveries';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
+import { checkPaywall, PaywallCheck } from '@/shared/utils/permissions';
 
 import {
   PartyHeaderCard,
@@ -116,6 +118,10 @@ export function DeliveryDetailSupplierView({
   const [showPaymentStatusModal, setShowPaymentStatusModal] = useState(false);
   const [isSchedulingModalVisible, setIsSchedulingModalVisible] = useState(false);
   const [searchTransport, setSearchTransport] = useState('');
+  
+  // Paywall state
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallCheckResult, setPaywallCheckResult] = useState<PaywallCheck | null>(null);
 
   // Animation values
   const [transportOverlayAnimation] = useState(new Animated.Value(0));
@@ -277,6 +283,14 @@ export function DeliveryDetailSupplierView({
 
   // Transport modal handlers
   const handleShowTransportModal = () => {
+    // Check paywall for assign_transport (Free -> Pro)
+    const check = checkPaywall('assign_transport', activeBusiness?.plan || null);
+    if (!check.allowed) {
+      setPaywallCheckResult(check);
+      setShowPaywall(true);
+      return;
+    }
+    
     setShowTransportModal(true);
     animateOverlayIn(transportOverlayAnimation);
     animateContentIn(transportContentAnimation);
@@ -488,7 +502,16 @@ export function DeliveryDetailSupplierView({
           canEditPayment={true}
           onOpenScheduleModal={openSchedulingModal}
           onOpenTransportModal={handleShowTransportModal}
-          onOpenStaffModal={() => setShowStaffModal(true)}
+          onOpenStaffModal={() => {
+            // Check paywall for staff assignment (Free -> Pro)
+            const check = checkPaywall('assign_transport', activeBusiness?.plan || null);
+            if (!check.allowed) {
+              setPaywallCheckResult(check);
+              setShowPaywall(true);
+              return;
+            }
+            setShowStaffModal(true);
+          }}
           onOpenStatusModal={handleShowOrderStatusModal}
           onOpenPaymentModal={handleShowPaymentStatusModal}
         />
@@ -534,6 +557,20 @@ export function DeliveryDetailSupplierView({
           setTeamLeaderStaff(teamLeader as SelectedStaffMember || null);
         }}
         title="Assign Staff"
+      />
+
+      {/* Paywall Modal for Free Plan Users */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onUpgrade={() => {
+          setShowPaywall(false);
+          navigation.navigate('SubscriptionPlans' as never);
+        }}
+        requiredPlan={paywallCheckResult?.requiredPlan || 'pro'}
+        modalType={paywallCheckResult?.modalType}
+        title={paywallCheckResult?.title}
+        description={paywallCheckResult?.description}
       />
 
       {/* Transport Modal */}
