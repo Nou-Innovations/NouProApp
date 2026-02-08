@@ -102,6 +102,13 @@ async function removeLocationMember(id) {
 // HELPER QUERIES
 // ============================================================================
 
+async function getByUserId(userId) {
+  return prisma.businessMember.findMany({
+    where: { userId },
+    include: { user: true }
+  });
+}
+
 async function isBusinessMember(businessId, userId) {
   const member = await prisma.businessMember.findFirst({
     where: {
@@ -152,6 +159,7 @@ module.exports = {
   removeLocationMember,
   
   // Helper queries
+  getByUserId,
   isBusinessMember,
   isBusinessSuperAdmin,
   isLocationMember

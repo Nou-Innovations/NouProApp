@@ -5069,7 +5069,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
     let notifications = [];
     
     // Get user's businesses for team-related notifications
-    const userBusinesses = await repos.businessMemberRepo.getByUserId(userId);
+    const userBusinesses = await repos.memberRepo.getByUserId(userId);
     
     // 1. Join requests (for admins)
     for (const ub of userBusinesses) {

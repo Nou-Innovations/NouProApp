@@ -84,6 +84,10 @@ async function removeLocationMember(id) {
 // HELPER QUERIES
 // ============================================================================
 
+async function getByUserId(userId) {
+  return businessMembers.filter(m => m.userId === userId);
+}
+
 async function isBusinessMember(businessId, userId) {
   return businessMembers.some(m => 
     m.businessId === businessId && 
@@ -125,6 +129,7 @@ module.exports = {
   removeLocationMember,
   
   // Helper queries
+  getByUserId,
   isBusinessMember,
   isBusinessSuperAdmin,
   isLocationMember
