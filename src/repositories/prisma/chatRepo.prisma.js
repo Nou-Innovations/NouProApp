@@ -90,6 +90,7 @@ async function getById(id) {
  * @param {string} companyId - The company ID to filter by
  */
 async function getByCompanyId(companyId) {
+  if (!companyId) return [];
   return prisma.chat.findMany({
     where: { companyId },
     orderBy: { updatedAt: 'desc' }
@@ -98,18 +99,20 @@ async function getByCompanyId(companyId) {
 
 /**
  * Get chats by user ID (for personal mode)
- * Returns chats where the user is a participant
+ * Queries via the ChatParticipant join table for efficient, indexed lookup.
  * @param {string} userId - The user ID to filter by
  */
 async function getByUserId(userId) {
-  // participants is a Json? field storing an array of user IDs
-  // Fetch all chats and filter in JS for reliable cross-DB compatibility
-  const allChats = await prisma.chat.findMany({
+  const participations = await prisma.chatParticipant.findMany({
+    where: { userId },
+    select: { chatId: true }
+  });
+  const chatIds = participations.map(p => p.chatId);
+  if (chatIds.length === 0) return [];
+  return prisma.chat.findMany({
+    where: { id: { in: chatIds } },
     orderBy: { updatedAt: 'desc' }
   });
-  return allChats.filter(c =>
-    Array.isArray(c.participants) && c.participants.includes(userId)
-  );
 }
 
 async function getByLocationId(locationId) {
@@ -121,22 +124,35 @@ async function getByLocationId(locationId) {
 
 /**
  * Create a new chat
+ * Also creates ChatParticipant records for indexed participant lookups.
  * @param {object} data - Chat data with companyId
  */
 async function create(data) {
-  return prisma.chat.create({
+  const participants = data.participants || [];
+
+  const chat = await prisma.chat.create({
     data: {
       id: data.id,
-      companyId: data.companyId,
+      companyId: data.companyId || null, // null for personal chats
       locationId: data.locationId || null,
       type: data.type || 'direct',
       name: data.name,
-      participants: data.participants || [],
+      participants,
       lastMessage: data.lastMessage || null,
       unreadCount: data.unreadCount || 0,
       avatar: data.avatar || null,
     }
   });
+
+  // Create ChatParticipant rows in bulk
+  if (participants.length > 0) {
+    await prisma.chatParticipant.createMany({
+      data: participants.map(userId => ({ chatId: chat.id, userId })),
+      skipDuplicates: true,
+    });
+  }
+
+  return chat;
 }
 
 async function update(id, patch) {
@@ -162,11 +178,26 @@ async function remove(id) {
 // Message operations
 // ============================================================================
 
-async function getMessages(chatId) {
-  const msgs = await prisma.message.findMany({
+/**
+ * Get messages for a chat with cursor-based pagination (DB-level).
+ * Returns messages in descending order (newest first) for pagination,
+ * but the caller can reverse for display.
+ * @param {string} chatId
+ * @param {object} opts - { limit, cursor }
+ */
+async function getMessages(chatId, { limit = 50, cursor = null } = {}) {
+  const query = {
     where: { chatId },
-    orderBy: { timestamp: 'asc' }
-  });
+    orderBy: { timestamp: 'desc' },
+    take: limit,
+  };
+
+  if (cursor) {
+    query.cursor = { id: cursor };
+    query.skip = 1; // Skip the cursor message itself
+  }
+
+  const msgs = await prisma.message.findMany(query);
   return msgs.map(mapMessageToApi);
 }
 
@@ -281,6 +312,45 @@ async function deleteMessage(chatId, messageId) {
   return mapMessageToApi(updated);
 }
 
+/**
+ * Mark chat as read for a specific user.
+ * - Upserts a ReadReceipt linking this user to the latest message in the chat.
+ * - Resets the chat-level unreadCount to 0 (simple MVP, works for DMs).
+ * - Still bulk-marks messages isRead for backwards compat with existing queries.
+ * @param {string} chatId - The chat ID
+ * @param {string} userId - The user ID marking as read (optional for backward compat)
+ */
+async function markMessagesAsRead(chatId, userId) {
+  // Bulk-mark messages isRead for backward compatibility
+  await prisma.message.updateMany({
+    where: { chatId, isRead: false },
+    data: { isRead: true }
+  });
+
+  // Reset chat-level unread count
+  await prisma.chat.update({
+    where: { id: chatId },
+    data: { unreadCount: 0 }
+  });
+
+  // If userId provided, create a per-user ReadReceipt for the latest message
+  if (userId) {
+    const latestMessage = await prisma.message.findFirst({
+      where: { chatId },
+      orderBy: { timestamp: 'desc' },
+      select: { id: true }
+    });
+
+    if (latestMessage) {
+      await prisma.readReceipt.upsert({
+        where: { chatId_userId: { chatId, userId } },
+        create: { chatId, userId, messageId: latestMessage.id },
+        update: { messageId: latestMessage.id, readAt: new Date() },
+      });
+    }
+  }
+}
+
 module.exports = { 
   list, 
   getById, 
@@ -293,5 +363,6 @@ module.exports = {
   getMessages,
   addMessage,
   getMessage,
-  deleteMessage
+  deleteMessage,
+  markMessagesAsRead
 };

@@ -24,7 +24,6 @@ async function main() {
         email: u.email,
         avatar: u.avatar,
         phone: u.phone,
-        description: u.description,
         lastLoginAt: u.lastLoginAt ? new Date(u.lastLoginAt) : null,
         createdAt: new Date(u.createdAt),
       },
@@ -33,7 +32,6 @@ async function main() {
         email: u.email,
         avatar: u.avatar,
         phone: u.phone,
-        description: u.description,
         lastLoginAt: u.lastLoginAt ? new Date(u.lastLoginAt) : null,
       },
     });
@@ -122,10 +120,10 @@ async function main() {
         variants: p.variants || null,
         unit: p.unit,
         stockQuantity: p.stockQuantity,
-        is_listed: p.is_listed,
+        isListed: p.is_listed,
         isCreatedByUser: p.isCreatedByUser,
         isDisplayable: p.isDisplayable,
-        isImported: p.isImported,
+        isImported: p.isImported || false,
         createdAt: new Date(p.createdAt),
         updatedAt: new Date(p.updatedAt),
       },
@@ -141,10 +139,10 @@ async function main() {
         variants: p.variants || null,
         unit: p.unit,
         stockQuantity: p.stockQuantity,
-        is_listed: p.is_listed,
+        isListed: p.is_listed,
         isCreatedByUser: p.isCreatedByUser,
         isDisplayable: p.isDisplayable,
-        isImported: p.isImported,
+        isImported: p.isImported || false,
       },
     });
   }
@@ -377,37 +375,54 @@ async function main() {
   }
   console.log(`  ✓ ${store.deliveries.length} deliveries\n`);
 
-  // 12) Chats (map companyId -> businessId)
+  // 12) Chats (Prisma field is companyId, mapped to DB column businessId via @map)
+  // companyId is nullable — personal chats have companyId: null
   console.log('Creating chats...');
   for (const chat of store.chats) {
     await prisma.chat.upsert({
       where: { id: chat.id },
       create: {
         id: chat.id,
-        businessId: chat.companyId, // Map to businessId
-        locationId: chat.locationId,
+        companyId: chat.companyId || null,
+        locationId: chat.locationId || null,
         type: chat.type,
         name: chat.name,
         participants: chat.participants || [],
         lastMessage: chat.lastMessage || null,
-        unreadCount: chat.unreadCount,
-        avatar: chat.avatar,
+        unreadCount: chat.unreadCount || 0,
+        avatar: chat.avatar || null,
         createdAt: new Date(chat.createdAt),
         updatedAt: new Date(chat.updatedAt),
       },
       update: {
-        businessId: chat.companyId,
-        locationId: chat.locationId,
+        companyId: chat.companyId || null,
+        locationId: chat.locationId || null,
         type: chat.type,
         name: chat.name,
         participants: chat.participants || [],
         lastMessage: chat.lastMessage || null,
-        unreadCount: chat.unreadCount,
-        avatar: chat.avatar,
+        unreadCount: chat.unreadCount || 0,
+        avatar: chat.avatar || null,
       },
     });
   }
   console.log(`  ✓ ${store.chats.length} chats\n`);
+
+  // 12b) Chat Participants (from participants JSON arrays)
+  console.log('Creating chat participants...');
+  let participantCount = 0;
+  for (const chat of store.chats) {
+    const participants = chat.participants || [];
+    for (const userId of participants) {
+      await prisma.chatParticipant.upsert({
+        where: { chatId_userId: { chatId: chat.id, userId } },
+        create: { chatId: chat.id, userId },
+        update: {},
+      });
+      participantCount++;
+    }
+  }
+  console.log(`  ✓ ${participantCount} chat participants\n`);
 
   // 13) Messages
   console.log('Creating messages...');
@@ -425,7 +440,20 @@ async function main() {
           content: msg.text || msg.content || msg.event,
           type: msg.type,
           timestamp: new Date(msg.timestamp),
-          meta: { sender: msg.sender },
+          meta: {
+            sender: msg.sender,
+            ...(msg.imageUrl && { imageUrl: msg.imageUrl }),
+            ...(msg.fileUrl && { fileUrl: msg.fileUrl }),
+            ...(msg.fileName && { fileName: msg.fileName }),
+            ...(msg.replyingTo && { replyingTo: msg.replyingTo }),
+            ...(msg.latitude != null && { latitude: msg.latitude }),
+            ...(msg.longitude != null && { longitude: msg.longitude }),
+            ...(msg.address && { address: msg.address }),
+            ...(msg.locationName && { locationName: msg.locationName }),
+            ...(msg.invoiceId && { invoiceId: msg.invoiceId }),
+            ...(msg.estimateId && { estimateId: msg.estimateId }),
+            ...(msg.event && { event: msg.event }),
+          },
           status: msg.status,
           isRead: msg.isRead || false,
           isOutgoing: msg.isOutgoing || false,

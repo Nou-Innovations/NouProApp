@@ -61,11 +61,20 @@ async function remove(id) {
   }
 }
 
+async function getByBuyerBusinessId(buyerBusinessId) {
+  return prisma.order.findMany({
+    where: { buyerBusinessId },
+    orderBy: { createdAt: 'desc' }
+  });
+}
+
 module.exports = { 
   list, 
+  getAll: list,
   getById, 
   getByBusinessId, 
   getByLocationId, 
+  getByBuyerBusinessId,
   create, 
   update, 
   delete: remove 

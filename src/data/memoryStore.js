@@ -119,6 +119,112 @@ let companies = [
     },
     createdAt: '2024-06-01T00:00:00Z',
     updatedAt: '2025-01-15T00:00:00Z'
+  },
+  // --- Fake businesses for testing "Outside connections" ---
+  {
+    id: 'biz-004',
+    name: 'Island Fresh Produce',
+    logoUrl: 'https://picsum.photos/seed/biz004/100/100',
+    description: 'Fresh fruits and vegetables sourced locally from Mauritian farms',
+    phone: '+230-5200-1001',
+    email: 'contact@islandfresh.mu',
+    subscriptionTier: SUBSCRIPTION_TIERS.PRO,
+    settings: {
+      taxRate: 0.15,
+      currency: 'MUR',
+      invoicePrefix: 'IFP',
+      allowPartialPayments: true,
+      autoGenerateInvoices: false,
+      timezone: 'Indian/Mauritius',
+      allowLocationPriceOverride: false,
+      allowLocationTaxOverride: false
+    },
+    createdAt: '2024-03-15T00:00:00Z',
+    updatedAt: '2025-01-10T00:00:00Z'
+  },
+  {
+    id: 'biz-005',
+    name: 'TechParts Mauritius',
+    logoUrl: 'https://picsum.photos/seed/biz005/100/100',
+    description: 'Electronics and tech components distributor',
+    phone: '+230-5200-1002',
+    email: 'sales@techparts.mu',
+    subscriptionTier: SUBSCRIPTION_TIERS.BUSINESS,
+    settings: {
+      taxRate: 0.15,
+      currency: 'MUR',
+      invoicePrefix: 'TPM',
+      allowPartialPayments: true,
+      autoGenerateInvoices: true,
+      timezone: 'Indian/Mauritius',
+      allowLocationPriceOverride: false,
+      allowLocationTaxOverride: false
+    },
+    createdAt: '2024-05-20T00:00:00Z',
+    updatedAt: '2025-01-12T00:00:00Z'
+  },
+  {
+    id: 'biz-006',
+    name: 'Oceanview Hotels Group',
+    logoUrl: 'https://picsum.photos/seed/biz006/100/100',
+    description: 'Premium hospitality chain across the Indian Ocean islands',
+    phone: '+230-5200-1003',
+    email: 'info@oceanviewhotels.mu',
+    subscriptionTier: SUBSCRIPTION_TIERS.ENTERPRISE,
+    settings: {
+      taxRate: 0.15,
+      currency: 'MUR',
+      invoicePrefix: 'OVH',
+      allowPartialPayments: true,
+      autoGenerateInvoices: true,
+      timezone: 'Indian/Mauritius',
+      allowLocationPriceOverride: true,
+      allowLocationTaxOverride: false
+    },
+    createdAt: '2024-07-01T00:00:00Z',
+    updatedAt: '2025-01-14T00:00:00Z'
+  },
+  {
+    id: 'biz-007',
+    name: 'QuickShip Logistics',
+    logoUrl: 'https://picsum.photos/seed/biz007/100/100',
+    description: 'Fast and reliable shipping and logistics solutions',
+    phone: '+230-5200-1004',
+    email: 'dispatch@quickship.mu',
+    subscriptionTier: SUBSCRIPTION_TIERS.PRO,
+    settings: {
+      taxRate: 0.15,
+      currency: 'MUR',
+      invoicePrefix: 'QSL',
+      allowPartialPayments: false,
+      autoGenerateInvoices: false,
+      timezone: 'Indian/Mauritius',
+      allowLocationPriceOverride: false,
+      allowLocationTaxOverride: false
+    },
+    createdAt: '2024-09-01T00:00:00Z',
+    updatedAt: '2025-01-13T00:00:00Z'
+  },
+  {
+    id: 'biz-008',
+    name: 'Craft Beverages Co.',
+    logoUrl: 'https://picsum.photos/seed/biz008/100/100',
+    description: 'Artisan craft beverages and specialty drinks',
+    phone: '+230-5200-1005',
+    email: 'hello@craftbev.mu',
+    subscriptionTier: SUBSCRIPTION_TIERS.FREE,
+    settings: {
+      taxRate: 0.15,
+      currency: 'MUR',
+      invoicePrefix: 'CBC',
+      allowPartialPayments: false,
+      autoGenerateInvoices: false,
+      timezone: 'Indian/Mauritius',
+      allowLocationPriceOverride: false,
+      allowLocationTaxOverride: false
+    },
+    createdAt: '2024-11-01T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z'
   }
 ];
 
@@ -436,6 +542,9 @@ let orders = [
     customerName: 'Grocery Mart Ltd',
     customerAddress: '123 Main Street, Port Louis',
     customerPhone: '+230 5123 4567',
+    buyerBusinessId: null,
+    buyerBusinessName: null,
+    createdBy: null,
     items: [
       { productId: 'prd-001', name: 'Coca-Cola 0.5L x10', quantity: 3, unitPrice: 25.99, subtotal: 77.97 },
       { productId: 'prd-002', name: 'Fanta Orange 1L x6', quantity: 2, unitPrice: 19.50, subtotal: 39.00 }
@@ -457,6 +566,9 @@ let orders = [
     customerName: 'Super Store Express',
     customerAddress: '456 Commerce Ave, Curepipe',
     customerPhone: '+230 5234 5678',
+    buyerBusinessId: null,
+    buyerBusinessName: null,
+    createdBy: null,
     items: [
       { productId: 'prd-004', name: 'Rice Premium 5kg', quantity: 10, unitPrice: 45.00, subtotal: 450.00 }
     ],
@@ -477,6 +589,9 @@ let orders = [
     customerName: 'Mini Mart Plus',
     customerAddress: '789 Industrial Rd, Vacoas',
     customerPhone: '+230 5345 6789',
+    buyerBusinessId: null,
+    buyerBusinessName: null,
+    createdBy: null,
     items: [
       { productId: 'prd-001', name: 'Coca-Cola 0.5L x10', quantity: 5, unitPrice: 25.99, subtotal: 129.95 },
       { productId: 'prd-006', name: 'Flour All-Purpose 2kg', quantity: 20, unitPrice: 8.50, subtotal: 170.00 }
@@ -498,6 +613,9 @@ let orders = [
     customerName: 'Fresh Mart Central',
     customerAddress: '321 Market Street, Quatre Bornes',
     customerPhone: '+230 5567 8901',
+    buyerBusinessId: null,
+    buyerBusinessName: null,
+    createdBy: null,
     items: [
       { productId: 'prd-007', name: 'Fresh Milk 1L', quantity: 50, unitPrice: 4.99, subtotal: 249.50 }
     ],
@@ -753,7 +871,7 @@ let deliveries = [
     totalAmount: 345.75,
     trackingNumber: 'TRK-006-2025',
     deliveryStatus: 'NOT_ASSIGNED',
-    paymentStatus: 'Pending Confirmation',
+    paymentStatus: 'PENDING_CONFIRMATION',
     assignedStaffId: null,
     assignedTo: null,
     transportMode: null,
@@ -958,6 +1076,77 @@ let chats = [
     avatar: null,
     createdAt: '2025-01-10T08:00:00Z',
     updatedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString()
+  },
+
+  // ── Personal-mode chats (companyId: null) ──
+  {
+    id: 'pchat-001',
+    companyId: null,
+    locationId: null,
+    type: 'direct',
+    name: 'Marie Manager',
+    participants: ['usr-001', 'usr-002'],
+    lastMessage: {
+      id: 'pmsg-001-003',
+      content: 'See you tomorrow!',
+      type: 'text',
+      senderId: 'usr-002',
+      senderName: 'Marie Manager',
+      timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      isRead: false,
+      isOutgoing: false,
+      status: 'delivered'
+    },
+    unreadCount: 1,
+    avatar: 'https://picsum.photos/seed/marie/40/40',
+    createdAt: '2025-01-12T10:00:00Z',
+    updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'pchat-002',
+    companyId: null,
+    locationId: null,
+    type: 'direct',
+    name: 'Global Owner',
+    participants: ['usr-001', 'usr-003'],
+    lastMessage: {
+      id: 'pmsg-002-002',
+      content: 'Let me check and get back to you.',
+      type: 'text',
+      senderId: 'usr-003',
+      senderName: 'Global Owner',
+      timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+      isRead: true,
+      isOutgoing: false,
+      status: 'read'
+    },
+    unreadCount: 0,
+    avatar: 'https://picsum.photos/seed/global/40/40',
+    createdAt: '2025-01-11T14:00:00Z',
+    updatedAt: new Date(Date.now() - 45 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'pchat-003',
+    companyId: null,
+    locationId: null,
+    type: 'group',
+    name: 'Weekend Catch-up',
+    participants: ['usr-001', 'usr-002', 'usr-003'],
+    lastMessage: {
+      id: 'pmsg-003-003',
+      content: 'Sounds good, count me in!',
+      type: 'text',
+      senderId: 'usr-001',
+      senderName: 'Arnaud Labonne',
+      timestamp: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
+      isRead: true,
+      isOutgoing: true,
+      status: 'read'
+    },
+    unreadCount: 0,
+    avatar: null,
+    createdAt: '2025-01-13T16:00:00Z',
+    updatedAt: new Date(Date.now() - 120 * 60 * 1000).toISOString()
   }
 ];
 
@@ -1157,6 +1346,94 @@ let messages = {
       sender: { id: 'usr-002', name: 'Marie Manager', avatar: 'https://picsum.photos/seed/marie/40/40', role: 'admin' },
       timestamp: new Date(Date.now() - 20 * 60 * 1000).toISOString()
     }
+  ],
+
+  // ── Personal chat messages ──
+  'pchat-001': [
+    {
+      id: 'pmsg-001-001',
+      chatId: 'pchat-001',
+      type: 'text',
+      text: 'Hey Marie, are we still on for the lunch meeting?',
+      isOutgoing: true,
+      sender: { id: 'usr-001', name: 'Arnaud Labonne', avatar: '', role: 'user' },
+      timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+      status: 'read'
+    },
+    {
+      id: 'pmsg-001-002',
+      chatId: 'pchat-001',
+      type: 'text',
+      text: 'Yes! 12:30 at the usual place.',
+      isOutgoing: false,
+      sender: { id: 'usr-002', name: 'Marie Manager', avatar: 'https://picsum.photos/seed/marie/40/40', role: 'user' },
+      timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+      status: 'delivered'
+    },
+    {
+      id: 'pmsg-001-003',
+      chatId: 'pchat-001',
+      type: 'text',
+      text: 'See you tomorrow!',
+      isOutgoing: false,
+      sender: { id: 'usr-002', name: 'Marie Manager', avatar: 'https://picsum.photos/seed/marie/40/40', role: 'user' },
+      timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      status: 'delivered'
+    }
+  ],
+  'pchat-002': [
+    {
+      id: 'pmsg-002-001',
+      chatId: 'pchat-002',
+      type: 'text',
+      text: 'Hi, do you have the updated pricing sheet?',
+      isOutgoing: true,
+      sender: { id: 'usr-001', name: 'Arnaud Labonne', avatar: '', role: 'user' },
+      timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      status: 'read'
+    },
+    {
+      id: 'pmsg-002-002',
+      chatId: 'pchat-002',
+      type: 'text',
+      text: 'Let me check and get back to you.',
+      isOutgoing: false,
+      sender: { id: 'usr-003', name: 'Global Owner', avatar: 'https://picsum.photos/seed/global/40/40', role: 'user' },
+      timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+      status: 'read'
+    }
+  ],
+  'pchat-003': [
+    {
+      id: 'pmsg-003-001',
+      chatId: 'pchat-003',
+      type: 'text',
+      text: 'Anyone free for a catch-up this weekend?',
+      isOutgoing: false,
+      sender: { id: 'usr-002', name: 'Marie Manager', avatar: 'https://picsum.photos/seed/marie/40/40', role: 'user' },
+      timestamp: new Date(Date.now() - 150 * 60 * 1000).toISOString(),
+      status: 'read'
+    },
+    {
+      id: 'pmsg-003-002',
+      chatId: 'pchat-003',
+      type: 'text',
+      text: 'I could do Saturday afternoon.',
+      isOutgoing: false,
+      sender: { id: 'usr-003', name: 'Global Owner', avatar: 'https://picsum.photos/seed/global/40/40', role: 'user' },
+      timestamp: new Date(Date.now() - 130 * 60 * 1000).toISOString(),
+      status: 'read'
+    },
+    {
+      id: 'pmsg-003-003',
+      chatId: 'pchat-003',
+      type: 'text',
+      text: 'Sounds good, count me in!',
+      isOutgoing: true,
+      sender: { id: 'usr-001', name: 'Arnaud Labonne', avatar: '', role: 'user' },
+      timestamp: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
+      status: 'read'
+    }
   ]
 };
 
@@ -1201,6 +1478,142 @@ let users = [
     phone: '+230-5456-7890',
     createdAt: '2024-06-01T00:00:00Z',
     lastLoginAt: '2025-01-15T06:00:00Z'
+  },
+  // --- Fake users for testing "Outside connections" ---
+  {
+    id: 'usr-005',
+    email: 'alice.wong@example.com',
+    name: 'Alice Wong',
+    avatar: 'https://picsum.photos/seed/alice/100/100',
+    phone: '+230-5100-0001',
+    createdAt: '2024-04-10T00:00:00Z',
+    lastLoginAt: '2025-01-10T08:00:00Z'
+  },
+  {
+    id: 'usr-006',
+    email: 'ben.carter@example.com',
+    name: 'Ben Carter',
+    avatar: 'https://picsum.photos/seed/ben/100/100',
+    phone: '+230-5100-0002',
+    createdAt: '2024-05-15T00:00:00Z',
+    lastLoginAt: '2025-01-12T09:00:00Z'
+  },
+  {
+    id: 'usr-007',
+    email: 'clara.dubois@example.com',
+    name: 'Clara Dubois',
+    avatar: 'https://picsum.photos/seed/clara/100/100',
+    phone: '+230-5100-0003',
+    createdAt: '2024-06-20T00:00:00Z',
+    lastLoginAt: '2025-01-13T10:00:00Z'
+  },
+  {
+    id: 'usr-008',
+    email: 'daniel.lee@example.com',
+    name: 'Daniel Lee',
+    avatar: 'https://picsum.photos/seed/daniell/100/100',
+    phone: '+230-5100-0004',
+    createdAt: '2024-07-01T00:00:00Z',
+    lastLoginAt: '2025-01-11T07:00:00Z'
+  },
+  {
+    id: 'usr-009',
+    email: 'emma.patel@example.com',
+    name: 'Emma Patel',
+    avatar: 'https://picsum.photos/seed/emma/100/100',
+    phone: '+230-5100-0005',
+    createdAt: '2024-08-05T00:00:00Z',
+    lastLoginAt: '2025-01-14T11:00:00Z'
+  },
+  {
+    id: 'usr-010',
+    email: 'felix.moreau@example.com',
+    name: 'Felix Moreau',
+    avatar: null,
+    phone: '+230-5100-0006',
+    createdAt: '2024-09-12T00:00:00Z',
+    lastLoginAt: '2025-01-09T06:00:00Z'
+  },
+  {
+    id: 'usr-011',
+    email: 'grace.nakamura@example.com',
+    name: 'Grace Nakamura',
+    avatar: 'https://picsum.photos/seed/grace/100/100',
+    phone: '+230-5100-0007',
+    createdAt: '2024-10-01T00:00:00Z',
+    lastLoginAt: '2025-01-15T12:00:00Z'
+  },
+  {
+    id: 'usr-012',
+    email: 'hassan.ali@example.com',
+    name: 'Hassan Ali',
+    avatar: null,
+    phone: '+230-5100-0008',
+    createdAt: '2024-10-20T00:00:00Z',
+    lastLoginAt: '2025-01-08T14:00:00Z'
+  },
+  {
+    id: 'usr-013',
+    email: 'isabelle.fontaine@example.com',
+    name: 'Isabelle Fontaine',
+    avatar: 'https://picsum.photos/seed/isabelle/100/100',
+    phone: '+230-5100-0009',
+    createdAt: '2024-11-05T00:00:00Z',
+    lastLoginAt: '2025-01-07T15:00:00Z'
+  },
+  {
+    id: 'usr-014',
+    email: 'james.oconnor@example.com',
+    name: 'James O\'Connor',
+    avatar: 'https://picsum.photos/seed/james/100/100',
+    phone: '+230-5100-0010',
+    createdAt: '2024-11-15T00:00:00Z',
+    lastLoginAt: '2025-01-06T16:00:00Z'
+  },
+  {
+    id: 'usr-015',
+    email: 'karen.bergstrom@example.com',
+    name: 'Karen Bergstrom',
+    avatar: null,
+    phone: '+230-5100-0011',
+    createdAt: '2024-12-01T00:00:00Z',
+    lastLoginAt: '2025-01-05T17:00:00Z'
+  },
+  {
+    id: 'usr-016',
+    email: 'liam.russo@example.com',
+    name: 'Liam Russo',
+    avatar: 'https://picsum.photos/seed/liam/100/100',
+    phone: '+230-5100-0012',
+    createdAt: '2024-12-10T00:00:00Z',
+    lastLoginAt: '2025-01-04T18:00:00Z'
+  },
+  {
+    id: 'usr-017',
+    email: 'mia.chen@example.com',
+    name: 'Mia Chen',
+    avatar: 'https://picsum.photos/seed/mia/100/100',
+    phone: '+230-5100-0013',
+    createdAt: '2024-12-15T00:00:00Z',
+    lastLoginAt: '2025-01-03T19:00:00Z'
+  },
+  {
+    id: 'usr-018',
+    email: 'nathan.brooks@example.com',
+    name: 'Nathan Brooks',
+    avatar: null,
+    phone: '+230-5100-0014',
+    createdAt: '2024-12-20T00:00:00Z',
+    lastLoginAt: '2025-01-02T20:00:00Z'
+  },
+  {
+    id: 'usr-019',
+    email: 'olivia.santos@example.com',
+    name: 'Olivia Santos',
+    avatar: 'https://picsum.photos/seed/olivia/100/100',
+    phone: '+230-5100-0015',
+    createdAt: '2025-01-01T00:00:00Z',
+    lastLoginAt: '2025-01-15T21:00:00Z'
   }
 ];
 

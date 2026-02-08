@@ -140,21 +140,43 @@ model Order {
   customerName          String?
   customerAddress       String?
   customerPhone         String?
+  buyerBusinessId       String?
+  buyerBusinessName     String?
+  createdBy             String?
   items                 Json
   totalAmount           Float?
   status                OrderStatus     @default(NEW)
-  paymentStatus         String?
+  paymentStatus         PaymentStatus?  @default(UNPAID)
   notes                 String?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
   deliveryStatus        DeliveryStatus? @default(NOT_ASSIGNED)
+  statusChangedAt       DateTime?
+  statusChangedBy       String?
+  statusReason          String?
+  lastActivityAt        DateTime?
   business              Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
   fulfillmentLocation   Location?       @relation("OrdersFulfilledByLocation", fields: [fulfillmentLocationId], references: [id])
   soldByLocation        Location?       @relation("OrdersSoldByLocation", fields: [soldByLocationId], references: [id])
+  statusHistory         OrderStatusHistory[]
 
   @@index([businessId])
   @@index([soldByLocationId])
   @@index([fulfillmentLocationId])
+  @@index([buyerBusinessId])
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(uuid())
+  orderId   String
+  from      String
+  to        String
+  reason    String?
+  changedBy String?
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }
 
 model Invoice {
@@ -185,40 +207,69 @@ model Invoice {
 }
 
 model Chat {
-  id           String    @id
-  companyId    String    @map("businessId")
-  locationId   String?
-  type         String?
-  name         String?
-  participants Json?
-  lastMessage  Json?
-  unreadCount  Int?
-  avatar       String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  business     Business  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  location     Location? @relation(fields: [locationId], references: [id])
-  messages     Message[]
+  id               String            @id
+  companyId        String?           @map("businessId")
+  locationId       String?
+  type             String?
+  name             String?
+  participants     Json?
+  lastMessage      Json?
+  unreadCount      Int?
+  avatar           String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  business         Business?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location         Location?         @relation(fields: [locationId], references: [id])
+  messages         Message[]
+  chatParticipants ChatParticipant[]
+  readReceipts     ReadReceipt[]
 
   @@index([companyId])
   @@index([locationId])
 }
 
 model Message {
-  id         String   @id
-  chatId     String
-  senderId   String?
-  senderName String?
-  content    String?
-  type       String?
-  timestamp  DateTime @default(now())
-  meta       Json?
-  status     String?
-  isRead     Boolean  @default(false)
-  isOutgoing Boolean  @default(false)
-  chat       Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  id           String        @id
+  chatId       String
+  senderId     String?
+  senderName   String?
+  content      String?
+  type         String?
+  timestamp    DateTime      @default(now())
+  meta         Json?
+  status       String?
+  isRead       Boolean       @default(false)
+  isOutgoing   Boolean       @default(false)
+  chat         Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  readReceipts ReadReceipt[]
 
   @@index([chatId])
+}
+
+model ChatParticipant {
+  id       String   @id @default(uuid())
+  chatId   String
+  userId   String
+  joinedAt DateTime @default(now())
+  chat     Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([userId])
+  @@index([chatId])
+}
+
+model ReadReceipt {
+  id        String   @id @default(uuid())
+  chatId    String
+  userId    String
+  messageId String
+  readAt    DateTime @default(now())
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([chatId])
+  @@index([userId])
 }
 
 model BusinessMember {
@@ -278,6 +329,7 @@ model Delivery {
   assignedStaffId          String?
   assignedTo               String?
   transportMode            String?
+  orderId                  String?
   createdAt                DateTime        @default(now())
   updatedAt                DateTime        @updatedAt
   deliveryStatus           DeliveryStatus? @default(NOT_ASSIGNED)
@@ -345,11 +397,13 @@ enum MemberStatus {
 
 enum OrderStatus {
   NEW
-  ASSIGNED
-  PACKED
-  OUT_FOR_DELIVERY
-  DELIVERED
-  CANCELLED
+  ACCEPTED
+  ONGOING
+  PENDING
+  IN_REVIEW
+  DONE
+  CANCELED
+  REJECTED
 }
 
 enum OrderScope {
