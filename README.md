@@ -1,195 +1,101 @@
-# NouPro
+# NouPro Backend Server
 
-**NouPro** is a professional mobile platform designed to help businesses, distributors, and entrepreneurs manage their operations, products, orders, invoices, and internal communication in one unified ecosystem.
+A simple Express.js mock API server for the NouPro React Native application.
 
-It combines **business management tools**, **professional networking**, and **real-time collaboration** into a single mobile-first experience.
+## Quick Start
 
----
+1. **Install dependencies:**
+   ```bash
+   cd backend
+   npm install
+   ```
 
-## 🚀 Key Features
+2. **Start the server:**
+   ```bash
+   npm start
+   ```
+   
+   Or for development with auto-restart:
+   ```bash
+   npm run dev
+   ```
 
-### Business Management
+3. **Server will be running at:**
+   - http://localhost:3000
+   - API endpoints: http://localhost:3000/api/
 
-* Multi-business & multi-location support
-* Product & brand catalogs
-* Order & delivery management
-* Invoice generation
-* Staff roles (Admin, Staff, Super Admin)
-* Stock & inventory tracking
+## API Endpoints
 
-### Professional Networking
+### Authentication
+- `POST /api/auth/login` - Login with email/password
+- `POST /api/auth/logout` - Logout
 
-* Pro & Personal modes
-* Company profiles & public pages
-* Business discovery
-* Activity feeds
-* Notifications system
+### Companies
+- `GET /api/companies` - Get all companies
+- `GET /api/companies/:id` - Get company by ID
+- `PUT /api/companies/:id` - Update company
 
-### Communication
+### Locations
+- `GET /api/companies/:companyId/locations` - Get company locations
+- `POST /api/companies/:companyId/locations` - Create new location
+- `PUT /api/companies/:companyId/locations/:locationId` - Update location
+- `DELETE /api/companies/:companyId/locations/:locationId` - Delete location
 
-* Slack-style Inbox
-* Channels & Direct Messages
-* Real-time chat (Socket.IO ready)
-* Business-to-business messaging
+### Products
+- `GET /api/companies/:companyId/products` - Get company products
+- `GET /api/companies/:companyId/products/:productId` - Get specific product
 
-### Technical Foundation
+### Deliveries
+- `GET /api/companies/:companyId/deliveries` - Get company deliveries
+- `POST /api/companies/:companyId/deliveries` - Create new delivery
 
-* React Native (Expo) mobile app
-* Node.js + Express backend
-* PostgreSQL + Prisma ORM
-* JWT authentication
-* REST API architecture
-* Cloud-ready deployment
+### Invoices
+- `GET /api/companies/:companyId/invoices` - Get company invoices
 
----
+### Chat
+- `GET /api/companies/:companyId/chats` - Get company chats
 
-## 🏗️ Project Structure
+### Users
+- `GET /api/companies/:companyId/users` - Get company users
 
-```
-NouProApp/
-├── src/                 # Mobile app (React Native / Expo)
-│   ├── features/        # Feature-based architecture (Inbox, Products, Invoices, etc.)
-│   ├── shared/          # Shared UI, services, stores
-│   └── navigation/      # React Navigation setup
-│
-├── backend/             # API server (Node + Express)
-│   ├── routes/          # REST endpoints
-│   ├── prisma/          # Database schema & migrations
-│   ├── controllers/    # Business logic
-│   └── services/        # Data & utility services
-│
-├── assets/              # Fonts, images, icons
-├── docs/                # Project documentation
-└── README.md
-```
+### File Upload
+- `POST /api/upload` - Upload files
 
----
+### Health Check
+- `GET /api/health` - Server health status
 
-## 🧑‍💻 Tech Stack
+## Mock Data
 
-### Mobile
+The server includes pre-loaded mock data:
+- 2 Companies (NouPro Distribution Inc., Global Supply Co.)
+- 4 Locations across both companies
+- 2 Products with stock levels
+- 2 Deliveries in different statuses
+- 1 Invoice
+- 1 Chat conversation
+- 1 Admin user
 
-* React Native
-* Expo SDK
-* TypeScript
-* React Navigation
+## Authentication
 
-### Backend
+For testing, use:
+- **Email:** admin@noupro.com
+- **Password:** password
 
-* Node.js
-* Express
-* PostgreSQL
-* Prisma ORM
-* JWT Authentication
+## Development Notes
 
-### Tooling
+- Server automatically restarts when files change (using nodemon)
+- All API responses follow the format: `{ success: boolean, data?: any, error?: string }`
+- File uploads are stored in the `uploads/` directory
+- Cross-origin requests are enabled (CORS)
 
-* GitHub
-* Cursor IDE
-* EAS Build
-* Render / Vercel (deployment)
+## Testing the API
 
----
-
-## ⚙️ Setup (Local Development)
-
-### 1. Clone the repository
+You can test the API using curl or any HTTP client:
 
 ```bash
-git clone https://github.com/your-username/NouProApp.git
-cd NouProApp
-```
+# Get all companies
+curl http://localhost:3000/api/companies
 
-### 2. Install dependencies
-
-```bash
-npm install
-```
-
-### 3. Mobile app
-
-```bash
-npx expo start
-```
-
-### 4. Backend
-
-```bash
-cd backend
-npm install
-npm run dev
-```
-
-### 5. Environment variables
-
-Create a `.env` file in `/backend`:
-
-```env
-DATABASE_URL=postgresql://user:password@localhost:5432/noupro
-JWT_SECRET=your_secret
-```
-
----
-
-## 🗄️ Database
-
-NouPro uses **PostgreSQL + Prisma** for:
-
-* Users
-* Businesses
-* Locations
-* Products
-* Orders
-* Invoices
-* Staff roles
-
-Schema lives in:
-
-```
-backend/prisma/schema.prisma
-```
-
----
-
-## 🔐 Security
-
-* No secrets are committed to the repository
-* All credentials use `.env`
-* `.gitignore` blocks sensitive files
-* JWT authentication
-* Role-based access control
-
----
-
-## 📈 Vision
-
-NouPro aims to become a **complete professional operating system** for:
-
-* Distributors
-* Retailers
-* Entrepreneurs
-* Service businesses
-* Local enterprises
-
-Future expansions include:
-
-* Payment integrations
-* Advanced analytics
-* AI-powered business tools
-* Public business marketplaces
-* Multi-country support
-
----
-
-## 📄 License
-
-This project is currently under **private/proprietary development**.
-Open-source licensing may be added later.
-
----
-
-## 👤 Author
-
-**Arnaud Labonne**
-Founder & Lead Developer
-NouPro Project
+# Get health status
+curl http://localhost:3000/api/health
+``` 
