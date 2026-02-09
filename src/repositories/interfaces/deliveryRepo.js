@@ -7,6 +7,7 @@ const DeliveryRepository = {
   getById: async (id) => {},
   getByBusinessId: async (businessId) => {},
   getByLocationId: async (locationId) => {},
+  getByOrderId: async (orderId) => {},
   create: async (data) => {},
   update: async (id, patch) => {},
   delete: async (id) => {},

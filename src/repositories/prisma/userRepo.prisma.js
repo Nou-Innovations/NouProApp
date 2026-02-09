@@ -21,6 +21,12 @@ async function getByEmail(email) {
   });
 }
 
+async function getByPhone(phone) {
+  return prisma.user.findFirst({
+    where: { phone }
+  });
+}
+
 async function create(data) {
   return prisma.user.create({
     data
@@ -49,6 +55,7 @@ module.exports = {
   list, 
   getById, 
   getByEmail, 
+  getByPhone,
   create, 
   update, 
   delete: remove 

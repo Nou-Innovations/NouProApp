@@ -142,7 +142,7 @@ function generateToken(payload, options = {}) {
   }
   
   const defaultOptions = {
-    expiresIn: '7d', // Default 7 days
+    expiresIn: '30m', // 30 minutes -- refresh token handles long sessions
     ...options,
   };
   

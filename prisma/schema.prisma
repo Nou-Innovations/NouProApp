@@ -11,9 +11,10 @@ datasource db {
 model User {
   id              String           @id
   name            String?
-  email           String?
+  email           String?          @unique
   avatar          String?
-  phone           String?
+  phone           String?          @unique
+  passwordHash    String?
   lastLoginAt     DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -90,6 +91,13 @@ model Product {
   isCreatedByUser  Boolean?
   isDisplayable    Boolean?
   isImported       Boolean?
+  description      String?
+  costPrice        Float?
+  salePrice        Float?
+  sku              String?
+  barcode          String?
+  taxRate          Float?
+  supplier         String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   locationProducts LocationProduct[]
@@ -159,6 +167,7 @@ model Order {
   fulfillmentLocation   Location?       @relation("OrdersFulfilledByLocation", fields: [fulfillmentLocationId], references: [id])
   soldByLocation        Location?       @relation("OrdersSoldByLocation", fields: [soldByLocationId], references: [id])
   statusHistory         OrderStatusHistory[]
+  deliveries            Delivery[]
 
   @@index([businessId])
   @@index([soldByLocationId])
@@ -167,10 +176,10 @@ model Order {
 }
 
 model OrderStatusHistory {
-  id        String   @id @default(uuid())
+  id        String      @id @default(uuid())
   orderId   String
-  from      String
-  to        String
+  from      OrderStatus
+  to        OrderStatus
   reason    String?
   changedBy String?
   createdAt DateTime @default(now())
@@ -188,22 +197,33 @@ model Invoice {
   invoiceNumber      String?
   clientName         String?
   clientEmail        String?
+  clientPhone        String?
+  clientAddress      String?
   amount             Float?
   taxAmount          Float?
   totalAmount        Float?
+  paidAmount         Float?         @default(0)
+  discount           Float?         @default(0)
+  shipping           Float?         @default(0)
+  currency           String?        @default("EUR")
   type               String?
-  issueDate          String?
-  dueDate            String?
+  issueDate          DateTime?
+  dueDate            DateTime?
   items              Json
   notes              String?
+  terms              String?
+  referenceNumber    String?
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
   status             InvoiceStatus? @default(DRAFT)
   business           Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location           Location?      @relation(fields: [issuedByLocationId], references: [id])
 
+  @@unique([businessId, invoiceNumber])
   @@index([businessId])
   @@index([issuedByLocationId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Chat {
@@ -214,7 +234,7 @@ model Chat {
   name             String?
   participants     Json?
   lastMessage      Json?
-  unreadCount      Int?
+  unreadCount      Int               @default(0)
   avatar           String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -244,14 +264,16 @@ model Message {
   readReceipts ReadReceipt[]
 
   @@index([chatId])
+  @@index([chatId, timestamp])
 }
 
 model ChatParticipant {
-  id       String   @id @default(uuid())
-  chatId   String
-  userId   String
-  joinedAt DateTime @default(now())
-  chat     Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  chatId      String
+  userId      String
+  joinedAt    DateTime @default(now())
+  unreadCount Int      @default(0)
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
   @@unique([chatId, userId])
   @@index([userId])
@@ -270,6 +292,7 @@ model ReadReceipt {
   @@unique([chatId, userId])
   @@index([chatId])
   @@index([userId])
+  @@index([messageId])
 }
 
 model BusinessMember {
@@ -308,8 +331,8 @@ model Delivery {
   id                       String          @id
   businessId               String
   locationId               String?
-  direction                String?
-  type                     String?
+  direction                DeliveryDirection?
+  type                     DeliveryType?
   clientId                 String?
   clientCompanyLogo        String?
   clientCompanyName        String?
@@ -317,6 +340,7 @@ model Delivery {
   clientEmail              String?
   clientPhone              String?
   clientNotes              String?
+  distributorName          String?
   distributorNotes         String?
   fromLocation             String?
   toLocation               String?
@@ -336,9 +360,11 @@ model Delivery {
   paymentStatus            PaymentStatus?  @default(UNPAID)
   business                 Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location                 Location?       @relation(fields: [locationId], references: [id])
+  order                    Order?          @relation(fields: [orderId], references: [id])
 
   @@index([businessId])
   @@index([locationId])
+  @@index([orderId])
 }
 
 model FeedPost {
@@ -414,6 +440,16 @@ enum OrderScope {
 enum InvoiceScope {
   PARENT
   LOCATION
+}
+
+enum DeliveryDirection {
+  outgoing
+  incoming
+}
+
+enum DeliveryType {
+  delivery
+  transfer
 }
 
 enum DeliveryStatus {

@@ -60,14 +60,30 @@ async function update(id, patch) {
 }
 
 async function remove(id) {
-  try {
-    await prisma.delivery.delete({
-      where: { id }
-    });
-    return true;
-  } catch (e) {
-    return false;
-  }
+  await prisma.delivery.delete({
+    where: { id }
+  });
+  return true;
+}
+
+async function getByOrderId(orderId) {
+  return prisma.delivery.findFirst({
+    where: { orderId }
+  });
+}
+
+async function getByAssignedStaffId(staffId) {
+  return prisma.delivery.findMany({
+    where: { assignedStaffId: staffId },
+    orderBy: { createdAt: 'desc' }
+  });
+}
+
+async function getByBusinessIdAndStaffId(businessId, staffId) {
+  return prisma.delivery.findMany({
+    where: { businessId, assignedStaffId: staffId },
+    orderBy: { createdAt: 'desc' }
+  });
 }
 
 module.exports = { 
@@ -75,6 +91,9 @@ module.exports = {
   getById, 
   getByBusinessId, 
   getByLocationId, 
+  getByOrderId,
+  getByAssignedStaffId,
+  getByBusinessIdAndStaffId,
   create, 
   update, 
   delete: remove 

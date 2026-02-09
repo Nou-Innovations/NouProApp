@@ -68,6 +68,40 @@ async function getByBuyerBusinessId(buyerBusinessId) {
   });
 }
 
+/**
+ * Atomically update order status and create a history record in one transaction.
+ */
+async function changeStatusWithHistory(orderId, { status, statusChangedAt, statusChangedBy, statusReason, lastActivityAt }, historyRecord) {
+  return prisma.$transaction(async (tx) => {
+    const updatedOrder = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        status,
+        statusChangedAt,
+        statusChangedBy,
+        statusReason,
+        lastActivityAt,
+      },
+    });
+
+    await tx.orderStatusHistory.create({
+      data: historyRecord,
+    });
+
+    return updatedOrder;
+  });
+}
+
+/**
+ * Get status history for an order, newest first.
+ */
+async function getStatusHistory(orderId) {
+  return prisma.orderStatusHistory.findMany({
+    where: { orderId },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
 module.exports = { 
   list, 
   getAll: list,
@@ -77,6 +111,8 @@ module.exports = {
   getByBuyerBusinessId,
   create, 
   update, 
-  delete: remove 
+  delete: remove,
+  changeStatusWithHistory,
+  getStatusHistory,
 };
 

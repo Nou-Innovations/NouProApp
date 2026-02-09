@@ -42,7 +42,7 @@ async function createEventMessage({
   // Note: isOutgoing is NOT set here - it should be computed on the frontend
   // by comparing message.sender.id with the current user's ID
   const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const message = await repos.chatRepo.addMessage(chat.id, {
+  const { message } = await repos.chatRepo.addMessage(chat.id, {
     id: messageId,
     type,
     content,
@@ -65,46 +65,50 @@ async function findOrCreateChat(businessA, businessB) {
   const repos = getRepos();
   
   // Find existing chat between these businesses
-  const chats = await repos.chatRepo.getByBusinessId(businessA);
+  const { chats } = await repos.chatRepo.getByBusinessId(businessA);
   
   // Look for a chat that includes businessB as a participant
+  // Participants can be plain string IDs or legacy objects with businessId/companyId
   let chat = chats.find(c => {
-    if (!c.participants) return false;
-    return c.participants.some(p => 
-      p.businessId === businessB || p.companyId === businessB
+    if (!c.participants || !Array.isArray(c.participants)) return false;
+    return c.participants.some(p =>
+      p === businessB || p.businessId === businessB || p.companyId === businessB
     );
   });
   
-  // If no existing chat, create one
+  // Also search chats owned by businessB that include businessA (bidirectional)
+  if (!chat && businessB) {
+    const { chats: chatsB } = await repos.chatRepo.getByBusinessId(businessB);
+    chat = chatsB.find(c => {
+      if (!c.participants || !Array.isArray(c.participants)) return false;
+      return c.participants.some(p =>
+        p === businessA || p.businessId === businessA || p.companyId === businessA
+      );
+    });
+  }
+  
+  // If no existing chat found in either direction, create one
   if (!chat && businessB) {
     chat = await repos.chatRepo.create({
       id: `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      businessId: businessA,
+      companyId: businessA,
       type: 'supplier',
       name: 'Business Chat',
-      participants: [
-        { businessId: businessA },
-        { businessId: businessB }
-      ],
+      participants: [businessA, businessB],
       unreadCount: 0
     });
   }
   
-  // If still no chat (single-party event), use or create a general chat for the business
+  // If still no chat (single-party event), create a dedicated activity feed chat
   if (!chat) {
-    const allChats = await repos.chatRepo.getByBusinessId(businessA);
-    chat = allChats[0]; // Use first available chat
-    
-    if (!chat) {
-      chat = await repos.chatRepo.create({
-        id: `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        businessId: businessA,
-        type: 'internal',
-        name: 'Activity Feed',
-        participants: [{ businessId: businessA }],
-        unreadCount: 0
-      });
-    }
+    chat = await repos.chatRepo.create({
+      id: `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      companyId: businessA,
+      type: 'internal',
+      name: 'Activity Feed',
+      participants: [businessA],
+      unreadCount: 0,
+    });
   }
   
   return chat;

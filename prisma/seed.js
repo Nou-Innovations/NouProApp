@@ -6,12 +6,17 @@
  */
 
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
 const store = require('../src/data/memoryStore');
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Starting database seed...\n');
+
+  // Hash the default dev password once (all seed users share it)
+  const devPasswordHash = await bcrypt.hash('password', 12);
+  console.log('  Generated dev password hash\n');
 
   // 1) Users (must be created first for foreign key relationships)
   console.log('Creating users...');
@@ -24,6 +29,7 @@ async function main() {
         email: u.email,
         avatar: u.avatar,
         phone: u.phone,
+        passwordHash: devPasswordHash,
         lastLoginAt: u.lastLoginAt ? new Date(u.lastLoginAt) : null,
         createdAt: new Date(u.createdAt),
       },
@@ -32,6 +38,7 @@ async function main() {
         email: u.email,
         avatar: u.avatar,
         phone: u.phone,
+        passwordHash: devPasswordHash,
         lastLoginAt: u.lastLoginAt ? new Date(u.lastLoginAt) : null,
       },
     });
@@ -124,6 +131,13 @@ async function main() {
         isCreatedByUser: p.isCreatedByUser,
         isDisplayable: p.isDisplayable,
         isImported: p.isImported || false,
+        description: p.description || null,
+        costPrice: p.costPrice || null,
+        salePrice: p.salePrice || null,
+        sku: p.sku || null,
+        barcode: p.barcode || null,
+        taxRate: p.taxRate || null,
+        supplier: p.supplier || null,
         createdAt: new Date(p.createdAt),
         updatedAt: new Date(p.updatedAt),
       },
@@ -143,6 +157,13 @@ async function main() {
         isCreatedByUser: p.isCreatedByUser,
         isDisplayable: p.isDisplayable,
         isImported: p.isImported || false,
+        description: p.description || null,
+        costPrice: p.costPrice || null,
+        salePrice: p.salePrice || null,
+        sku: p.sku || null,
+        barcode: p.barcode || null,
+        taxRate: p.taxRate || null,
+        supplier: p.supplier || null,
       },
     });
   }

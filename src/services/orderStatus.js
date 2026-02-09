@@ -12,15 +12,8 @@
  * Both frontend and backend should derive their logic from this.
  */
 
-// Conditionally load Prisma only if using database mode
-const dataSource = process.env.DATA_SOURCE || 'memory';
-let prisma = null;
-if (dataSource === 'prisma') {
-  prisma = require('../db/prisma').prisma;
-}
-
-// Import memory store for memory mode
-const memoryStore = require('../data/memoryStore');
+// Use the repository layer for all data access (single source of truth)
+const { getRepos } = require('../repositories');
 
 // ============================================================================
 // ORDER STATUS - SINGLE SOURCE OF TRUTH
@@ -260,15 +253,10 @@ async function changeOrderStatus({ orderId, nextStatus, reason, userId }) {
     throw error;
   }
 
-  // Get current order (memory or prisma)
-  let order;
-  if (dataSource === 'memory') {
-    order = memoryStore.orders.find(o => o.id === orderId);
-  } else {
-    order = await prisma.order.findUnique({
-      where: { id: orderId }
-    });
-  }
+  const repos = getRepos();
+
+  // Get current order via repository
+  const order = await repos.orderRepo.getById(orderId);
 
   if (!order) {
     const error = new Error('Order not found');
@@ -302,70 +290,24 @@ async function changeOrderStatus({ orderId, nextStatus, reason, userId }) {
   const now = new Date();
   const trimmedReason = reason ? reason.trim() : null;
 
-  // Memory mode: update in-memory array
-  if (dataSource === 'memory') {
-    const orderIndex = memoryStore.orders.findIndex(o => o.id === orderId);
-    if (orderIndex === -1) {
-      const error = new Error('Order not found');
-      error.code = 'ORDER_NOT_FOUND';
-      throw error;
-    }
-    
-    // Update order
-    memoryStore.orders[orderIndex] = {
-      ...memoryStore.orders[orderIndex],
+  // Atomically update order status and create history record via repository
+  return repos.orderRepo.changeStatusWithHistory(
+    orderId,
+    {
       status: nextStatus,
-      statusChangedAt: now.toISOString(),
+      statusChangedAt: now,
       statusChangedBy: userId || null,
       statusReason: trimmedReason,
-      lastActivityAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-    };
-    
-    // Create history record in memory (if orderStatusHistory array exists)
-    if (!memoryStore.orderStatusHistory) {
-      memoryStore.orderStatusHistory = [];
-    }
-    memoryStore.orderStatusHistory.push({
-      id: `osh-${Date.now()}`,
+      lastActivityAt: now,
+    },
+    {
       orderId,
       from: fromStatus,
       to: nextStatus,
       reason: trimmedReason,
       changedBy: userId || null,
-      createdAt: now.toISOString(),
-    });
-    
-    return memoryStore.orders[orderIndex];
-  }
-
-  // Prisma mode: perform update and create history in a transaction
-  return prisma.$transaction(async (tx) => {
-    // Update order
-    const updatedOrder = await tx.order.update({
-      where: { id: orderId },
-      data: {
-        status: nextStatus,
-        statusChangedAt: now,
-        statusChangedBy: userId || null,
-        statusReason: trimmedReason,
-        lastActivityAt: now,
-      },
-    });
-
-    // Create history record
-    await tx.orderStatusHistory.create({
-      data: {
-        orderId,
-        from: fromStatus,
-        to: nextStatus,
-        reason: trimmedReason,
-        changedBy: userId || null,
-      },
-    });
-
-    return updatedOrder;
-  });
+    }
+  );
 }
 
 /**
@@ -375,21 +317,8 @@ async function changeOrderStatus({ orderId, nextStatus, reason, userId }) {
  * @returns {Promise<Array>} Status history entries
  */
 async function getOrderStatusHistory(orderId) {
-  // Memory mode: return from in-memory array
-  if (dataSource === 'memory') {
-    if (!memoryStore.orderStatusHistory) {
-      return [];
-    }
-    return memoryStore.orderStatusHistory
-      .filter(h => h.orderId === orderId)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }
-  
-  // Prisma mode: query database
-  return prisma.orderStatusHistory.findMany({
-    where: { orderId },
-    orderBy: { createdAt: 'desc' },
-  });
+  const repos = getRepos();
+  return repos.orderRepo.getStatusHistory(orderId);
 }
 
 // ============================================================================
