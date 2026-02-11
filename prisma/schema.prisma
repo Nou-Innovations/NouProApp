@@ -46,6 +46,7 @@ model Business {
   orders           Order[]
   products         Product[]
   stocks           Stock[]
+  brands           Brand[]
 }
 
 model Location {
@@ -74,12 +75,28 @@ model Location {
   @@index([businessId])
 }
 
+model Brand {
+  id          String    @id
+  businessId  String
+  name        String
+  logoUrl     String?
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  products    Product[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+}
+
 model Product {
   id               String            @id
   businessId       String
   name             String
   brand            String?
   brandLogo        String?
+  brandId          String?
   productPicture   String?
   price            Float?
   category         String?
@@ -102,9 +119,11 @@ model Product {
   updatedAt        DateTime          @updatedAt
   locationProducts LocationProduct[]
   business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  brandRef         Brand?            @relation(fields: [brandId], references: [id], onDelete: SetNull)
   stocks           Stock[]
 
   @@index([businessId])
+  @@index([brandId])
 }
 
 model LocationProduct {

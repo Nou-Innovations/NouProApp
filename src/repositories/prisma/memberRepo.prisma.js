@@ -132,6 +132,12 @@ async function isBusinessSuperAdmin(businessId, userId) {
   return !!member;
 }
 
+async function listUserMemberships(userId) {
+  return prisma.businessMember.findMany({
+    where: { userId },
+  });
+}
+
 async function isLocationMember(locationId, userId) {
   const member = await prisma.locationMember.findFirst({
     where: {
@@ -160,6 +166,7 @@ module.exports = {
   
   // Helper queries
   getByUserId,
+  listUserMemberships,
   isBusinessMember,
   isBusinessSuperAdmin,
   isLocationMember

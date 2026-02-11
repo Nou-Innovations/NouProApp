@@ -129,6 +129,8 @@ function generateMessageContent(type, metadata) {
       return `Estimate for ${formatCurrency(metadata.amount, metadata.currency)} sent`;
     case 'estimate_confirmed':
       return `Estimate confirmed and converted to invoice`;
+    case 'stock_alert':
+      return `Low stock alert: ${metadata.productName || 'Unknown product'} has only ${metadata.currentStock ?? 0} units remaining`;
     default:
       return `Business event: ${type}`;
   }
@@ -147,6 +149,8 @@ function getEntityType(type) {
     case 'estimate':
     case 'estimate_confirmed':
       return 'estimate';
+    case 'stock_alert':
+      return 'stock';
     default:
       return 'unknown';
   }

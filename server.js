@@ -2390,8 +2390,21 @@ app.get('/api/companies/:companyId/products', async (req, res) => {
       if (brandCompare !== 0) return brandCompare;
       return (a.name || '').localeCompare(b.name || '');
     });
+
+    // Enrich products with aggregated stock data
+    const enrichedProducts = await Promise.all(
+      companyProducts.map(async (product) => {
+        try {
+          const stocks = await repos.stockRepo.getByProductId(product.id);
+          const totalStock = stocks.reduce((sum, s) => sum + (s.qtyOnHand || 0), 0);
+          return { ...product, stockQuantity: totalStock, locationStocks: stocks };
+        } catch {
+          return product;
+        }
+      })
+    );
     
-    res.json(successResponse(companyProducts));
+    res.json(successResponse(enrichedProducts));
   } catch (e) {
     console.error('Error fetching products:', e);
     res.status(500).json(errorResponse('Failed to load products'));
@@ -2507,6 +2520,93 @@ app.delete('/api/companies/:companyId/products/:productId', requireAuth, async (
   } catch (e) {
     console.error('Error deleting product:', e);
     res.status(500).json(errorResponse('Failed to delete product'));
+  }
+});
+
+// ============================================================================
+// BRAND ROUTES
+// ============================================================================
+
+// List brands for a company
+app.get('/api/companies/:companyId/brands', requireAuth, async (req, res) => {
+  try {
+    const brands = await repos.brandRepo.getByBusinessId(req.params.companyId);
+    res.json(successResponse(brands));
+  } catch (e) {
+    console.error('Error fetching brands:', e);
+    res.status(500).json(errorResponse('Failed to fetch brands'));
+  }
+});
+
+// Create a brand
+app.post('/api/companies/:companyId/brands', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { name, logoUrl, description } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json(errorResponse('Brand name is required'));
+    }
+
+    const newBrand = await repos.brandRepo.create({
+      id: 'brand-' + uuidv4().slice(0, 8),
+      businessId: companyId,
+      name: name.trim(),
+      logoUrl: logoUrl || null,
+      description: description || null,
+    });
+
+    res.status(201).json(successResponse(newBrand));
+  } catch (e) {
+    // Handle unique constraint violation
+    if (e.code === 'P2002') {
+      return res.status(409).json(errorResponse('A brand with this name already exists'));
+    }
+    console.error('Error creating brand:', e);
+    res.status(500).json(errorResponse('Failed to create brand'));
+  }
+});
+
+// Update a brand
+app.patch('/api/companies/:companyId/brands/:brandId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, brandId } = req.params;
+    const brand = await repos.brandRepo.getById(brandId);
+
+    if (!brand || brand.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Brand not found'));
+    }
+
+    const updated = await repos.brandRepo.update(brandId, {
+      ...req.body,
+      updatedAt: new Date(),
+    });
+
+    res.json(successResponse(updated));
+  } catch (e) {
+    if (e.code === 'P2002') {
+      return res.status(409).json(errorResponse('A brand with this name already exists'));
+    }
+    console.error('Error updating brand:', e);
+    res.status(500).json(errorResponse('Failed to update brand'));
+  }
+});
+
+// Delete a brand
+app.delete('/api/companies/:companyId/brands/:brandId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, brandId } = req.params;
+    const brand = await repos.brandRepo.getById(brandId);
+
+    if (!brand || brand.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Brand not found'));
+    }
+
+    await repos.brandRepo.delete(brandId);
+    res.json(successResponse(null, 'Brand deleted successfully'));
+  } catch (e) {
+    console.error('Error deleting brand:', e);
+    res.status(500).json(errorResponse('Failed to delete brand'));
   }
 });
 
@@ -2711,14 +2811,19 @@ app.post('/api/companies/:companyId/orders/:orderId/assign', requireAuth, async 
       userId: req.user?.id || null,
     });
 
-    // Sync order assignment to linked delivery (update deliveryStatus if delivery exists)
-    try {
-      const linkedDelivery = await repos.deliveryRepo.getByOrderId(req.params.orderId);
-      if (linkedDelivery && linkedDelivery.deliveryStatus === 'NOT_ASSIGNED') {
-        await repos.deliveryRepo.update(linkedDelivery.id, { deliveryStatus: 'ASSIGNED' });
+    // Sync order assignment to linked delivery (with loop guard)
+    if (!_orderDeliverySyncInProgress.has(req.params.orderId)) {
+      _orderDeliverySyncInProgress.add(req.params.orderId);
+      try {
+        const linkedDelivery = await repos.deliveryRepo.getByOrderId(req.params.orderId);
+        if (linkedDelivery && linkedDelivery.deliveryStatus === 'NOT_ASSIGNED') {
+          await repos.deliveryRepo.update(linkedDelivery.id, { deliveryStatus: 'ASSIGNED' });
+        }
+      } catch (syncErr) {
+        console.warn('Failed to sync order assign to delivery:', syncErr.message);
+      } finally {
+        _orderDeliverySyncInProgress.delete(req.params.orderId);
       }
-    } catch (syncErr) {
-      console.warn('Failed to sync order assign to delivery:', syncErr.message);
     }
 
     res.json(successResponse(updated, 'Order assigned successfully'));
@@ -3196,14 +3301,32 @@ app.patch('/api/locations/:locationId/orders/:orderId', requireAuth, async (req,
       ));
     }
 
+    // Block core field edits on terminal-status orders
+    const terminalStatuses = ['DONE', 'CANCELED', 'REJECTED'];
+    const isTerminal = terminalStatuses.includes(order.status);
+
+    if (isTerminal) {
+      const coreFields = ['customerName', 'customerAddress', 'customerPhone',
+        'items', 'totalAmount', 'fulfillmentLocationId'];
+      const blockedAttempts = coreFields.filter(f => req.body[f] !== undefined);
+      if (blockedAttempts.length > 0) {
+        return res.status(400).json(errorResponse(
+          `Cannot edit ${blockedAttempts.join(', ')} on a ${order.status} order`,
+          'TERMINAL_ORDER_EDIT_BLOCKED'
+        ));
+      }
+    }
+
     // Dependent locations can only update limited fields (status workflow)
     const allowedFieldsDependent = ['status', 'paymentStatus', 'notes'];
     // Independent locations can update more fields (explicit whitelist for safety)
-    const allowedFieldsIndependent = [
-      'status', 'paymentStatus', 'notes', 'customerName',
-      'customerAddress', 'customerPhone', 'items', 'totalAmount',
-      'fulfillmentLocationId'
-    ];
+    const allowedFieldsIndependent = isTerminal
+      ? ['status', 'paymentStatus', 'notes']
+      : [
+          'status', 'paymentStatus', 'notes', 'customerName',
+          'customerAddress', 'customerPhone', 'items', 'totalAmount',
+          'fulfillmentLocationId'
+        ];
 
     let updates = {};
     const allowedFields = location.operatingMode === LOCATION_MODES.DEPENDENT
@@ -3236,8 +3359,9 @@ app.patch('/api/locations/:locationId/orders/:orderId', requireAuth, async (req,
         userId: req.user?.id || null,
       });
 
-      // Sync terminal order statuses to linked delivery (same pattern as business-level route)
-      if (['CANCELED', 'REJECTED', 'DONE'].includes(newStatus)) {
+      // Sync terminal order statuses to linked delivery (with loop guard)
+      if (['CANCELED', 'REJECTED', 'DONE'].includes(newStatus) && !_orderDeliverySyncInProgress.has(req.params.orderId)) {
+        _orderDeliverySyncInProgress.add(req.params.orderId);
         try {
           const linkedDelivery = await repos.deliveryRepo.getByOrderId(req.params.orderId);
           if (linkedDelivery) {
@@ -3246,6 +3370,8 @@ app.patch('/api/locations/:locationId/orders/:orderId', requireAuth, async (req,
           }
         } catch (syncErr) {
           console.warn('Failed to sync location order status to delivery:', syncErr.message);
+        } finally {
+          _orderDeliverySyncInProgress.delete(req.params.orderId);
         }
       }
     } else {
@@ -3572,12 +3698,37 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, async
 
     const updated = await repos.deliveryRepo.update(deliveryId, updateData);
 
-    // Sync Order.deliveryStatus when delivery status changes and delivery is linked to an order
-    if (updateData.deliveryStatus && delivery.orderId) {
+    // Sync delivery changes to linked order (with loop guard)
+    if (delivery.orderId && !_orderDeliverySyncInProgress.has(delivery.orderId)) {
+      _orderDeliverySyncInProgress.add(delivery.orderId);
       try {
-        await repos.orderRepo.update(delivery.orderId, { deliveryStatus: updateData.deliveryStatus });
+        // Sync deliveryStatus to order
+        if (updateData.deliveryStatus) {
+          await repos.orderRepo.update(delivery.orderId, { deliveryStatus: updateData.deliveryStatus });
+        }
+
+        // If delivery becomes DELIVERED, move order to DONE
+        if (updateData.deliveryStatus === 'DELIVERED') {
+          try {
+            await orderStatusService.changeOrderStatus({
+              orderId: delivery.orderId,
+              nextStatus: 'DONE',
+              changedBy: req.user?.id || null,
+              note: 'Auto-completed: delivery marked as delivered',
+            });
+          } catch (statusErr) {
+            console.warn('Failed to auto-complete order on DELIVERED:', statusErr.message);
+          }
+        }
+
+        // Sync paymentStatus to order if changed
+        if (updateData.paymentStatus) {
+          await repos.orderRepo.update(delivery.orderId, { paymentStatus: updateData.paymentStatus });
+        }
       } catch (syncErr) {
-        console.warn('Failed to sync order delivery status:', syncErr.message);
+        console.warn('Failed to sync delivery changes to order:', syncErr.message);
+      } finally {
+        _orderDeliverySyncInProgress.delete(delivery.orderId);
       }
     }
 
@@ -3615,7 +3766,7 @@ app.post('/api/companies/:companyId/orders/:orderId/create-delivery', requireAut
   if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
 
   try {
-    const { businessId, orderId } = req.params;
+    const { companyId: businessId, orderId } = req.params;
     const order = await repos.orderRepo.getById(orderId);
     
     if (!order || order.businessId !== businessId) {
@@ -3666,11 +3817,16 @@ app.post('/api/companies/:companyId/orders/:orderId/create-delivery', requireAut
       paymentStatus: order.paymentStatus || 'UNPAID',
     });
 
-    // Sync Order.deliveryStatus to reflect that a delivery now exists
-    try {
-      await repos.orderRepo.update(orderId, { deliveryStatus: 'NOT_ASSIGNED' });
-    } catch (syncErr) {
-      console.warn('Failed to sync order deliveryStatus:', syncErr.message);
+    // Sync Order.deliveryStatus to reflect that a delivery now exists (with loop guard)
+    if (!_orderDeliverySyncInProgress.has(orderId)) {
+      _orderDeliverySyncInProgress.add(orderId);
+      try {
+        await repos.orderRepo.update(orderId, { deliveryStatus: 'NOT_ASSIGNED' });
+      } catch (syncErr) {
+        console.warn('Failed to sync order deliveryStatus:', syncErr.message);
+      } finally {
+        _orderDeliverySyncInProgress.delete(orderId);
+      }
     }
 
     res.status(201).json(successResponse(delivery));
@@ -3875,7 +4031,7 @@ app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => 
         await eventMessages.createEventMessage({
           type: messageType,
           fromBusinessId: created.businessId,
-          toBusinessId: null, // B2C invoice
+          toBusinessId: null, // B2B invoice messaging requires clientBusinessId field on Invoice model (future enhancement)
           entityId: created.id,
           actorId: req.user?.id,
           actorName: req.user?.name || 'Staff',
@@ -3883,7 +4039,9 @@ app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => 
             amount: created.totalAmount || created.total,
             currency: business.settings?.currency || 'EUR',
             invoiceNumber: created.invoiceNumber,
-            clientName: created.clientName
+            clientName: created.clientName,
+            invoiceId: created.type === 'invoice' ? created.id : undefined,
+            estimateId: created.type === 'estimate' ? created.id : undefined,
           }
         });
       } catch (msgErr) {
@@ -4205,6 +4363,31 @@ app.patch('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
 
     const updated = await repos.invoiceRepo.update(req.params.invoiceId, req.body);
 
+    // Emit estimate_confirmed when type changes from estimate to invoice
+    const wasEstimate = (invoice.type || '').toLowerCase() === 'estimate';
+    const isNowInvoice = (updated.type || '').toLowerCase() === 'invoice';
+    if (wasEstimate && isNowInvoice) {
+      try {
+        await eventMessages.createEventMessage({
+          type: 'estimate_confirmed',
+          fromBusinessId: updated.businessId,
+          toBusinessId: null, // B2B invoice messaging requires clientBusinessId field on Invoice model (future enhancement)
+          entityId: updated.id,
+          actorId: req.user?.id,
+          actorName: req.user?.name || 'Staff',
+          metadata: {
+            invoiceId: updated.id,
+            invoiceNumber: updated.invoiceNumber,
+            amount: updated.totalAmount || updated.total,
+            currency: updated.currency || 'EUR',
+            clientName: updated.clientName,
+          }
+        });
+      } catch (msgErr) {
+        console.error('Failed to create estimate_confirmed event:', msgErr);
+      }
+    }
+
     // Create event message when invoice/estimate is sent
     if (wasNotSent && isBeingSent) {
       try {
@@ -4212,7 +4395,7 @@ app.patch('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
         await eventMessages.createEventMessage({
           type: messageType,
           fromBusinessId: updated.businessId,
-          toBusinessId: null, // B2C invoice
+          toBusinessId: null, // B2B invoice messaging requires clientBusinessId field on Invoice model (future enhancement)
           entityId: updated.id,
           actorId: req.user?.id,
           actorName: req.user?.name || 'Staff',
@@ -4220,7 +4403,9 @@ app.patch('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
             amount: updated.totalAmount || updated.total,
             currency: updated.currency || 'EUR',
             invoiceNumber: updated.invoiceNumber,
-            clientName: updated.clientName
+            clientName: updated.clientName,
+            invoiceId: updated.type === 'invoice' ? updated.id : undefined,
+            estimateId: updated.type === 'estimate' ? updated.id : undefined,
           }
         });
       } catch (msgErr) {
@@ -4264,6 +4449,58 @@ app.delete('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Error deleting invoice:', err);
     res.status(500).json(errorResponse('Failed to delete invoice', 'DELETE_ERROR'));
+  }
+});
+
+// Accept estimate (convert to invoice) - admin/super_admin only
+app.post('/api/invoices/:invoiceId/accept', requireAuth, async (req, res) => {
+  try {
+    const invoice = await repos.invoiceRepo.getById(req.params.invoiceId);
+    if (!invoice) {
+      return res.status(404).json(errorResponse('Invoice not found', 'NOT_FOUND'));
+    }
+    // Must be an estimate in SENT status
+    if ((invoice.type || '').toLowerCase() !== 'estimate') {
+      return res.status(400).json(errorResponse('Only estimates can be accepted', 'VALIDATION_ERROR'));
+    }
+    if (invoice.status !== 'SENT') {
+      return res.status(400).json(errorResponse('Estimate is not in a valid state for acceptance', 'VALIDATION_ERROR'));
+    }
+    // Check caller is admin/super_admin of ANY business (RBAC)
+    const userId = req.user?.id;
+    const memberships = await repos.memberRepo.listUserMemberships(userId);
+    const isAdminOrSuperAdmin = memberships.some(m =>
+      m.status === 'accepted' && (m.role === 'admin' || m.role === 'super_admin')
+    );
+    if (!isAdminOrSuperAdmin) {
+      return res.status(403).json(errorResponse('Only admin or super admin can accept estimates', 'PERMISSION_DENIED'));
+    }
+    // Convert: change type to invoice
+    const updated = await repos.invoiceRepo.update(req.params.invoiceId, { type: 'invoice' });
+    // Emit estimate_confirmed event
+    try {
+      await eventMessages.createEventMessage({
+        type: 'estimate_confirmed',
+        fromBusinessId: invoice.businessId,
+        toBusinessId: null, // B2B invoice messaging requires clientBusinessId field on Invoice model (future enhancement)
+        entityId: invoice.id,
+        actorId: userId,
+        actorName: req.user?.name || 'Client',
+        metadata: {
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          amount: invoice.totalAmount,
+          currency: invoice.currency || 'EUR',
+          clientName: invoice.clientName,
+        }
+      });
+    } catch (msgErr) {
+      console.error('Failed to create estimate_confirmed event:', msgErr);
+    }
+    res.json(successResponse(updated, 'Estimate accepted and converted to invoice'));
+  } catch (err) {
+    console.error('Error accepting estimate:', err);
+    res.status(500).json(errorResponse('Failed to accept estimate', 'ACCEPT_ERROR'));
   }
 });
 
@@ -4392,8 +4629,14 @@ app.get('/api/companies/:companyId/chats/:chatId/messages', requireAuth, require
       return res.status(404).json(errorResponse('Chat not found'));
     }
 
-    // DB-level cursor pagination (messages returned newest-first)
+    // Verify user is a participant in this chat
     const requestingUserId = req.user?.id;
+    const isParticipant = Array.isArray(chat.participants) && chat.participants.includes(requestingUserId);
+    if (!isParticipant) {
+      return res.status(403).json(errorResponse('You are not a participant in this chat'));
+    }
+
+    // DB-level cursor pagination (messages returned newest-first)
     const chatMessages = await repos.chatRepo.getMessages(chatId, { limit, cursor, requestingUserId });
     const nextCursor = chatMessages.length === limit ? chatMessages[chatMessages.length - 1].id : null;
 
@@ -4421,11 +4664,23 @@ app.post('/api/companies/:companyId/chats/:chatId/read', requireAuth, requireCom
 
     const userId = req.user?.id;
 
+    // Verify user is a participant in this chat
+    const isParticipant = Array.isArray(chat.participants) && chat.participants.includes(userId);
+    if (!isParticipant) {
+      return res.status(403).json(errorResponse('You are not a participant in this chat'));
+    }
+
     // Mark messages as read (also resets unreadCount and creates ReadReceipt)
     await repos.chatRepo.markMessagesAsRead(chatId, userId);
 
     // Notify participants about the read receipt
     io.to(`chat:${chatId}`).emit('chat_read', { chatId, userId });
+
+    // Also emit chat_update so other devices of the same user clear the badge
+    io.to(`user:${userId}`).emit('chat_update', {
+      id: chatId,
+      unreadCount: 0,
+    });
 
     res.json(successResponse(chat));
   } catch (e) {
@@ -4761,6 +5016,12 @@ app.post('/api/users/:userId/chats/:chatId/read', requireAuth, async (req, res) 
 
     // Notify participants about the read receipt
     io.to(`chat:${chatId}`).emit('chat_read', { chatId, userId });
+
+    // Also emit chat_update so other devices of the same user clear the badge
+    io.to(`user:${userId}`).emit('chat_update', {
+      id: chatId,
+      unreadCount: 0,
+    });
 
     res.json(successResponse(chat));
   } catch (e) {
@@ -6145,16 +6406,19 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/assign', requireAuth
 
     const updated = await repos.deliveryRepo.update(deliveryId, patch);
 
-    // Sync delivery assignment status to linked order
-    if (patch.deliveryStatus && delivery.orderId) {
+    // Sync delivery assignment status to linked order (with loop guard)
+    if (patch.deliveryStatus && delivery.orderId && !_orderDeliverySyncInProgress.has(delivery.orderId)) {
+      _orderDeliverySyncInProgress.add(delivery.orderId);
       try {
         await repos.orderRepo.update(delivery.orderId, { deliveryStatus: patch.deliveryStatus });
       } catch (syncErr) {
         console.warn('Failed to sync delivery assign to order:', syncErr.message);
+      } finally {
+        _orderDeliverySyncInProgress.delete(delivery.orderId);
       }
     }
 
-    return res.json(successResponse({ delivery: updated }));
+    return res.json(successResponse(updated));
   } catch (err) {
     return res.status(500).json(errorResponse(err.message || 'Server error'));
   }
@@ -6187,16 +6451,19 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/unassign', requireAu
 
     const updated = await repos.deliveryRepo.update(deliveryId, patch);
 
-    // Sync delivery unassignment status to linked order
-    if (patch.deliveryStatus && delivery.orderId) {
+    // Sync delivery unassignment status to linked order (with loop guard)
+    if (patch.deliveryStatus && delivery.orderId && !_orderDeliverySyncInProgress.has(delivery.orderId)) {
+      _orderDeliverySyncInProgress.add(delivery.orderId);
       try {
         await repos.orderRepo.update(delivery.orderId, { deliveryStatus: patch.deliveryStatus });
       } catch (syncErr) {
         console.warn('Failed to sync delivery unassign to order:', syncErr.message);
+      } finally {
+        _orderDeliverySyncInProgress.delete(delivery.orderId);
       }
     }
 
-    return res.json(successResponse({ delivery: updated }));
+    return res.json(successResponse(updated));
   } catch (err) {
     return res.status(500).json(errorResponse(err.message || 'Server error'));
   }
@@ -6542,6 +6809,41 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
         }
       } catch (err) {
         console.error('Error fetching deliveries for notifications:', err);
+      }
+    }
+    
+    // 5. Low stock alerts
+    for (const ub of userBusinesses) {
+      if (ub.role === 'admin' || ub.role === 'super_admin') {
+        try {
+          const allStocks = await repos.stockRepo.getByBusinessId(ub.businessId);
+          const LOW_STOCK_THRESHOLD = 10;
+          const lowStocks = allStocks.filter(s => (s.qtyOnHand || 0) <= LOW_STOCK_THRESHOLD);
+
+          for (const stock of lowStocks.slice(0, 10)) {
+            const product = await repos.productRepo.getById(stock.productId);
+            if (!product) continue;
+
+            notifications.push({
+              id: `stock-low-${stock.id}`,
+              type: 'stock_alert',
+              title: 'Low stock alert',
+              description: `${product.name} has only ${stock.qtyOnHand} units remaining`,
+              time: formatRelativeTime(stock.updatedAt || stock.createdAt),
+              timestamp: stock.updatedAt || stock.createdAt,
+              read: false,
+              avatar: product.productPicture || null,
+              productData: {
+                productId: product.id,
+                productName: product.name,
+                currentStock: stock.qtyOnHand,
+                locationId: stock.locationId,
+              },
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching low stock alerts for notifications:', err);
+        }
       }
     }
     

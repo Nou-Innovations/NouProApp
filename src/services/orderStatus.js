@@ -228,6 +228,62 @@ function getStatusMeta(status) {
 }
 
 // ============================================================================
+// STOCK ADJUSTMENT HELPER
+// ============================================================================
+
+const LOW_STOCK_THRESHOLD = 10;
+
+/**
+ * Adjust stock levels for all items in an order.
+ * Called automatically when an order transitions to ACCEPTED (decrement)
+ * or when a previously-accepted order is CANCELED (increment / restore).
+ *
+ * @param {Object} repos - Repository instances
+ * @param {Object} order - The order object (must include items, fulfillmentLocationId, businessId)
+ * @param {'decrement'|'increment'} direction
+ */
+async function adjustStockForOrder(repos, order, direction) {
+  const items = order.items || [];
+  const locationId = order.fulfillmentLocationId;
+  if (!locationId || items.length === 0) return;
+
+  for (const item of items) {
+    const productId = item.productId || item.product?.id;
+    if (!productId) continue;
+
+    const stock = await repos.stockRepo.getByLocationAndProduct(locationId, productId);
+    const currentQty = stock?.qtyOnHand || 0;
+    const delta = direction === 'decrement' ? -item.quantity : item.quantity;
+    const newQty = Math.max(0, currentQty + delta);
+
+    await repos.stockRepo.upsert(locationId, productId, newQty, order.businessId);
+
+    // Create low-stock alert when stock drops below threshold
+    if (direction === 'decrement' && newQty <= LOW_STOCK_THRESHOLD) {
+      try {
+        const eventMessages = require('./eventMessages');
+        const product = await repos.productRepo.getById(productId);
+        await eventMessages.createEventMessage({
+          type: 'stock_alert',
+          fromBusinessId: order.businessId,
+          toBusinessId: null,
+          entityId: productId,
+          actorId: 'system',
+          actorName: 'System',
+          metadata: {
+            productName: product?.name,
+            currentStock: newQty,
+            locationId,
+          },
+        });
+      } catch (err) {
+        console.error('[orderStatus] Failed to create low-stock alert:', err.message);
+      }
+    }
+  }
+}
+
+// ============================================================================
 // MAIN SERVICE FUNCTION
 // ============================================================================
 
@@ -291,7 +347,7 @@ async function changeOrderStatus({ orderId, nextStatus, reason, userId }) {
   const trimmedReason = reason ? reason.trim() : null;
 
   // Atomically update order status and create history record via repository
-  return repos.orderRepo.changeStatusWithHistory(
+  const updatedOrder = await repos.orderRepo.changeStatusWithHistory(
     orderId,
     {
       status: nextStatus,
@@ -308,6 +364,21 @@ async function changeOrderStatus({ orderId, nextStatus, reason, userId }) {
       changedBy: userId || null,
     }
   );
+
+  // Auto-decrement stock when order is accepted
+  if (nextStatus === ORDER_STATUS.ACCEPTED) {
+    await adjustStockForOrder(repos, order, 'decrement');
+  }
+
+  // Restore stock when order is canceled (if it was previously in an accepted/active state)
+  if (
+    nextStatus === ORDER_STATUS.CANCELED &&
+    [ORDER_STATUS.ACCEPTED, ORDER_STATUS.ONGOING, ORDER_STATUS.PENDING, ORDER_STATUS.IN_REVIEW].includes(fromStatus)
+  ) {
+    await adjustStockForOrder(repos, order, 'increment');
+  }
+
+  return updatedOrder;
 }
 
 /**

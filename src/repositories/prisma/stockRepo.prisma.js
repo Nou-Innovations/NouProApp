@@ -64,6 +64,12 @@ async function upsert(locationId, productId, qtyOnHand, businessId) {
   });
 }
 
+async function getByProductId(productId) {
+  return prisma.stock.findMany({
+    where: { productId }
+  });
+}
+
 async function remove(id) {
   try {
     await prisma.stock.delete({
@@ -81,6 +87,7 @@ module.exports = {
   getByBusinessId, 
   getByLocationId, 
   getByLocationAndProduct,
+  getByProductId,
   create, 
   update, 
   upsert,
