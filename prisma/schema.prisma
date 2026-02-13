@@ -15,20 +15,32 @@ model User {
   avatar          String?
   phone           String?          @unique
   passwordHash    String?
+  jobTitle        String?
+  description     String?
+  address         String?
+  language        String?          @default("EN")
+  privacySettings Json?
   lastLoginAt     DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   businessMembers BusinessMember[]
   locationMembers LocationMember[]
+  sentConnections     UserConnection[] @relation("ConnectionSender")
+  receivedConnections UserConnection[] @relation("ConnectionReceiver")
 }
 
 model Business {
   id               String            @id
   name             String
   logoUrl          String?
+  bannerUrl        String?
   description      String?
+  industry         String?
   phone            String?
   email            String?
+  address          String?
+  website          String?
+  isPublished      Boolean           @default(false)
   subscriptionTier SubscriptionTier  @default(FREE)
   billingPeriod    BillingPeriod     @default(MONTHLY)
   currentPeriodEnd DateTime?
@@ -47,6 +59,8 @@ model Business {
   products         Product[]
   stocks           Stock[]
   brands           Brand[]
+  connectionsSent     BusinessConnection[] @relation("ConnectionsRequested")
+  connectionsReceived BusinessConnection[] @relation("ConnectionsReceived")
 }
 
 model Location {
@@ -115,6 +129,11 @@ model Product {
   barcode          String?
   taxRate          Float?
   supplier         String?
+  hasCarton        Boolean?          @default(false)
+  unitsPerCarton   Int?
+  pricePerCarton   Float?
+  hasRetailPriceLimit Boolean?       @default(false)
+  retailPriceLimit Float?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   locationProducts LocationProduct[]
@@ -506,4 +525,40 @@ enum PaymentStatus {
   REFUNDED
   PARTIALLY_REFUNDED
   DISPUTED
+}
+
+model UserConnection {
+  id         String           @id @default(uuid())
+  senderId   String
+  receiverId String
+  status     ConnectionStatus @default(pending)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  sender     User             @relation("ConnectionSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User             @relation("ConnectionReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+enum ConnectionStatus {
+  pending
+  accepted
+  rejected
+}
+
+model BusinessConnection {
+  id                  String           @id @default(uuid())
+  requesterBusinessId String
+  targetBusinessId    String
+  status              ConnectionStatus @default(pending)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  requesterBusiness   Business         @relation("ConnectionsRequested", fields: [requesterBusinessId], references: [id], onDelete: Cascade)
+  targetBusiness      Business         @relation("ConnectionsReceived", fields: [targetBusinessId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterBusinessId, targetBusinessId])
+  @@index([requesterBusinessId])
+  @@index([targetBusinessId])
 }

@@ -283,9 +283,12 @@ function deriveCapabilities(business) {
     maxStaff: tier === SUBSCRIPTION_TIERS.FREE ? 1 : 
               tier === SUBSCRIPTION_TIERS.PRO ? 3 : 
               tier === SUBSCRIPTION_TIERS.BUSINESS ? 9 : 999,
-    maxProducts: tier === SUBSCRIPTION_TIERS.FREE ? 20 :
-                 tier === SUBSCRIPTION_TIERS.PRO ? 500 :
-                 tier === SUBSCRIPTION_TIERS.BUSINESS ? 5000 : 999999,
+    maxListedProducts: tier === SUBSCRIPTION_TIERS.FREE ? 10 :
+                      tier === SUBSCRIPTION_TIERS.PRO ? 50 :
+                      tier === SUBSCRIPTION_TIERS.BUSINESS ? 150 : 999999,
+
+    // Price privacy (Business+ only)
+    canEnablePricePrivacy: isBusiness || isEnterprise,
   };
 }
 
@@ -527,10 +530,12 @@ function toStaffDto({ user, role, status, scope, locationId, locationName, joine
 function withProductVisibility(product) {
   if (!product) return product;
   const ownerBusinessId = product.ownerBusinessId || product.companyId || product.businessId || product.distributorId;
+  const isListed = product.isListed ?? product.is_listed ?? product.isDisplayable ?? false;
   return {
     ...product,
     ownerBusinessId,
-    isPublic: product.isPublic ?? product.isDisplayable ?? product.is_listed ?? false,
+    isListed,
+    isPublic: isListed,
   };
 }
 
@@ -1752,21 +1757,16 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     });
     
     // Build user response (exclude passwordHash, match register shape)
+    const { passwordHash: _pw, ...safeDbUser } = dbUser;
     const nameParts = (dbUser.name || '').split(' ');
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
-    
+
     const userResponse = {
-      id: dbUser.id,
+      ...safeDbUser,
       firstName,
       lastName,
-      name: dbUser.name,
-      phone: dbUser.phone,
-      email: dbUser.email,
-      avatar: dbUser.avatar,
       profilePicture: dbUser.avatar,
-      createdAt: dbUser.createdAt,
-      updatedAt: dbUser.updatedAt,
     };
     
     if (process.env.NODE_ENV !== 'production') {
@@ -1887,17 +1887,12 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     });
     
     // Build user response object (exclude passwordHash)
+    const { passwordHash: _ph, ...safeNewUser } = dbUser;
     const newUser = {
-      id: dbUser.id,
+      ...safeNewUser,
       firstName,
       lastName,
-      name: dbUser.name,
-      phone: dbUser.phone,
-      email: dbUser.email,
-      avatar: dbUser.avatar,
       profilePicture: dbUser.avatar,
-      createdAt: dbUser.createdAt,
-      updatedAt: dbUser.updatedAt,
     };
     
     // Also push to in-memory users array (for non-migrated routes)
@@ -1988,22 +1983,32 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 // Update current user profile (requires authentication)
 app.patch('/api/auth/me', requireAuth, async (req, res) => {
   try {
-    const { avatar, name } = req.body;
-    
+    const { avatar, name, jobTitle, description, address, language, privacySettings, phone, email } = req.body;
+
     // Build update payload with only allowed fields
     const updateData = {};
     if (avatar !== undefined) updateData.avatar = avatar;
     if (name !== undefined) updateData.name = name;
-    
+    if (jobTitle !== undefined) updateData.jobTitle = jobTitle;
+    if (description !== undefined) updateData.description = description;
+    if (address !== undefined) updateData.address = address;
+    if (language !== undefined) updateData.language = language;
+    if (privacySettings !== undefined) updateData.privacySettings = privacySettings;
+    if (phone !== undefined) updateData.phone = phone;
+    if (email !== undefined) updateData.email = email;
+
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json(errorResponse('No fields to update'));
     }
-    
+
     const updatedUser = await repos.userRepo.update(req.user.id, updateData);
-    
+
+    // Strip passwordHash from response
+    const { passwordHash, ...safeUser } = updatedUser;
+
     console.log('[UpdateProfile] Updated user:', req.user.id, Object.keys(updateData));
-    
-    res.json(successResponse(updatedUser, 'Profile updated successfully'));
+
+    res.json(successResponse(safeUser, 'Profile updated successfully'));
   } catch (err) {
     console.error('[UpdateProfile] Error:', err);
     res.status(500).json(errorResponse('Failed to update profile'));
@@ -2011,44 +2016,113 @@ app.patch('/api/auth/me', requireAuth, async (req, res) => {
 });
 
 // Get current user
-app.get('/api/auth/me', (req, res) => {
+app.get('/api/auth/me', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json(errorResponse('Not authenticated'));
   }
-  
+
   // Verify JWT and extract user ID
   const result = verifyToken(authHeader);
   if (result.error) {
     return res.status(401).json(errorResponse(result.error));
   }
-  
-  // Find user by ID from token
-  const user = users.find(u => u.id === result.user.id);
-  if (!user) {
-    return res.status(404).json(errorResponse('User not found'));
+
+  try {
+    // Use Prisma instead of in-memory array
+    const user = await repos.userRepo.getById(result.user.id);
+    if (!user) {
+      return res.status(404).json(errorResponse('User not found'));
+    }
+
+    // Strip passwordHash from response
+    const { passwordHash, ...safeUser } = user;
+
+    // Get businesses from Prisma
+    const memberships = await repos.memberRepo.getByUserId(user.id);
+    const userBusinesses = [];
+    for (const m of memberships) {
+      if (m.status !== 'accepted') continue;
+      const business = await repos.businessRepo.getById(m.businessId);
+      if (!business) continue;
+      userBusinesses.push({
+        business: { ...business, capabilities: deriveCapabilities(business) },
+        role: m.role,
+        staff_entry: {
+          id: m.id,
+          status: m.status,
+          role_type: m.roleType || null,
+          joinedAt: m.createdAt,
+        },
+      });
+    }
+
+    // Get connection count
+    const connectionsCount = await repos.connectionRepo.countByUserId(user.id);
+
+    res.json(successResponse({
+      user: { ...safeUser, connectionsCount },
+      businesses: userBusinesses,
+    }));
+  } catch (err) {
+    console.error('[GetMe] Error:', err);
+    res.status(500).json(errorResponse('Failed to get user profile'));
   }
-  
-  // Get user's businesses
-  const userMemberships = businessMembers.filter(m => 
-    m.userId === user.id && m.status === 'accepted'
-  );
-  
-  const userBusinesses = userMemberships.map(membership => {
-    const business = companies.find(c => c.id === membership.businessId);
-    return {
-      business,
-      role: membership.role,
-      staff_entry: {
-        id: membership.id,
-        status: membership.status,
-        role_type: membership.roleType || null,
-        joinedAt: membership.joinedAt,
-      }
-    };
-  }).filter(ub => ub.business);
-  
-  res.json(successResponse({ user, businesses: userBusinesses }));
+});
+
+// Get another user's profile by ID
+app.get('/api/users/:userId', requireAuth, async (req, res) => {
+  try {
+    const user = await repos.userRepo.getById(req.params.userId);
+    if (!user) {
+      return res.status(404).json(errorResponse('User not found'));
+    }
+
+    const { passwordHash, ...safeUser } = user;
+
+    // Check privacy: if not connected, strip private fields
+    const isSelf = req.user.id === req.params.userId;
+    const isConnected = isSelf ? true : await repos.connectionRepo.areConnected(req.user.id, req.params.userId);
+    const privacy = user.privacySettings || {};
+
+    if (!isSelf && !isConnected) {
+      if (!privacy.show_email_publicly) delete safeUser.email;
+      if (!privacy.show_phone_publicly) delete safeUser.phone;
+      if (!privacy.show_address_publicly) delete safeUser.address;
+    }
+
+    // Get connection count
+    const connectionsCount = await repos.connectionRepo.countByUserId(req.params.userId);
+
+    // Get connection status with requester
+    const connectionStatus = isSelf ? null : await repos.connectionRepo.getStatus(req.user.id, req.params.userId);
+
+    // Get user's businesses (public info for experience section)
+    const memberships = await repos.memberRepo.getByUserId(req.params.userId);
+    const experiences = [];
+    for (const m of memberships) {
+      if (m.status !== 'accepted') continue;
+      const biz = await repos.businessRepo.getById(m.businessId);
+      if (!biz) continue;
+      experiences.push({
+        business_id: biz.id,
+        business_name: biz.name,
+        business_logo: biz.logoUrl,
+        role: m.role,
+        started_at: m.createdAt,
+      });
+    }
+
+    res.json(successResponse({
+      ...safeUser,
+      connectionsCount,
+      connectionStatus,
+      experiences,
+    }));
+  } catch (err) {
+    console.error('[GetUser] Error:', err);
+    res.status(500).json(errorResponse('Failed to get user profile'));
+  }
 });
 
 // ============================================================================
@@ -2084,6 +2158,9 @@ app.get('/api/companies/:companyId', async (req, res) => {
 
 // Update business
 app.patch('/api/companies/:companyId', requireAuth, async (req, res) => {
+  // Require business membership
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
   const existing = await repos.businessRepo.getById(req.params.companyId);
   if (!existing) {
     return res.status(404).json(errorResponse('Business not found'));
@@ -2091,7 +2168,15 @@ app.patch('/api/companies/:companyId', requireAuth, async (req, res) => {
   
   // Don't allow changing subscription tier via this endpoint
   const { subscriptionTier, ...allowedUpdates } = req.body;
-  
+
+  // Merge settings instead of overwriting
+  if (allowedUpdates.settings) {
+    allowedUpdates.settings = {
+      ...(existing.settings || {}),
+      ...allowedUpdates.settings,
+    };
+  }
+
   const updated = await repos.businessRepo.update(req.params.companyId, allowedUpdates);
   
   res.json(successResponse({
@@ -2160,6 +2245,9 @@ app.get('/api/companies', async (req, res) => {
 
 // PUT /api/companies/:id -- legacy route used by businessStore
 app.put('/api/companies/:id', requireAuth, async (req, res) => {
+  // Require business membership
+  if (!(await requireBusinessMembership(req, res, req.params.id))) return;
+
   const existing = await repos.businessRepo.getById(req.params.id);
   if (!existing) {
     return res.status(404).json(errorResponse('Company not found'));
@@ -2171,6 +2259,300 @@ app.put('/api/companies/:id', requireAuth, async (req, res) => {
     ...updated,
     capabilities: deriveCapabilities(updated),
     }));
+});
+
+// ============================================================================
+// CONNECTION ROUTES (user-to-user and business-to-business)
+// ============================================================================
+
+// Send a connection request
+app.post('/api/connections/request', requireAuth, async (req, res) => {
+  try {
+    const { receiverId } = req.body;
+    if (!receiverId) {
+      return res.status(400).json(errorResponse('receiverId is required'));
+    }
+    if (receiverId === req.user.id) {
+      return res.status(400).json(errorResponse('Cannot connect with yourself'));
+    }
+
+    // Check receiver exists
+    const receiver = await repos.userRepo.getById(receiverId);
+    if (!receiver) {
+      return res.status(404).json(errorResponse('User not found'));
+    }
+
+    // Check for existing connection
+    const existing = await repos.connectionRepo.findExisting(req.user.id, receiverId);
+    if (existing) {
+      if (existing.status === 'accepted') {
+        return res.status(409).json(errorResponse('Already connected'));
+      }
+      if (existing.status === 'pending') {
+        return res.status(409).json(errorResponse('Connection request already pending'));
+      }
+      // If rejected, allow re-request by removing old one
+      await repos.connectionRepo.removeConnection(existing.id);
+    }
+
+    const connection = await repos.connectionRepo.sendRequest(req.user.id, receiverId);
+    res.status(201).json(successResponse(connection, 'Connection request sent'));
+  } catch (err) {
+    console.error('[ConnectionRequest] Error:', err);
+    res.status(500).json(errorResponse('Failed to send connection request'));
+  }
+});
+
+// Accept a connection request
+app.patch('/api/connections/:id/accept', requireAuth, async (req, res) => {
+  try {
+    const connection = await repos.connectionRepo.getById(req.params.id);
+    if (!connection) {
+      return res.status(404).json(errorResponse('Connection not found'));
+    }
+    if (connection.receiverId !== req.user.id) {
+      return res.status(403).json(errorResponse('Only the receiver can accept'));
+    }
+    if (connection.status !== 'pending') {
+      return res.status(400).json(errorResponse('Connection is not pending'));
+    }
+
+    const updated = await repos.connectionRepo.acceptRequest(req.params.id);
+    res.json(successResponse(updated, 'Connection accepted'));
+  } catch (err) {
+    console.error('[ConnectionAccept] Error:', err);
+    res.status(500).json(errorResponse('Failed to accept connection'));
+  }
+});
+
+// Reject a connection request
+app.patch('/api/connections/:id/reject', requireAuth, async (req, res) => {
+  try {
+    const connection = await repos.connectionRepo.getById(req.params.id);
+    if (!connection) {
+      return res.status(404).json(errorResponse('Connection not found'));
+    }
+    if (connection.receiverId !== req.user.id) {
+      return res.status(403).json(errorResponse('Only the receiver can reject'));
+    }
+    if (connection.status !== 'pending') {
+      return res.status(400).json(errorResponse('Connection is not pending'));
+    }
+
+    const updated = await repos.connectionRepo.rejectRequest(req.params.id);
+    res.json(successResponse(updated, 'Connection rejected'));
+  } catch (err) {
+    console.error('[ConnectionReject] Error:', err);
+    res.status(500).json(errorResponse('Failed to reject connection'));
+  }
+});
+
+// Remove a connection
+app.delete('/api/connections/:id', requireAuth, async (req, res) => {
+  try {
+    const connection = await repos.connectionRepo.getById(req.params.id);
+    if (!connection) {
+      return res.status(404).json(errorResponse('Connection not found'));
+    }
+    // Either party can remove the connection
+    if (connection.senderId !== req.user.id && connection.receiverId !== req.user.id) {
+      return res.status(403).json(errorResponse('Not your connection'));
+    }
+
+    await repos.connectionRepo.removeConnection(req.params.id);
+    res.json(successResponse(null, 'Connection removed'));
+  } catch (err) {
+    console.error('[ConnectionRemove] Error:', err);
+    res.status(500).json(errorResponse('Failed to remove connection'));
+  }
+});
+
+// List user's accepted connections
+app.get('/api/connections', requireAuth, async (req, res) => {
+  try {
+    const connections = await repos.connectionRepo.listByUserId(req.user.id, 'accepted');
+    // Map to return the other user in each connection
+    const result = connections.map(conn => {
+      const otherUser = conn.senderId === req.user.id ? conn.receiver : conn.sender;
+      const { passwordHash, ...safeUser } = otherUser;
+      return {
+        connectionId: conn.id,
+        user: safeUser,
+        connectedAt: conn.updatedAt,
+      };
+    });
+    res.json(successResponse(result));
+  } catch (err) {
+    console.error('[ConnectionsList] Error:', err);
+    res.status(500).json(errorResponse('Failed to list connections'));
+  }
+});
+
+// List pending connection requests (received)
+app.get('/api/connections/pending', requireAuth, async (req, res) => {
+  try {
+    const pending = await repos.connectionRepo.listPending(req.user.id);
+    const result = pending.map(conn => {
+      const { passwordHash, ...safeSender } = conn.sender;
+      return {
+        connectionId: conn.id,
+        sender: safeSender,
+        requestedAt: conn.createdAt,
+      };
+    });
+    res.json(successResponse(result));
+  } catch (err) {
+    console.error('[ConnectionsPending] Error:', err);
+    res.status(500).json(errorResponse('Failed to list pending connections'));
+  }
+});
+
+// ============================================================================
+// BUSINESS CONNECTION ROUTES
+// ============================================================================
+
+// Send a business connection request
+app.post('/api/business-connections/request', requireAuth, async (req, res) => {
+  try {
+    const { requesterBusinessId, targetBusinessId } = req.body;
+    if (!requesterBusinessId || !targetBusinessId) {
+      return res.status(400).json(errorResponse('requesterBusinessId and targetBusinessId are required'));
+    }
+    if (requesterBusinessId === targetBusinessId) {
+      return res.status(400).json(errorResponse('Cannot connect with yourself'));
+    }
+
+    // Verify membership in requester business
+    if (!(await requireBusinessMembership(req, res, requesterBusinessId))) return;
+
+    // Check target exists
+    const target = await repos.businessRepo.getById(targetBusinessId);
+    if (!target) {
+      return res.status(404).json(errorResponse('Target business not found'));
+    }
+
+    // Check for existing
+    const existing = await repos.connectionRepo.findExistingBusinessConnection(requesterBusinessId, targetBusinessId);
+    if (existing) {
+      if (existing.status === 'accepted') {
+        return res.status(409).json(errorResponse('Already connected'));
+      }
+      if (existing.status === 'pending') {
+        return res.status(409).json(errorResponse('Connection request already pending'));
+      }
+      await repos.connectionRepo.removeBusinessConnection(existing.id);
+    }
+
+    const connection = await repos.connectionRepo.sendBusinessRequest(requesterBusinessId, targetBusinessId);
+    res.status(201).json(successResponse(connection, 'Business connection request sent'));
+  } catch (err) {
+    console.error('[BizConnectionRequest] Error:', err);
+    res.status(500).json(errorResponse('Failed to send business connection request'));
+  }
+});
+
+// Accept a business connection request
+app.patch('/api/business-connections/:id/accept', requireAuth, async (req, res) => {
+  try {
+    const connection = await repos.connectionRepo.getBusinessConnectionById(req.params.id);
+    if (!connection) {
+      return res.status(404).json(errorResponse('Connection not found'));
+    }
+    // Verify membership in target business
+    if (!(await requireBusinessMembership(req, res, connection.targetBusinessId))) return;
+    if (connection.status !== 'pending') {
+      return res.status(400).json(errorResponse('Connection is not pending'));
+    }
+
+    const updated = await repos.connectionRepo.acceptBusinessRequest(req.params.id);
+    res.json(successResponse(updated, 'Business connection accepted'));
+  } catch (err) {
+    console.error('[BizConnectionAccept] Error:', err);
+    res.status(500).json(errorResponse('Failed to accept business connection'));
+  }
+});
+
+// Reject a business connection request
+app.patch('/api/business-connections/:id/reject', requireAuth, async (req, res) => {
+  try {
+    const connection = await repos.connectionRepo.getBusinessConnectionById(req.params.id);
+    if (!connection) {
+      return res.status(404).json(errorResponse('Connection not found'));
+    }
+    if (!(await requireBusinessMembership(req, res, connection.targetBusinessId))) return;
+    if (connection.status !== 'pending') {
+      return res.status(400).json(errorResponse('Connection is not pending'));
+    }
+
+    const updated = await repos.connectionRepo.rejectBusinessRequest(req.params.id);
+    res.json(successResponse(updated, 'Business connection rejected'));
+  } catch (err) {
+    console.error('[BizConnectionReject] Error:', err);
+    res.status(500).json(errorResponse('Failed to reject business connection'));
+  }
+});
+
+// Remove a business connection
+app.delete('/api/business-connections/:id', requireAuth, async (req, res) => {
+  try {
+    const connection = await repos.connectionRepo.getBusinessConnectionById(req.params.id);
+    if (!connection) {
+      return res.status(404).json(errorResponse('Connection not found'));
+    }
+    // Either party can remove
+    const isMemberOfRequester = await repos.memberRepo.isBusinessMember(connection.requesterBusinessId, req.user.id);
+    const isMemberOfTarget = await repos.memberRepo.isBusinessMember(connection.targetBusinessId, req.user.id);
+    if (!isMemberOfRequester && !isMemberOfTarget) {
+      return res.status(403).json(errorResponse('Not your connection'));
+    }
+
+    await repos.connectionRepo.removeBusinessConnection(req.params.id);
+    res.json(successResponse(null, 'Business connection removed'));
+  } catch (err) {
+    console.error('[BizConnectionRemove] Error:', err);
+    res.status(500).json(errorResponse('Failed to remove business connection'));
+  }
+});
+
+// List business connections
+app.get('/api/business-connections/:businessId', requireAuth, async (req, res) => {
+  try {
+    if (!(await requireBusinessMembership(req, res, req.params.businessId))) return;
+
+    const connections = await repos.connectionRepo.listBusinessConnections(req.params.businessId, 'accepted');
+    const result = connections.map(conn => {
+      const otherBiz = conn.requesterBusinessId === req.params.businessId
+        ? conn.targetBusiness
+        : conn.requesterBusiness;
+      return {
+        connectionId: conn.id,
+        business: otherBiz,
+        connectedAt: conn.updatedAt,
+      };
+    });
+    res.json(successResponse(result));
+  } catch (err) {
+    console.error('[BizConnectionsList] Error:', err);
+    res.status(500).json(errorResponse('Failed to list business connections'));
+  }
+});
+
+// List pending business connection requests
+app.get('/api/business-connections/:businessId/pending', requireAuth, async (req, res) => {
+  try {
+    if (!(await requireBusinessMembership(req, res, req.params.businessId))) return;
+
+    const pending = await repos.connectionRepo.listPendingBusinessRequests(req.params.businessId);
+    const result = pending.map(conn => ({
+      connectionId: conn.id,
+      requesterBusiness: conn.requesterBusiness,
+      requestedAt: conn.createdAt,
+    }));
+    res.json(successResponse(result));
+  } catch (err) {
+    console.error('[BizConnectionsPending] Error:', err);
+    res.status(500).json(errorResponse('Failed to list pending business connections'));
+  }
 });
 
 // ============================================================================
@@ -2341,7 +2723,7 @@ app.delete('/api/companies/:companyId/locations/:locationId', requireAuth, async
 });
 
 // Product Routes
-app.get('/api/companies/:companyId/products', async (req, res) => {
+app.get('/api/companies/:companyId/products', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
     const { locationId, category, search, status, viewType } = req.query;
@@ -2349,15 +2731,29 @@ app.get('/api/companies/:companyId/products', async (req, res) => {
     // Repo returns products for this businessId (companyId maps to businessId)
     let companyProducts = await repos.productRepo.getByBusinessId(companyId);
 
+    // Filter by location if specified (via LocationProduct or Stock tables)
+    if (locationId) {
+      try {
+        const locationStocks = await repos.stockRepo.getByLocationId(locationId);
+        const locationProductIds = new Set(locationStocks.map(s => s.productId));
+        companyProducts = companyProducts.filter(p => locationProductIds.has(p.id));
+      } catch {
+        // If stock repo doesn't support this, skip location filtering
+      }
+    }
+
     // Apply filters
     if (category) {
-      companyProducts = companyProducts.filter(p => 
+      companyProducts = companyProducts.filter(p =>
         p.category?.toLowerCase().includes(category.toLowerCase())
       );
     }
     
     if (status && status !== 'All') {
-      companyProducts = companyProducts.filter(p => p.status === status);
+      const statusLower = status.toLowerCase();
+      companyProducts = companyProducts.filter(p =>
+        (p.status || '').toLowerCase() === statusLower
+      );
     }
     
     if (viewType) {
@@ -2439,25 +2835,16 @@ app.post('/api/companies/:companyId/products', requireAuth, async (req, res) => 
     const { companyId } = req.params;
     const productData = req.body;
 
-    // Get business and check product limit
+    // Verify business exists
     const business = await repos.businessRepo.getById(companyId);
     if (!business) {
       return res.status(404).json(errorResponse('Business not found'));
     }
 
-    const capabilities = deriveCapabilities(business);
-    const currentProducts = await repos.productRepo.getByBusinessId(companyId);
-    const currentProductCount = currentProducts.length;
-
-    if (currentProductCount >= capabilities.maxProducts) {
-      return res.status(403).json(errorResponse(
-        `Product limit reached (${capabilities.maxProducts}). Upgrade your plan to add more products.`
-      ));
-    }
-
-    // Create the product
+    // Create the product (generate ID if not provided)
     const newProduct = await repos.productRepo.create({
       ...productData,
+      id: productData.id || uuidv4(),
       businessId: companyId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -2485,6 +2872,22 @@ app.patch('/api/companies/:companyId/products/:productId', requireAuth, async (r
     const productBusinessId = product.businessId || product.companyId;
     if (productBusinessId !== companyId) {
       return res.status(404).json(errorResponse('Product not found'));
+    }
+
+    // Check listed product limit when listing a product
+    const isListingProduct = (patch.isListed === true || patch.is_listed === true) &&
+      !(product.isListed === true || product.is_listed === true);
+    if (isListingProduct) {
+      const business = await repos.businessRepo.getById(companyId);
+      const capabilities = deriveCapabilities(business);
+      const allProducts = await repos.productRepo.getByBusinessId(companyId);
+      const currentListedCount = allProducts.filter(p => p.isListed === true || p.is_listed === true).length;
+
+      if (currentListedCount >= capabilities.maxListedProducts) {
+        return res.status(403).json(errorResponse(
+          `Listed product limit reached (${capabilities.maxListedProducts}). Upgrade your plan to list more products.`
+        ));
+      }
     }
 
     const updatedProduct = await repos.productRepo.update(productId, {
@@ -2611,6 +3014,117 @@ app.delete('/api/companies/:companyId/brands/:brandId', requireAuth, async (req,
 });
 
 // ============================================================================
+// BUSINESS CONNECTION ROUTES
+// ============================================================================
+
+// Send a connection request
+app.post('/api/companies/:companyId/connections', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const { targetBusinessId } = req.body;
+    if (!targetBusinessId) {
+      return res.status(400).json(errorResponse('targetBusinessId is required'));
+    }
+    if (targetBusinessId === req.params.companyId) {
+      return res.status(400).json(errorResponse('Cannot connect to your own business'));
+    }
+    const targetBusiness = await repos.businessRepo.getById(targetBusinessId);
+    if (!targetBusiness) {
+      return res.status(404).json(errorResponse('Target business not found'));
+    }
+    const connection = await prisma.businessConnection.create({
+      data: {
+        requesterBusinessId: req.params.companyId,
+        targetBusinessId,
+      },
+    });
+    res.status(201).json(successResponse(connection));
+  } catch (e) {
+    if (e.code === 'P2002') {
+      return res.status(409).json(errorResponse('Connection request already exists'));
+    }
+    console.error('Error creating connection:', e);
+    res.status(500).json(errorResponse('Failed to create connection'));
+  }
+});
+
+// List connections for a business
+app.get('/api/companies/:companyId/connections', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const { status } = req.query;
+    const where = {
+      OR: [
+        { requesterBusinessId: req.params.companyId },
+        { targetBusinessId: req.params.companyId },
+      ],
+    };
+    if (status) where.status = status;
+
+    const connections = await prisma.businessConnection.findMany({
+      where,
+      include: {
+        requesterBusiness: { select: { id: true, name: true, logoUrl: true } },
+        targetBusiness: { select: { id: true, name: true, logoUrl: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(successResponse(connections));
+  } catch (e) {
+    console.error('Error fetching connections:', e);
+    res.status(500).json(errorResponse('Failed to fetch connections'));
+  }
+});
+
+// Accept or reject a connection request
+app.patch('/api/companies/:companyId/connections/:connectionId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const { status } = req.body;
+    if (!['accepted', 'rejected'].includes(status)) {
+      return res.status(400).json(errorResponse('Status must be "accepted" or "rejected"'));
+    }
+    const connection = await prisma.businessConnection.findUnique({
+      where: { id: req.params.connectionId },
+    });
+    if (!connection || connection.targetBusinessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Connection request not found'));
+    }
+    if (connection.status !== 'pending') {
+      return res.status(400).json(errorResponse('Connection request already responded to'));
+    }
+    const updated = await prisma.businessConnection.update({
+      where: { id: req.params.connectionId },
+      data: { status },
+    });
+    res.json(successResponse(updated));
+  } catch (e) {
+    console.error('Error updating connection:', e);
+    res.status(500).json(errorResponse('Failed to update connection'));
+  }
+});
+
+// Remove a connection
+app.delete('/api/companies/:companyId/connections/:connectionId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const connection = await prisma.businessConnection.findUnique({
+      where: { id: req.params.connectionId },
+    });
+    if (!connection ||
+      (connection.requesterBusinessId !== req.params.companyId &&
+       connection.targetBusinessId !== req.params.companyId)) {
+      return res.status(404).json(errorResponse('Connection not found'));
+    }
+    await prisma.businessConnection.delete({ where: { id: req.params.connectionId } });
+    res.json(successResponse(null, 'Connection removed'));
+  } catch (e) {
+    console.error('Error deleting connection:', e);
+    res.status(500).json(errorResponse('Failed to delete connection'));
+  }
+});
+
+// ============================================================================
 // ORDER ROUTES (with scope: PARENT vs LOCATION)
 // ============================================================================
 
@@ -2688,7 +3202,7 @@ app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
     }
 
     const capabilities = deriveCapabilities(business);
-    if (!capabilities.canCreateOrders) {
+    if (!capabilities.canCreateSellingOrders) {
       return res.status(403).json(errorResponse(
         'Creating orders requires a paid subscription.',
         'CAPABILITY_REQUIRED'
@@ -3212,7 +3726,7 @@ app.post('/api/locations/:locationId/orders', requireAuth, async (req, res) => {
       });
     }
 
-    if (!capabilities.canCreateOrders) {
+    if (!capabilities.canCreateSellingOrders) {
       return res.status(403).json(errorResponse(
         'Creating orders requires a paid subscription.',
         'CAPABILITY_REQUIRED'
@@ -6916,33 +7430,78 @@ app.post('/api/users/:userId/notifications/:notificationId/read', requireAuth, a
 // GET /api/products?visibility=public (also supported for compatibility)
 app.get('/api/products', async (req, res) => {
   try {
-    const { scope, visibility, companyId, brand, category } = req.query;
+    const { scope, visibility, companyId, brand, category, viewerBusinessId } = req.query;
     let catalog = await repos.productRepo.list();
 
-    // "public catalog" for personal mode + ordering other products
+    // "public catalog" — only listed products visible to others
     if (scope === 'public' || visibility === 'public') {
-      catalog = catalog.filter(p => 
-        (p.is_listed === true || p.isPublic === true) && 
-        (p.isDisplayable === true || p.isPublic === true)
+      catalog = catalog.filter(p =>
+        p.isListed === true || p.is_listed === true || p.isDisplayable === true || p.isPublic === true
       );
     }
 
     // Optional filters for product-details suggestions carousels
     if (companyId) {
-      catalog = catalog.filter(p => 
+      catalog = catalog.filter(p =>
         (p.companyId || p.businessId || p.ownerBusinessId) === companyId
       );
     }
     if (brand) {
-      catalog = catalog.filter(p => 
+      catalog = catalog.filter(p =>
         (p.brand || '').toLowerCase() === String(brand).toLowerCase()
       );
     }
     if (category) {
-      catalog = catalog.filter(p => 
+      catalog = catalog.filter(p =>
         (p.category || '').toLowerCase() === String(category).toLowerCase()
       );
     }
+
+    // Apply price privacy: hide prices for businesses with pricePrivacyEnabled
+    const businessSettingsCache = new Map();
+    const getBusinessSettings = async (bizId) => {
+      if (!bizId) return null;
+      if (businessSettingsCache.has(bizId)) return businessSettingsCache.get(bizId);
+      const biz = await repos.businessRepo.getById(bizId);
+      businessSettingsCache.set(bizId, biz?.settings || null);
+      return biz?.settings || null;
+    };
+
+    const isConnected = async (bizA, bizB) => {
+      if (!bizA || !bizB || bizA === bizB) return true;
+      try {
+        const conn = await prisma.businessConnection.findFirst({
+          where: {
+            status: 'accepted',
+            OR: [
+              { requesterBusinessId: bizA, targetBusinessId: bizB },
+              { requesterBusinessId: bizB, targetBusinessId: bizA },
+            ],
+          },
+        });
+        return !!conn;
+      } catch {
+        return false;
+      }
+    };
+
+    catalog = await Promise.all(catalog.map(async (p) => {
+      const ownerBizId = p.businessId || p.companyId || p.ownerBusinessId;
+      // Own products always show price
+      if (viewerBusinessId && ownerBizId === viewerBusinessId) return p;
+
+      const settings = await getBusinessSettings(ownerBizId);
+      if (!settings?.pricePrivacyEnabled) return p;
+
+      // Privacy enabled — check connection
+      if (viewerBusinessId) {
+        const connected = await isConnected(viewerBusinessId, ownerBizId);
+        if (connected) return p;
+      }
+
+      // Not connected or no viewer — hide prices
+      return { ...p, price: null, salePrice: null, costPrice: null, pricePerCarton: null, priceHidden: true };
+    }));
 
     return res.json(successResponse(catalog.map(withProductVisibility)));
   } catch (err) {
