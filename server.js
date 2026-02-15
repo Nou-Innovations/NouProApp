@@ -539,6 +539,103 @@ function withProductVisibility(product) {
   };
 }
 
+// Helper: Apply price privacy to a single product
+// Returns product with prices hidden if the owner business has pricePrivacyEnabled
+// and the viewer is not connected.
+async function applyPricePrivacy(product, viewerBusinessId) {
+  if (!product) return product;
+  const ownerBizId = product.businessId || product.companyId || product.ownerBusinessId;
+
+  // Own products always show price
+  if (viewerBusinessId && ownerBizId === viewerBusinessId) return product;
+
+  // Check if owner has price privacy enabled
+  let settings = null;
+  try {
+    const biz = await repos.businessRepo.getById(ownerBizId);
+    settings = biz?.settings || null;
+  } catch { /* ignore */ }
+
+  if (!settings?.pricePrivacyEnabled) return product;
+
+  // Privacy enabled — check connection
+  if (viewerBusinessId) {
+    try {
+      const conn = await prisma.businessConnection.findFirst({
+        where: {
+          status: 'accepted',
+          OR: [
+            { requesterBusinessId: viewerBusinessId, targetBusinessId: ownerBizId },
+            { requesterBusinessId: ownerBizId, targetBusinessId: viewerBusinessId },
+          ],
+        },
+      });
+      if (conn) return product;
+    } catch { /* ignore */ }
+  }
+
+  // Not connected or no viewer — hide prices
+  return { ...product, price: null, salePrice: null, costPrice: null, pricePerCarton: null, priceHidden: true };
+}
+
+// Helper: Apply price privacy to an array of products (with caching for efficiency)
+async function applyPricePrivacyBatch(products, viewerBusinessId) {
+  const businessSettingsCache = new Map();
+  const connectionCache = new Map();
+
+  const getSettings = async (bizId) => {
+    if (!bizId) return null;
+    if (businessSettingsCache.has(bizId)) return businessSettingsCache.get(bizId);
+    try {
+      const biz = await repos.businessRepo.getById(bizId);
+      const s = biz?.settings || null;
+      businessSettingsCache.set(bizId, s);
+      return s;
+    } catch {
+      businessSettingsCache.set(bizId, null);
+      return null;
+    }
+  };
+
+  const checkConnection = async (bizA, bizB) => {
+    if (!bizA || !bizB || bizA === bizB) return true;
+    const key = [bizA, bizB].sort().join(':');
+    if (connectionCache.has(key)) return connectionCache.get(key);
+    try {
+      const conn = await prisma.businessConnection.findFirst({
+        where: {
+          status: 'accepted',
+          OR: [
+            { requesterBusinessId: bizA, targetBusinessId: bizB },
+            { requesterBusinessId: bizB, targetBusinessId: bizA },
+          ],
+        },
+      });
+      const result = !!conn;
+      connectionCache.set(key, result);
+      return result;
+    } catch {
+      connectionCache.set(key, false);
+      return false;
+    }
+  };
+
+  return Promise.all(products.map(async (p) => {
+    const ownerBizId = p.businessId || p.companyId || p.ownerBusinessId;
+    if (viewerBusinessId && ownerBizId === viewerBusinessId) return p;
+
+    const settings = await getSettings(ownerBizId);
+    if (!settings?.pricePrivacyEnabled) return p;
+
+    if (viewerBusinessId) {
+      const connected = await checkConnection(viewerBusinessId, ownerBizId);
+      if (connected) return p;
+    }
+
+    return { ...p, price: null, salePrice: null, costPrice: null, pricePerCarton: null, priceHidden: true };
+  }));
+}
+
 // ============================================================================
 // MEMBERSHIP ENFORCEMENT MIDDLEWARE
 // ============================================================================
@@ -1682,6 +1779,22 @@ io.on('connection', (socket) => {
   });
 });
 
+// Shared password validation (used by register, change-password, reset-password)
+function validatePassword(password) {
+  const errors = [];
+  if (password.length < 8) errors.push('at least 8 characters');
+  if (!/[A-Z]/.test(password)) errors.push('one uppercase letter');
+  if (!/[a-z]/.test(password)) errors.push('one lowercase letter');
+  if (!/\d/.test(password)) errors.push('one number');
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) errors.push('one special character');
+  return errors;
+}
+
+// Track failed login attempts per email for account lockout
+const failedLoginAttempts = new Map(); // email -> { count, lastAttempt }
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
 // Auth Routes
 app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
@@ -1691,11 +1804,23 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       return res.status(400).json(errorResponse('Email and password are required'));
     }
     
+    // Check for account lockout
+    const attempts = failedLoginAttempts.get(email?.toLowerCase());
+    if (attempts && attempts.count >= MAX_LOGIN_ATTEMPTS) {
+      const timeSinceLock = Date.now() - attempts.lastAttempt;
+      if (timeSinceLock < LOCKOUT_DURATION_MS) {
+        const minutesLeft = Math.ceil((LOCKOUT_DURATION_MS - timeSinceLock) / 60000);
+        return res.status(429).json(errorResponse(`Account temporarily locked. Try again in ${minutesLeft} minutes.`));
+      }
+      // Lockout expired, reset
+      failedLoginAttempts.delete(email?.toLowerCase());
+    }
+
     // Debug logging
     if (process.env.NODE_ENV !== 'production') {
       console.log('[Login] Received:', { email, passwordLength: password?.length });
     }
-    
+
     // Look up user from database
     const dbUser = await repos.userRepo.getByEmail(email);
     if (!dbUser) {
@@ -1715,30 +1840,37 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     const passwordValid = await bcrypt.compare(password, dbUser.passwordHash);
     
     if (!passwordValid) {
+      // Track failed attempt
+      const key = email.toLowerCase();
+      const current = failedLoginAttempts.get(key) || { count: 0, lastAttempt: 0 };
+      failedLoginAttempts.set(key, { count: current.count + 1, lastAttempt: Date.now() });
       if (process.env.NODE_ENV !== 'production') {
         console.log('[Login] Invalid password for:', email);
       }
       return res.status(401).json(errorResponse('Invalid credentials'));
     }
-    
-    // Get user's businesses (still using in-memory for now)
-    const userMemberships = businessMembers.filter(m => 
-      m.userId === dbUser.id && m.status === 'accepted'
-    );
-    
-    const userBusinesses = userMemberships.map(membership => {
-      const business = companies.find(c => c.id === membership.businessId);
-      return {
-        business,
-        role: membership.role,
+
+    // Clear failed attempts on successful login
+    failedLoginAttempts.delete(email.toLowerCase());
+
+    // Get user's businesses from database
+    const memberships = await repos.memberRepo.getByUserId(dbUser.id);
+    const userBusinesses = [];
+    for (const m of memberships) {
+      if (m.status !== 'accepted') continue;
+      const business = await repos.businessRepo.getById(m.businessId);
+      if (!business) continue;
+      userBusinesses.push({
+        business: { ...business, capabilities: deriveCapabilities(business) },
+        role: m.role,
         staff_entry: {
-          id: membership.id,
-          status: membership.status,
-          role_type: membership.roleType || null,
-          joinedAt: membership.joinedAt,
-        }
-      };
-    }).filter(ub => ub.business);
+          id: m.id,
+          status: m.status,
+          role_type: m.roleType || null,
+          joinedAt: m.createdAt,
+        },
+      });
+    }
     
     // Generate real JWT tokens
     const token = generateToken({ 
@@ -1785,8 +1917,98 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   }
 });
 
-app.post('/api/auth/logout', (req, res) => {
+app.post('/api/auth/logout', requireAuth, (req, res) => {
+  // Note: Token invalidation requires a blacklist/Redis store (future improvement)
+  // For now, the client clears tokens locally and we log the event
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Logout] User logged out:', req.user.id);
+  }
   res.json(successResponse(null, 'Logged out successfully'));
+});
+
+// Request password reset (sends reset email/link)
+app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json(errorResponse('Email is required'));
+    }
+
+    // Look up user
+    const dbUser = await repos.userRepo.getByEmail(email);
+
+    // Always return success to prevent email enumeration
+    if (!dbUser) {
+      return res.json(successResponse(null, 'If an account with that email exists, a reset link has been sent.'));
+    }
+
+    // Generate a short-lived reset token (15 minutes)
+    const resetToken = generateToken({
+      sub: dbUser.id,
+      type: 'password_reset',
+      email: dbUser.email
+    }, { expiresIn: '15m' });
+
+    // TODO: Send email with reset link/code
+    // For now, log the token in development
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ForgotPassword] Reset token for', email, ':', resetToken);
+    }
+
+    res.json(successResponse(null, 'If an account with that email exists, a reset link has been sent.'));
+  } catch (err) {
+    console.error('[ForgotPassword] Error:', err);
+    res.status(500).json(errorResponse('Failed to process password reset request'));
+  }
+});
+
+// Reset password with token
+app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json(errorResponse('Token and new password are required'));
+    }
+
+    if (newPassword.length > 128) {
+      return res.status(400).json(errorResponse('Password must be 128 characters or less'));
+    }
+
+    // Validate password strength
+    const passwordErrors = validatePassword(newPassword);
+    if (passwordErrors.length > 0) {
+      return res.status(400).json(errorResponse(`Password must contain: ${passwordErrors.join(', ')}`));
+    }
+
+    // Verify the reset token
+    const result = verifyToken(`Bearer ${token}`);
+    if (result.error) {
+      return res.status(401).json(errorResponse('Invalid or expired reset link. Please request a new one.'));
+    }
+
+    if (result.user.claims.type !== 'password_reset') {
+      return res.status(401).json(errorResponse('Invalid token type'));
+    }
+
+    // Look up user
+    const dbUser = await repos.userRepo.getById(result.user.id);
+    if (!dbUser) {
+      return res.status(404).json(errorResponse('User not found'));
+    }
+
+    // Hash and store new password
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await repos.userRepo.update(dbUser.id, { passwordHash });
+
+    console.log('[ResetPassword] Password reset for user:', dbUser.id);
+
+    res.json(successResponse(null, 'Password has been reset successfully. You can now log in with your new password.'));
+  } catch (err) {
+    console.error('[ResetPassword] Error:', err);
+    res.status(500).json(errorResponse('Failed to reset password'));
+  }
 });
 
 // Refresh access token (no rate limiter -- already protected by requiring a valid refresh token)
@@ -1826,9 +2048,15 @@ app.post('/api/auth/refresh', async (req, res) => {
       console.log('[Refresh] Generated new token for user:', dbUser.id);
     }
     
+    // Generate a new refresh token (rotation)
+    const newRefreshToken = generateToken({
+      sub: dbUser.id,
+      type: 'refresh'
+    }, { expiresIn: '30d' });
+
     res.json(successResponse({
       token: newToken,
-      refreshToken, // Return the same refresh token (still valid)
+      refreshToken: newRefreshToken,
     }));
   } catch (err) {
     console.error('[Refresh] Error:', err);
@@ -1846,20 +2074,19 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       return res.status(400).json(errorResponse('Missing required fields: firstName, lastName, phone, password'));
     }
     
+    if (password.length > 128) {
+      return res.status(400).json(errorResponse('Password must be 128 characters or less'));
+    }
+
     // Validate password strength
-    const passwordErrors = [];
-    if (password.length < 8) passwordErrors.push('at least 8 characters');
-    if (!/[A-Z]/.test(password)) passwordErrors.push('one uppercase letter');
-    if (!/[a-z]/.test(password)) passwordErrors.push('one lowercase letter');
-    if (!/\d/.test(password)) passwordErrors.push('one number');
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) passwordErrors.push('one special character');
+    const passwordErrors = validatePassword(password);
     if (passwordErrors.length > 0) {
       return res.status(400).json(errorResponse(`Password must contain: ${passwordErrors.join(', ')}`));
     }
-    
+
     // Build the full phone number
     const fullPhone = `${countryCode || '+230'}${phone}`;
-    
+
     // Check if user already exists (by phone or email) in the database
     const existingByPhone = await repos.userRepo.getByPhone(fullPhone);
     if (existingByPhone) {
@@ -1871,21 +2098,29 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
         return res.status(409).json(errorResponse('A user with this email already exists'));
       }
     }
-    
+
     // Hash the password
     const passwordHash = await bcrypt.hash(password, 12);
-    
+
     // Create user in database via Prisma
     const userId = uuidv4();
-    const dbUser = await repos.userRepo.create({
-      id: userId,
-      name: `${firstName} ${lastName}`,
-      email: email || null,
-      phone: fullPhone,
-      avatar: profilePicture || null,
-      passwordHash,
-    });
-    
+    let dbUser;
+    try {
+      dbUser = await repos.userRepo.create({
+        id: userId,
+        name: `${firstName} ${lastName}`,
+        email: email || null,
+        phone: fullPhone,
+        avatar: profilePicture || null,
+        passwordHash,
+      });
+    } catch (createErr) {
+      if (createErr.code === 'P2002') {
+        return res.status(409).json(errorResponse('A user with these details already exists. Please try logging in.'));
+      }
+      throw createErr;
+    }
+
     // Build user response object (exclude passwordHash)
     const { passwordHash: _ph, ...safeNewUser } = dbUser;
     const newUser = {
@@ -1894,9 +2129,6 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       lastName,
       profilePicture: dbUser.avatar,
     };
-    
-    // Also push to in-memory users array (for non-migrated routes)
-    users.push(newUser);
     
     // Generate real JWT tokens
     const token = generateToken({ 
@@ -1934,17 +2166,16 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
       return res.status(400).json(errorResponse('Current password and new password are required'));
     }
     
+    if (newPassword.length > 128) {
+      return res.status(400).json(errorResponse('Password must be 128 characters or less'));
+    }
+
     // Validate new password strength (same rules as register)
-    const passwordErrors = [];
-    if (newPassword.length < 8) passwordErrors.push('at least 8 characters');
-    if (!/[A-Z]/.test(newPassword)) passwordErrors.push('one uppercase letter');
-    if (!/[a-z]/.test(newPassword)) passwordErrors.push('one lowercase letter');
-    if (!/\d/.test(newPassword)) passwordErrors.push('one number');
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(newPassword)) passwordErrors.push('one special character');
+    const passwordErrors = validatePassword(newPassword);
     if (passwordErrors.length > 0) {
       return res.status(400).json(errorResponse(`New password must contain: ${passwordErrors.join(', ')}`));
     }
-    
+
     // Look up user from database
     const dbUser = await repos.userRepo.getById(req.user.id);
     if (!dbUser) {
@@ -2016,21 +2247,10 @@ app.patch('/api/auth/me', requireAuth, async (req, res) => {
 });
 
 // Get current user
-app.get('/api/auth/me', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json(errorResponse('Not authenticated'));
-  }
-
-  // Verify JWT and extract user ID
-  const result = verifyToken(authHeader);
-  if (result.error) {
-    return res.status(401).json(errorResponse(result.error));
-  }
-
+app.get('/api/auth/me', requireAuth, async (req, res) => {
   try {
     // Use Prisma instead of in-memory array
-    const user = await repos.userRepo.getById(result.user.id);
+    const user = await repos.userRepo.getById(req.user.id);
     if (!user) {
       return res.status(404).json(errorResponse('User not found'));
     }
@@ -2841,6 +3061,19 @@ app.post('/api/companies/:companyId/products', requireAuth, async (req, res) => 
       return res.status(404).json(errorResponse('Business not found'));
     }
 
+    // Enforce listed product limit when creating a listed product
+    if (productData.isListed === true || productData.is_listed === true) {
+      const capabilities = deriveCapabilities(business);
+      const allProducts = await repos.productRepo.getByBusinessId(companyId);
+      const currentListedCount = allProducts.filter(p => p.isListed === true || p.is_listed === true).length;
+
+      if (currentListedCount >= capabilities.maxListedProducts) {
+        return res.status(403).json(errorResponse(
+          `Listed product limit reached (${capabilities.maxListedProducts}). Upgrade your plan to list more products.`
+        ));
+      }
+    }
+
     // Create the product (generate ID if not provided)
     const newProduct = await repos.productRepo.create({
       ...productData,
@@ -2933,8 +3166,17 @@ app.delete('/api/companies/:companyId/products/:productId', requireAuth, async (
 // List brands for a company
 app.get('/api/companies/:companyId/brands', requireAuth, async (req, res) => {
   try {
+    const { viewerBusinessId } = req.query;
     const brands = await repos.brandRepo.getByBusinessId(req.params.companyId);
-    res.json(successResponse(brands));
+
+    // Apply price privacy to products within each brand
+    const brandsWithPrivacy = await Promise.all(brands.map(async (brand) => {
+      if (!brand.products || brand.products.length === 0) return brand;
+      const privacyProducts = await applyPricePrivacyBatch(brand.products, viewerBusinessId || null);
+      return { ...brand, products: privacyProducts };
+    }));
+
+    res.json(successResponse(brandsWithPrivacy));
   } catch (e) {
     console.error('Error fetching brands:', e);
     res.status(500).json(errorResponse('Failed to fetch brands'));
@@ -7003,6 +7245,8 @@ app.get('/api/users/:userId/activities', requireAuth, async (req, res) => {
       delivery: {
         id: d.id,
         businessId: d.businessId,
+        businessName: d.business?.name || d.distributorName || null,
+        businessLogo: d.business?.logoUrl || null,
         locationId: d.locationId,
         clientName: d.clientCompanyName,
         clientAddress: d.clientAddress,
@@ -7069,9 +7313,10 @@ app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
 });
 
 // Feed Routes (paginated)
-app.get('/api/feed', (req, res) => {
+app.get('/api/feed', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit || '20', 10), 50);
   const cursor = req.query.cursor; // post id of the last item (optional)
+  const { viewerBusinessId } = req.query;
 
   let startIndex = 0;
   if (cursor) {
@@ -7083,9 +7328,26 @@ app.get('/api/feed', (req, res) => {
   const nextCursor = page.length ? page[page.length - 1].id : null;
   const hasMore = (startIndex + limit) < feedPosts.length;
 
+  // Apply price privacy to embedded products in feed posts
+  const privacyPage = await Promise.all(page.map(async (post) => {
+    if (!post.data?.products || post.data.products.length === 0) return post;
+
+    // Determine the owner business ID for this post's products
+    const ownerBizId = post.data.distributorId || post.data.businessId;
+    if (!ownerBizId) return post;
+
+    // Apply price privacy to each product in the post
+    const privacyProducts = await applyPricePrivacyBatch(
+      post.data.products.map(p => ({ ...p, ownerBusinessId: ownerBizId })),
+      viewerBusinessId || null
+    );
+
+    return { ...post, data: { ...post.data, products: privacyProducts } };
+  }));
+
   res.json({
     success: true,
-    data: page,
+    data: privacyPage,
     nextCursor: hasMore ? nextCursor : null,
     message: 'Success'
   });
@@ -7458,50 +7720,7 @@ app.get('/api/products', async (req, res) => {
     }
 
     // Apply price privacy: hide prices for businesses with pricePrivacyEnabled
-    const businessSettingsCache = new Map();
-    const getBusinessSettings = async (bizId) => {
-      if (!bizId) return null;
-      if (businessSettingsCache.has(bizId)) return businessSettingsCache.get(bizId);
-      const biz = await repos.businessRepo.getById(bizId);
-      businessSettingsCache.set(bizId, biz?.settings || null);
-      return biz?.settings || null;
-    };
-
-    const isConnected = async (bizA, bizB) => {
-      if (!bizA || !bizB || bizA === bizB) return true;
-      try {
-        const conn = await prisma.businessConnection.findFirst({
-          where: {
-            status: 'accepted',
-            OR: [
-              { requesterBusinessId: bizA, targetBusinessId: bizB },
-              { requesterBusinessId: bizB, targetBusinessId: bizA },
-            ],
-          },
-        });
-        return !!conn;
-      } catch {
-        return false;
-      }
-    };
-
-    catalog = await Promise.all(catalog.map(async (p) => {
-      const ownerBizId = p.businessId || p.companyId || p.ownerBusinessId;
-      // Own products always show price
-      if (viewerBusinessId && ownerBizId === viewerBusinessId) return p;
-
-      const settings = await getBusinessSettings(ownerBizId);
-      if (!settings?.pricePrivacyEnabled) return p;
-
-      // Privacy enabled — check connection
-      if (viewerBusinessId) {
-        const connected = await isConnected(viewerBusinessId, ownerBizId);
-        if (connected) return p;
-      }
-
-      // Not connected or no viewer — hide prices
-      return { ...p, price: null, salePrice: null, costPrice: null, pricePerCarton: null, priceHidden: true };
-    }));
+    catalog = await applyPricePrivacyBatch(catalog, viewerBusinessId || null);
 
     return res.json(successResponse(catalog.map(withProductVisibility)));
   } catch (err) {
@@ -7512,52 +7731,67 @@ app.get('/api/products', async (req, res) => {
 // Get single product by ID (public view)
 app.get('/api/products/:productId', async (req, res) => {
   const { productId } = req.params;
-  
+  const { viewerBusinessId } = req.query;
+
   try {
+    let foundProduct = null;
+
     // First check in database via Prisma repo
     const dbProduct = await repos.productRepo.getById(productId);
     if (dbProduct) {
-      return res.json(successResponse(withProductVisibility(dbProduct)));
+      foundProduct = withProductVisibility(dbProduct);
     }
 
     // Fallback: check in-memory products array
-    const memProduct = products.find(p => p.id === productId);
-    if (memProduct) {
-      return res.json(successResponse(withProductVisibility(memProduct)));
+    if (!foundProduct) {
+      const memProduct = products.find(p => p.id === productId);
+      if (memProduct) {
+        foundProduct = withProductVisibility(memProduct);
+      }
     }
-    
+
     // Then check in feed posts (products from feed)
-    for (const post of feedPosts) {
-      if (post.type === 'brand_presentation' && post.data.products) {
-        const feedProduct = post.data.products.find(p => p.id === productId);
-        if (feedProduct) {
-          return res.json(successResponse({
-            ...feedProduct,
-            brandName: post.data.brandName,
-            brandLogo: post.data.brandLogo,
-            distributorName: post.data.distributorName,
-            distributorId: post.data.distributorId,
-            ownerBusinessId: post.data.distributorId,
-            isPublic: true,
-          }));
+    if (!foundProduct) {
+      for (const post of feedPosts) {
+        if (post.type === 'brand_presentation' && post.data.products) {
+          const feedProduct = post.data.products.find(p => p.id === productId);
+          if (feedProduct) {
+            foundProduct = {
+              ...feedProduct,
+              brandName: post.data.brandName,
+              brandLogo: post.data.brandLogo,
+              distributorName: post.data.distributorName,
+              distributorId: post.data.distributorId,
+              ownerBusinessId: post.data.distributorId,
+              isPublic: true,
+            };
+            break;
+          }
         }
-      }
-      if (post.type === 'new_products' && post.data.products) {
-        const feedProduct = post.data.products.find(p => p.id === productId);
-        if (feedProduct) {
-          return res.json(successResponse({
-            ...feedProduct,
-            businessName: post.data.businessName,
-            businessLogo: post.data.businessLogo,
-            businessId: post.data.businessId,
-            ownerBusinessId: post.data.businessId,
-            isPublic: true,
-          }));
+        if (post.type === 'new_products' && post.data.products) {
+          const feedProduct = post.data.products.find(p => p.id === productId);
+          if (feedProduct) {
+            foundProduct = {
+              ...feedProduct,
+              businessName: post.data.businessName,
+              businessLogo: post.data.businessLogo,
+              businessId: post.data.businessId,
+              ownerBusinessId: post.data.businessId,
+              isPublic: true,
+            };
+            break;
+          }
         }
       }
     }
-    
-    res.status(404).json(errorResponse('Product not found'));
+
+    if (!foundProduct) {
+      return res.status(404).json(errorResponse('Product not found'));
+    }
+
+    // Apply price privacy
+    const result = await applyPricePrivacy(foundProduct, viewerBusinessId || null);
+    return res.json(successResponse(result));
   } catch (e) {
     console.error('Error fetching product:', e);
     res.status(500).json(errorResponse('Failed to load product'));
@@ -7621,15 +7855,16 @@ app.get('/api/public/locations/:locationId', (req, res) => {
 });
 
 // Get products for public storefront - no auth required
-app.get('/api/public/locations/:locationId/products', (req, res) => {
+app.get('/api/public/locations/:locationId/products', async (req, res) => {
+  const { viewerBusinessId } = req.query;
   const location = locations.find(l => l.id === req.params.locationId);
-  
+
   if (!location) {
     return res.status(404).json(errorResponse('Location not found'));
   }
-  
+
   const business = companies.find(c => c.id === location.companyId);
-  
+
   // Check effective public status (accounts for subscription tier)
   if (!isLocationPublicEffective(business, location)) {
     if (location.operatingMode === LOCATION_MODES.INDEPENDENT && location.isPublic) {
@@ -7643,14 +7878,17 @@ app.get('/api/public/locations/:locationId/products', (req, res) => {
     }
     return res.status(404).json(errorResponse('This location does not have a public storefront'));
   }
-  
+
   // Get products from parent business that are listed
-  let locationProducts = products.filter(p => 
+  let locationProducts = products.filter(p =>
     p.companyId === location.companyId && p.is_listed === true
   );
-  
+
   // TODO: Apply location-specific price overrides from locationProducts table
-  
+
+  // Apply price privacy
+  locationProducts = await applyPricePrivacyBatch(locationProducts, viewerBusinessId || null);
+
   res.json(successResponse(locationProducts.map(withProductVisibility)));
 });
 

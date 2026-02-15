@@ -20,6 +20,7 @@ async function getByBusinessId(businessId) {
     where: { businessId },
     orderBy: { name: 'asc' },
     include: {
+      products: true,
       _count: { select: { products: true } }
     }
   });

@@ -18,11 +18,11 @@ function mapMessageToApi(msg, requestingUserId = null) {
     id: msg.id,
     chatId: msg.chatId,
     type: msg.type || 'text',
-    sender: meta.sender || {
-      id: msg.senderId || 'unknown',
-      name: msg.senderName || 'Unknown',
-      avatar: '',
-      role: 'personal'
+    sender: {
+      id: meta.sender?.id || msg.senderId || 'unknown',
+      name: meta.sender?.name || msg.senderName || 'Unknown',
+      avatar: meta.sender?.avatar || '',
+      role: meta.sender?.role || 'personal',
     },
     timestamp: msg.timestamp,
     status: msg.status || 'sent',

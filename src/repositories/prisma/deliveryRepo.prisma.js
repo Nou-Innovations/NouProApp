@@ -75,7 +75,12 @@ async function getByOrderId(orderId) {
 async function getByAssignedStaffId(staffId) {
   return prisma.delivery.findMany({
     where: { assignedStaffId: staffId },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    include: {
+      business: {
+        select: { id: true, name: true, logoUrl: true }
+      }
+    }
   });
 }
 

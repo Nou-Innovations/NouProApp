@@ -51,6 +51,7 @@ function verifyToken(authHeader) {
       user: {
         id: userId,
         email: payload.email || null,
+        name: payload.name || null,
         role: payload.role || null,
         // Include full payload for extensibility
         claims: payload,
