@@ -8,9 +8,11 @@
 const orderStatus = require('./orderStatus');
 const orderAutomation = require('./orderAutomation');
 const eventMessages = require('./eventMessages');
+const pushService = require('./pushService');
 
 module.exports = {
   orderStatus,
   orderAutomation,
   eventMessages,
+  pushService,
 };

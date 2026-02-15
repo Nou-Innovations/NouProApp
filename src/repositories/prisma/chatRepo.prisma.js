@@ -48,7 +48,13 @@ function mapMessageToApi(msg, requestingUserId = null) {
     mapped.address = meta.address;
     mapped.locationName = meta.locationName;
   } else if (msg.type === 'voice') {
+    mapped.audioUrl = meta.audioUrl;
     mapped.durationSeconds = meta.durationSeconds;
+  } else if (msg.type === 'profile') {
+    mapped.profileId = meta.profileId;
+    mapped.profileName = meta.profileName;
+    mapped.profileAvatar = meta.profileAvatar;
+    mapped.profileType = meta.profileType || 'user';
   } else if (msg.type === 'invoice') {
     mapped.invoiceId = meta.invoiceId;
   } else if (msg.type === 'estimate') {
@@ -68,6 +74,21 @@ function mapMessageToApi(msg, requestingUserId = null) {
   // Reply context
   if (meta.replyingTo) {
     mapped.replyingTo = meta.replyingTo;
+  }
+
+  // Forwarded from context
+  if (meta.forwardedFrom) {
+    mapped.forwardedFrom = meta.forwardedFrom;
+  }
+
+  // Mentions
+  if (meta.mentions) {
+    mapped.mentions = meta.mentions;
+  }
+
+  // Edited at
+  if (meta.editedAt) {
+    mapped.editedAt = meta.editedAt;
   }
 
   return mapped;
@@ -279,9 +300,16 @@ async function addMessage(chatId, message, options = {}) {
           ...(message.address && { address: message.address }),
           ...(message.locationName && { locationName: message.locationName }),
           ...(message.durationSeconds != null && { durationSeconds: message.durationSeconds }),
+          ...(message.audioUrl && { audioUrl: message.audioUrl }),
           ...(message.invoiceId && { invoiceId: message.invoiceId }),
           ...(message.estimateId && { estimateId: message.estimateId }),
           ...(message.event && { event: message.event }),
+          ...(message.profileId && { profileId: message.profileId }),
+          ...(message.profileName && { profileName: message.profileName }),
+          ...(message.profileAvatar && { profileAvatar: message.profileAvatar }),
+          ...(message.profileType && { profileType: message.profileType }),
+          ...(message.forwardedFrom && { forwardedFrom: message.forwardedFrom }),
+          ...(message.mentions && { mentions: message.mentions }),
         },
         status: message.status || 'sent',
         isRead: message.isRead || false,
@@ -504,13 +532,71 @@ async function getChatParticipants(chatId) {
   });
 }
 
-module.exports = { 
-  getById, 
+/**
+ * Remove a participant from a chat.
+ * Deletes the ChatParticipant row and removes userId from the Chat.participants JSON array.
+ * @param {string} chatId
+ * @param {string} userId
+ * @returns {object} The updated chat
+ */
+async function removeParticipant(chatId, userId) {
+  return prisma.$transaction(async (tx) => {
+    // Delete the ChatParticipant row
+    await tx.chatParticipant.deleteMany({
+      where: { chatId, userId },
+    });
+
+    // Get current chat to update participants JSON
+    const chat = await tx.chat.findUnique({ where: { id: chatId } });
+    if (!chat) throw new Error('Chat not found');
+
+    const currentParticipants = Array.isArray(chat.participants) ? chat.participants : [];
+    const updatedParticipants = currentParticipants.filter(pid => pid !== userId);
+
+    const updatedChat = await tx.chat.update({
+      where: { id: chatId },
+      data: { participants: updatedParticipants },
+    });
+
+    return updatedChat;
+  });
+}
+
+/**
+ * Edit a message's content (text only).
+ * Updates content field and stores editedAt in meta.
+ * @param {string} chatId
+ * @param {string} messageId
+ * @param {string} newContent
+ * @returns {object} The mapped updated message
+ */
+async function editMessage(chatId, messageId, newContent) {
+  const existing = await prisma.message.findFirst({
+    where: { id: messageId, chatId },
+  });
+  if (!existing) return null;
+
+  const updated = await prisma.message.update({
+    where: { id: messageId },
+    data: {
+      content: newContent,
+      meta: {
+        ...(existing.meta || {}),
+        editedAt: new Date().toISOString(),
+      },
+    },
+  });
+
+  return mapMessageToApi(updated);
+}
+
+module.exports = {
+  getById,
   getByCompanyId,
   getByBusinessId: getByCompanyId, // Alias for backward compatibility (eventMessages.js)
   getByUserId,
-  create, 
-  update, 
+  create,
+  update,
   delete: remove,
   getMessages,
   addMessage,
@@ -519,4 +605,6 @@ module.exports = {
   markMessagesAsRead,
   getParticipantUnreadCounts,
   getChatParticipants,
+  removeParticipant,
+  editMessage,
 };

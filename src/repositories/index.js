@@ -33,6 +33,8 @@ function getRepos() {
     notificationReadRepo: require('./prisma/notificationReadRepo.prisma'),
     brandRepo: require('./prisma/brandRepo.prisma'),
     connectionRepo: require('./prisma/connectionRepo.prisma'),
+    pushTokenRepo: require('./prisma/pushTokenRepo.prisma'),
+    notificationPreferenceRepo: require('./prisma/notificationPreferenceRepo.prisma'),
   };
 
   return cachedRepos;

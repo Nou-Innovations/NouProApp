@@ -6,9 +6,13 @@ const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const path = require('path');
 const { Server: SocketIOServer } = require('socket.io');
+const { Expo } = require('expo-server-sdk');
 
 // Load environment variables (create a .env file in backend/ if needed)
 require('dotenv').config();
+
+// Expo push notification client
+const expo = new Expo();
 
 // ============================================================================
 // REPOSITORY LAYER - Import repositories for data access
@@ -26,9 +30,10 @@ require('dotenv').config();
 // ============================================================================
 const { getRepos, getDataSource } = require('./src/repositories');
 const repos = getRepos();
+const { prisma } = require('./src/db/prisma');
 
 // Services
-const { orderStatus: orderStatusService, eventMessages } = require('./src/services');
+const { orderStatus: orderStatusService, eventMessages, pushService } = require('./src/services');
 
 // Authentication middleware
 const { requireAuth, optionalAuth, generateToken, verifyToken } = require('./src/middleware/auth');
@@ -779,7 +784,8 @@ const MEMBER_STATUS = {
 
 const VALID_MESSAGE_TYPES = new Set([
   'text', 'image', 'pdf', 'location', 'voice',
-  'video_call', 'invoice', 'estimate', 'delivery', 'event'
+  'video_call', 'invoice', 'estimate', 'delivery', 'event',
+  'profile',
 ]);
 
 const MAX_MESSAGE_LENGTH = 10000; // 10k characters
@@ -1732,6 +1738,8 @@ io.use((socket, next) => {
   }
 
   socket.userId = userId;
+  // Store user name for typing indicators (from JWT claims)
+  socket.userName = result.user.name || result.user.email || 'Someone';
   next();
 });
 
@@ -1772,6 +1780,24 @@ io.on('connection', (socket) => {
   socket.on('leave_chat', (chatId) => {
     socket.leave(`chat:${chatId}`);
     console.log(`[Socket] ${socket.userId} left chat:${chatId}`);
+  });
+
+  // Typing indicators
+  socket.on('typing_start', ({ chatId }) => {
+    if (!chatId) return;
+    socket.to(`chat:${chatId}`).emit('typing', {
+      chatId,
+      userId: socket.userId,
+      userName: socket.userName || 'Someone',
+    });
+  });
+
+  socket.on('typing_stop', ({ chatId }) => {
+    if (!chatId) return;
+    socket.to(`chat:${chatId}`).emit('typing_stop', {
+      chatId,
+      userId: socket.userId,
+    });
   });
 
   socket.on('disconnect', () => {
@@ -1853,6 +1879,19 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     // Clear failed attempts on successful login
     failedLoginAttempts.delete(email.toLowerCase());
 
+    // Check if 2FA is enabled
+    if (dbUser.twoFactorEnabled) {
+      const tempToken = generateToken({
+        sub: dbUser.id,
+        type: '2fa_pending',
+      }, { expiresIn: '5m' });
+
+      return res.json(successResponse({
+        requiresTwoFactor: true,
+        tempToken,
+      }, 'Two-factor authentication required'));
+    }
+
     // Get user's businesses from database
     const memberships = await repos.memberRepo.getByUserId(dbUser.id);
     const userBusinesses = [];
@@ -1888,8 +1927,8 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       console.warn('[Login] Failed to update lastLoginAt:', err.message);
     });
     
-    // Build user response (exclude passwordHash, match register shape)
-    const { passwordHash: _pw, ...safeDbUser } = dbUser;
+    // Build user response (exclude sensitive fields, match register shape)
+    const { passwordHash: _pw, twoFactorSecret: _ts, twoFactorBackupCodes: _tbc, ...safeDbUser } = dbUser;
     const nameParts = (dbUser.name || '').split(' ');
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -2211,6 +2250,232 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
   }
 });
 
+// ============================================================================
+// Two-Factor Authentication (2FA / TOTP)
+// ============================================================================
+
+// Begin 2FA setup - generate TOTP secret
+app.post('/api/auth/2fa/setup', requireAuth, async (req, res) => {
+  try {
+    const { authenticator } = require('otplib');
+
+    const dbUser = await repos.userRepo.getById(req.user.id);
+    if (!dbUser) return res.status(404).json(errorResponse('User not found'));
+
+    if (dbUser.twoFactorEnabled) {
+      return res.status(400).json(errorResponse('Two-factor authentication is already enabled'));
+    }
+
+    // Generate secret
+    const secret = authenticator.generateSecret();
+
+    // Generate otpauth URI for QR code
+    const otpauthUrl = authenticator.keyuri(
+      dbUser.email || dbUser.phone || dbUser.id,
+      'NouPro',
+      secret
+    );
+
+    // Store secret temporarily (not yet enabled)
+    await repos.userRepo.update(req.user.id, { twoFactorSecret: secret });
+
+    // Format secret for display (groups of 4)
+    const formattedSecret = secret.match(/.{1,4}/g)?.join('-') || secret;
+
+    res.json(successResponse({ secret: formattedSecret, otpauthUrl }));
+  } catch (err) {
+    console.error('[2FA Setup] Error:', err);
+    res.status(500).json(errorResponse('Failed to set up two-factor authentication'));
+  }
+});
+
+// Verify setup code and enable 2FA
+app.post('/api/auth/2fa/verify-setup', requireAuth, async (req, res) => {
+  try {
+    const { authenticator } = require('otplib');
+    const crypto = require('crypto');
+    const { code } = req.body;
+
+    if (!code || code.length !== 6) {
+      return res.status(400).json(errorResponse('A valid 6-digit code is required'));
+    }
+
+    const dbUser = await repos.userRepo.getById(req.user.id);
+    if (!dbUser || !dbUser.twoFactorSecret) {
+      return res.status(400).json(errorResponse('2FA setup not initiated'));
+    }
+
+    // Verify the TOTP code (allow 1 window tolerance)
+    authenticator.options = { window: 1 };
+    const isValid = authenticator.verify({ token: code, secret: dbUser.twoFactorSecret });
+    if (!isValid) {
+      return res.status(400).json(errorResponse('Invalid verification code. Please try again.'));
+    }
+
+    // Generate 8 backup codes
+    const backupCodes = Array.from({ length: 8 }, () =>
+      crypto.randomBytes(4).toString('hex')
+    );
+
+    // Hash backup codes before storing
+    const hashedBackupCodes = await Promise.all(
+      backupCodes.map(c => bcrypt.hash(c, 10))
+    );
+
+    // Enable 2FA
+    await repos.userRepo.update(req.user.id, {
+      twoFactorEnabled: true,
+      twoFactorBackupCodes: JSON.stringify(hashedBackupCodes),
+    });
+
+    console.log('[2FA] Enabled for user:', req.user.id);
+
+    res.json(successResponse({
+      backupCodes,
+      message: 'Two-factor authentication enabled successfully',
+    }));
+  } catch (err) {
+    console.error('[2FA Verify Setup] Error:', err);
+    res.status(500).json(errorResponse('Failed to verify two-factor code'));
+  }
+});
+
+// Disable 2FA (requires password)
+app.post('/api/auth/2fa/disable', requireAuth, async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json(errorResponse('Password is required to disable 2FA'));
+    }
+
+    const dbUser = await repos.userRepo.getById(req.user.id);
+    if (!dbUser) return res.status(404).json(errorResponse('User not found'));
+
+    const valid = await bcrypt.compare(password, dbUser.passwordHash);
+    if (!valid) {
+      return res.status(401).json(errorResponse('Invalid password'));
+    }
+
+    await repos.userRepo.update(req.user.id, {
+      twoFactorEnabled: false,
+      twoFactorSecret: null,
+      twoFactorBackupCodes: null,
+    });
+
+    console.log('[2FA] Disabled for user:', req.user.id);
+
+    res.json(successResponse(null, 'Two-factor authentication disabled'));
+  } catch (err) {
+    console.error('[2FA Disable] Error:', err);
+    res.status(500).json(errorResponse('Failed to disable two-factor authentication'));
+  }
+});
+
+// Verify 2FA code during login
+app.post('/api/auth/2fa/verify', async (req, res) => {
+  try {
+    const { authenticator } = require('otplib');
+    const { tempToken, code } = req.body;
+
+    if (!tempToken || !code) {
+      return res.status(400).json(errorResponse('Temporary token and code are required'));
+    }
+
+    // Verify the temp token
+    const result = verifyToken(`Bearer ${tempToken}`);
+    if (result.error) {
+      return res.status(401).json(errorResponse('Invalid or expired session'));
+    }
+
+    if (result.user.claims.type !== '2fa_pending') {
+      return res.status(401).json(errorResponse('Invalid token type'));
+    }
+
+    const dbUser = await repos.userRepo.getById(result.user.id);
+    if (!dbUser || !dbUser.twoFactorSecret) {
+      return res.status(400).json(errorResponse('2FA not configured'));
+    }
+
+    // Try TOTP code first (allow 1 window tolerance)
+    authenticator.options = { window: 1 };
+    let isValid = authenticator.verify({ token: code, secret: dbUser.twoFactorSecret });
+
+    // If TOTP fails, try backup codes
+    if (!isValid && dbUser.twoFactorBackupCodes) {
+      const hashedCodes = JSON.parse(dbUser.twoFactorBackupCodes);
+      for (let i = 0; i < hashedCodes.length; i++) {
+        const match = await bcrypt.compare(code, hashedCodes[i]);
+        if (match) {
+          isValid = true;
+          hashedCodes.splice(i, 1);
+          await repos.userRepo.update(dbUser.id, {
+            twoFactorBackupCodes: JSON.stringify(hashedCodes),
+          });
+          break;
+        }
+      }
+    }
+
+    if (!isValid) {
+      return res.status(400).json(errorResponse('Invalid verification code'));
+    }
+
+    // Issue real tokens (same as login success)
+    const memberships = await repos.memberRepo.getByUserId(dbUser.id);
+    const userBusinesses = [];
+    for (const m of memberships) {
+      if (m.status !== 'accepted') continue;
+      const business = await repos.businessRepo.getById(m.businessId);
+      if (!business) continue;
+      userBusinesses.push({
+        business: { ...business, capabilities: deriveCapabilities(business) },
+        role: m.role,
+        staff_entry: {
+          id: m.id,
+          status: m.status,
+          role_type: m.roleType || null,
+          joinedAt: m.createdAt,
+        },
+      });
+    }
+
+    const token = generateToken({
+      sub: dbUser.id,
+      email: dbUser.email,
+      name: dbUser.name,
+    });
+    const refreshToken = generateToken({
+      sub: dbUser.id,
+      type: 'refresh',
+    }, { expiresIn: '30d' });
+
+    await repos.userRepo.update(dbUser.id, { lastLoginAt: new Date() }).catch(() => {});
+
+    const { passwordHash: _pw, twoFactorSecret: _ts, twoFactorBackupCodes: _tbc, ...safeDbUser } = dbUser;
+    const nameParts = (dbUser.name || '').split(' ');
+
+    const userResponse = {
+      ...safeDbUser,
+      firstName: nameParts[0] || '',
+      lastName: nameParts.slice(1).join(' ') || '',
+      profilePicture: dbUser.avatar,
+    };
+
+    console.log('[2FA Verify] Login completed for user:', dbUser.id);
+
+    res.json(successResponse({
+      user: userResponse,
+      token,
+      refreshToken,
+      businesses: userBusinesses,
+    }));
+  } catch (err) {
+    console.error('[2FA Verify] Error:', err);
+    res.status(500).json(errorResponse('Failed to verify two-factor code'));
+  }
+});
+
 // Update current user profile (requires authentication)
 app.patch('/api/auth/me', requireAuth, async (req, res) => {
   try {
@@ -2234,8 +2499,8 @@ app.patch('/api/auth/me', requireAuth, async (req, res) => {
 
     const updatedUser = await repos.userRepo.update(req.user.id, updateData);
 
-    // Strip passwordHash from response
-    const { passwordHash, ...safeUser } = updatedUser;
+    // Strip sensitive fields from response
+    const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = updatedUser;
 
     console.log('[UpdateProfile] Updated user:', req.user.id, Object.keys(updateData));
 
@@ -2255,8 +2520,8 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
       return res.status(404).json(errorResponse('User not found'));
     }
 
-    // Strip passwordHash from response
-    const { passwordHash, ...safeUser } = user;
+    // Strip sensitive fields from response
+    const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = user;
 
     // Get businesses from Prisma
     const memberships = await repos.memberRepo.getByUserId(user.id);
@@ -2298,7 +2563,7 @@ app.get('/api/users/:userId', requireAuth, async (req, res) => {
       return res.status(404).json(errorResponse('User not found'));
     }
 
-    const { passwordHash, ...safeUser } = user;
+    const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = user;
 
     // Check privacy: if not connected, strip private fields
     const isSelf = req.user.id === req.params.userId;
@@ -3742,6 +4007,17 @@ app.patch('/api/companies/:companyId/orders/:orderId/status', requireAuth, async
       // Don't fail the status update if message creation fails
     }
 
+    // Push notification for order status change (non-blocking)
+    if (updated.createdBy && updated.createdBy !== req.user?.id) {
+      pushService.sendToUsers({
+        userIds: [updated.createdBy],
+        title: 'Order Update',
+        body: `Order status changed to ${status}`,
+        category: 'orders',
+        data: { type: 'order_status', orderId: updated.id, status },
+      }, repos).catch((err) => console.error('[Push] Order status push error:', err));
+    }
+
     res.json(successResponse(updated, 'Order status updated successfully'));
   } catch (err) {
     console.error('Error changing order status:', err);
@@ -4486,6 +4762,17 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, async
       } finally {
         _orderDeliverySyncInProgress.delete(delivery.orderId);
       }
+    }
+
+    // Push notification for delivery status change (non-blocking)
+    if (updateData.deliveryStatus && delivery.assignedStaffId && delivery.assignedStaffId !== req.user?.id) {
+      pushService.sendToUsers({
+        userIds: [delivery.assignedStaffId],
+        title: 'Delivery Update',
+        body: `Delivery status changed to ${updateData.deliveryStatus.replace(/_/g, ' ')}`,
+        category: 'deliveries',
+        data: { type: 'delivery_status', deliveryId: delivery.id, status: updateData.deliveryStatus },
+      }, repos).catch((err) => console.error('[Push] Delivery status push error:', err));
     }
 
     res.json(successResponse(updated));
@@ -5266,7 +5553,7 @@ app.post('/api/invoices/:invoiceId/accept', requireAuth, async (req, res) => {
 app.post('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, chatCreationLimiter, async (req, res) => {
   try {
     const { companyId } = req.params;
-    const { type, name, participants, partnerId, partnerType, locationId } = req.body;
+    const { type, name, participants, partnerId, partnerType, locationId, avatar } = req.body;
 
     // Validate required fields
     if (!name) {
@@ -5298,7 +5585,7 @@ app.post('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, c
       partnerId: partnerId || null,
       partnerType: partnerType || null,
       unreadCount: 0,
-      avatar: null,
+      avatar: avatar || null,
       lastMessage: null
     });
 
@@ -5488,6 +5775,7 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, requir
     // Add type-specific fields
     if (type === 'text') {
       newMessage.text = content;
+      if (metadata?.mentions) newMessage.mentions = metadata.mentions;
     } else if (type === 'pdf') {
       newMessage.fileName = content;
       newMessage.fileUrl = attachmentUrl;
@@ -5498,6 +5786,20 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, requir
       newMessage.longitude = metadata?.longitude;
       newMessage.address = metadata?.address;
       newMessage.locationName = metadata?.locationName;
+    } else if (type === 'voice') {
+      newMessage.content = content;
+      newMessage.audioUrl = attachmentUrl || metadata?.audioUrl;
+      newMessage.durationSeconds = metadata?.durationSeconds;
+    } else if (type === 'profile') {
+      newMessage.content = content;
+      newMessage.profileId = metadata?.profileId;
+      newMessage.profileName = metadata?.profileName;
+      newMessage.profileAvatar = metadata?.profileAvatar;
+      newMessage.profileType = metadata?.profileType || 'user';
+    } else {
+      // Fallback for other valid types (invoice, estimate, delivery, event, video_call)
+      newMessage.content = content;
+      if (metadata) newMessage.meta = metadata;
     }
 
     // Add reply context if replying (efficient single-message lookup)
@@ -5522,6 +5824,9 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, requir
     // Emit full message object to all participants in the chat room
     io.to(`chat:${chatId}`).emit('message', created);
 
+    // Send push notifications to offline participants
+    sendPushToOfflineParticipants(chatId, senderName, created.text || created.content || 'New message', senderId);
+
     // Emit per-user chat_update so each user gets their own unreadCount
     const lastMessagePayload = {
       id: created.id,
@@ -5541,6 +5846,20 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, requir
       }
     } else {
       console.warn(`[Chat] No participants found for chat ${chatId}, skipping chat_update emit`);
+    }
+
+    // Send push notifications to other participants
+    const otherParticipantIds = participantCounts
+      .map((p) => p.userId)
+      .filter((id) => id !== senderId);
+    if (otherParticipantIds.length > 0) {
+      pushService.sendToUsers({
+        userIds: otherParticipantIds,
+        title: senderName || 'New Message',
+        body: created.content || 'Sent a message',
+        category: 'messages',
+        data: { type: 'chat_message', chatId },
+      }, repos).catch((err) => console.error('[Push] Chat message push error:', err));
     }
 
     res.json(successResponse(created));
@@ -5600,6 +5919,256 @@ app.delete('/api/companies/:companyId/chats/:chatId/messages/:messageId', requir
   }
 });
 
+// Edit a message (business mode)
+app.patch('/api/companies/:companyId/chats/:chatId/messages/:messageId', requireAuth, requireCompanyMember, async (req, res) => {
+  try {
+    const { companyId, chatId, messageId } = req.params;
+    const { content } = req.body;
+
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return res.status(400).json(errorResponse('Content is required'));
+    }
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat || chat.companyId !== companyId) {
+      return res.status(404).json(errorResponse('Chat not found'));
+    }
+
+    const message = await repos.chatRepo.getMessage(chatId, messageId);
+    if (!message) {
+      return res.status(404).json(errorResponse('Message not found'));
+    }
+
+    // Only the sender can edit
+    if (message.sender?.id !== req.user?.id) {
+      return res.status(403).json(errorResponse('You can only edit your own messages'));
+    }
+
+    // Only text messages can be edited
+    const msgType = message.type || (message.meta?.type) || 'text';
+    if (msgType !== 'text') {
+      return res.status(400).json(errorResponse('Only text messages can be edited'));
+    }
+
+    // Must be within 24 hours
+    const messageAge = Date.now() - new Date(message.createdAt).getTime();
+    if (messageAge > 24 * 60 * 60 * 1000) {
+      return res.status(400).json(errorResponse('Messages can only be edited within 24 hours'));
+    }
+
+    const edited = await repos.chatRepo.editMessage(chatId, messageId, content.trim());
+    const editedAt = edited.meta?.editedAt || new Date().toISOString();
+
+    // Notify all participants
+    io.to(`chat:${chatId}`).emit('message_edited', {
+      chatId,
+      messageId,
+      content: content.trim(),
+      editedAt,
+    });
+
+    res.json(successResponse(edited));
+  } catch (e) {
+    console.error('Error editing message:', e);
+    res.status(500).json(errorResponse('Failed to edit message'));
+  }
+});
+
+
+// Forward a message to another chat (business mode)
+app.post('/api/companies/:companyId/chats/:chatId/messages/:messageId/forward', requireAuth, requireCompanyMember, async (req, res) => {
+  try {
+    const { companyId, chatId, messageId } = req.params;
+    const { targetChatId } = req.body;
+    const userId = req.user?.id;
+
+    if (!targetChatId) {
+      return res.status(400).json(errorResponse('targetChatId is required'));
+    }
+
+    // Verify source chat exists and belongs to company
+    const sourceChat = await repos.chatRepo.getById(chatId);
+    if (!sourceChat || sourceChat.companyId !== companyId) {
+      return res.status(404).json(errorResponse('Source chat not found'));
+    }
+
+    // Verify target chat exists and belongs to same company
+    const targetChat = await repos.chatRepo.getById(targetChatId);
+    if (!targetChat || targetChat.companyId !== companyId) {
+      return res.status(404).json(errorResponse('Target chat not found'));
+    }
+
+    // Verify user is a participant in the target chat
+    const isTargetParticipant = Array.isArray(targetChat.participants) && targetChat.participants.includes(userId);
+    if (!isTargetParticipant) {
+      return res.status(403).json(errorResponse('You are not a member of the target chat'));
+    }
+
+    // Get the original message
+    const originalMessage = await repos.chatRepo.getMessage(chatId, messageId);
+    if (!originalMessage) {
+      return res.status(404).json(errorResponse('Message not found'));
+    }
+
+    // Look up sender name
+    const senderUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    const senderName = senderUser?.name || 'Someone';
+
+    // Build forwarded message
+    const forwardedMsg = {
+      id: `msg-${uuidv4()}`,
+      type: originalMessage.type || 'text',
+      content: originalMessage.text || originalMessage.content || '',
+      text: originalMessage.text || '',
+      sender: { id: userId, name: senderName, avatar: '', role: 'business' },
+      status: 'sent',
+      isOutgoing: false,
+      forwardedFrom: { chatId, senderName: originalMessage.sender?.name || 'Unknown' },
+      // Copy type-specific fields
+      ...(originalMessage.imageUrl && { imageUrl: originalMessage.imageUrl }),
+      ...(originalMessage.fileUrl && { fileUrl: originalMessage.fileUrl }),
+      ...(originalMessage.fileName && { fileName: originalMessage.fileName }),
+      ...(originalMessage.audioUrl && { audioUrl: originalMessage.audioUrl }),
+      ...(originalMessage.durationSeconds != null && { durationSeconds: originalMessage.durationSeconds }),
+      ...(originalMessage.profileId && { profileId: originalMessage.profileId }),
+      ...(originalMessage.profileName && { profileName: originalMessage.profileName }),
+      ...(originalMessage.profileAvatar && { profileAvatar: originalMessage.profileAvatar }),
+      ...(originalMessage.profileType && { profileType: originalMessage.profileType }),
+      ...(originalMessage.latitude != null && { latitude: originalMessage.latitude }),
+      ...(originalMessage.longitude != null && { longitude: originalMessage.longitude }),
+      ...(originalMessage.address && { address: originalMessage.address }),
+      ...(originalMessage.locationName && { locationName: originalMessage.locationName }),
+    };
+
+    const { message: savedMessage, participantCounts } = await repos.chatRepo.addMessage(targetChatId, forwardedMsg);
+
+    // Emit to target chat room
+    io.to(`chat:${targetChatId}`).emit('message', savedMessage);
+
+    // Per-participant unread counts
+    if (participantCounts) {
+      for (const pc of participantCounts) {
+        if (pc.userId !== userId) {
+          io.to(`user:${pc.userId}`).emit('unread_update', { chatId: targetChatId, unreadCount: pc.unreadCount });
+        }
+      }
+    }
+
+    // Push notifications to offline participants
+    if (typeof sendPushToOfflineParticipants === 'function') {
+      sendPushToOfflineParticipants(targetChat, savedMessage, userId).catch(() => {});
+    }
+
+    res.json(successResponse(savedMessage));
+  } catch (e) {
+    console.error('Error forwarding message:', e);
+    res.status(500).json(errorResponse('Failed to forward message'));
+  }
+});
+
+// Leave a group chat (business mode)
+app.post('/api/companies/:companyId/chats/:chatId/leave', requireAuth, requireCompanyMember, async (req, res) => {
+  try {
+    const { companyId, chatId } = req.params;
+    const userId = req.user?.id;
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat || chat.companyId !== companyId) {
+      return res.status(404).json(errorResponse('Chat not found'));
+    }
+
+    // Look up user name for the system message
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    const userName = user?.name || 'Someone';
+
+    // Remove participant from the chat
+    const updatedChat = await repos.chatRepo.removeParticipant(chatId, userId);
+
+    // Send a system event message to the chat
+    const eventMessage = {
+      id: `msg-${uuidv4()}`,
+      type: 'event',
+      content: `${userName} left the group`,
+      event: `${userName} left the group`,
+      sender: { id: 'system', name: 'System', avatar: '', role: 'system' },
+      status: 'sent',
+      isOutgoing: false,
+    };
+    await repos.chatRepo.addMessage(chatId, eventMessage, { incrementUnread: true });
+    io.to(`chat:${chatId}`).emit('message', eventMessage);
+
+    // Notify remaining participants
+    const remainingParticipants = updatedChat.participants || [];
+    for (const pid of remainingParticipants) {
+      if (typeof pid === 'string') {
+        io.to(`user:${pid}`).emit('chat_update', { id: chatId, participants: remainingParticipants });
+      }
+    }
+
+    res.json(successResponse({ message: 'Left group successfully' }));
+  } catch (e) {
+    console.error('Error leaving chat:', e);
+    res.status(500).json(errorResponse('Failed to leave group'));
+  }
+});
+
+// Remove a participant from a group chat (business mode)
+app.post('/api/companies/:companyId/chats/:chatId/remove-participant', requireAuth, requireCompanyMember, async (req, res) => {
+  try {
+    const { companyId, chatId } = req.params;
+    const { userId: targetUserId } = req.body;
+    const requesterId = req.user?.id;
+
+    if (!targetUserId) {
+      return res.status(400).json(errorResponse('userId is required'));
+    }
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat || chat.companyId !== companyId) {
+      return res.status(404).json(errorResponse('Chat not found'));
+    }
+
+    // Look up names for the system message
+    const [requester, target] = await Promise.all([
+      prisma.user.findUnique({ where: { id: requesterId }, select: { name: true } }),
+      prisma.user.findUnique({ where: { id: targetUserId }, select: { name: true } }),
+    ]);
+    const requesterName = requester?.name || 'Someone';
+    const targetName = target?.name || 'a member';
+
+    // Remove participant
+    const updatedChat = await repos.chatRepo.removeParticipant(chatId, targetUserId);
+
+    // Send system event message
+    const eventMessage = {
+      id: `msg-${uuidv4()}`,
+      type: 'event',
+      content: `${requesterName} removed ${targetName} from the group`,
+      event: `${requesterName} removed ${targetName} from the group`,
+      sender: { id: 'system', name: 'System', avatar: '', role: 'system' },
+      status: 'sent',
+      isOutgoing: false,
+    };
+    await repos.chatRepo.addMessage(chatId, eventMessage, { incrementUnread: true });
+    io.to(`chat:${chatId}`).emit('message', eventMessage);
+
+    // Notify the removed user
+    io.to(`user:${targetUserId}`).emit('chat_update', { id: chatId, removed: true });
+
+    // Notify remaining participants
+    const remainingParticipants = updatedChat.participants || [];
+    for (const pid of remainingParticipants) {
+      if (typeof pid === 'string') {
+        io.to(`user:${pid}`).emit('chat_update', { id: chatId, participants: remainingParticipants });
+      }
+    }
+
+    res.json(successResponse({ message: 'Participant removed successfully' }));
+  } catch (e) {
+    console.error('Error removing participant:', e);
+    res.status(500).json(errorResponse('Failed to remove participant'));
+  }
+});
 
 // ============================================================================
 // USER CHAT ROUTES (Personal Mode)
@@ -5671,7 +6240,7 @@ app.post('/api/users/:userId/chats', requireAuth, chatCreationLimiter, async (re
       return res.status(403).json(errorResponse('Access denied'));
     }
 
-    const { type, name, participants } = req.body;
+    const { type, name, participants, avatar } = req.body;
 
     if (!name) {
       return res.status(400).json(errorResponse('Chat name is required'));
@@ -5690,7 +6259,7 @@ app.post('/api/users/:userId/chats', requireAuth, chatCreationLimiter, async (re
       name,
       participants: allParticipants,
       unreadCount: 0,
-      avatar: null,
+      avatar: avatar || null,
       lastMessage: null
     });
 
@@ -5838,6 +6407,7 @@ app.post('/api/users/:userId/chats/:chatId/messages', requireAuth, messageLimite
     // Add type-specific fields
     if (resolvedType === 'text') {
       newMessage.text = content;
+      if (metadata?.mentions) newMessage.mentions = metadata.mentions;
     } else if (resolvedType === 'pdf') {
       newMessage.fileName = content;
       newMessage.fileUrl = attachmentUrl;
@@ -5850,6 +6420,7 @@ app.post('/api/users/:userId/chats/:chatId/messages', requireAuth, messageLimite
       newMessage.locationName = metadata?.locationName;
     } else if (resolvedType === 'voice') {
       newMessage.content = content;
+      newMessage.audioUrl = attachmentUrl || metadata?.audioUrl;
       newMessage.durationSeconds = metadata?.durationSeconds;
     } else if (resolvedType === 'video_call') {
       newMessage.content = content;
@@ -5866,6 +6437,12 @@ app.post('/api/users/:userId/chats/:chatId/messages', requireAuth, messageLimite
     } else if (resolvedType === 'event') {
       newMessage.content = content;
       newMessage.meta = metadata;
+    } else if (resolvedType === 'profile') {
+      newMessage.content = content;
+      newMessage.profileId = metadata?.profileId;
+      newMessage.profileName = metadata?.profileName;
+      newMessage.profileAvatar = metadata?.profileAvatar;
+      newMessage.profileType = metadata?.profileType || 'user';
     }
 
     // Add reply context if replying (efficient single-message lookup)
@@ -5888,6 +6465,9 @@ app.post('/api/users/:userId/chats/:chatId/messages', requireAuth, messageLimite
 
     // Emit full message object to all participants in the chat room
     io.to(`chat:${chatId}`).emit('message', created);
+
+    // Send push notifications to offline participants
+    sendPushToOfflineParticipants(chatId, senderName, created.text || created.content || 'New message', senderId);
 
     // Emit per-user chat_update so each user gets their own unreadCount
     const lastMessagePayloadUser = {
@@ -5977,6 +6557,249 @@ app.delete('/api/users/:userId/chats/:chatId/messages/:messageId', requireAuth, 
   }
 });
 
+// Edit a message (personal mode)
+app.patch('/api/users/:userId/chats/:chatId/messages/:messageId', requireAuth, async (req, res) => {
+  try {
+    const { userId, chatId, messageId } = req.params;
+    const { content } = req.body;
+
+    if (req.user?.id && req.user.id !== userId) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return res.status(400).json(errorResponse('Content is required'));
+    }
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat) {
+      return res.status(404).json(errorResponse('Chat not found'));
+    }
+
+    const isParticipant = Array.isArray(chat.participants) && chat.participants.includes(userId);
+    if (!isParticipant) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    const message = await repos.chatRepo.getMessage(chatId, messageId);
+    if (!message) {
+      return res.status(404).json(errorResponse('Message not found'));
+    }
+
+    if (message.sender?.id !== userId) {
+      return res.status(403).json(errorResponse('You can only edit your own messages'));
+    }
+
+    const msgType = message.type || (message.meta?.type) || 'text';
+    if (msgType !== 'text') {
+      return res.status(400).json(errorResponse('Only text messages can be edited'));
+    }
+
+    const messageAge = Date.now() - new Date(message.createdAt).getTime();
+    if (messageAge > 24 * 60 * 60 * 1000) {
+      return res.status(400).json(errorResponse('Messages can only be edited within 24 hours'));
+    }
+
+    const edited = await repos.chatRepo.editMessage(chatId, messageId, content.trim());
+    const editedAt = edited.meta?.editedAt || new Date().toISOString();
+
+    io.to(`chat:${chatId}`).emit('message_edited', {
+      chatId,
+      messageId,
+      content: content.trim(),
+      editedAt,
+    });
+
+    res.json(successResponse(edited));
+  } catch (e) {
+    console.error('Error editing user message:', e);
+    res.status(500).json(errorResponse('Failed to edit message'));
+  }
+});
+
+
+// Forward a message to another chat (personal mode)
+app.post('/api/users/:userId/chats/:chatId/messages/:messageId/forward', requireAuth, async (req, res) => {
+  try {
+    const { userId, chatId, messageId } = req.params;
+    const { targetChatId } = req.body;
+    if (req.user?.id !== userId) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    if (!targetChatId) {
+      return res.status(400).json(errorResponse('targetChatId is required'));
+    }
+
+    // Verify source chat
+    const sourceChat = await repos.chatRepo.getById(chatId);
+    if (!sourceChat) {
+      return res.status(404).json(errorResponse('Source chat not found'));
+    }
+    const isSourceParticipant = Array.isArray(sourceChat.participants) && sourceChat.participants.includes(userId);
+    if (!isSourceParticipant) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    // Verify target chat
+    const targetChat = await repos.chatRepo.getById(targetChatId);
+    if (!targetChat) {
+      return res.status(404).json(errorResponse('Target chat not found'));
+    }
+    const isTargetParticipant = Array.isArray(targetChat.participants) && targetChat.participants.includes(userId);
+    if (!isTargetParticipant) {
+      return res.status(403).json(errorResponse('You are not a member of the target chat'));
+    }
+
+    // Get original message
+    const originalMessage = await repos.chatRepo.getMessage(chatId, messageId);
+    if (!originalMessage) {
+      return res.status(404).json(errorResponse('Message not found'));
+    }
+
+    // Look up sender name
+    const senderUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    const senderName = senderUser?.name || 'Someone';
+
+    // Build forwarded message
+    const forwardedMsg = {
+      id: `msg-${uuidv4()}`,
+      type: originalMessage.type || 'text',
+      content: originalMessage.text || originalMessage.content || '',
+      text: originalMessage.text || '',
+      sender: { id: userId, name: senderName, avatar: '', role: 'user' },
+      status: 'sent',
+      isOutgoing: false,
+      forwardedFrom: { chatId, senderName: originalMessage.sender?.name || 'Unknown' },
+      ...(originalMessage.imageUrl && { imageUrl: originalMessage.imageUrl }),
+      ...(originalMessage.fileUrl && { fileUrl: originalMessage.fileUrl }),
+      ...(originalMessage.fileName && { fileName: originalMessage.fileName }),
+      ...(originalMessage.audioUrl && { audioUrl: originalMessage.audioUrl }),
+      ...(originalMessage.durationSeconds != null && { durationSeconds: originalMessage.durationSeconds }),
+      ...(originalMessage.profileId && { profileId: originalMessage.profileId }),
+      ...(originalMessage.profileName && { profileName: originalMessage.profileName }),
+      ...(originalMessage.profileAvatar && { profileAvatar: originalMessage.profileAvatar }),
+      ...(originalMessage.profileType && { profileType: originalMessage.profileType }),
+      ...(originalMessage.latitude != null && { latitude: originalMessage.latitude }),
+      ...(originalMessage.longitude != null && { longitude: originalMessage.longitude }),
+      ...(originalMessage.address && { address: originalMessage.address }),
+      ...(originalMessage.locationName && { locationName: originalMessage.locationName }),
+    };
+
+    const { message: savedMessage, participantCounts } = await repos.chatRepo.addMessage(targetChatId, forwardedMsg);
+
+    io.to(`chat:${targetChatId}`).emit('message', savedMessage);
+
+    if (participantCounts) {
+      for (const pc of participantCounts) {
+        if (pc.userId !== userId) {
+          io.to(`user:${pc.userId}`).emit('unread_update', { chatId: targetChatId, unreadCount: pc.unreadCount });
+        }
+      }
+    }
+
+    if (typeof sendPushToOfflineParticipants === 'function') {
+      sendPushToOfflineParticipants(targetChat, savedMessage, userId).catch(() => {});
+    }
+
+    res.json(successResponse(savedMessage));
+  } catch (e) {
+    console.error('Error forwarding user message:', e);
+    res.status(500).json(errorResponse('Failed to forward message'));
+  }
+});
+
+// Leave a group chat (personal mode)
+app.post('/api/users/:userId/chats/:chatId/leave', requireAuth, async (req, res) => {
+  try {
+    const { userId, chatId } = req.params;
+    if (req.user?.id !== userId) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat) return res.status(404).json(errorResponse('Chat not found'));
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    const userName = user?.name || 'Someone';
+
+    const updatedChat = await repos.chatRepo.removeParticipant(chatId, userId);
+
+    const eventMessage = {
+      id: `msg-${uuidv4()}`,
+      type: 'event',
+      content: `${userName} left the group`,
+      event: `${userName} left the group`,
+      sender: { id: 'system', name: 'System', avatar: '', role: 'system' },
+      status: 'sent',
+      isOutgoing: false,
+    };
+    await repos.chatRepo.addMessage(chatId, eventMessage, { incrementUnread: true });
+    io.to(`chat:${chatId}`).emit('message', eventMessage);
+
+    const remainingParticipants = updatedChat.participants || [];
+    for (const pid of remainingParticipants) {
+      if (typeof pid === 'string') {
+        io.to(`user:${pid}`).emit('chat_update', { id: chatId, participants: remainingParticipants });
+      }
+    }
+
+    res.json(successResponse({ message: 'Left group successfully' }));
+  } catch (e) {
+    console.error('Error leaving user chat:', e);
+    res.status(500).json(errorResponse('Failed to leave group'));
+  }
+});
+
+// Remove a participant from a group chat (personal mode)
+app.post('/api/users/:userId/chats/:chatId/remove-participant', requireAuth, async (req, res) => {
+  try {
+    const { userId, chatId } = req.params;
+    const { userId: targetUserId } = req.body;
+    if (req.user?.id !== userId) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+    if (!targetUserId) {
+      return res.status(400).json(errorResponse('userId is required'));
+    }
+
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat) return res.status(404).json(errorResponse('Chat not found'));
+
+    const [requester, target] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+      prisma.user.findUnique({ where: { id: targetUserId }, select: { name: true } }),
+    ]);
+
+    const updatedChat = await repos.chatRepo.removeParticipant(chatId, targetUserId);
+
+    const eventMessage = {
+      id: `msg-${uuidv4()}`,
+      type: 'event',
+      content: `${requester?.name || 'Someone'} removed ${target?.name || 'a member'} from the group`,
+      event: `${requester?.name || 'Someone'} removed ${target?.name || 'a member'} from the group`,
+      sender: { id: 'system', name: 'System', avatar: '', role: 'system' },
+      status: 'sent',
+      isOutgoing: false,
+    };
+    await repos.chatRepo.addMessage(chatId, eventMessage, { incrementUnread: true });
+    io.to(`chat:${chatId}`).emit('message', eventMessage);
+
+    io.to(`user:${targetUserId}`).emit('chat_update', { id: chatId, removed: true });
+
+    const remainingParticipants = updatedChat.participants || [];
+    for (const pid of remainingParticipants) {
+      if (typeof pid === 'string') {
+        io.to(`user:${pid}`).emit('chat_update', { id: chatId, participants: remainingParticipants });
+      }
+    }
+
+    res.json(successResponse({ message: 'Participant removed successfully' }));
+  } catch (e) {
+    console.error('Error removing participant from user chat:', e);
+    res.status(500).json(errorResponse('Failed to remove participant'));
+  }
+});
 
 // ============================================================================
 // MEMBERSHIP ROUTES
@@ -7687,6 +8510,74 @@ app.post('/api/users/:userId/notifications/:notificationId/read', requireAuth, a
   }
 });
 
+// ==================== PUSH TOKENS & NOTIFICATION PREFERENCES ====================
+
+// Register push token
+app.post('/api/push-tokens/register', requireAuth, async (req, res) => {
+  try {
+    const { token, platform, deviceId } = req.body;
+    if (!token || !platform) {
+      return res.status(400).json(errorResponse('VALIDATION', 'token and platform are required'));
+    }
+    const record = await repos.pushTokenRepo.upsert(req.user.id, token, platform, deviceId || null);
+    return res.json(successResponse(record, 'Push token registered'));
+  } catch (err) {
+    console.error('[PushToken] Register error:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to register push token'));
+  }
+});
+
+// Unregister push token
+app.delete('/api/push-tokens/unregister', requireAuth, async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json(errorResponse('VALIDATION', 'token is required'));
+    }
+    await repos.pushTokenRepo.deactivate(req.user.id, token);
+    return res.json(successResponse(null, 'Push token unregistered'));
+  } catch (err) {
+    console.error('[PushToken] Unregister error:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to unregister push token'));
+  }
+});
+
+// Get notification preferences
+app.get('/api/notification-preferences', requireAuth, async (req, res) => {
+  try {
+    let prefs = await repos.notificationPreferenceRepo.getByUserId(req.user.id);
+    if (!prefs) {
+      // Return defaults
+      prefs = { messages: true, deliveries: true, invoices: true, orders: true, team: true, system: true };
+    }
+    return res.json(successResponse(prefs));
+  } catch (err) {
+    console.error('[NotifPrefs] Get error:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to get notification preferences'));
+  }
+});
+
+// Update notification preferences
+app.patch('/api/notification-preferences', requireAuth, async (req, res) => {
+  try {
+    const allowed = ['messages', 'deliveries', 'invoices', 'orders', 'team', 'system'];
+    const updates = {};
+    for (const key of allowed) {
+      if (typeof req.body[key] === 'boolean') {
+        updates[key] = req.body[key];
+      }
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json(errorResponse('VALIDATION', 'No valid preferences to update'));
+    }
+    const prefs = await repos.notificationPreferenceRepo.upsert(req.user.id, updates);
+    return res.json(successResponse(prefs, 'Preferences updated'));
+  } catch (err) {
+    console.error('[NotifPrefs] Update error:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to update notification preferences'));
+  }
+});
+
 // Public product catalog (scope/visibility filter)
 // GET /api/products?scope=public&companyId=...&brand=...&category=...
 // GET /api/products?visibility=public (also supported for compatibility)
@@ -7994,6 +8885,118 @@ const getNetworkIP = () => {
   }
   return 'localhost';
 };
+
+// ============================================================================
+// DEVICE TOKENS & PUSH NOTIFICATIONS
+// ============================================================================
+
+// Register device token
+app.post('/api/users/:userId/device-tokens', requireAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { token, platform } = req.body;
+
+    if (req.user?.id !== userId) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+    if (!token || !platform) {
+      return res.status(400).json(errorResponse('Token and platform are required'));
+    }
+
+    // Upsert: create or update
+    const deviceToken = await prisma.deviceToken.upsert({
+      where: { token },
+      update: { userId, platform, updatedAt: new Date() },
+      create: { userId, token, platform },
+    });
+
+    res.json(successResponse(deviceToken));
+  } catch (e) {
+    console.error('Error registering device token:', e);
+    res.status(500).json(errorResponse('Failed to register device token'));
+  }
+});
+
+// Unregister device token
+app.delete('/api/users/:userId/device-tokens/:token', requireAuth, async (req, res) => {
+  try {
+    const { userId, token } = req.params;
+
+    if (req.user?.id !== userId) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    await prisma.deviceToken.deleteMany({
+      where: { userId, token: decodeURIComponent(token) },
+    });
+
+    res.json(successResponse({ deleted: true }));
+  } catch (e) {
+    console.error('Error unregistering device token:', e);
+    res.status(500).json(errorResponse('Failed to unregister device token'));
+  }
+});
+
+/**
+ * Send push notifications to chat participants who are NOT currently connected via socket.
+ * Called after a new message is emitted via socket.
+ */
+async function sendPushToOfflineParticipants(chatId, senderName, messagePreview, excludeSenderId) {
+  try {
+    const chat = await repos.chatRepo.getById(chatId);
+    if (!chat) return;
+
+    const participantIds = (Array.isArray(chat.participants) ? chat.participants : [])
+      .filter(pid => pid !== excludeSenderId);
+
+    if (participantIds.length === 0) return;
+
+    // Find which participants have active socket connections
+    const connectedUserIds = new Set();
+    const sockets = await io.fetchSockets();
+    for (const s of sockets) {
+      if (s.userId) connectedUserIds.add(s.userId);
+    }
+
+    // Get tokens for offline participants only
+    const offlineParticipantIds = participantIds.filter(pid => !connectedUserIds.has(pid));
+    if (offlineParticipantIds.length === 0) return;
+
+    const tokens = await prisma.deviceToken.findMany({
+      where: { userId: { in: offlineParticipantIds } },
+      select: { token: true },
+    });
+
+    if (tokens.length === 0) return;
+
+    // Build push messages
+    const messages = [];
+    for (const { token } of tokens) {
+      if (!Expo.isExpoPushToken(token)) continue;
+      messages.push({
+        to: token,
+        sound: 'default',
+        title: senderName || 'New message',
+        body: messagePreview || 'You have a new message',
+        data: { chatId, chatName: chat.name || senderName },
+      });
+    }
+
+    if (messages.length === 0) return;
+
+    // Send in chunks
+    const chunks = expo.chunkPushNotifications(messages);
+    for (const chunk of chunks) {
+      try {
+        await expo.sendPushNotificationsAsync(chunk);
+      } catch (err) {
+        console.error('[Push] Error sending chunk:', err);
+      }
+    }
+  } catch (err) {
+    console.error('[Push] Error in sendPushToOfflineParticipants:', err);
+  }
+}
 
 // Start server (using HTTP server for Socket.IO support)
 server.listen(PORT, HOST, () => {
