@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npx expo install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(xargs:*)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(node -e:*)",
+      "Bash(npx expo config:*)",
+      "Bash(identify:*)",
+      "Bash(ls:*)",
+      "Bash(python3:*)",
+      "Bash(eas:*)",
+      "Bash(npm --version:*)",
+      "Bash(node --version:*)"
+    ]
+  }
+}

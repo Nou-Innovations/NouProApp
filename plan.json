@@ -1,0 +1,1265 @@
+{
+  "$schema": "https://noupro.app/plan/v1",
+  "version": "1.0.0",
+  "name": "NouPro App Architecture Migration Plan",
+  "description": "Complete implementation plan to align the NouPro app with app-logic.json specification. This plan establishes the dual-mode identity system, proper navigation, and all business features.",
+  "createdAt": "2025-12-12",
+  "lastUpdated": "2025-12-12",
+  "status": "in_progress",
+
+  "summary": {
+    "totalPhases": 5,
+    "estimatedDuration": "6 weeks",
+    "criticalPath": ["phase1", "phase2", "phase3"],
+    "currentPhase": "phase3"
+  },
+
+  "phases": {
+    "phase1": {
+      "name": "Foundation - Core Architecture",
+      "description": "Establish the dual-mode identity system, update type definitions, and refactor navigation to support Personal and Business modes",
+      "priority": "critical",
+      "estimatedDuration": "1-2 weeks",
+      "status": "completed",
+      "completedAt": "2025-12-12",
+      "blockedBy": [],
+      
+      "tasks": {
+        "task1_1": {
+          "name": "Update Type Definitions",
+          "description": "Align all TypeScript types with app-logic.json data models",
+          "status": "not_started",
+          "priority": "critical",
+          "estimatedHours": 4,
+          "files": [
+            "src/types/user.ts",
+            "src/types/business.ts",
+            "src/types/product.ts",
+            "src/types/order.ts",
+            "src/types/roles.ts",
+            "src/types/subscription.ts",
+            "src/types/store.ts"
+          ],
+          "subtasks": [
+            {
+              "id": "1_1_a",
+              "name": "Create User type matching app-logic userProfile",
+              "status": "not_started",
+              "details": {
+                "fields": ["id (UUID)", "name", "email (optional)", "phone (optional)", "password_hash", "language (EN/FR)", "notifications_on", "created_at"],
+                "notes": "User Profile is personal identity, REQUIRED for everyone"
+              }
+            },
+            {
+              "id": "1_1_b",
+              "name": "Create Business type matching app-logic businessProfile",
+              "status": "not_started",
+              "details": {
+                "fields": ["id", "owner_id (FK User)", "name", "industry", "description", "logo_url", "banner_url", "plan", "is_published", "subscription_status", "next_billing_date", "created_at"],
+                "notes": "Business Profile is professional entity"
+              }
+            },
+            {
+              "id": "1_1_c",
+              "name": "Create BusinessStaff type",
+              "status": "not_started",
+              "details": {
+                "fields": ["id", "business_id (FK)", "user_id (FK)", "role (staff/admin/super_admin)", "status (pending/accepted/rejected/locked)", "created_at"]
+              }
+            },
+            {
+              "id": "1_1_d",
+              "name": "Create Brand type",
+              "status": "not_started",
+              "details": {
+                "fields": ["id", "business_id (FK)", "name", "logo_url", "description", "created_at", "updated_at"]
+              }
+            },
+            {
+              "id": "1_1_e",
+              "name": "Update Product type",
+              "status": "not_started",
+              "details": {
+                "fields": ["id", "business_id (FK)", "brand_id (FK)", "name", "unit", "price", "description", "status (enum)", "is_published", "created_at", "updated_at"],
+                "statusEnum": ["available", "out_of_stock", "discontinued", "in_production", "inactive", "low_stock"]
+              }
+            },
+            {
+              "id": "1_1_f",
+              "name": "Create Order type for B2B",
+              "status": "not_started",
+              "details": {
+                "fields": ["id", "from_business (FK)", "to_business (FK)", "status", "total_price", "created_by (FK User)", "created_at"],
+                "statusEnum": ["pending", "accepted", "completed", "cancelled"]
+              }
+            },
+            {
+              "id": "1_1_g",
+              "name": "Create Delivery type",
+              "status": "not_started",
+              "details": {
+                "fields": ["id", "order_id (FK)", "assigned_to (FK User)", "status", "created_at"],
+                "statusEnum": ["pending", "on_the_way", "done"]
+              }
+            },
+            {
+              "id": "1_1_h",
+              "name": "Create InvoiceDocument type",
+              "status": "not_started",
+              "details": {
+                "fields": ["id", "type (invoice/estimate)", "business_id (FK)", "customer_id", "related_order_id (FK)", "issue_date", "due_date", "status", "total_amount", "notes", "created_by", "created_at"],
+                "statusEnum": ["draft", "sent", "paid", "cancelled", "expired"]
+              }
+            },
+            {
+              "id": "1_1_i",
+              "name": "Create Roles & Permissions types",
+              "status": "not_started",
+              "details": {
+                "roles": ["superAdmin", "admin", "staff"],
+                "staffRoleTypes": ["Delivery", "Sales", "Inventory", "Custom"]
+              }
+            },
+            {
+              "id": "1_1_j",
+              "name": "Create Subscription types",
+              "status": "not_started",
+              "details": {
+                "plans": ["free", "pro", "business", "enterprise"],
+                "prices": { "free": 0, "pro": 799, "business": 1999, "enterprise": 3999 },
+                "currency": "MUR"
+              }
+            }
+          ]
+        },
+
+        "task1_2": {
+          "name": "Create Profile Store",
+          "description": "New Zustand store to manage active profile mode and business context",
+          "status": "not_started",
+          "priority": "critical",
+          "estimatedHours": 3,
+          "files": ["src/store/profileStore.ts"],
+          "subtasks": [
+            {
+              "id": "1_2_a",
+              "name": "Create profileStore with mode state",
+              "status": "not_started",
+              "details": {
+                "state": {
+                  "activeMode": "'personal' | 'business'",
+                  "activeBusinessId": "string | null",
+                  "userBusinesses": "Business[]",
+                  "currentUserRole": "Role | null"
+                },
+                "actions": ["switchToPersonal()", "switchToBusiness(businessId)", "setUserBusinesses()", "fetchUserBusinesses()"]
+              }
+            },
+            {
+              "id": "1_2_b",
+              "name": "Integrate with existing stores",
+              "status": "not_started"
+            }
+          ]
+        },
+
+        "task1_3": {
+          "name": "Refactor Navigation Architecture",
+          "description": "Split navigation into Personal Mode and Business Mode tab navigators",
+          "status": "not_started",
+          "priority": "critical",
+          "estimatedHours": 6,
+          "files": [
+            "App.tsx",
+            "src/navigation/PersonalTabNavigator.tsx",
+            "src/navigation/BusinessTabNavigator.tsx",
+            "src/navigation/RootNavigator.tsx",
+            "src/types/navigation.ts"
+          ],
+          "subtasks": [
+            {
+              "id": "1_3_a",
+              "name": "Create PersonalTabNavigator",
+              "status": "not_started",
+              "details": {
+                "tabs": [
+                  { "name": "Home", "icon": "home", "screen": "HomeScreen" },
+                  { "name": "Explore", "icon": "search", "screen": "ExploreScreen" },
+                  { "name": "Inbox", "icon": "mail", "screen": "InboxScreen" },
+                  { "name": "Activity", "icon": "list", "screen": "ActivityScreen" },
+                  { "name": "Profile", "icon": "person", "screen": "PersonalProfileScreen" }
+                ]
+              }
+            },
+            {
+              "id": "1_3_b",
+              "name": "Create BusinessTabNavigator",
+              "status": "not_started",
+              "details": {
+                "tabs": [
+                  { "name": "Inbox", "icon": "mail", "screen": "BusinessInboxScreen" },
+                  { "name": "Deliveries", "icon": "car", "screen": "DeliveryScreen" },
+                  { "name": "Products", "icon": "cube", "screen": "ProductsScreen" },
+                  { "name": "Invoices", "icon": "document-text", "screen": "InvoicesScreen" },
+                  { "name": "Business", "icon": "business-logo", "screen": "BusinessProfileScreen" }
+                ]
+              }
+            },
+            {
+              "id": "1_3_c",
+              "name": "Update App.tsx with conditional navigation",
+              "status": "not_started",
+              "details": {
+                "logic": "Render PersonalTabNavigator or BusinessTabNavigator based on profileStore.activeMode"
+              }
+            },
+            {
+              "id": "1_3_d",
+              "name": "Update navigation types",
+              "status": "not_started"
+            }
+          ]
+        },
+
+        "task1_4": {
+          "name": "Create ProfileSwitcher Component",
+          "description": "Reusable component for switching between personal and business profiles",
+          "status": "not_started",
+          "priority": "high",
+          "estimatedHours": 4,
+          "files": ["src/components/ProfileSwitcher.tsx"],
+          "subtasks": [
+            {
+              "id": "1_4_a",
+              "name": "Design ProfileSwitcher UI",
+              "status": "not_started",
+              "details": {
+                "features": [
+                  "Show current active profile (name + avatar/logo)",
+                  "Dropdown/modal to switch profiles",
+                  "List user's businesses",
+                  "Option to switch to Personal Profile",
+                  "Option to create new business",
+                  "Option to join existing business"
+                ]
+              }
+            },
+            {
+              "id": "1_4_b",
+              "name": "Implement ProfileSwitcher logic",
+              "status": "not_started"
+            },
+            {
+              "id": "1_4_c",
+              "name": "Integrate with profileStore",
+              "status": "not_started"
+            }
+          ]
+        },
+
+        "task1_5": {
+          "name": "Refactor Existing Stores",
+          "description": "Update existing stores to work with new architecture",
+          "status": "not_started",
+          "priority": "high",
+          "estimatedHours": 4,
+          "files": [
+            "src/store/index.ts",
+            "src/store/companyStore.ts"
+          ],
+          "subtasks": [
+            {
+              "id": "1_5_a",
+              "name": "Rename companyStore to businessStore",
+              "status": "not_started"
+            },
+            {
+              "id": "1_5_b",
+              "name": "Update main store with new types",
+              "status": "not_started"
+            },
+            {
+              "id": "1_5_c",
+              "name": "Add currentUser state for User Profile",
+              "status": "not_started"
+            }
+          ]
+        },
+
+        "task1_6": {
+          "name": "Create Permissions Utility",
+          "description": "Utility functions to check user permissions based on role and plan",
+          "status": "not_started",
+          "priority": "high",
+          "estimatedHours": 3,
+          "files": ["src/utils/permissions.ts"],
+          "subtasks": [
+            {
+              "id": "1_6_a",
+              "name": "Create role-based permission checks",
+              "status": "not_started",
+              "details": {
+                "functions": [
+                  "canManageStaff(role): boolean",
+                  "canEditBusinessSettings(role): boolean",
+                  "canPublishBusinessPage(role, plan): boolean",
+                  "canAccessDeliveries(role): boolean",
+                  "canManageInvoices(role, plan): boolean",
+                  "canDeleteBusiness(role): boolean"
+                ]
+              }
+            },
+            {
+              "id": "1_6_b",
+              "name": "Create plan-based feature checks",
+              "status": "not_started",
+              "details": {
+                "functions": [
+                  "canReceiveOrders(plan): boolean",
+                  "canCreateDeliveries(plan): boolean",
+                  "canAcceptStaff(plan): boolean",
+                  "getMaxStaffCount(plan): number",
+                  "getMaxLocations(plan): number"
+                ]
+              }
+            }
+          ]
+        }
+      },
+
+      "deliverables": [
+        "All type definitions aligned with app-logic.json",
+        "profileStore working with mode switching",
+        "Dual-mode navigation (Personal/Business tabs)",
+        "ProfileSwitcher component",
+        "Permission utility functions"
+      ],
+
+      "acceptanceCriteria": [
+        "User can switch between Personal and Business modes",
+        "Tab navigation changes based on active mode",
+        "Types match app-logic.json data models exactly",
+        "Permission checks work for all roles"
+      ]
+    },
+
+    "phase2": {
+      "name": "Personal Mode Screens",
+      "description": "Create all screens needed for Personal Mode navigation",
+      "priority": "critical",
+      "estimatedDuration": "1 week",
+      "status": "completed",
+      "completedAt": "2025-12-12",
+      "blockedBy": ["phase1"],
+
+      "tasks": {
+        "task2_1": {
+          "name": "Create HomeScreen",
+          "description": "Personal mode home with feed, promoted businesses, and suggestions",
+          "status": "completed",
+          "priority": "critical",
+          "estimatedHours": 8,
+          "files": ["src/screens/personal/HomeScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "2_1_a",
+              "name": "Design HomeScreen layout",
+              "status": "not_started",
+              "details": {
+                "sections": [
+                  "Header with ProfileSwitcher and NotificationBell",
+                  "Feed cards from followed businesses",
+                  "Promoted/suggested businesses",
+                  "Quick actions section"
+                ]
+              }
+            },
+            {
+              "id": "2_1_b",
+              "name": "Implement feed logic",
+              "status": "not_started"
+            },
+            {
+              "id": "2_1_c",
+              "name": "Create BusinessFeedCard component",
+              "status": "not_started"
+            }
+          ]
+        },
+
+        "task2_2": {
+          "name": "Create ExploreScreen",
+          "description": "Discover businesses, browse categories, search functionality",
+          "status": "completed",
+          "priority": "critical",
+          "estimatedHours": 10,
+          "files": ["src/screens/personal/ExploreScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "2_2_a",
+              "name": "Design ExploreScreen layout",
+              "status": "not_started",
+              "details": {
+                "sections": [
+                  "Search bar",
+                  "Category filters",
+                  "Business grid/list",
+                  "Featured businesses section"
+                ]
+              }
+            },
+            {
+              "id": "2_2_b",
+              "name": "Implement search functionality",
+              "status": "not_started"
+            },
+            {
+              "id": "2_2_c",
+              "name": "Implement category filtering",
+              "status": "not_started"
+            },
+            {
+              "id": "2_2_d",
+              "name": "Create BusinessListCard component",
+              "status": "not_started"
+            },
+            {
+              "id": "2_2_e",
+              "name": "Navigate to BusinessProfile on tap",
+              "status": "not_started"
+            }
+          ]
+        },
+
+        "task2_3": {
+          "name": "Create ActivityScreen",
+          "description": "List of personal tasks and orders placed as individual",
+          "status": "completed",
+          "priority": "high",
+          "estimatedHours": 6,
+          "files": ["src/screens/personal/ActivityScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "2_3_a",
+              "name": "Design ActivityScreen layout",
+              "status": "not_started",
+              "details": {
+                "sections": [
+                  "Filter tabs (All, Pending, Completed)",
+                  "Task/Order list",
+                  "Empty state"
+                ],
+                "notes": "Shows tasks assigned to staff by admin (deliveries, etc.)"
+              }
+            },
+            {
+              "id": "2_3_b",
+              "name": "Implement task list",
+              "status": "not_started"
+            },
+            {
+              "id": "2_3_c",
+              "name": "Create TaskCard component",
+              "status": "not_started"
+            }
+          ]
+        },
+
+        "task2_4": {
+          "name": "Refactor Personal Inbox",
+          "description": "Update inbox for personal mode (user-to-business chat)",
+          "status": "completed",
+          "priority": "high",
+          "estimatedHours": 4,
+          "files": ["src/screens/personal/PersonalInboxScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "2_4_a",
+              "name": "Filter chats for personal context",
+              "status": "not_started",
+              "details": {
+                "notes": "Show only chats between user and businesses, not internal business chats"
+              }
+            }
+          ]
+        },
+
+        "task2_5": {
+          "name": "Update PersonalProfileScreen",
+          "description": "Align with app-logic.json spec for viewing own User Profile",
+          "status": "completed",
+          "priority": "high",
+          "estimatedHours": 5,
+          "files": ["src/screens/PersonalProfileScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "2_5_a",
+              "name": "Add ProfileSwitcher to header",
+              "status": "not_started"
+            },
+            {
+              "id": "2_5_b",
+              "name": "Update buttons to Edit/Share",
+              "status": "not_started"
+            },
+            {
+              "id": "2_5_c",
+              "name": "Add Company affiliation section",
+              "status": "not_started",
+              "details": {
+                "fields": ["Company Logo", "Company Name", "Company Description", "Go to Company Profile action"]
+              }
+            },
+            {
+              "id": "2_5_d",
+              "name": "Add Settings navigation",
+              "status": "not_started"
+            }
+          ]
+        }
+      },
+
+      "deliverables": [
+        "HomeScreen with feed and suggestions",
+        "ExploreScreen with search and categories",
+        "ActivityScreen with tasks list",
+        "Updated PersonalProfileScreen",
+        "Personal mode fully functional"
+      ],
+
+      "acceptanceCriteria": [
+        "All 5 Personal mode tabs work correctly",
+        "User can discover and view businesses from Explore",
+        "User can see their activity/tasks",
+        "Profile shows correct buttons (Edit/Share)"
+      ]
+    },
+
+    "phase3": {
+      "name": "Business Mode Refinement",
+      "description": "Implement role/permission system and refine business mode screens",
+      "priority": "critical",
+      "estimatedDuration": "1 week",
+      "status": "completed",
+      "blockedBy": ["phase1"],
+
+      "tasks": {
+        "task3_1": {
+          "name": "Implement Role-Based Access Control",
+          "description": "Add permission checks to all business screens",
+          "status": "completed",
+          "priority": "critical",
+          "estimatedHours": 8,
+          "files": [
+            "src/screens/ProductsScreen.tsx",
+            "src/screens/DeliveryScreen.tsx",
+            "src/screens/InvoicesScreen.tsx",
+            "src/screens/ProfileScreen.tsx"
+          ],
+          "subtasks": [
+            {
+              "id": "3_1_a",
+              "name": "Add permission checks to ProductsScreen",
+              "status": "completed",
+              "details": {
+                "checks": [
+                  "Staff: view if permitted",
+                  "Admin: full access",
+                  "SuperAdmin: full access",
+                  "FreePlan: private only",
+                  "PaidPlan: can publish"
+                ]
+              }
+            },
+            {
+              "id": "3_1_b",
+              "name": "Add permission checks to DeliveryScreen",
+              "status": "completed",
+              "details": {
+                "checks": [
+                  "Staff (Delivery role): view assigned only",
+                  "Admin: full access",
+                  "SuperAdmin: full access",
+                  "FreePlan: no access",
+                  "PaidPlan: full access"
+                ]
+              }
+            },
+            {
+              "id": "3_1_c",
+              "name": "Add permission checks to InvoicesScreen",
+              "status": "completed",
+              "details": {
+                "checks": [
+                  "Staff: no access",
+                  "Admin: paid plan only",
+                  "SuperAdmin: paid plan only"
+                ]
+              }
+            },
+            {
+              "id": "3_1_d",
+              "name": "Add permission checks to Business Profile tab",
+              "status": "completed",
+              "details": {
+                "checks": [
+                  "Staff: limited view",
+                  "Admin: most settings",
+                  "SuperAdmin: full control"
+                ]
+              }
+            }
+          ]
+        },
+
+        "task3_2": {
+          "name": "Update ProductsScreen",
+          "description": "Add publish toggle, view selector, and permission-based UI",
+          "status": "completed",
+          "priority": "high",
+          "estimatedHours": 6,
+          "files": ["src/screens/ProductsScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "3_2_a",
+              "name": "Add view selector",
+              "status": "completed",
+              "details": {
+                "views": ["All products", "My products", "Imported products", "Display products"]
+              }
+            },
+            {
+              "id": "3_2_b",
+              "name": "Add publish toggle per product",
+              "status": "completed"
+            },
+            {
+              "id": "3_2_c",
+              "name": "Show paywall for publish on free plan",
+              "status": "completed"
+            }
+          ]
+        },
+
+        "task3_3": {
+          "name": "Update DeliveryScreen",
+          "description": "Add transfer support and staff assignment",
+          "status": "completed",
+          "priority": "high",
+          "estimatedHours": 8,
+          "files": ["src/screens/DeliveryScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "3_3_a",
+              "name": "Add Transfers tab/section",
+              "status": "completed"
+            },
+            {
+              "id": "3_3_b",
+              "name": "Implement staff assignment flow",
+              "status": "completed"
+            },
+            {
+              "id": "3_3_c",
+              "name": "Add delivery status updates",
+              "status": "completed",
+              "details": {
+                "statuses": ["Pending", "On the way", "Delivered/Done"]
+              }
+            },
+            {
+              "id": "3_3_d",
+              "name": "Add proof/photo upload on delivery",
+              "status": "not_started",
+              "note": "Deferred - requires backend implementation"
+            }
+          ]
+        },
+
+        "task3_4": {
+          "name": "Update InvoicesScreen",
+          "description": "Add estimates support and proper type handling",
+          "status": "completed",
+          "priority": "high",
+          "estimatedHours": 6,
+          "files": ["src/screens/InvoicesScreen.tsx", "src/screens/CreateInvoiceScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "3_4_a",
+              "name": "Add Invoice/Estimate type selector",
+              "status": "completed"
+            },
+            {
+              "id": "3_4_b",
+              "name": "Update status handling",
+              "status": "completed",
+              "details": {
+                "statuses": ["draft", "sent", "paid", "cancelled", "expired"]
+              }
+            },
+            {
+              "id": "3_4_c",
+              "name": "Add paid plan check with paywall",
+              "status": "completed"
+            }
+          ]
+        },
+
+        "task3_5": {
+          "name": "Update Business Profile Tab",
+          "description": "Refactor for viewing own business profile with proper layout",
+          "status": "completed",
+          "priority": "high",
+          "estimatedHours": 6,
+          "files": ["src/screens/ProfileScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "3_5_a",
+              "name": "Remove notification button from header (notification is on Inbox screen)",
+              "status": "completed"
+            },
+            {
+              "id": "3_5_b",
+              "name": "Remove profileSwitcher button from header",
+              "status": "completed"
+            },
+            {
+              "id": "3_5_c",
+              "name": "Add dropdown arrow to profile name that opens ModalList-style bottom sheet",
+              "status": "completed"
+            },
+            {
+              "id": "3_5_d",
+              "name": "Update typography: Name Inter Semi Bold 20px, Status Inter Medium 16px, Description Inter Regular 14px, 16px gaps",
+              "status": "completed"
+            },
+            {
+              "id": "3_5_e",
+              "name": "Update buttons: 40px height, Inter Semi Bold 16px text, Edit button black text/border",
+              "status": "completed"
+            },
+            {
+              "id": "3_5_f",
+              "name": "Show Products tab (all products)",
+              "status": "completed"
+            },
+            {
+              "id": "3_5_g",
+              "name": "Show About tab (editable)",
+              "status": "completed"
+            }
+          ]
+        },
+
+        "task3_6": {
+          "name": "Update Team Management",
+          "description": "Implement proper staff management with roles",
+          "status": "completed",
+          "priority": "medium",
+          "estimatedHours": 6,
+          "files": ["src/screens/TeamManagementScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "3_6_a",
+              "name": "List staff with roles",
+              "status": "completed"
+            },
+            {
+              "id": "3_6_b",
+              "name": "Invite new staff",
+              "status": "completed"
+            },
+            {
+              "id": "3_6_c",
+              "name": "Change staff roles (SuperAdmin only)",
+              "status": "completed"
+            },
+            {
+              "id": "3_6_d",
+              "name": "Remove staff",
+              "status": "completed"
+            },
+            {
+              "id": "3_6_e",
+              "name": "Accept/reject join requests (paid plans)",
+              "status": "completed"
+            }
+          ]
+        }
+      },
+
+      "deliverables": [
+        "Role-based access control on all screens",
+        "ProductsScreen with publish toggle and views",
+        "DeliveryScreen with transfers and assignment",
+        "InvoicesScreen with estimates",
+        "Updated Team Management"
+      ],
+
+      "acceptanceCriteria": [
+        "Staff can only see permitted tabs/features",
+        "Admin has most access but limited staff management",
+        "SuperAdmin has full control",
+        "Free plan users see paywalls for premium features"
+      ]
+    },
+
+    "phase4": {
+      "name": "B2B Ordering System",
+      "description": "Implement full B2B ordering flow between businesses",
+      "priority": "high",
+      "estimatedDuration": "1 week",
+      "status": "not_started",
+      "blockedBy": ["phase1", "phase3"],
+
+      "tasks": {
+        "task4_1": {
+          "name": "Update BusinessProfileScreen (Viewing Others)",
+          "description": "Enable B2B ordering when viewing another business's profile",
+          "status": "not_started",
+          "priority": "critical",
+          "estimatedHours": 8,
+          "files": ["src/screens/BusinessProfileScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "4_1_a",
+              "name": "Show Message/Connect buttons (others' profile)",
+              "status": "not_started"
+            },
+            {
+              "id": "4_1_b",
+              "name": "Show Products tab with published products",
+              "status": "not_started"
+            },
+            {
+              "id": "4_1_c",
+              "name": "Show Cart tab (only when in Business Mode)",
+              "status": "not_started",
+              "details": {
+                "note": "Cart and ordering only available when viewing from Business Mode"
+              }
+            },
+            {
+              "id": "4_1_d",
+              "name": "Implement Add to Cart functionality",
+              "status": "not_started"
+            }
+          ]
+        },
+
+        "task4_2": {
+          "name": "Implement B2B Order Flow",
+          "description": "Complete flow from cart to order placement",
+          "status": "not_started",
+          "priority": "critical",
+          "estimatedHours": 10,
+          "files": [
+            "src/store/orderStore.ts",
+            "src/screens/CartScreen.tsx"
+          ],
+          "subtasks": [
+            {
+              "id": "4_2_a",
+              "name": "Create orderStore",
+              "status": "not_started",
+              "details": {
+                "state": ["currentCart", "orders", "selectedOrder"],
+                "actions": ["addToCart", "removeFromCart", "placeOrder", "fetchOrders"]
+              }
+            },
+            {
+              "id": "4_2_b",
+              "name": "Update Cart functionality",
+              "status": "not_started"
+            },
+            {
+              "id": "4_2_c",
+              "name": "Implement place order flow",
+              "status": "not_started",
+              "details": {
+                "flow": [
+                  "Review cart items",
+                  "Add notes",
+                  "Confirm order",
+                  "Order sent to receiving business"
+                ]
+              }
+            }
+          ]
+        },
+
+        "task4_3": {
+          "name": "Create Orders Management Screen",
+          "description": "View and manage incoming/outgoing orders",
+          "status": "not_started",
+          "priority": "high",
+          "estimatedHours": 8,
+          "files": ["src/screens/OrdersScreen.tsx", "src/screens/OrderDetailScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "4_3_a",
+              "name": "Create OrdersScreen",
+              "status": "not_started",
+              "details": {
+                "tabs": ["Incoming", "Outgoing"],
+                "filters": ["All", "Pending", "Accepted", "Completed", "Cancelled"]
+              }
+            },
+            {
+              "id": "4_3_b",
+              "name": "Create OrderDetailScreen",
+              "status": "not_started",
+              "details": {
+                "content": ["Line items", "Quantities", "Prices", "Total", "Notes"],
+                "actions": ["Accept/Reject", "Mark as Prepared", "Link to Delivery"]
+              }
+            },
+            {
+              "id": "4_3_c",
+              "name": "Create OrderCard component",
+              "status": "not_started"
+            }
+          ]
+        },
+
+        "task4_4": {
+          "name": "Manual Order Creation",
+          "description": "Allow distributors to create orders for clients manually",
+          "status": "not_started",
+          "priority": "medium",
+          "estimatedHours": 6,
+          "files": ["src/screens/CreateOrderScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "4_4_a",
+              "name": "Select existing customer or create new",
+              "status": "not_started"
+            },
+            {
+              "id": "4_4_b",
+              "name": "Select products from catalog",
+              "status": "not_started"
+            },
+            {
+              "id": "4_4_c",
+              "name": "Set quantities",
+              "status": "not_started"
+            },
+            {
+              "id": "4_4_d",
+              "name": "Review and confirm",
+              "status": "not_started"
+            }
+          ]
+        }
+      },
+
+      "deliverables": [
+        "B2B ordering from business profiles",
+        "Cart functionality for Business Mode",
+        "Orders management screen",
+        "Manual order creation",
+        "Order detail view with actions"
+      ],
+
+      "acceptanceCriteria": [
+        "Business can order from another business",
+        "Orders appear in receiving business's orders list",
+        "Distributor can create orders manually",
+        "Order lifecycle works (pending → accepted → completed)"
+      ]
+    },
+
+    "phase5": {
+      "name": "Subscription & Paywalls",
+      "description": "Implement subscription plans and paywall triggers",
+      "priority": "medium",
+      "estimatedDuration": "1 week",
+      "status": "not_started",
+      "blockedBy": ["phase3"],
+
+      "tasks": {
+        "task5_1": {
+          "name": "Create Subscription Store",
+          "description": "Manage subscription state and plan information",
+          "status": "not_started",
+          "priority": "high",
+          "estimatedHours": 4,
+          "files": ["src/store/subscriptionStore.ts"],
+          "subtasks": [
+            {
+              "id": "5_1_a",
+              "name": "Define plan limits",
+              "status": "not_started",
+              "details": {
+                "free": { "staff": 1, "locations": 1 },
+                "pro": { "staff": 3, "locations": 3 },
+                "business": { "staff": 9, "locations": 8 },
+                "enterprise": { "staff": "unlimited", "locations": "unlimited" }
+              }
+            },
+            {
+              "id": "5_1_b",
+              "name": "Create subscription state",
+              "status": "not_started"
+            },
+            {
+              "id": "5_1_c",
+              "name": "Create plan feature checks",
+              "status": "not_started"
+            }
+          ]
+        },
+
+        "task5_2": {
+          "name": "Create PaywallModal Component",
+          "description": "Reusable modal for upgrade prompts",
+          "status": "not_started",
+          "priority": "high",
+          "estimatedHours": 5,
+          "files": ["src/components/PaywallModal.tsx"],
+          "subtasks": [
+            {
+              "id": "5_2_a",
+              "name": "Design PaywallModal UI",
+              "status": "not_started",
+              "details": {
+                "content": [
+                  "Feature being blocked",
+                  "Required plan",
+                  "Plan comparison",
+                  "Upgrade button"
+                ]
+              }
+            },
+            {
+              "id": "5_2_b",
+              "name": "Implement upgrade flow navigation",
+              "status": "not_started"
+            }
+          ]
+        },
+
+        "task5_3": {
+          "name": "Implement Paywall Triggers",
+          "description": "Add paywall checks to premium features",
+          "status": "not_started",
+          "priority": "high",
+          "estimatedHours": 6,
+          "files": [
+            "src/screens/ProductsScreen.tsx",
+            "src/screens/DeliveryScreen.tsx",
+            "src/screens/InvoicesScreen.tsx",
+            "src/screens/TeamManagementScreen.tsx"
+          ],
+          "subtasks": [
+            {
+              "id": "5_3_a",
+              "name": "Accept staff join request → Show upgrade modal",
+              "status": "not_started"
+            },
+            {
+              "id": "5_3_b",
+              "name": "Publish business page → Show upgrade modal",
+              "status": "not_started"
+            },
+            {
+              "id": "5_3_c",
+              "name": "Publish product → Show upgrade modal",
+              "status": "not_started"
+            },
+            {
+              "id": "5_3_d",
+              "name": "Receive incoming orders → Block with message",
+              "status": "not_started"
+            },
+            {
+              "id": "5_3_e",
+              "name": "Create invoices/estimates → Show upgrade modal",
+              "status": "not_started"
+            },
+            {
+              "id": "5_3_f",
+              "name": "Exceed staff limit → Prompt to upgrade",
+              "status": "not_started"
+            }
+          ]
+        },
+
+        "task5_4": {
+          "name": "Create Subscription Settings Screen",
+          "description": "View current plan and upgrade options",
+          "status": "not_started",
+          "priority": "medium",
+          "estimatedHours": 6,
+          "files": ["src/screens/SubscriptionScreen.tsx"],
+          "subtasks": [
+            {
+              "id": "5_4_a",
+              "name": "Show current plan details",
+              "status": "not_started"
+            },
+            {
+              "id": "5_4_b",
+              "name": "Show staff/location usage",
+              "status": "not_started"
+            },
+            {
+              "id": "5_4_c",
+              "name": "Show plan comparison",
+              "status": "not_started"
+            },
+            {
+              "id": "5_4_d",
+              "name": "Upgrade/downgrade actions",
+              "status": "not_started"
+            }
+          ]
+        }
+      },
+
+      "deliverables": [
+        "Subscription store with plan management",
+        "PaywallModal component",
+        "All paywall triggers implemented",
+        "Subscription settings screen"
+      ],
+
+      "acceptanceCriteria": [
+        "Free plan users see paywalls at correct triggers",
+        "Upgrade prompts show correct required plan",
+        "Plan limits enforced (staff, locations)",
+        "Users can view their subscription status"
+      ]
+    }
+  },
+
+  "criticalFlowsValidation": {
+    "description": "After all phases, validate these critical flows from app-logic.json work correctly",
+    "flows": [
+      {
+        "name": "Distributor: Product to Delivery",
+        "steps": [
+          "Switch to Business Profile",
+          "Products → Add Product → fill details → Save",
+          "Stock → select product → add stock quantity",
+          "Customer places order OR distributor creates manually",
+          "Orders → view incoming order → Accept",
+          "Deliveries → assign staff → update status until Delivered"
+        ]
+      },
+      {
+        "name": "Retailer Orders from Distributor",
+        "steps": [
+          "Switch to Retailer's Business Profile",
+          "Go to Explore/search",
+          "Open Distributor Public Business Page",
+          "Browse Products → add items to Cart",
+          "Go to Cart → confirm → submit Order Request",
+          "Order appears in Distributor's Orders tab"
+        ]
+      },
+      {
+        "name": "Staff Delivery Flow",
+        "steps": [
+          "Log in → Personal Profile Home",
+          "Switch to assigned Business Profile",
+          "Only Deliveries tab visible",
+          "Open Delivery List → tap assigned delivery",
+          "Update status: Pending → On the way → Delivered",
+          "Optionally add note/photo as proof"
+        ]
+      },
+      {
+        "name": "Business Setup & Publish",
+        "steps": [
+          "From Personal Profile → Create Business Profile",
+          "Enter company info",
+          "Switch into new Business Profile",
+          "Go to Business tab → Public Profile section",
+          "Toggle Publish Profile ON",
+          "Select which products are public",
+          "Save & preview"
+        ]
+      }
+    ]
+  },
+
+  "statusEnums": {
+    "description": "Reference for status values to use throughout the app",
+    "productStatus": {
+      "values": ["available", "out_of_stock", "discontinued", "in_production", "inactive", "low_stock"],
+      "colors": {
+        "available": "#22C55E",
+        "out_of_stock": "#EF4444",
+        "in_production": "#0EA5E9",
+        "discontinued": "#F59E42",
+        "inactive": "#6B7280",
+        "low_stock": "#F59E0B"
+      }
+    },
+    "orderStatus": {
+      "values": ["pending", "accepted", "completed", "cancelled"],
+      "colors": {
+        "pending": "#F59E0B",
+        "accepted": "#0EA5E9",
+        "completed": "#22C55E",
+        "cancelled": "#6B7280"
+      }
+    },
+    "deliveryStatus": {
+      "values": ["pending", "on_the_way", "done"],
+      "colors": {
+        "pending": "#F59E0B",
+        "on_the_way": "#0EA5E9",
+        "done": "#22C55E"
+      }
+    },
+    "invoiceStatus": {
+      "values": ["draft", "sent", "paid", "cancelled", "expired"],
+      "colors": {
+        "draft": "#6B7280",
+        "sent": "#FF3B30",
+        "paid": "#22C55E",
+        "cancelled": "#6B7280",
+        "expired": "#EF4444"
+      }
+    },
+    "staffStatus": {
+      "values": ["pending", "accepted", "rejected", "locked"],
+      "colors": {
+        "pending": "#F59E0B",
+        "accepted": "#22C55E",
+        "rejected": "#EF4444",
+        "locked": "#6B7280"
+      }
+    }
+  },
+
+  "localization": {
+    "currency": {
+      "code": "MUR",
+      "symbol": "Rs",
+      "name": "Mauritian Rupee"
+    },
+    "vat": {
+      "rate": 15,
+      "description": "Standard VAT rate in Mauritius"
+    },
+    "languages": {
+      "supported": ["EN", "FR"],
+      "default": "EN"
+    }
+  },
+
+  "notes": [
+    "This plan aligns with app-logic.json version 1.0.0",
+    "Phase 1 is critical and must be completed before other phases",
+    "Phases 2 and 3 can be partially parallelized after Phase 1",
+    "Phase 4 depends on Phase 3 for proper permission handling",
+    "Phase 5 can start after Phase 3",
+    "Each phase should be tested thoroughly before moving to next",
+    "Update this file as tasks are completed"
+  ]
+}
+
