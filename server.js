@@ -11,6 +11,67 @@ const { Expo } = require('expo-server-sdk');
 // Load environment variables (create a .env file in backend/ if needed)
 require('dotenv').config();
 
+// ============================================================================
+// EMAIL SERVICE - Nodemailer for transactional emails
+// ============================================================================
+const nodemailer = require('nodemailer');
+
+let emailTransporter = null;
+
+function getEmailTransporter() {
+  if (emailTransporter) return emailTransporter;
+
+  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+    console.warn('[Email] Email not configured. Set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD in .env');
+    return null;
+  }
+
+  emailTransporter = nodemailer.createTransport({
+    host: process.env.EMAIL_HOST,
+    port: parseInt(process.env.EMAIL_PORT || '465', 10),
+    secure: process.env.EMAIL_SECURE === 'true',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+
+  return emailTransporter;
+}
+
+async function sendPasswordResetEmail(toEmail, resetToken) {
+  const transporter = getEmailTransporter();
+  const appUrl = process.env.APP_BASE_URL || 'https://nouproapp.onrender.com';
+  const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
+
+  if (!transporter) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[Email] Would send password reset email to:', toEmail);
+      console.log('[Email] Reset link:', resetLink);
+    }
+    return;
+  }
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || 'NouPro <noreply@noupro.app>',
+    to: toEmail,
+    subject: 'Reset your NouPro password',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #000;">Reset your password</h2>
+        <p>You requested a password reset for your NouPro account.</p>
+        <p>This link expires in 15 minutes.</p>
+        <a href="${resetLink}" style="display:inline-block;padding:12px 24px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
+          Reset Password
+        </a>
+        <p style="margin-top:24px;color:#666;font-size:14px;">
+          If you didn't request this, you can safely ignore this email.
+        </p>
+      </div>
+    `,
+  });
+}
+
 // Expo push notification client
 const expo = new Expo();
 
@@ -165,6 +226,16 @@ const chatCreationLimiter = rateLimit({
   max: 10,
   keyGenerator: (req) => req.user?.id ?? 'anonymous',
   message: { success: false, message: 'Too many chats created, please slow down' },
+  validate: { xForwardedForHeader: false },
+});
+
+// Rate limiter for join requests (10 per 15 minutes per user — prevents notification spam)
+const joinRequestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.user?.id ?? req.ip,
+  skip: (req) => !req.user,
+  message: { success: false, error: 'Too many join requests, please try again later' },
   validate: { xForwardedForHeader: false },
 });
 
@@ -344,12 +415,12 @@ function getPublicDisabledReason(business, location) {
 
 // Get user from request
 // Requires JWT authentication - all routes using this should have requireAuth middleware
-function getUserFromRequest(req) {
+async function getUserFromRequest(req) {
   // Only use JWT-authenticated user from middleware
   if (req.user?.id) {
-    return users.find(u => u.id === req.user.id);
+    return await repos.userRepo.getById(req.user.id);
   }
-  
+
   // No fallback - authentication required
   return null;
 }
@@ -647,7 +718,7 @@ async function applyPricePrivacyBatch(products, viewerBusinessId) {
 
 // Require user to be a member of the business
 async function requireBusinessMembership(req, res, businessId) {
-  const user = getUserFromRequest(req);
+  const user = await getUserFromRequest(req);
   if (!user) {
     res.status(401).json(errorResponse('Authentication required', 'AUTH_REQUIRED'));
     return false;
@@ -662,7 +733,7 @@ async function requireBusinessMembership(req, res, businessId) {
 
 // Require user to be admin or super_admin of the business (Prisma-backed)
 async function requireBusinessAdmin(req, res, businessId) {
-  const user = getUserFromRequest(req);
+  const user = await getUserFromRequest(req);
   if (!user) {
     res.status(401).json(errorResponse('Authentication required', 'AUTH_REQUIRED'));
     return false;
@@ -684,7 +755,7 @@ async function requireBusinessAdmin(req, res, businessId) {
 
 // Require user to be a member of the location (or super admin of parent business) (Prisma-backed)
 async function requireLocationMembership(req, res, locationId) {
-  const user = getUserFromRequest(req);
+  const user = await getUserFromRequest(req);
   if (!user) {
     res.status(401).json(errorResponse('Authentication required', 'AUTH_REQUIRED'));
     return false;
@@ -1989,11 +2060,7 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
       email: dbUser.email
     }, { expiresIn: '15m' });
 
-    // TODO: Send email with reset link/code
-    // For now, log the token in development
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[ForgotPassword] Reset token for', email, ':', resetToken);
-    }
+    await sendPasswordResetEmail(email, resetToken);
 
     res.json(successResponse(null, 'If an account with that email exists, a reset link has been sent.'));
   } catch (err) {
@@ -2555,6 +2622,39 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   }
 });
 
+// Search users by name or email (for inviting staff, etc.)
+// GET /api/users/search?q=
+app.get('/api/users/search', requireAuth, async (req, res) => {
+  try {
+    const { q = '' } = req.query;
+    if (!q.trim()) {
+      return res.json(successResponse([]));
+    }
+
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } },
+        ],
+        NOT: { id: req.user.id },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true,
+      },
+      take: 20,
+      orderBy: { name: 'asc' },
+    });
+
+    return res.json(successResponse(users));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
 // Get another user's profile by ID
 app.get('/api/users/:userId', requireAuth, async (req, res) => {
   try {
@@ -2614,6 +2714,127 @@ app.get('/api/users/:userId', requireAuth, async (req, res) => {
 // BUSINESS ROUTES (with capabilities)
 // ============================================================================
 
+// Industry mapping from frontend registration types to backend industry values
+const FRONTEND_TYPE_TO_INDUSTRY = {
+  'Bookstore': 'general_retail',
+  'Dealers & Resellers': 'general_retail',
+  'Distributors & Wholesalers': 'general_retail',
+  'Franchise & Chain Businesses': 'general_retail',
+  'Hardware Store': 'general_retail',
+  'Importers & Exporters': 'general_retail',
+  'Library': 'services',
+  'Manufacturers & Producers': 'production',
+  'Others': 'other',
+  'Pharmacy': 'cosmetics',
+  'Restaurant': 'food_beverage',
+  'Retailers': 'general_retail',
+  'Showrooms': 'general_retail',
+  'Supply Chain & Logistics': 'services',
+  'Wholesalers & Cash and Carry': 'general_retail',
+};
+
+// Create a new business
+app.post('/api/companies', requireAuth, async (req, res) => {
+  try {
+    const user = await repos.userRepo.getById(req.user.id);
+    if (!user) {
+      return res.status(404).json(errorResponse('User not found', 'USER_NOT_FOUND'));
+    }
+
+    const { name, type, industry, category, phone, email, website, address, latitude, longitude, businessHours, logoUrl } = req.body;
+
+    // Validate required fields
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json(errorResponse('Business name is required'));
+    }
+    if (name.trim().length > 100) {
+      return res.status(400).json(errorResponse('Business name must be 100 characters or less'));
+    }
+    if (email && !email.includes('@')) {
+      return res.status(400).json(errorResponse('Invalid email format'));
+    }
+    if (phone && phone.length > 30) {
+      return res.status(400).json(errorResponse('Phone number must be 30 characters or less'));
+    }
+    if (latitude != null && (latitude < -90 || latitude > 90)) {
+      return res.status(400).json(errorResponse('Latitude must be between -90 and 90'));
+    }
+    if (longitude != null && (longitude < -180 || longitude > 180)) {
+      return res.status(400).json(errorResponse('Longitude must be between -180 and 180'));
+    }
+
+    // Resolve industry from frontend type or direct industry value
+    const VALID_INDUSTRIES = ['food_beverage', 'general_retail', 'production', 'services', 'cosmetics', 'electronics', 'other'];
+    const resolvedIndustry = (industry && VALID_INDUSTRIES.includes(industry))
+      ? industry
+      : (FRONTEND_TYPE_TO_INDUSTRY[type] || 'other');
+
+    // Store business hours in settings JSON
+    const settings = {};
+    if (businessHours && Array.isArray(businessHours)) {
+      settings.businessHours = businessHours;
+    }
+
+    // Create the business
+    const businessId = uuidv4();
+    const newBusiness = await repos.businessRepo.create({
+      id: businessId,
+      name: name.trim(),
+      industry: resolvedIndustry,
+      category: category || null,
+      phone: phone || null,
+      email: email || null,
+      website: website || null,
+      address: address || null,
+      logoUrl: logoUrl || null,
+      isPublished: false,
+      subscriptionTier: 'FREE',
+      settings,
+    });
+
+    // Create primary location if coordinates provided
+    if (latitude != null && longitude != null) {
+      const locationPayload = {
+        id: 'loc-' + uuidv4().slice(0, 8),
+        name: name.trim() + ' - Main',
+        address: address || null,
+        latitude,
+        longitude,
+        operatingMode: 'DEPENDENT',
+        isPublic: false,
+        isPrimary: true,
+      };
+      await repos.locationRepo.create(businessId, locationPayload);
+    }
+
+    // Create BusinessMember record for the creator as super_admin
+    const memberId = uuidv4();
+    const member = await repos.memberRepo.addBusinessMember({
+      id: memberId,
+      businessId,
+      userId: user.id,
+      role: 'super_admin',
+      status: 'accepted',
+    });
+
+    const capabilities = deriveCapabilities(newBusiness);
+
+    res.status(201).json(successResponse({
+      business: { ...newBusiness, capabilities },
+      role: 'super_admin',
+      staff_entry: {
+        id: member.id,
+        status: 'accepted',
+        role_type: null,
+        joinedAt: member.createdAt,
+      },
+    }, 'Business created successfully'));
+  } catch (err) {
+    console.error('[Create Business] Error:', err);
+    res.status(500).json(errorResponse('Failed to create business. Please try again.'));
+  }
+});
+
 // Get all businesses (for search/discovery)
 app.get('/api/businesses', async (req, res) => {
   const businesses = await repos.businessRepo.list();
@@ -2622,6 +2843,44 @@ app.get('/api/businesses', async (req, res) => {
     capabilities: deriveCapabilities(b),
   }));
   res.json(successResponse(businessesWithCaps));
+});
+
+// Search published companies by name or industry
+// GET /api/companies/search?q=&page=1&limit=20
+app.get('/api/companies/search', requireAuth, async (req, res) => {
+  try {
+    const { q = '', page = '1', limit = '20' } = req.query;
+    const take = Math.min(parseInt(limit) || 20, 50);
+    const skip = ((parseInt(page) || 1) - 1) * take;
+
+    const businesses = await prisma.business.findMany({
+      where: {
+        isPublished: true,
+        ...(q.trim() ? {
+          OR: [
+            { name: { contains: q, mode: 'insensitive' } },
+            { industry: { contains: q, mode: 'insensitive' } },
+            { category: { contains: q, mode: 'insensitive' } },
+          ],
+        } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        logoUrl: true,
+        industry: true,
+        category: true,
+        description: true,
+      },
+      take,
+      skip,
+      orderBy: { name: 'asc' },
+    });
+
+    return res.json(successResponse(businesses));
+  } catch (err) {
+    return sendError(res, err);
+  }
 });
 
 // Get single business with capabilities
@@ -2650,9 +2909,40 @@ app.patch('/api/companies/:companyId', requireAuth, async (req, res) => {
   if (!existing) {
     return res.status(404).json(errorResponse('Business not found'));
   }
-  
+
   // Don't allow changing subscription tier via this endpoint
   const { subscriptionTier, ...allowedUpdates } = req.body;
+
+  // Input validation
+  if (allowedUpdates.name !== undefined) {
+    if (typeof allowedUpdates.name !== 'string' || !allowedUpdates.name.trim()) {
+      return res.status(400).json(errorResponse('Business name cannot be empty'));
+    }
+    if (allowedUpdates.name.trim().length > 100) {
+      return res.status(400).json(errorResponse('Business name must be 100 characters or less'));
+    }
+    allowedUpdates.name = allowedUpdates.name.trim();
+  }
+  if (allowedUpdates.email !== undefined && allowedUpdates.email !== null && allowedUpdates.email !== '') {
+    if (!allowedUpdates.email.includes('@')) {
+      return res.status(400).json(errorResponse('Invalid email format'));
+    }
+  }
+  if (allowedUpdates.website !== undefined && allowedUpdates.website !== null && allowedUpdates.website !== '') {
+    if (!allowedUpdates.website.startsWith('http://') && !allowedUpdates.website.startsWith('https://')) {
+      return res.status(400).json(errorResponse('Website must start with http:// or https://'));
+    }
+  }
+  if (allowedUpdates.description !== undefined && allowedUpdates.description !== null) {
+    if (typeof allowedUpdates.description === 'string' && allowedUpdates.description.length > 2000) {
+      return res.status(400).json(errorResponse('Description must be 2000 characters or less'));
+    }
+  }
+  if (allowedUpdates.phone !== undefined && allowedUpdates.phone !== null && allowedUpdates.phone !== '') {
+    if (allowedUpdates.phone.length > 30) {
+      return res.status(400).json(errorResponse('Phone number must be 30 characters or less'));
+    }
+  }
 
   // Merge settings instead of overwriting
   if (allowedUpdates.settings) {
@@ -2663,7 +2953,7 @@ app.patch('/api/companies/:companyId', requireAuth, async (req, res) => {
   }
 
   const updated = await repos.businessRepo.update(req.params.companyId, allowedUpdates);
-  
+
   res.json(successResponse({
     ...updated,
     capabilities: deriveCapabilities(updated),
@@ -3064,20 +3354,42 @@ app.post('/api/companies/:companyId/locations', requireAuth, async (req, res) =>
   if (!business) {
     return res.status(404).json(errorResponse('Business not found'));
   }
-  
+
   const capabilities = deriveCapabilities(business);
-  let { operatingMode, ...locationData } = req.body;
-  
+  let { operatingMode, locationType, ...locationData } = req.body;
+
+  // INPUT VALIDATION
+  if (!locationData.name || typeof locationData.name !== 'string' || locationData.name.trim().length === 0) {
+    return res.status(400).json(errorResponse('Location name is required'));
+  }
+  if (locationData.name.length > 100) {
+    return res.status(400).json(errorResponse('Location name must be 100 characters or less'));
+  }
+  if (locationData.phone && locationData.phone.length > 30) {
+    return res.status(400).json(errorResponse('Phone number must be 30 characters or less'));
+  }
+  if (locationData.email && typeof locationData.email === 'string' && locationData.email.length > 0) {
+    if (!locationData.email.includes('@')) {
+      return res.status(400).json(errorResponse('Invalid email format'));
+    }
+  }
+  if (locationData.latitude != null && (locationData.latitude < -90 || locationData.latitude > 90)) {
+    return res.status(400).json(errorResponse('Latitude must be between -90 and 90'));
+  }
+  if (locationData.longitude != null && (locationData.longitude < -180 || locationData.longitude > 180)) {
+    return res.status(400).json(errorResponse('Longitude must be between -180 and 180'));
+  }
+
   // ENFORCE: Non-top-tier businesses can only have DEPENDENT locations
   if (!capabilities.canChooseLocationMode) {
     operatingMode = LOCATION_MODES.DEPENDENT;
   }
-  
+
   // ENFORCE: If mode is INDEPENDENT but not allowed, force to DEPENDENT
   if (operatingMode === LOCATION_MODES.INDEPENDENT && !capabilities.canHaveIndependentLocations) {
     operatingMode = LOCATION_MODES.DEPENDENT;
   }
-  
+
   // Check max locations limit
   const currentLocations = await repos.locationRepo.getByBusinessId(req.params.companyId);
   if (currentLocations.length >= capabilities.maxLocations) {
@@ -3086,22 +3398,23 @@ app.post('/api/companies/:companyId/locations', requireAuth, async (req, res) =>
       'LOCATION_LIMIT_REACHED'
     ));
   }
-  
+
   const newLocationPayload = {
     id: 'loc-' + uuidv4().slice(0, 8),
     operatingMode: operatingMode || LOCATION_MODES.DEPENDENT,
     isPublic: operatingMode === LOCATION_MODES.INDEPENDENT ? (req.body.isPublic ?? false) : false,
+    locationType: locationType || null,
     ...locationData,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  
+
   const created = await repos.locationRepo.create(req.params.companyId, newLocationPayload);
   res.json(successResponse(created));
 });
 
 // Get single location
-app.get('/api/locations/:locationId', async (req, res) => {
+app.get('/api/locations/:locationId', requireAuth, async (req, res) => {
   const location = await repos.locationRepo.getById(req.params.locationId);
   if (!location) {
     return res.status(404).json(errorResponse('Location not found'));
@@ -3143,7 +3456,31 @@ app.patch('/api/locations/:locationId', requireAuth, async (req, res) => {
   
   const capabilities = deriveCapabilities(business);
   let { operatingMode, ...updates } = req.body;
-  
+
+  // INPUT VALIDATION on update fields
+  if (updates.name !== undefined) {
+    if (typeof updates.name !== 'string' || updates.name.trim().length === 0) {
+      return res.status(400).json(errorResponse('Location name cannot be empty'));
+    }
+    if (updates.name.length > 100) {
+      return res.status(400).json(errorResponse('Location name must be 100 characters or less'));
+    }
+  }
+  if (updates.phone !== undefined && updates.phone && updates.phone.length > 30) {
+    return res.status(400).json(errorResponse('Phone number must be 30 characters or less'));
+  }
+  if (updates.email !== undefined && updates.email && typeof updates.email === 'string') {
+    if (updates.email.length > 0 && !updates.email.includes('@')) {
+      return res.status(400).json(errorResponse('Invalid email format'));
+    }
+  }
+  if (updates.latitude != null && (updates.latitude < -90 || updates.latitude > 90)) {
+    return res.status(400).json(errorResponse('Latitude must be between -90 and 90'));
+  }
+  if (updates.longitude != null && (updates.longitude < -180 || updates.longitude > 180)) {
+    return res.status(400).json(errorResponse('Longitude must be between -180 and 180'));
+  }
+
   // MODE CHANGE ENFORCEMENT with grandfathering policy
   if (operatingMode && operatingMode !== location.operatingMode) {
     // Trying to switch DEPENDENT → INDEPENDENT
@@ -3230,7 +3567,7 @@ app.get('/api/companies/:companyId/products', requireAuth, async (req, res) => {
     // Apply filters
     if (category) {
       companyProducts = companyProducts.filter(p =>
-        p.category?.toLowerCase().includes(category.toLowerCase())
+        p.category?.toLowerCase() === category.toLowerCase()
       );
     }
     
@@ -3359,7 +3696,22 @@ app.post('/api/companies/:companyId/products', requireAuth, async (req, res) => 
 app.patch('/api/companies/:companyId/products/:productId', requireAuth, async (req, res) => {
   try {
     const { companyId, productId } = req.params;
-    const patch = req.body;
+    const { name, description, unit, price, taxRate, minOrderQty, stock, sku, barcode, isAvailable, images, categoryId, subcategoryId } = req.body;
+    const patch = {
+      ...(name !== undefined && { name }),
+      ...(description !== undefined && { description }),
+      ...(unit !== undefined && { unit }),
+      ...(price !== undefined && { price }),
+      ...(taxRate !== undefined && { taxRate }),
+      ...(minOrderQty !== undefined && { minOrderQty }),
+      ...(stock !== undefined && { stock }),
+      ...(sku !== undefined && { sku }),
+      ...(barcode !== undefined && { barcode }),
+      ...(isAvailable !== undefined && { isAvailable }),
+      ...(images !== undefined && { images }),
+      ...(categoryId !== undefined && { categoryId }),
+      ...(subcategoryId !== undefined && { subcategoryId }),
+    };
 
     const product = await repos.productRepo.getById(productId);
     if (!product) {
@@ -3487,8 +3839,14 @@ app.patch('/api/companies/:companyId/brands/:brandId', requireAuth, async (req, 
       return res.status(404).json(errorResponse('Brand not found'));
     }
 
+    const { name, description, logoUrl, website, country, categories } = req.body;
     const updated = await repos.brandRepo.update(brandId, {
-      ...req.body,
+      ...(name !== undefined && { name }),
+      ...(description !== undefined && { description }),
+      ...(logoUrl !== undefined && { logoUrl }),
+      ...(website !== undefined && { website }),
+      ...(country !== undefined && { country }),
+      ...(categories !== undefined && { categories }),
       updatedAt: new Date(),
     });
 
@@ -3517,6 +3875,179 @@ app.delete('/api/companies/:companyId/brands/:brandId', requireAuth, async (req,
   } catch (e) {
     console.error('Error deleting brand:', e);
     res.status(500).json(errorResponse('Failed to delete brand'));
+  }
+});
+
+// ============================================================================
+// TRANSPORT / FLEET ROUTES
+// ============================================================================
+
+// Helper: map Prisma camelCase transport to snake_case for frontend
+function mapTransportToResponse(t) {
+  return {
+    id: t.id,
+    business_id: t.businessId,
+    name: t.name,
+    vehicle_type: t.vehicleType,
+    license_plate: t.licensePlate || null,
+    capacity: t.capacity || null,
+    status: t.status,
+    assigned_staff_id: t.assignedStaffId || null,
+    assigned_staff_name: t._staffName || null,
+    assigned_staff_avatar: t._staffAvatar || null,
+    notes: t.notes || null,
+    created_at: t.createdAt,
+    updated_at: t.updatedAt,
+  };
+}
+
+// List transports for a company
+app.get('/api/companies/:companyId/transports', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const transports = await repos.transportRepo.getByBusinessId(req.params.companyId);
+
+    // Enrich with staff info
+    for (const t of transports) {
+      if (t.assignedStaffId) {
+        const user = await repos.userRepo.getById(t.assignedStaffId);
+        t._staffName = user?.name || null;
+        t._staffAvatar = user?.avatar || null;
+      }
+    }
+
+    res.json(successResponse(transports.map(mapTransportToResponse)));
+  } catch (e) {
+    console.error('Error fetching transports:', e);
+    res.status(500).json(errorResponse('Failed to fetch transports'));
+  }
+});
+
+// Create a transport
+app.post('/api/companies/:companyId/transports', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const { companyId } = req.params;
+    const business = await repos.businessRepo.getById(companyId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found'));
+    }
+
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canAssignTransport) {
+      return res.status(403).json(errorResponse(
+        'Upgrade to Pro to manage transports',
+        'PAYWALL'
+      ));
+    }
+
+    const { name, vehicle_type, license_plate, capacity, notes } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json(errorResponse('Transport name is required'));
+    }
+
+    const validTypes = ['bicycle', 'motorcycle', 'scooter', 'car', 'van', 'pickup', 'truck', 'lorry', 'other'];
+    if (vehicle_type && !validTypes.includes(vehicle_type)) {
+      return res.status(400).json(errorResponse('Invalid vehicle type'));
+    }
+
+    const created = await repos.transportRepo.create({
+      id: 'trn-' + uuidv4().slice(0, 8),
+      businessId: companyId,
+      name: name.trim(),
+      vehicleType: vehicle_type || 'other',
+      licensePlate: license_plate || null,
+      capacity: capacity || null,
+      status: 'available',
+      notes: notes || null,
+    });
+
+    res.status(201).json(successResponse(mapTransportToResponse(created)));
+  } catch (e) {
+    console.error('Error creating transport:', e);
+    res.status(500).json(errorResponse('Failed to create transport'));
+  }
+});
+
+// Update a transport
+app.patch('/api/companies/:companyId/transports/:transportId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const { companyId, transportId } = req.params;
+    const transport = await repos.transportRepo.getById(transportId);
+
+    if (!transport || transport.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Transport not found'));
+    }
+
+    const business = await repos.businessRepo.getById(companyId);
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canAssignTransport) {
+      return res.status(403).json(errorResponse('Upgrade to Pro to manage transports', 'PAYWALL'));
+    }
+
+    // Whitelist allowed fields (map snake_case from frontend to camelCase for Prisma)
+    const patch = {};
+    if (req.body.name !== undefined) patch.name = req.body.name;
+    if (req.body.vehicle_type !== undefined) patch.vehicleType = req.body.vehicle_type;
+    if (req.body.license_plate !== undefined) patch.licensePlate = req.body.license_plate;
+    if (req.body.capacity !== undefined) patch.capacity = req.body.capacity;
+    if (req.body.status !== undefined) patch.status = req.body.status;
+    if (req.body.assigned_staff_id !== undefined) patch.assignedStaffId = req.body.assigned_staff_id;
+    if (req.body.notes !== undefined) patch.notes = req.body.notes;
+
+    // Validate assignedStaffId if provided
+    if (patch.assignedStaffId) {
+      const allMembers = await repos.memberRepo.listBusinessMembers(companyId);
+      const staffMember = allMembers.find(
+        m => m.userId === patch.assignedStaffId && m.status === 'accepted'
+      );
+      if (!staffMember) {
+        return res.status(400).json(errorResponse('assigned_staff_id must be an accepted business member'));
+      }
+    }
+
+    const updated = await repos.transportRepo.update(transportId, {
+      ...patch,
+      updatedAt: new Date(),
+    });
+
+    // Enrich with staff info
+    if (updated.assignedStaffId) {
+      const user = await repos.userRepo.getById(updated.assignedStaffId);
+      updated._staffName = user?.name || null;
+      updated._staffAvatar = user?.avatar || null;
+    }
+
+    res.json(successResponse(mapTransportToResponse(updated)));
+  } catch (e) {
+    console.error('Error updating transport:', e);
+    res.status(500).json(errorResponse('Failed to update transport'));
+  }
+});
+
+// Delete a transport
+app.delete('/api/companies/:companyId/transports/:transportId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const { companyId, transportId } = req.params;
+    const transport = await repos.transportRepo.getById(transportId);
+
+    if (!transport || transport.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Transport not found'));
+    }
+
+    const business = await repos.businessRepo.getById(companyId);
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canAssignTransport) {
+      return res.status(403).json(errorResponse('Upgrade to Pro to manage transports', 'PAYWALL'));
+    }
+
+    await repos.transportRepo.delete(transportId);
+    res.json(successResponse(null, 'Transport deleted successfully'));
+  } catch (e) {
+    console.error('Error deleting transport:', e);
+    res.status(500).json(errorResponse('Failed to delete transport'));
   }
 });
 
@@ -4445,7 +4976,7 @@ app.get('/api/locations/:locationId/orders/:orderId', requireAuth, async (req, r
 // ============================================================================
 
 // Get stock for a location
-app.get('/api/locations/:locationId/stock', async (req, res) => {
+app.get('/api/locations/:locationId/stock', requireAuth, async (req, res) => {
   try {
     // PERMISSION: Require location membership
     if (!(await requireLocationMembership(req, res, req.params.locationId))) return;
@@ -4503,7 +5034,7 @@ app.patch('/api/locations/:locationId/stock/:productId', requireAuth, async (req
 });
 
 // Get stock for a business (all locations)
-app.get('/api/companies/:companyId/stock', async (req, res) => {
+app.get('/api/companies/:companyId/stock', requireAuth, async (req, res) => {
   try {
     const { businessId } = req.params;
 
@@ -4637,6 +5168,26 @@ app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =
       ? body.items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0)
       : 0);
 
+    // Validate assignedStaffId if provided
+    if (body.assignedStaffId) {
+      const allMembers = await repos.memberRepo.listBusinessMembers(companyId);
+      const staffMember = allMembers.find(
+        m => m.userId === body.assignedStaffId && m.status === 'accepted'
+      );
+      if (!staffMember) {
+        return res.status(400).json(errorResponse('assignedStaffId must be an accepted business member'));
+      }
+      if (body.locationId && staffMember.role !== 'super_admin') {
+        const locationMembersResult = await repos.memberRepo.listLocationMembers(body.locationId);
+        const hasAccess = locationMembersResult.some(lm =>
+          lm.userId === body.assignedStaffId && lm.status === 'accepted'
+        );
+        if (!hasAccess) {
+          return res.status(400).json(errorResponse('Assigned staff member does not have access to the delivery location'));
+        }
+      }
+    }
+
     const created = await repos.deliveryRepo.create({
       id: uuidv4(),
       businessId: companyId,
@@ -4667,6 +5218,27 @@ app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =
       paymentStatus: body.paymentStatus || 'UNPAID',
       orderId: body.orderId || null,
     });
+
+    // Handle optional multi-staff assignments
+    if (body.staffAssignments && Array.isArray(body.staffAssignments)) {
+      for (const sa of body.staffAssignments) {
+        if (sa.userId) {
+          try {
+            await repos.deliveryStaffRepo.assign({
+              deliveryId: created.id,
+              userId: sa.userId,
+              role: sa.role || 'driver',
+              assignedBy: req.user?.id || null,
+            });
+          } catch (staffErr) {
+            console.warn('Failed to assign staff during delivery creation:', staffErr.message);
+          }
+        }
+      }
+      // Re-fetch with staff assignments included
+      const enriched = await repos.deliveryRepo.getById(created.id);
+      return res.status(201).json(successResponse(enriched));
+    }
 
     res.status(201).json(successResponse(created));
   } catch (e) {
@@ -6806,70 +7378,64 @@ app.post('/api/users/:userId/chats/:chatId/remove-participant', requireAuth, asy
 // ============================================================================
 
 // Get business members
-app.get('/api/companies/:companyId/members', (req, res) => {
-  const members = businessMembers.filter(m => m.businessId === req.params.companyId);
-  
-  // Enrich with user data
-  const enrichedMembers = members.map(m => {
-    const user = users.find(u => u.id === m.userId);
-    return {
+app.get('/api/companies/:companyId/members', requireAuth, async (req, res) => {
+  try {
+    const members = await repos.memberRepo.listBusinessMembers(req.params.companyId);
+    const enrichedMembers = members.map(m => ({
       ...m,
-      user: user ? { id: user.id, name: user.name, email: user.email, avatar: user.avatar } : null
-    };
-  });
-  
-  res.json(successResponse(enrichedMembers));
+      user: m.user ? { id: m.user.id, name: m.user.name, email: m.user.email, avatar: m.user.avatar } : null
+    }));
+    res.json(successResponse(enrichedMembers));
+  } catch (err) { return sendError(res, err); }
 });
 
 // Get location members
-app.get('/api/locations/:locationId/members', (req, res) => {
-  const members = locationMembers.filter(m => m.locationId === req.params.locationId);
-  
-  const enrichedMembers = members.map(m => {
-    const user = users.find(u => u.id === m.userId);
-    return {
+app.get('/api/locations/:locationId/members', requireAuth, async (req, res) => {
+  try {
+    const members = await repos.memberRepo.listLocationMembers(req.params.locationId);
+    const enrichedMembers = members.map(m => ({
       ...m,
-      user: user ? { id: user.id, name: user.name, email: user.email, avatar: user.avatar } : null
-    };
-  });
-  
-  res.json(successResponse(enrichedMembers));
+      user: m.user ? { id: m.user.id, name: m.user.name, email: m.user.email, avatar: m.user.avatar } : null
+    }));
+    res.json(successResponse(enrichedMembers));
+  } catch (err) { return sendError(res, err); }
 });
 
 // Get user's business memberships
-app.get('/api/users/:userId/businesses', (req, res) => {
-  const userBusinessMembers = businessMembers.filter(m => 
-    m.userId === req.params.userId && m.status === MEMBER_STATUS.ACCEPTED
-  );
-  
-  const businessesWithRole = userBusinessMembers.map(m => {
-    const business = companies.find(c => c.id === m.businessId);
-    return {
-      membership: m,
-      business: business ? { ...business, capabilities: deriveCapabilities(business) } : null
-    };
-  }).filter(b => b.business !== null);
-  
-  res.json(successResponse(businessesWithRole));
+app.get('/api/users/:userId/businesses', requireAuth, async (req, res) => {
+  try {
+    const userBusinessMembers = await repos.memberRepo.getByUserId(req.params.userId);
+    const accepted = userBusinessMembers.filter(m => m.status === MEMBER_STATUS.ACCEPTED);
+
+    const businessesWithRole = (await Promise.all(accepted.map(async m => {
+      const business = await repos.businessRepo.getById(m.businessId);
+      if (!business) return null;
+      return {
+        membership: m,
+        business: { ...business, capabilities: deriveCapabilities(business) }
+      };
+    }))).filter(Boolean);
+
+    res.json(successResponse(businessesWithRole));
+  } catch (err) { return sendError(res, err); }
 });
 
 // Get user's location memberships
-app.get('/api/users/:userId/locations', (req, res) => {
-  const userLocationMembers = locationMembers.filter(m => 
-    m.userId === req.params.userId && m.status === MEMBER_STATUS.ACCEPTED
-  );
-  
-  const locationsWithRole = userLocationMembers.map(m => {
-    const location = locations.find(l => l.id === m.locationId);
-    const business = location ? companies.find(c => c.id === location.companyId) : null;
-    return {
-      membership: m,
-      location: location || null,
-      business: business ? { id: business.id, name: business.name } : null
-    };
-  }).filter(l => l.location !== null);
-  
-  res.json(successResponse(locationsWithRole));
+app.get('/api/users/:userId/locations', requireAuth, async (req, res) => {
+  try {
+    const allLocMembers = await repos.memberRepo.listLocationMembersByUserId(req.params.userId);
+    const accepted = allLocMembers.filter(m => m.status === MEMBER_STATUS.ACCEPTED);
+
+    const locationsWithRole = accepted
+      .filter(m => m.location)
+      .map(m => ({
+        membership: { id: m.id, locationId: m.locationId, businessId: m.businessId, userId: m.userId, role: m.role, status: m.status, createdAt: m.createdAt },
+        location: m.location,
+        business: m.business ? { id: m.business.id, name: m.business.name } : null
+      }));
+
+    res.json(successResponse(locationsWithRole));
+  } catch (err) { return sendError(res, err); }
 });
 
 // Search all users and businesses with connection status for the new chat modal
@@ -6999,9 +7565,10 @@ app.get('/api/companies/:companyId/users', async (req, res) => {
 // STAFF MANAGEMENT - Unified staff list for Team Management screen
 // ============================================================================
 // Returns merged list of business-level and location-level members with user details
-app.get('/api/companies/:companyId/staff', async (req, res) => {
+app.get('/api/companies/:companyId/staff', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
     const { status = 'accepted', locationId } = req.query;
 
     // Validate status
@@ -7053,9 +7620,8 @@ app.get('/api/companies/:companyId/staff', async (req, res) => {
         if (!user) return null;
 
         // Collect all locationIds for this user
-        const locationIds = locationMembers
-          .filter(lm => lm.businessId === companyId && lm.userId === bm.userId)
-          .map(lm => lm.locationId);
+        const userLocMembers = await repos.memberRepo.listLocationMembersByBusinessAndUser(companyId, bm.userId);
+        const locationIds = userLocMembers.map(lm => lm.locationId);
 
         // If location filter is active and non-super_admin, attach locationName
         let locName = null;
@@ -7094,9 +7660,10 @@ app.get('/api/companies/:companyId/staff', async (req, res) => {
 
 // Get staff for a specific location (with status filter)
 // GET /api/companies/:companyId/locations/:locationId/staff?status=accepted|invited|suspended|all&includeBusinessAdmins=true
-app.get('/api/companies/:companyId/locations/:locationId/staff', async (req, res) => {
+app.get('/api/companies/:companyId/locations/:locationId/staff', requireAuth, async (req, res) => {
   try {
     const { companyId, locationId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
     const { status = 'accepted', includeBusinessAdmins = 'true' } = req.query;
 
     // Validate status
@@ -7138,10 +7705,9 @@ app.get('/api/companies/:companyId/locations/:locationId/staff', async (req, res
           if (!user) return null;
           
           // Collect all locationIds for this user
-          const locationIds = locationMembers
-            .filter(lm => lm.businessId === companyId && lm.userId === bm.userId)
-            .map(lm => lm.locationId);
-          
+          const superLocMembers = await repos.memberRepo.listLocationMembersByBusinessAndUser(companyId, bm.userId);
+          const locationIds = superLocMembers.map(lm => lm.locationId);
+
           return {
             id: user.id,
             name: user.name,
@@ -7168,9 +7734,8 @@ app.get('/api/companies/:companyId/locations/:locationId/staff', async (req, res
         const effectiveStatus = lm.status ?? bm?.status ?? 'accepted';
 
         // Collect all locationIds for this user
-        const locationIds = locationMembers
-          .filter(lmx => lmx.businessId === companyId && lmx.userId === lm.userId)
-          .map(lmx => lmx.locationId);
+        const userLocMembers = await repos.memberRepo.listLocationMembersByBusinessAndUser(companyId, lm.userId);
+        const locationIds = userLocMembers.map(lmx => lmx.locationId);
 
         return {
           id: user.id,
@@ -7196,7 +7761,8 @@ app.get('/api/companies/:companyId/locations/:locationId/staff', async (req, res
 
 // Get staff for a location without company prefix (convenience)
 // GET /api/locations/:locationId/staff
-app.get('/api/locations/:locationId/staff', async (req, res) => {
+app.get('/api/locations/:locationId/staff', requireAuth, async (req, res) => {
+  try {
   const { locationId } = req.params;
   const includeBusinessAdmins = req.query.includeBusinessAdmins === 'true';
 
@@ -7205,6 +7771,7 @@ app.get('/api/locations/:locationId/staff', async (req, res) => {
 
   // Derive companyId from location
   const companyId = location.businessId || location.companyId;
+  if (!(await requireBusinessMembership(req, res, companyId))) return;
 
   // Location-level members for this location
   const allLocMembers = await repos.memberRepo.listLocationMembers(locationId);
@@ -7212,6 +7779,9 @@ app.get('/api/locations/:locationId/staff', async (req, res) => {
   const locationStaff = (await Promise.all(filteredLocMembers.map(async m => {
       const user = await findUser(m.userId);
       if (!user) return null;
+
+      const userLocMembers = await repos.memberRepo.listLocationMembersByBusinessAndUser(companyId, m.userId);
+      const locationIds = userLocMembers.map(lm => lm.locationId);
 
       return {
         id: user.id,
@@ -7223,6 +7793,7 @@ app.get('/api/locations/:locationId/staff', async (req, res) => {
         status: m.status ?? 'accepted',
         scope: 'location',
         locationId,
+        locationIds,
         locationName: location.name,
         joinedAt: m.createdAt || null,
       };
@@ -7231,10 +7802,13 @@ app.get('/api/locations/:locationId/staff', async (req, res) => {
   let businessAdminStaff = [];
   if (includeBusinessAdmins) {
     const allBizMembers = await repos.memberRepo.listBusinessMembers(companyId);
-    const adminMembers = allBizMembers.filter(m => m.role === 'super_admin' || m.role === 'admin');
+    const adminMembers = allBizMembers.filter(m => m.role === 'super_admin');
     businessAdminStaff = (await Promise.all(adminMembers.map(async m => {
         const user = await findUser(m.userId);
         if (!user) return null;
+
+        const userLocMembers = await repos.memberRepo.listLocationMembersByBusinessAndUser(companyId, m.userId);
+        const locationIds = userLocMembers.map(lm => lm.locationId);
 
         return {
           id: user.id,
@@ -7246,6 +7820,7 @@ app.get('/api/locations/:locationId/staff', async (req, res) => {
           status: m.status ?? 'accepted',
           scope: 'business',
           locationId,
+          locationIds,
           locationName: location.name,
           joinedAt: m.createdAt || null,
         };
@@ -7257,6 +7832,9 @@ app.get('/api/locations/:locationId/staff', async (req, res) => {
   locationStaff.forEach(m => map.set(m.id, m));
 
   return res.json(successResponse(Array.from(map.values())));
+  } catch (err) {
+    return sendError(res, err);
+  }
 });
 
 // ============================================================================
@@ -7269,11 +7847,27 @@ app.get('/api/locations/:locationId/staff', async (req, res) => {
 app.post('/api/companies/:companyId/locations/:locationId/staff', requireAuth, async (req, res) => {
   try {
     const { companyId, locationId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
     const { userId, role, status = 'accepted' } = req.body || {};
 
     if (!userId) return res.status(400).json(errorResponse('userId is required'));
     ensureRole(role);
     ensureStatus(status);
+
+    // Check staff limits (paywall)
+    const business = await repos.businessRepo.getById(companyId);
+    if (business) {
+      const capabilities = deriveCapabilities(business);
+      if (!capabilities.canHaveStaff) {
+        return res.status(403).json({
+          error: { code: 'PAYWALL', triggerId: 'accept_staff', requiredPlan: 'pro', message: 'Upgrade to Pro to add staff members' }
+        });
+      }
+      const currentCount = await getStaffCount(companyId);
+      if (currentCount >= capabilities.maxStaff) {
+        return res.status(403).json(errorResponse(`Staff limit reached (${capabilities.maxStaff}). Upgrade your plan to add more staff.`));
+      }
+    }
 
     // Validate location belongs to business
     const location = await findLocation(companyId, locationId);
@@ -7288,19 +7882,16 @@ app.post('/api/companies/:companyId/locations/:locationId/staff', requireAuth, a
 
     // If not business member, create it
     if (!bm) {
-      bm = {
+      bm = await repos.memberRepo.addBusinessMember({
         id: nextId('bm'),
         businessId: companyId,
         userId,
         role,
         status,
-        createdAt: new Date().toISOString(),
-      };
-      businessMembers.push(bm);
+      });
     } else {
       // If already a business member, update business role if it differs
-      bm.role = role;
-      bm.status = status;
+      bm = await repos.memberRepo.updateBusinessMember(bm.id, { role, status });
     }
 
     // Super admin has implicit access to all locations; no need to create locationMember
@@ -7314,19 +7905,16 @@ app.post('/api/companies/:companyId/locations/:locationId/staff', requireAuth, a
     // For admin/staff we create/update a locationMember record
     let lm = await findLocationMember(companyId, locationId, userId);
     if (!lm) {
-      lm = {
+      lm = await repos.memberRepo.addLocationMember({
         id: nextId('lm'),
         businessId: companyId,
         locationId,
         userId,
         role,
         status,
-        createdAt: new Date().toISOString(),
-      };
-      locationMembers.push(lm);
+      });
     } else {
-      lm.role = role;
-      lm.status = status;
+      lm = await repos.memberRepo.updateLocationMember(lm.id, { role, status });
     }
 
     return res.json(successResponse({
@@ -7343,6 +7931,7 @@ app.post('/api/companies/:companyId/locations/:locationId/staff', requireAuth, a
 app.delete('/api/companies/:companyId/locations/:locationId/staff/:userId', requireAuth, async (req, res) => {
   try {
     const { companyId, locationId, userId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
 
     const location = await findLocation(companyId, locationId);
     if (!location) return res.status(404).json(errorResponse('Location not found for this business'));
@@ -7355,12 +7944,12 @@ app.delete('/api/companies/:companyId/locations/:locationId/staff/:userId', requ
       return res.status(400).json(errorResponse('super_admin access is implicit; cannot remove per-location assignment.'));
     }
 
-    const idx = locationMembers.findIndex(m => m.businessId === companyId && m.locationId === locationId && m.userId === userId);
-    if (idx === -1) return res.status(404).json(errorResponse('No location assignment found for this user'));
+    const lm = await findLocationMember(companyId, locationId, userId);
+    if (!lm) return res.status(404).json(errorResponse('No location assignment found for this user'));
 
-    const removed = locationMembers.splice(idx, 1)[0];
+    await repos.memberRepo.removeLocationMember(lm.id);
 
-    return res.json(successResponse({ removed }));
+    return res.json(successResponse({ removed: lm }));
   } catch (err) {
     return sendError(res, err);
   }
@@ -7372,6 +7961,7 @@ app.delete('/api/companies/:companyId/locations/:locationId/staff/:userId', requ
 app.patch('/api/companies/:companyId/locations/:locationId/staff/:userId', requireAuth, async (req, res) => {
   try {
     const { companyId, locationId, userId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
     const { role, status } = req.body || {};
 
     if (role !== undefined) ensureRole(role);
@@ -7391,26 +7981,33 @@ app.patch('/api/companies/:companyId/locations/:locationId/staff/:userId', requi
     let lm = await findLocationMember(companyId, locationId, userId);
     if (!lm) {
       // If not assigned yet, create assignment on patch (useful UX)
-      lm = {
+      lm = await repos.memberRepo.addLocationMember({
         id: nextId('lm'),
         businessId: companyId,
         locationId,
         userId,
         role: role || bm.role || 'staff',
         status: status || bm.status || 'accepted',
-        createdAt: new Date().toISOString(),
-      };
-      locationMembers.push(lm);
+      });
     } else {
-      if (role !== undefined) lm.role = role;
-      if (status !== undefined) lm.status = status;
+      const lmPatch = {};
+      if (role !== undefined) lmPatch.role = role;
+      if (status !== undefined) lmPatch.status = status;
+      if (Object.keys(lmPatch).length > 0) {
+        lm = await repos.memberRepo.updateLocationMember(lm.id, lmPatch);
+      }
     }
 
     // Keep business role aligned with location role where applicable
-    if (role !== undefined) bm.role = role;
-    if (status !== undefined) bm.status = status;
+    const bmPatch = {};
+    if (role !== undefined) bmPatch.role = role;
+    if (status !== undefined) bmPatch.status = status;
+    let updatedBm = bm;
+    if (Object.keys(bmPatch).length > 0) {
+      updatedBm = await repos.memberRepo.updateBusinessMember(bm.id, bmPatch);
+    }
 
-    return res.json(successResponse({ businessMember: bm, locationMember: lm }));
+    return res.json(successResponse({ businessMember: updatedBm, locationMember: lm }));
   } catch (err) {
     return sendError(res, err);
   }
@@ -7423,7 +8020,7 @@ app.patch('/api/companies/:companyId/locations/:locationId/staff/:userId', requi
 // Get accessible locations for a user in a business
 // GET /api/companies/:companyId/access/locations?userId=usr-002
 // Returns: { role, locations[] }
-app.get('/api/companies/:companyId/access/locations', async (req, res) => {
+app.get('/api/companies/:companyId/access/locations', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
     const { userId } = req.query;
@@ -7489,6 +8086,7 @@ app.get('/api/companies/:companyId/access/capabilities', async (req, res) => {
 app.post('/api/companies/:companyId/users/invite', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
     const { email, name, role, locationIds, status = 'invited' } = req.body || {};
 
     if (!email) return res.status(400).json(errorResponse('email is required'));
@@ -7544,31 +8142,26 @@ app.post('/api/companies/:companyId/users/invite', requireAuth, async (req, res)
     // Find or create user
     let user = await findUserByEmail(email);
     if (!user) {
-      user = {
+      user = await repos.userRepo.create({
         id: nextId('usr'),
         email: String(email).toLowerCase(),
         name: name || email.split('@')[0],
         avatar: '',
-        createdAt: new Date().toISOString(),
-      };
-      users.push(user);
+      });
     }
 
     // Create/update business membership
     let bm = await findBusinessMember(companyId, user.id);
     if (!bm) {
-      bm = {
+      bm = await repos.memberRepo.addBusinessMember({
         id: nextId('bm'),
         businessId: companyId,
         userId: user.id,
         role,
         status, // invited by default
-        createdAt: new Date().toISOString(),
-      };
-      businessMembers.push(bm);
+      });
     } else {
-      bm.role = role;
-      bm.status = status;
+      bm = await repos.memberRepo.updateBusinessMember(bm.id, { role, status });
     }
 
     // Super admin: no locationMembers needed
@@ -7577,19 +8170,16 @@ app.post('/api/companies/:companyId/users/invite', requireAuth, async (req, res)
       for (const locId of locIds) {
         let lm = await findLocationMember(companyId, locId, user.id);
         if (!lm) {
-          lm = {
+          lm = await repos.memberRepo.addLocationMember({
             id: nextId('lm'),
             businessId: companyId,
             locationId: locId,
             userId: user.id,
             role,
             status,
-            createdAt: new Date().toISOString(),
-          };
-          locationMembers.push(lm);
+          });
         } else {
-          lm.role = role;
-          lm.status = status;
+          lm = await repos.memberRepo.updateLocationMember(lm.id, { role, status });
         }
         createdLocationMembers.push(lm);
       }
@@ -7615,19 +8205,24 @@ app.post('/api/companies/:companyId/users/invite', requireAuth, async (req, res)
 app.post('/api/companies/:companyId/users/:userId/accept', requireAuth, async (req, res) => {
   try {
     const { companyId, userId } = req.params;
+    const currentUser = await getUserFromRequest(req);
+    if (!currentUser || currentUser.id !== userId) {
+      return res.status(403).json(errorResponse('You can only accept your own invite', 'ACCESS_DENIED'));
+    }
 
     const bm = await findBusinessMember(companyId, userId);
     if (!bm) return res.status(404).json(errorResponse('Invite not found'));
 
     // Accept business membership
-    bm.status = 'accepted';
+    const updatedBm = await repos.memberRepo.updateBusinessMember(bm.id, { status: 'accepted' });
 
     // Accept all location assignments for this business+user
-    locationMembers
-      .filter(m => m.businessId === companyId && m.userId === userId)
-      .forEach(m => { m.status = 'accepted'; });
+    const locMembers = await repos.memberRepo.listLocationMembersByBusinessAndUser(companyId, userId);
+    for (const lm of locMembers) {
+      await repos.memberRepo.updateLocationMember(lm.id, { status: 'accepted' });
+    }
 
-    return res.json(successResponse({ businessMember: bm }));
+    return res.json(successResponse({ businessMember: updatedBm }));
   } catch (err) {
     return sendError(res, err);
   }
@@ -7635,20 +8230,33 @@ app.post('/api/companies/:companyId/users/:userId/accept', requireAuth, async (r
 
 // Revoke invite (remove memberships)
 // DELETE /api/companies/:companyId/users/:userId/invite
-app.delete('/api/companies/:companyId/users/:userId/invite', requireAuth, (req, res) => {
+app.delete('/api/companies/:companyId/users/:userId/invite', requireAuth, async (req, res) => {
   try {
     const { companyId, userId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
+
+    // Prevent removing the last admin/super_admin
+    const targetBm = await findBusinessMember(companyId, userId);
+    if (targetBm && (targetBm.role === 'admin' || targetBm.role === 'super_admin') && targetBm.status === 'accepted') {
+      const allMembers = await repos.memberRepo.listBusinessMembers(companyId);
+      const remainingAdmins = allMembers.filter(
+        m => (m.role === 'admin' || m.role === 'super_admin') && m.status === 'accepted' && m.userId !== userId
+      );
+      if (remainingAdmins.length === 0) {
+        return res.status(400).json(errorResponse('Cannot remove the last admin. Transfer ownership first.', 'LAST_ADMIN'));
+      }
+    }
 
     // Remove location assignments
-    for (let i = locationMembers.length - 1; i >= 0; i--) {
-      const lm = locationMembers[i];
-      if (lm.businessId === companyId && lm.userId === userId) locationMembers.splice(i, 1);
+    const locMembers = await repos.memberRepo.listLocationMembersByBusinessAndUser(companyId, userId);
+    for (const lm of locMembers) {
+      await repos.memberRepo.removeLocationMember(lm.id);
     }
 
     // Remove business membership
-    for (let i = businessMembers.length - 1; i >= 0; i--) {
-      const bm = businessMembers[i];
-      if (bm.businessId === companyId && bm.userId === userId) businessMembers.splice(i, 1);
+    const bm = await findBusinessMember(companyId, userId);
+    if (bm) {
+      await repos.memberRepo.removeBusinessMember(bm.id);
     }
 
     return res.json(successResponse({ ok: true }));
@@ -7659,25 +8267,73 @@ app.delete('/api/companies/:companyId/users/:userId/invite', requireAuth, (req, 
 
 // Decline invite
 // POST /api/companies/:companyId/users/:userId/decline
-app.post('/api/companies/:companyId/users/:userId/decline', requireAuth, (req, res) => {
+app.post('/api/companies/:companyId/users/:userId/decline', requireAuth, async (req, res) => {
   try {
     const { companyId, userId } = req.params;
+    const currentUser = await getUserFromRequest(req);
+    if (!currentUser || currentUser.id !== userId) {
+      return res.status(403).json(errorResponse('You can only decline your own invite', 'ACCESS_DENIED'));
+    }
 
-    const bmIndex = businessMembers.findIndex(m => m.businessId === companyId && m.userId === userId);
-    if (bmIndex === -1) return res.status(404).json(errorResponse('Invite not found'));
-
-    const bm = businessMembers[bmIndex];
+    const bm = await findBusinessMember(companyId, userId);
+    if (!bm) return res.status(404).json(errorResponse('Invite not found'));
 
     // Remove location assignments
-    for (let i = locationMembers.length - 1; i >= 0; i--) {
-      const lm = locationMembers[i];
-      if (lm.businessId === companyId && lm.userId === userId) locationMembers.splice(i, 1);
+    const locMembers = await repos.memberRepo.listLocationMembersByBusinessAndUser(companyId, userId);
+    for (const lm of locMembers) {
+      await repos.memberRepo.removeLocationMember(lm.id);
     }
 
     // Remove business membership
-    businessMembers.splice(bmIndex, 1);
+    await repos.memberRepo.removeBusinessMember(bm.id);
 
     return res.json(successResponse({ removed: bm }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Leave company (self-removal for accepted members)
+// DELETE /api/companies/:companyId/members/me
+app.delete('/api/companies/:companyId/members/me', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const currentUser = await getUserFromRequest(req);
+    if (!currentUser) {
+      return res.status(401).json(errorResponse('Authentication required', 'AUTH_REQUIRED'));
+    }
+
+    const bm = await findBusinessMember(companyId, currentUser.id);
+    if (!bm) return res.status(404).json(errorResponse('You are not a member of this business'));
+
+    if (bm.status !== 'accepted') {
+      return res.status(400).json(errorResponse('Only accepted members can leave. Use decline for pending invites.'));
+    }
+
+    // Prevent leaving if you are the last admin
+    if (bm.role === 'admin' || bm.role === 'super_admin') {
+      const allMembers = await repos.memberRepo.listBusinessMembers(companyId);
+      const remainingAdmins = allMembers.filter(
+        m => (m.role === 'admin' || m.role === 'super_admin') && m.status === 'accepted' && m.userId !== currentUser.id
+      );
+      if (remainingAdmins.length === 0) {
+        return res.status(400).json(errorResponse(
+          'You are the last admin. Transfer ownership to another member before leaving.',
+          'LAST_ADMIN'
+        ));
+      }
+    }
+
+    // Remove location assignments first
+    const locMembers = await repos.memberRepo.listLocationMembersByBusinessAndUser(companyId, currentUser.id);
+    for (const lm of locMembers) {
+      await repos.memberRepo.removeLocationMember(lm.id);
+    }
+
+    // Remove business membership
+    await repos.memberRepo.removeBusinessMember(bm.id);
+
+    return res.json(successResponse({ ok: true }));
   } catch (err) {
     return sendError(res, err);
   }
@@ -7688,6 +8344,7 @@ app.post('/api/companies/:companyId/users/:userId/decline', requireAuth, (req, r
 app.post('/api/companies/:companyId/users/:userId/resend-invite', requireAuth, async (req, res) => {
   try {
     const { companyId, userId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
     const bm = await findBusinessMember(companyId, userId);
     if (!bm) return res.status(404).json(errorResponse('Invite not found'));
 
@@ -7708,77 +8365,57 @@ app.post('/api/companies/:companyId/users/:userId/resend-invite', requireAuth, a
 // ROLE UPGRADE REQUESTS (staff → admin)
 // ============================================================================
 
-// Mock storage for role requests (in production: use DB table)
-let roleRequests = [];
+// Role requests are now stored in the RoleRequest Prisma model.
 
 // Create role upgrade request (staff only)
 // POST /api/companies/:companyId/role-requests
 app.post('/api/companies/:companyId/role-requests', requireAuth, async (req, res) => {
   try {
-    const { businessId } = req.params;
+    const businessId = req.params.companyId;
     const { requestedRole = 'admin', message } = req.body;
-    
-    // Get user from request (requires JWT auth)
+
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json(errorResponse('Authentication required'));
     }
-    
+
     // Verify user is a staff member
     const bm = await findBusinessMember(businessId, userId);
     if (!bm) {
       return res.status(404).json(errorResponse('Not a member of this business'));
     }
-    
+
     if (bm.role !== 'staff') {
       return res.status(400).json(errorResponse('Only staff can request upgrades'));
     }
-    
+
     if (bm.status !== 'accepted') {
       return res.status(400).json(errorResponse('You must be an accepted member first'));
     }
-    
+
     // Check for existing pending request
-    const existingPending = roleRequests.find(r => 
-      r.businessId === businessId && 
-      r.userId === userId && 
-      r.status === 'PENDING'
-    );
-    
+    const existingPending = await repos.roleRequestRepo.getByBusinessAndUser(businessId, userId, 'PENDING');
     if (existingPending) {
       return res.status(400).json(errorResponse('You already have a pending request'));
     }
-    
+
     // Check cooldown (7 days after rejection)
-    const recentRejection = roleRequests.find(r =>
-      r.businessId === businessId &&
-      r.userId === userId &&
-      r.status === 'REJECTED' &&
-      new Date(r.resolvedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    );
-    
-    if (recentRejection) {
+    const recentRejection = await repos.roleRequestRepo.getByBusinessAndUser(businessId, userId, 'REJECTED');
+    if (recentRejection && recentRejection.resolvedAt &&
+        new Date(recentRejection.resolvedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) {
       return res.status(400).json(errorResponse('Please wait 7 days after rejection before requesting again'));
     }
-    
-    // Create request
-    const user = await findUser(userId);
-    const request = {
-      id: `rr-${Date.now()}`,
+
+    // Create request in DB
+    const request = await repos.roleRequestRepo.create({
       businessId,
       userId,
-      userName: user?.name || '',
-      userEmail: user?.email || '',
-      userAvatar: user?.avatar || null,
       requestedRole,
       currentRole: 'staff',
       status: 'PENDING',
       message: message || null,
-      createdAt: new Date().toISOString(),
-    };
-    
-    roleRequests.push(request);
-    
+    });
+
     return res.json(successResponse(request, 'Role upgrade request created'));
   } catch (err) {
     return sendError(res, err);
@@ -7787,20 +8424,18 @@ app.post('/api/companies/:companyId/role-requests', requireAuth, async (req, res
 
 // Get current user's role request (if any)
 // GET /api/companies/:companyId/role-requests/me
-app.get('/api/companies/:companyId/role-requests/me', (req, res) => {
+app.get('/api/companies/:companyId/role-requests/me', requireAuth, async (req, res) => {
   try {
-    const { businessId } = req.params;
+    const businessId = req.params.companyId;
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json(errorResponse('Authentication required'));
     }
-    
-    const request = roleRequests.find(r =>
-      r.businessId === businessId &&
-      r.userId === userId &&
-      (r.status === 'PENDING' || r.status === 'REJECTED')
+
+    const request = await repos.roleRequestRepo.getByBusinessAndUser(
+      businessId, userId, ['PENDING', 'REJECTED']
     );
-    
+
     return res.json(successResponse(request || null));
   } catch (err) {
     return sendError(res, err);
@@ -7809,39 +8444,18 @@ app.get('/api/companies/:companyId/role-requests/me', (req, res) => {
 
 // Get all role requests for a business (admin only)
 // GET /api/companies/:companyId/role-requests?status=PENDING
-app.get('/api/companies/:companyId/role-requests', (req, res) => {
+app.get('/api/companies/:companyId/role-requests', requireAuth, async (req, res) => {
   try {
-    const { businessId } = req.params;
+    const businessId = req.params.companyId;
+    if (!(await requireBusinessAdmin(req, res, businessId))) return;
+
     const { status } = req.query;
-    
-    // TODO: Add admin check
-    
-    let allRequests = roleRequests.filter(r => r.businessId === businessId);
-    
-    if (status) {
-      allRequests = allRequests.filter(r => r.status === status);
-    }
-    
-    // Enrich with full user details for frontend display
-    const enhancedRequests = allRequests.map(req => {
-      const user = users.find(u => u.id === req.userId);
-      return {
-        ...req,
-        user: user ? {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          avatar: user.avatar_url,
-          phone: user.phone,
-        } : null,
-        // Also add direct properties for easier access in frontend
-        userName: user?.name,
-        userEmail: user?.email,
-        userAvatar: user?.avatar_url,
-      };
-    });
-    
-    return res.json(successResponse({ requests: enhancedRequests }));
+
+    const requests = await repos.roleRequestRepo.getByBusinessId(
+      businessId, status || null
+    );
+
+    return res.json(successResponse({ requests }));
   } catch (err) {
     return sendError(res, err);
   }
@@ -7851,57 +8465,172 @@ app.get('/api/companies/:companyId/role-requests', (req, res) => {
 // PATCH /api/companies/:companyId/role-requests/:requestId
 app.patch('/api/companies/:companyId/role-requests/:requestId', requireAuth, async (req, res) => {
   try {
-    const { businessId, requestId } = req.params;
+    const { requestId } = req.params;
+    const businessId = req.params.companyId;
     const { status, rejectionReason } = req.body;
-    
-    // Get user from request (requires JWT auth)
+
+    if (!status || !['APPROVED', 'REJECTED'].includes(status)) {
+      return res.status(400).json(errorResponse('status must be APPROVED or REJECTED'));
+    }
+
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json(errorResponse('Authentication required'));
     }
-    
+
     // Verify admin
     const adminMember = await findBusinessMember(businessId, userId);
     if (!adminMember || adminMember.role === 'staff') {
       return res.status(403).json(errorResponse('Only admins can approve requests'));
     }
-    
-    // Find request
-    const request = roleRequests.find(r => r.id === requestId);
+
+    // Find request in DB
+    const request = await repos.roleRequestRepo.getById(requestId);
     if (!request || request.businessId !== businessId) {
       return res.status(404).json(errorResponse('Request not found'));
     }
-    
+
     if (request.status !== 'PENDING') {
       return res.status(400).json(errorResponse('Request already resolved'));
     }
-    
-    // Update request
-    request.status = status;
-    request.resolvedAt = new Date().toISOString();
-    request.resolvedByUserId = userId;
-    
+
+    // Build update patch
     const admin = await findUser(userId);
-    request.resolvedByName = admin?.name || null;
-    
+    const updatePatch = {
+      status,
+      resolvedAt: new Date(),
+      resolvedByUserId: userId,
+      resolvedByName: admin?.name || null,
+    };
+
     if (status === 'REJECTED' && rejectionReason) {
-      request.rejectionReason = rejectionReason;
+      updatePatch.rejectionReason = rejectionReason;
     }
-    
-    // If approved, upgrade the user's role
+
+    const updated = await repos.roleRequestRepo.update(requestId, updatePatch);
+
+    // If approved, create or upgrade membership
     if (status === 'APPROVED') {
       const bm = await findBusinessMember(businessId, request.userId);
-      if (bm) {
-        bm.role = 'admin';
-        
-        // Update location memberships too
-        locationMembers
-          .filter(lm => lm.businessId === businessId && lm.userId === request.userId)
-          .forEach(lm => { lm.role = 'admin'; });
+
+      if (request.currentRole === 'none') {
+        // Check staff limits before adding new member (paywall)
+        const business = await repos.businessRepo.getById(businessId);
+        if (business) {
+          const capabilities = deriveCapabilities(business);
+          if (!capabilities.canHaveStaff) {
+            return res.status(403).json({
+              error: { code: 'PAYWALL', triggerId: 'accept_staff', requiredPlan: 'pro', message: 'Upgrade to Pro to accept join requests' }
+            });
+          }
+          const currentCount = await getStaffCount(businessId);
+          if (currentCount >= capabilities.maxStaff) {
+            return res.status(403).json(errorResponse(`Staff limit reached (${capabilities.maxStaff}). Upgrade your plan to accept more members.`));
+          }
+        }
+
+        // Join request: user is not yet a member — create BusinessMember
+        // Only admin or staff may be assigned via join request (never super_admin)
+        const assignedRole = ['admin', 'staff'].includes(req.body.role) ? req.body.role : 'staff';
+        if (bm) {
+          // Has a pending/invited record, upgrade it to accepted
+          await repos.memberRepo.updateBusinessMember(bm.id, { role: assignedRole, status: 'accepted' });
+        } else {
+          await repos.memberRepo.addBusinessMember({
+            id: `bm-${uuidv4()}`,
+            businessId,
+            userId: request.userId,
+            role: assignedRole,
+            status: 'accepted',
+          });
+        }
+
+        // Assign to primary/first location so user has location access
+        if (assignedRole !== 'super_admin') {
+          const bizLocations = await repos.locationRepo.getByBusinessId(businessId);
+          const primaryLoc = bizLocations.find(l => l.isPrimary) || bizLocations[0];
+          if (primaryLoc) {
+            const existingLm = await findLocationMember(businessId, primaryLoc.id, request.userId);
+            if (!existingLm) {
+              await repos.memberRepo.addLocationMember({
+                id: nextId('lm'),
+                businessId,
+                locationId: primaryLoc.id,
+                userId: request.userId,
+                role: assignedRole,
+                status: 'accepted',
+              });
+            }
+          }
+        }
+      } else if (bm) {
+        // Role upgrade request: existing member wants admin role
+        await repos.memberRepo.updateBusinessMember(bm.id, { role: 'admin' });
+
+        // Update location memberships too (efficient: only this user's memberships)
+        const locMembers = await repos.memberRepo.listLocationMembersByBusinessAndUser(businessId, request.userId);
+        for (const lm of locMembers) {
+          await repos.memberRepo.updateLocationMember(lm.id, { role: 'admin' });
+        }
       }
     }
-    
-    return res.json(successResponse(request, 'Role request resolved'));
+
+    return res.json(successResponse(updated, 'Role request resolved'));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Request to join a company from its profile (for non-members in personal mode)
+// POST /api/companies/:companyId/request-membership
+app.post('/api/companies/:companyId/request-membership', requireAuth, joinRequestLimiter, async (req, res) => {
+  try {
+    const businessId = req.params.companyId;
+    const userId = req.user?.id;
+    const { message } = req.body;
+
+    if (!userId) {
+      return res.status(401).json(errorResponse('Authentication required'));
+    }
+
+    // Check business exists
+    const business = await repos.businessRepo.getById(businessId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Company not found'));
+    }
+
+    // Only allow joining published companies
+    if (!business.isPublished) {
+      return res.status(403).json(errorResponse('This company is not accepting applications'));
+    }
+
+    // Check user is not already a member or invited
+    const existingMember = await findBusinessMember(businessId, userId);
+    if (existingMember) {
+      if (existingMember.status === 'accepted') {
+        return res.status(400).json(errorResponse('You are already a member of this company'));
+      }
+      return res.status(400).json(errorResponse('You already have a pending invitation from this company'));
+    }
+
+    // Check for existing pending membership request
+    const existingPending = await repos.roleRequestRepo.getByBusinessAndUser(businessId, userId, 'PENDING');
+    if (existingPending) {
+      return res.status(400).json(errorResponse('You already have a pending request for this company'));
+    }
+
+    // Create the join request (currentRole 'none' = non-member requesting to join)
+    const request = await repos.roleRequestRepo.create({
+      id: `rr-${uuidv4()}`,
+      businessId,
+      userId,
+      requestedRole: 'staff',
+      currentRole: 'none',
+      status: 'PENDING',
+      message: message || null,
+    });
+
+    return res.json(successResponse(request, 'Join request sent'));
   } catch (err) {
     return sendError(res, err);
   }
@@ -7985,6 +8714,18 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/assign', requireAuth
 
     const updated = await repos.deliveryRepo.update(deliveryId, patch);
 
+    // Bridge: also create DeliveryStaff record for multi-staff system
+    try {
+      const existingAssignment = await repos.deliveryStaffRepo.getAssignment(deliveryId, userId);
+      if (!existingAssignment) {
+        await repos.deliveryStaffRepo.assign({
+          deliveryId, userId, role: 'driver', assignedBy: req.user?.id || null,
+        });
+      }
+    } catch (staffErr) {
+      console.warn('Failed to create DeliveryStaff record:', staffErr.message);
+    }
+
     // Sync delivery assignment status to linked order (with loop guard)
     if (patch.deliveryStatus && delivery.orderId && !_orderDeliverySyncInProgress.has(delivery.orderId)) {
       _orderDeliverySyncInProgress.add(delivery.orderId);
@@ -8030,6 +8771,16 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/unassign', requireAu
 
     const updated = await repos.deliveryRepo.update(deliveryId, patch);
 
+    // Bridge: also remove all DeliveryStaff records
+    try {
+      const allStaff = await repos.deliveryStaffRepo.getByDeliveryId(deliveryId);
+      for (const staff of allStaff) {
+        await repos.deliveryStaffRepo.unassign(deliveryId, staff.userId);
+      }
+    } catch (staffErr) {
+      console.warn('Failed to remove DeliveryStaff records:', staffErr.message);
+    }
+
     // Sync delivery unassignment status to linked order (with loop guard)
     if (patch.deliveryStatus && delivery.orderId && !_orderDeliverySyncInProgress.has(delivery.orderId)) {
       _orderDeliverySyncInProgress.add(delivery.orderId);
@@ -8049,6 +8800,184 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/unassign', requireAu
 });
 
 // ============================================================================
+// MULTI-STAFF DELIVERY ASSIGNMENT (CRUD)
+// ============================================================================
+
+// Assign staff to delivery with role
+// POST /api/companies/:companyId/deliveries/:deliveryId/staff
+app.post('/api/companies/:companyId/deliveries/:deliveryId/staff', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const { companyId, deliveryId } = req.params;
+    const { userId, role = 'driver' } = req.body;
+
+    if (!userId) return res.status(400).json(errorResponse('userId is required'));
+    if (!['driver', 'teamLeader', 'support'].includes(role)) {
+      return res.status(400).json(errorResponse('role must be driver, teamLeader, or support'));
+    }
+
+    // Plan capability check
+    const business = await repos.businessRepo.getById(companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found'));
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canAssignTransport) {
+      return res.status(403).json({ error: { code: 'PAYWALL', triggerId: 'assign_transport', requiredPlan: 'pro', message: 'Upgrade to Pro to assign transport' } });
+    }
+
+    // Validate delivery exists and belongs to business
+    const delivery = await repos.deliveryRepo.getById(deliveryId);
+    if (!delivery || delivery.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Delivery not found'));
+    }
+
+    // Validate user is accepted business member
+    const members = await repos.memberRepo.listBusinessMembers(companyId);
+    const member = members.find(m => m.userId === userId && m.status === 'accepted');
+    if (!member) return res.status(403).json(errorResponse('User not accepted in this business'));
+
+    // Enforce location access (unless super_admin)
+    if (member.role !== 'super_admin' && delivery.locationId) {
+      const locationMembersResult = await repos.memberRepo.listLocationMembers(delivery.locationId);
+      const hasAccess = locationMembersResult.some(lm => lm.userId === userId && lm.status === 'accepted');
+      if (!hasAccess) return res.status(403).json(errorResponse('User has no access to this delivery location'));
+    }
+
+    // Check if already assigned
+    const existing = await repos.deliveryStaffRepo.getAssignment(deliveryId, userId);
+    if (existing) return res.status(409).json(errorResponse('User already assigned to this delivery'));
+
+    // Create assignment
+    const assignment = await repos.deliveryStaffRepo.assign({
+      deliveryId, userId, role, assignedBy: req.user?.id || null,
+    });
+
+    // Backward compat: update legacy fields with primary driver
+    const allStaff = await repos.deliveryStaffRepo.getByDeliveryId(deliveryId);
+    const primaryDriver = allStaff.find(s => s.role === 'driver') || allStaff[0];
+    const backwardPatch = {
+      assignedStaffId: primaryDriver?.userId || null,
+      assignedTo: primaryDriver?.user?.name || null,
+    };
+    if (delivery.deliveryStatus === 'NOT_ASSIGNED') {
+      backwardPatch.deliveryStatus = 'ASSIGNED';
+    }
+    await repos.deliveryRepo.update(deliveryId, backwardPatch);
+
+    // Sync to linked order
+    if (backwardPatch.deliveryStatus && delivery.orderId && !_orderDeliverySyncInProgress.has(delivery.orderId)) {
+      _orderDeliverySyncInProgress.add(delivery.orderId);
+      try { await repos.orderRepo.update(delivery.orderId, { deliveryStatus: backwardPatch.deliveryStatus }); }
+      catch (syncErr) { console.warn('Failed to sync:', syncErr.message); }
+      finally { _orderDeliverySyncInProgress.delete(delivery.orderId); }
+    }
+
+    return res.status(201).json(successResponse(assignment));
+  } catch (err) {
+    return res.status(500).json(errorResponse(err.message || 'Server error'));
+  }
+});
+
+// Remove staff from delivery
+// DELETE /api/companies/:companyId/deliveries/:deliveryId/staff/:userId
+app.delete('/api/companies/:companyId/deliveries/:deliveryId/staff/:userId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const { companyId, deliveryId, userId } = req.params;
+
+    const delivery = await repos.deliveryRepo.getById(deliveryId);
+    if (!delivery || delivery.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Delivery not found'));
+    }
+
+    const existing = await repos.deliveryStaffRepo.getAssignment(deliveryId, userId);
+    if (!existing) return res.status(404).json(errorResponse('Assignment not found'));
+
+    await repos.deliveryStaffRepo.unassign(deliveryId, userId);
+
+    // Backward compat: recalculate legacy fields
+    const remainingStaff = await repos.deliveryStaffRepo.getByDeliveryId(deliveryId);
+    const primaryDriver = remainingStaff.find(s => s.role === 'driver') || remainingStaff[0];
+    const backwardPatch = {
+      assignedStaffId: primaryDriver?.userId || null,
+      assignedTo: primaryDriver?.user?.name || null,
+    };
+    if (remainingStaff.length === 0 && delivery.deliveryStatus === 'ASSIGNED') {
+      backwardPatch.deliveryStatus = 'NOT_ASSIGNED';
+    }
+    await repos.deliveryRepo.update(deliveryId, backwardPatch);
+
+    // Sync to linked order
+    if (backwardPatch.deliveryStatus && delivery.orderId && !_orderDeliverySyncInProgress.has(delivery.orderId)) {
+      _orderDeliverySyncInProgress.add(delivery.orderId);
+      try { await repos.orderRepo.update(delivery.orderId, { deliveryStatus: backwardPatch.deliveryStatus }); }
+      catch (syncErr) { console.warn('Failed to sync:', syncErr.message); }
+      finally { _orderDeliverySyncInProgress.delete(delivery.orderId); }
+    }
+
+    return res.json(successResponse(null, 'Staff removed from delivery'));
+  } catch (err) {
+    return res.status(500).json(errorResponse(err.message || 'Server error'));
+  }
+});
+
+// List staff assigned to a delivery
+// GET /api/companies/:companyId/deliveries/:deliveryId/staff
+app.get('/api/companies/:companyId/deliveries/:deliveryId/staff', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const { companyId, deliveryId } = req.params;
+
+    const delivery = await repos.deliveryRepo.getById(deliveryId);
+    if (!delivery || delivery.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Delivery not found'));
+    }
+
+    const staff = await repos.deliveryStaffRepo.getByDeliveryId(deliveryId);
+    return res.json(successResponse(staff));
+  } catch (err) {
+    return res.status(500).json(errorResponse(err.message || 'Server error'));
+  }
+});
+
+// Update staff role on a delivery
+// PATCH /api/companies/:companyId/deliveries/:deliveryId/staff/:userId
+app.patch('/api/companies/:companyId/deliveries/:deliveryId/staff/:userId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const { companyId, deliveryId, userId } = req.params;
+    const { role } = req.body;
+
+    if (!role || !['driver', 'teamLeader', 'support'].includes(role)) {
+      return res.status(400).json(errorResponse('role must be driver, teamLeader, or support'));
+    }
+
+    const delivery = await repos.deliveryRepo.getById(deliveryId);
+    if (!delivery || delivery.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Delivery not found'));
+    }
+
+    const existing = await repos.deliveryStaffRepo.getAssignment(deliveryId, userId);
+    if (!existing) {
+      return res.status(404).json(errorResponse('User is not assigned to this delivery'));
+    }
+
+    const updated = await repos.deliveryStaffRepo.updateRole(deliveryId, userId, role);
+
+    // Backward compat: recalculate primary driver
+    const allStaff = await repos.deliveryStaffRepo.getByDeliveryId(deliveryId);
+    const primaryDriver = allStaff.find(s => s.role === 'driver') || allStaff[0];
+    await repos.deliveryRepo.update(deliveryId, {
+      assignedStaffId: primaryDriver?.userId || null,
+      assignedTo: primaryDriver?.user?.name || null,
+    });
+
+    return res.json(successResponse(updated));
+  } catch (err) {
+    return res.status(500).json(errorResponse(err.message || 'Server error'));
+  }
+});
+
+// ============================================================================
 // PERSONAL MODE ACTIVITIES ENDPOINTS
 // ============================================================================
 
@@ -8058,6 +8987,10 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/unassign', requireAu
 app.get('/api/users/:userId/activities', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
+    const currentUser = await getUserFromRequest(req);
+    if (!currentUser || currentUser.id !== userId) {
+      return res.status(403).json(errorResponse('You can only view your own activities', 'ACCESS_DENIED'));
+    }
 
     const assignedDeliveries = await repos.deliveryRepo.getByAssignedStaffId(userId);
 
@@ -8124,14 +9057,19 @@ app.get('/api/companies/:companyId/users/:userId/activities', requireAuth, async
 
 // File Upload Route
 app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
-  if (req.file) {
-    // Use request host for dynamic URL (works with LAN IP)
-    const protocol = req.protocol;
-    const host = req.get('host');
-    const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
-    res.json(successResponse({ url: fileUrl }));
-  } else {
-    res.status(400).json(errorResponse('No file uploaded'));
+  try {
+    if (req.file) {
+      // Use request host for dynamic URL (works with LAN IP)
+      const protocol = req.protocol;
+      const host = req.get('host');
+      const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+      res.json(successResponse({ url: fileUrl }));
+    } else {
+      res.status(400).json(errorResponse('No file uploaded'));
+    }
+  } catch (err) {
+    console.error('[Upload] Error:', err);
+    res.status(500).json(errorResponse('File upload failed'));
   }
 });
 
@@ -8279,176 +9217,516 @@ app.get('/api/companies/:companyId/activity-feed', requireAuth, async (req, res)
 });
 
 // Notifications API - Aggregates notifications from multiple sources
-// GET /api/users/:userId/notifications?filter=all|unread|requests
+// GET /api/users/:userId/notifications?filter=all|unread|requests&mode=business|personal
 app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
-    const { filter = 'all' } = req.query;
-    
+    const { filter = 'all', mode = 'business' } = req.query;
+
     // Verify user is requesting their own notifications
     const requestUserId = req.user?.id;
     if (requestUserId !== userId) {
       return res.status(403).json(errorResponse('ACCESS_DENIED', 'You can only access your own notifications'));
     }
-    
-    // Helper to format currency
+
     const formatCurrency = (amount) => `Rs ${Number(amount || 0).toFixed(2)}`;
-    
+    const THIRTY_DAYS_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     let notifications = [];
-    
-    // Get user's businesses for team-related notifications
+
+    // =========================================================================
+    // BUSINESS MODE
+    // =========================================================================
+    if (mode === 'business') {
     const userBusinesses = await repos.memberRepo.getByUserId(userId);
     
-    // 1. Join requests (for admins)
-    for (const ub of userBusinesses) {
-      if (ub.role === 'admin' || ub.role === 'super_admin') {
-        const pendingRequests = roleRequests.filter(
-          rr => rr.businessId === ub.businessId && rr.status === 'PENDING'
-        );
-        
-        for (const rr of pendingRequests) {
-          const user = users.find(u => u.id === rr.userId);
-          notifications.push({
-            id: `req-${rr.id}`,
-            type: 'staff_request',
-            title: 'Join request',
-            description: `${user?.name || 'Someone'} wants to join your company`,
-            time: formatRelativeTime(rr.createdAt),
-            timestamp: rr.createdAt,
-            read: false,
-            avatar: user?.avatar_url || null,
-            status: 'pending',
-            requestData: {
-              requestId: rr.id,
-              userId: rr.userId,
-              userName: user?.name,
-              userEmail: user?.email,
-              businessId: rr.businessId,
-            },
-          });
-        }
-      }
-    }
-    
-    // 2. Pending invites (sent by user's business) - informational, not actionable
-    for (const ub of userBusinesses) {
-      if (ub.role === 'admin' || ub.role === 'super_admin') {
-        const pendingInvites = businessMembers.filter(
-          m => m.businessId === ub.businessId && m.status === 'invited'
-        );
-        
-        for (const inv of pendingInvites) {
-          notifications.push({
-            id: `inv-${inv.id}`,
-            type: 'invite_pending',
-            title: 'Invite pending',
-            description: `Invitation sent to ${inv.email}`,
-            time: formatRelativeTime(inv.createdAt),
-            timestamp: inv.createdAt,
-            read: false,
-            avatar: null,
-            status: 'pending',
-            requestData: {
-              inviteId: inv.id,
-              email: inv.email,
-              role: inv.role,
-              businessId: ub.businessId,
-            },
-          });
-        }
-      }
-    }
-    
-    // 3. Recent invoice notifications (payments received)
-    for (const ub of userBusinesses) {
-      try {
-        const allInvoices = await repos.invoiceRepo.getByBusinessId(ub.businessId);
-        const paidInvoices = allInvoices
-          .filter(inv => inv.status === 'PAID')
-          .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
-          .slice(0, 5);
-        
-        for (const inv of paidInvoices) {
-          notifications.push({
-            id: `inv-paid-${inv.id}`,
-            type: 'invoice',
-            title: 'Invoice payment received',
-            description: `Payment of ${formatCurrency(inv.totalAmount)} received for invoice #${inv.id}`,
-            time: formatRelativeTime(inv.updatedAt || inv.createdAt),
-            timestamp: inv.updatedAt || inv.createdAt,
-            read: false,
-            avatar: null,
-          });
-        }
-      } catch (err) {
-        console.error('Error fetching invoices for notifications:', err);
-      }
-    }
-    
-    // 4. Recent delivery notifications (completed deliveries)
-    for (const ub of userBusinesses) {
-      try {
-        const allDeliveries = await repos.deliveryRepo.getByBusinessId(ub.businessId);
-        const completedDeliveries = allDeliveries
-          .filter(del => del.deliveryStatus === 'DELIVERED')
-          .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
-          .slice(0, 3);
-        
-        for (const del of completedDeliveries) {
-          notifications.push({
-            id: `del-completed-${del.id}`,
-            type: 'delivery',
-            title: 'Delivery completed',
-            description: `Delivery #${del.id} to ${del.clientCompanyName || 'client'} completed`,
-            time: formatRelativeTime(del.updatedAt || del.createdAt),
-            timestamp: del.updatedAt || del.createdAt,
-            read: false,
-            avatar: null,
-          });
-        }
-      } catch (err) {
-        console.error('Error fetching deliveries for notifications:', err);
-      }
-    }
-    
-    // 5. Low stock alerts
-    for (const ub of userBusinesses) {
-      if (ub.role === 'admin' || ub.role === 'super_admin') {
-        try {
-          const allStocks = await repos.stockRepo.getByBusinessId(ub.businessId);
-          const LOW_STOCK_THRESHOLD = 10;
-          const lowStocks = allStocks.filter(s => (s.qtyOnHand || 0) <= LOW_STOCK_THRESHOLD);
-
-          for (const stock of lowStocks.slice(0, 10)) {
-            const product = await repos.productRepo.getById(stock.productId);
-            if (!product) continue;
-
+      // 1. Pending join requests — staff_request
+      for (const ub of userBusinesses) {
+        if (ub.role === 'admin' || ub.role === 'super_admin') {
+          const pendingRequests = await repos.roleRequestRepo.getByBusinessId(ub.businessId, 'PENDING');
+          for (const rr of pendingRequests) {
+            const isJoinRequest = !rr.currentRole || rr.currentRole === 'none';
             notifications.push({
-              id: `stock-low-${stock.id}`,
-              type: 'stock_alert',
-              title: 'Low stock alert',
-              description: `${product.name} has only ${stock.qtyOnHand} units remaining`,
-              time: formatRelativeTime(stock.updatedAt || stock.createdAt),
-              timestamp: stock.updatedAt || stock.createdAt,
+              id: `req-${rr.id}`,
+              type: 'staff_request',
+              title: isJoinRequest ? 'Join request' : 'Role upgrade request',
+              description: isJoinRequest
+                ? `${rr.user?.name || 'Someone'} wants to join your company`
+                : `${rr.user?.name || 'Someone'} is requesting admin access`,
+              time: formatRelativeTime(rr.createdAt),
+              timestamp: rr.createdAt,
               read: false,
-              avatar: product.productPicture || null,
-              productData: {
-                productId: product.id,
-                productName: product.name,
-                currentStock: stock.qtyOnHand,
-                locationId: stock.locationId,
+              avatar: rr.user?.avatar || null,
+              status: 'pending',
+              requestData: {
+                requestId: rr.id,
+                userId: rr.userId,
+                userName: rr.user?.name,
+                userEmail: rr.user?.email,
+                businessId: rr.businessId,
+                currentRole: rr.currentRole,
               },
             });
           }
-        } catch (err) {
-          console.error('Error fetching low stock alerts for notifications:', err);
         }
       }
-    }
-    
+
+      // 2. Recently approved requests needing role assignment — join_accepted
+      for (const ub of userBusinesses) {
+        if (ub.role === 'admin' || ub.role === 'super_admin') {
+          const approvedRequests = await repos.roleRequestRepo.getByBusinessId(ub.businessId, 'APPROVED');
+          const recentApproved = approvedRequests.filter(
+            rr => rr.resolvedAt && new Date(rr.resolvedAt) > THIRTY_DAYS_AGO
+          );
+          for (const rr of recentApproved) {
+            notifications.push({
+              id: `join-accepted-${rr.id}`,
+              type: 'join_accepted',
+              title: 'Request accepted',
+              description: `${rr.user?.name || 'Someone'} joined your company — assign their role`,
+              time: formatRelativeTime(rr.resolvedAt),
+              timestamp: rr.resolvedAt,
+              read: false,
+              avatar: rr.user?.avatar || null,
+              status: 'accepted',
+              requestData: {
+                requestId: rr.id,
+                userId: rr.userId,
+                userName: rr.user?.name,
+                userEmail: rr.user?.email,
+                businessId: rr.businessId,
+              },
+            });
+          }
+        }
+      }
+
+      // 3. Pending invites sent by the business — invite_pending
+      for (const ub of userBusinesses) {
+        if (ub.role === 'admin' || ub.role === 'super_admin') {
+          const allMembers = await repos.memberRepo.listBusinessMembers(ub.businessId);
+          const pendingInvites = allMembers.filter(m => m.status === 'invited');
+          for (const inv of pendingInvites) {
+            notifications.push({
+              id: `inv-${inv.id}`,
+              type: 'invite_pending',
+              title: 'Invite pending',
+              description: `Invitation sent to ${inv.email || inv.user?.email || 'unknown'}`,
+              time: formatRelativeTime(inv.createdAt),
+              timestamp: inv.createdAt,
+              read: false,
+              avatar: null,
+              status: 'pending',
+              requestData: {
+                inviteId: inv.id,
+                email: inv.email || inv.user?.email,
+                role: inv.role,
+                businessId: ub.businessId,
+              },
+            });
+          }
+        }
+      }
+
+      // 4. Business connection requests received — company_request
+      for (const ub of userBusinesses) {
+        if (ub.role === 'admin' || ub.role === 'super_admin') {
+          try {
+            const pendingBizConns = await repos.connectionRepo.listPendingBusinessRequests(ub.businessId);
+            for (const conn of pendingBizConns) {
+              const requester = conn.requesterBusiness;
+              notifications.push({
+                id: `biz-conn-req-${conn.id}`,
+                type: 'company_request',
+                title: 'Connection request',
+                description: `${requester?.name || 'A company'} wants to connect with your business`,
+                time: formatRelativeTime(conn.createdAt),
+                timestamp: conn.createdAt,
+                read: false,
+                avatar: requester?.logoUrl || null,
+                status: 'pending',
+                requestData: {
+                  connectionId: conn.id,
+                  companyId: requester?.id,
+                  companyName: requester?.name,
+                  businessId: ub.businessId,
+                },
+              });
+            }
+          } catch (err) {
+            console.error('Error fetching business connection requests:', err);
+          }
+        }
+      }
+
+      // 5. Recently accepted business connections — connection_accepted
+      for (const ub of userBusinesses) {
+        if (ub.role === 'admin' || ub.role === 'super_admin') {
+          try {
+            const acceptedConns = await repos.connectionRepo.listBusinessConnections(ub.businessId, 'accepted');
+            const recentAccepted = acceptedConns
+              .filter(c => c.createdAt && new Date(c.createdAt) > THIRTY_DAYS_AGO)
+              .slice(0, 5);
+            for (const conn of recentAccepted) {
+              const otherBiz = conn.requesterBusinessId === ub.businessId
+                ? conn.targetBusiness
+                : conn.requesterBusiness;
+              notifications.push({
+                id: `biz-conn-accepted-${conn.id}`,
+                type: 'connection_accepted',
+                title: 'Connection accepted',
+                description: `You are now connected with ${otherBiz?.name || 'a company'}`,
+                time: formatRelativeTime(conn.createdAt),
+                timestamp: conn.createdAt,
+                read: false,
+                avatar: otherBiz?.logoUrl || null,
+                requestData: {
+                  connectionId: conn.id,
+                  companyId: otherBiz?.id,
+                  companyName: otherBiz?.name,
+                },
+              });
+            }
+          } catch (err) {
+            console.error('Error fetching accepted business connections:', err);
+          }
+        }
+      }
+
+      // 6. Paid invoices — invoice
+      for (const ub of userBusinesses) {
+        try {
+          const allInvoices = await repos.invoiceRepo.getByBusinessId(ub.businessId);
+          const paidInvoices = allInvoices
+            .filter(inv => inv.status === 'PAID')
+            .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+            .slice(0, 5);
+          for (const inv of paidInvoices) {
+            notifications.push({
+              id: `inv-paid-${inv.id}`,
+              type: 'invoice',
+              title: 'Invoice payment received',
+              description: `Payment of ${formatCurrency(inv.totalAmount)} received for invoice #${inv.id}`,
+              time: formatRelativeTime(inv.updatedAt || inv.createdAt),
+              timestamp: inv.updatedAt || inv.createdAt,
+              read: false,
+              avatar: null,
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching invoices for notifications:', err);
+        }
+      }
+
+      // 7. Completed deliveries — delivery
+      for (const ub of userBusinesses) {
+        try {
+          const allDeliveries = await repos.deliveryRepo.getByBusinessId(ub.businessId);
+          const completedDeliveries = allDeliveries
+            .filter(del => del.deliveryStatus === 'DELIVERED')
+            .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+            .slice(0, 3);
+          for (const del of completedDeliveries) {
+            notifications.push({
+              id: `del-completed-${del.id}`,
+              type: 'delivery',
+              title: 'Delivery completed',
+              description: `Delivery #${del.id} to ${del.clientCompanyName || 'client'} completed`,
+              time: formatRelativeTime(del.updatedAt || del.createdAt),
+              timestamp: del.updatedAt || del.createdAt,
+              read: false,
+              avatar: null,
+              requestData: { deliveryId: del.id, businessId: ub.businessId },
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching deliveries for notifications:', err);
+        }
+      }
+
+      // 8. Low stock alerts — stock_alert
+      for (const ub of userBusinesses) {
+        if (ub.role === 'admin' || ub.role === 'super_admin') {
+          try {
+            const allStocks = await repos.stockRepo.getByBusinessId(ub.businessId);
+            const LOW_STOCK_THRESHOLD = 10;
+            const lowStocks = allStocks.filter(s => (s.qtyOnHand || 0) <= LOW_STOCK_THRESHOLD);
+            for (const stock of lowStocks.slice(0, 10)) {
+              const product = await repos.productRepo.getById(stock.productId);
+              if (!product) continue;
+              notifications.push({
+                id: `stock-low-${stock.id}`,
+                type: 'stock_alert',
+                title: 'Low stock alert',
+                description: `${product.name} has only ${stock.qtyOnHand} units remaining`,
+                time: formatRelativeTime(stock.updatedAt || stock.createdAt),
+                timestamp: stock.updatedAt || stock.createdAt,
+                read: false,
+                avatar: product.productPicture || null,
+                productData: {
+                  productId: product.id,
+                  productName: product.name,
+                  currentStock: stock.qtyOnHand,
+                  locationId: stock.locationId,
+                },
+              });
+            }
+          } catch (err) {
+            console.error('Error fetching low stock alerts for notifications:', err);
+          }
+        }
+      }
+
+      // 9. Recent order status updates — order_update
+      for (const ub of userBusinesses) {
+        try {
+          const allOrders = await repos.orderRepo.getByBusinessId(ub.businessId);
+          const recentOrders = allOrders
+            .filter(o => ['CANCELED', 'REJECTED', 'DONE', 'PENDING', 'ACCEPTED'].includes(o.status))
+            .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+            .slice(0, 5);
+          for (const order of recentOrders) {
+            const statusLabel = {
+              CANCELED: 'Canceled', REJECTED: 'Rejected', DONE: 'Completed',
+              PENDING: 'Pending', ACCEPTED: 'Accepted',
+            }[order.status] || order.status;
+            notifications.push({
+              id: `order-update-${order.id}`,
+              type: 'order_update',
+              title: `Order ${statusLabel.toLowerCase()}`,
+              description: `Order #${order.id} is now ${statusLabel.toLowerCase()}${order.customerName ? ` — ${order.customerName}` : ''}`,
+              time: formatRelativeTime(order.updatedAt || order.createdAt),
+              timestamp: order.updatedAt || order.createdAt,
+              read: false,
+              avatar: null,
+              requestData: { orderId: order.id, businessId: ub.businessId },
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching order updates for notifications:', err);
+        }
+      }
+
+      // 10. Subscription due / expired — subscription_due
+      for (const ub of userBusinesses) {
+        if (ub.role === 'admin' || ub.role === 'super_admin') {
+          try {
+            const business = await repos.businessRepo.getById(ub.businessId);
+            if (!business || business.subscriptionTier === 'FREE') continue;
+            const periodEnd = business.currentPeriodEnd ? new Date(business.currentPeriodEnd) : null;
+            if (!periodEnd) continue;
+            const now = new Date();
+            const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+            if (periodEnd < now) {
+              notifications.push({
+                id: `sub-expired-${ub.businessId}`,
+                type: 'subscription_due',
+                title: 'Subscription expired',
+                description: `Your ${business.subscriptionTier} subscription for ${business.name} has expired — renew to keep access`,
+                time: formatRelativeTime(periodEnd),
+                timestamp: periodEnd,
+                read: false,
+                avatar: null,
+                requestData: { businessId: ub.businessId, severity: 'critical' },
+              });
+            } else if (periodEnd <= sevenDaysFromNow) {
+              notifications.push({
+                id: `sub-due-${ub.businessId}`,
+                type: 'subscription_due',
+                title: 'Subscription renewing soon',
+                description: `Your ${business.subscriptionTier} subscription for ${business.name} renews on ${periodEnd.toLocaleDateString()}`,
+                time: formatRelativeTime(periodEnd),
+                timestamp: periodEnd,
+                read: false,
+                avatar: null,
+                requestData: { businessId: ub.businessId, severity: 'warning' },
+              });
+            }
+          } catch (err) {
+            console.error('Error fetching subscription status for notifications:', err);
+          }
+        }
+      }
+    } // end business mode
+
+    // =========================================================================
+    // PERSONAL MODE
+    // =========================================================================
+    if (mode === 'personal') {
+      // 1. Company invites received by this user — invite_received
+      try {
+        const allMemberships = await repos.memberRepo.getByUserId(userId);
+        const receivedInvites = allMemberships.filter(m => m.status === 'invited');
+        for (const inv of receivedInvites) {
+          const business = inv.business || await repos.businessRepo.getById(inv.businessId).catch(() => null);
+          notifications.push({
+            id: `invite-received-${inv.id}`,
+            type: 'invite_received',
+            title: 'Invitation to join a company',
+            description: `${business?.name || 'A company'} invited you to join as ${inv.role || 'staff'}`,
+            time: formatRelativeTime(inv.createdAt),
+            timestamp: inv.createdAt,
+            read: false,
+            avatar: business?.logoUrl || null,
+            status: 'pending',
+            requestData: {
+              inviteId: inv.id,
+              businessId: inv.businessId,
+              companyName: business?.name,
+              role: inv.role,
+            },
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching received invites for personal notifications:', err);
+      }
+
+      // 2. User's own join/role requests resolved — join_request_accepted / status_change
+      try {
+        const myRequests = await repos.roleRequestRepo.getByUserId(userId, ['APPROVED', 'REJECTED']);
+        const recentRequests = myRequests.filter(
+          rr => rr.resolvedAt && new Date(rr.resolvedAt) > THIRTY_DAYS_AGO
+        );
+        for (const rr of recentRequests) {
+          const business = rr.business || await repos.businessRepo.getById(rr.businessId).catch(() => null);
+          const isInitialJoin = !rr.currentRole || rr.currentRole === 'none';
+          if (rr.status === 'APPROVED') {
+            notifications.push({
+              id: `my-req-approved-${rr.id}`,
+              type: isInitialJoin ? 'join_request_accepted' : 'status_change',
+              title: isInitialJoin ? 'Join request accepted' : 'Role updated',
+              description: isInitialJoin
+                ? `Your request to join ${business?.name || 'the company'} was accepted`
+                : `Your role at ${business?.name || 'the company'} was changed to ${rr.requestedRole}`,
+              time: formatRelativeTime(rr.resolvedAt),
+              timestamp: rr.resolvedAt,
+              read: false,
+              avatar: business?.logoUrl || null,
+              requestData: {
+                requestId: rr.id,
+                businessId: rr.businessId,
+                companyName: business?.name,
+                role: rr.requestedRole,
+              },
+            });
+          } else {
+            notifications.push({
+              id: `my-req-rejected-${rr.id}`,
+              type: isInitialJoin ? 'join_request_rejected' : 'status_change',
+              title: isInitialJoin ? 'Join request declined' : 'Role request declined',
+              description: isInitialJoin
+                ? `Your request to join ${business?.name || 'the company'} was declined`
+                : `Your role upgrade at ${business?.name || 'the company'} was declined`,
+              time: formatRelativeTime(rr.resolvedAt),
+              timestamp: rr.resolvedAt,
+              read: false,
+              avatar: business?.logoUrl || null,
+              requestData: {
+                requestId: rr.id,
+                businessId: rr.businessId,
+                companyName: business?.name,
+              },
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching user role requests for personal notifications:', err);
+      }
+
+      // 3. Deliveries assigned to this user — delivery_assigned
+      try {
+        const myAssignments = await repos.deliveryStaffRepo.getByUserId(userId);
+        const recentAssignments = myAssignments
+          .filter(a => a.assignedAt && new Date(a.assignedAt) > THIRTY_DAYS_AGO)
+          .slice(0, 10);
+        for (const assignment of recentAssignments) {
+          const del = assignment.delivery;
+          const biz = del?.business;
+          notifications.push({
+            id: `delivery-assigned-${assignment.deliveryId}`,
+            type: 'delivery_assigned',
+            title: 'New job assigned',
+            description: `${biz?.name || 'Your company'} assigned you to delivery #${assignment.deliveryId}`,
+            time: formatRelativeTime(assignment.assignedAt),
+            timestamp: assignment.assignedAt,
+            read: false,
+            avatar: biz?.logoUrl || null,
+            requestData: {
+              deliveryId: assignment.deliveryId,
+              businessId: del?.businessId,
+              companyName: biz?.name,
+            },
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching delivery assignments for personal notifications:', err);
+      }
+
+      // 4. Pending personal connection requests received — company_request
+      try {
+        const pendingConns = await repos.connectionRepo.listPending(userId);
+        for (const conn of pendingConns) {
+          const sender = conn.sender;
+          notifications.push({
+            id: `conn-req-${conn.id}`,
+            type: 'company_request',
+            title: 'Connection request',
+            description: `${sender?.name || 'Someone'} wants to connect with you`,
+            time: formatRelativeTime(conn.createdAt),
+            timestamp: conn.createdAt,
+            read: false,
+            avatar: sender?.avatar || null,
+            status: 'pending',
+            requestData: {
+              connectionId: conn.id,
+              userId: sender?.id,
+              userName: sender?.name,
+            },
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching connection requests for personal notifications:', err);
+      }
+
+      // 5. Recently accepted personal connections — connection_accepted
+      try {
+        const acceptedConns = await repos.connectionRepo.listByUserId(userId, 'accepted');
+        const recentAccepted = acceptedConns
+          .filter(c => c.createdAt && new Date(c.createdAt) > THIRTY_DAYS_AGO)
+          .slice(0, 5);
+        for (const conn of recentAccepted) {
+          const otherUser = conn.senderId === userId ? conn.receiver : conn.sender;
+          notifications.push({
+            id: `conn-accepted-${conn.id}`,
+            type: 'connection_accepted',
+            title: 'Connection accepted',
+            description: `You are now connected with ${otherUser?.name || 'someone'}`,
+            time: formatRelativeTime(conn.createdAt),
+            timestamp: conn.createdAt,
+            read: false,
+            avatar: otherUser?.avatar || null,
+            requestData: {
+              connectionId: conn.id,
+              userId: otherUser?.id,
+              userName: otherUser?.name,
+            },
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching accepted connections for personal notifications:', err);
+      }
+    } // end personal mode
+
+    // Deduplicate by id (a user admin of multiple businesses could get the same notification twice)
+    const _seenIds = new Set();
+    notifications = notifications.filter(n => {
+      if (_seenIds.has(n.id)) return false;
+      _seenIds.add(n.id);
+      return true;
+    });
+
     // Sort by timestamp (newest first)
     notifications.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
+
     // Apply read state from notificationReadRepo
     const notificationKeys = notifications.map(n => n.id);
     const readStates = await repos.notificationReadRepo.getReadStates(userId, notificationKeys);
@@ -8457,22 +9735,45 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
     for (const record of readRecords) {
       readAtMap[record.notificationKey] = record.readAt;
     }
-    
     notifications = notifications.map(n => ({
       ...n,
       read: !!readStates[n.id],
-      readAt: readAtMap[n.id] || null
+      readAt: readAtMap[n.id] || null,
     }));
-    
+
     // Apply filters
     if (filter === 'unread') {
       notifications = notifications.filter(n => !n.read);
     } else if (filter === 'requests') {
-      notifications = notifications.filter(n => 
-        n.type === 'staff_request' || n.type === 'company_request' || n.type === 'invite_pending'
+      notifications = notifications.filter(n =>
+        mode === 'personal'
+          ? ['invite_received', 'company_request', 'join_request_accepted', 'join_request_rejected'].includes(n.type)
+          : ['staff_request', 'join_accepted', 'company_request', 'invite_pending'].includes(n.type)
+      );
+    } else if (filter === 'deliveries') {
+      notifications = notifications.filter(n =>
+        n.type === 'delivery' ||
+        n.type === 'delivery_assigned' ||
+        (mode === 'business' && n.type === 'stock_alert')
+      );
+    } else if (filter === 'invoices') {
+      notifications = notifications.filter(n => n.type === 'invoice');
+    } else if (filter === 'orders') {
+      notifications = notifications.filter(n =>
+        n.type === 'order_update' ||
+        (mode === 'business' && n.type === 'subscription_due')
+      );
+    } else if (filter === 'connections') {
+      notifications = notifications.filter(n =>
+        n.type === 'company_request' || n.type === 'connection_accepted'
+      );
+    } else if (filter === 'jobs') {
+      notifications = notifications.filter(n =>
+        n.type === 'delivery_assigned' ||
+        (mode === 'personal' && n.type === 'status_change')
       );
     }
-    
+
     return res.json(successResponse({ notifications }));
   } catch (err) {
     console.error('Error fetching notifications:', err);
@@ -8712,6 +10013,9 @@ app.get('/api/public/locations/:locationId', (req, res) => {
   }
   
   const business = companies.find(c => c.id === location.companyId);
+  if (!business) {
+    return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+  }
   
   // Check effective public status (accounts for subscription tier)
   if (!isLocationPublicEffective(business, location)) {
@@ -8755,6 +10059,9 @@ app.get('/api/public/locations/:locationId/products', async (req, res) => {
   }
 
   const business = companies.find(c => c.id === location.companyId);
+  if (!business) {
+    return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+  }
 
   // Check effective public status (accounts for subscription tier)
   if (!isLocationPublicEffective(business, location)) {
@@ -8793,6 +10100,9 @@ app.post('/api/public/locations/:locationId/orders', (req, res) => {
   }
   
   const business = companies.find(c => c.id === location.companyId);
+  if (!business) {
+    return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+  }
   
   // Check effective public status (accounts for subscription tier)
   if (!isLocationPublicEffective(business, location)) {

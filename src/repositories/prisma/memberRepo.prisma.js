@@ -60,6 +60,31 @@ async function listLocationMembers(locationId) {
   });
 }
 
+async function listLocationMembersByBusinessId(businessId) {
+  return prisma.locationMember.findMany({
+    where: { businessId },
+    include: { user: true }
+  });
+}
+
+async function listLocationMembersByBusinessAndUser(businessId, userId) {
+  return prisma.locationMember.findMany({
+    where: { businessId, userId },
+    include: { user: true }
+  });
+}
+
+async function listLocationMembersByUserId(userId) {
+  return prisma.locationMember.findMany({
+    where: { userId },
+    include: {
+      user: true,
+      location: true,
+      business: { select: { id: true, name: true } }
+    }
+  });
+}
+
 async function getLocationMember(locationId, userId) {
   return prisma.locationMember.findUnique({
     where: {
@@ -105,7 +130,7 @@ async function removeLocationMember(id) {
 async function getByUserId(userId) {
   return prisma.businessMember.findMany({
     where: { userId },
-    include: { user: true }
+    include: { user: true, business: { select: { id: true, name: true, logoUrl: true } } }
   });
 }
 
@@ -159,6 +184,9 @@ module.exports = {
   
   // Location members
   listLocationMembers,
+  listLocationMembersByBusinessId,
+  listLocationMembersByBusinessAndUser,
+  listLocationMembersByUserId,
   getLocationMember,
   addLocationMember,
   updateLocationMember,

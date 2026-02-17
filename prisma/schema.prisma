@@ -28,6 +28,8 @@ model User {
   updatedAt            DateTime         @updatedAt
   businessMembers      BusinessMember[]
   locationMembers      LocationMember[]
+  deliveryAssignments  DeliveryStaff[]  @relation("DeliveryStaffUser")
+  roleRequests         RoleRequest[]    @relation("RoleRequestUser")
   sentConnections      UserConnection[] @relation("ConnectionSender")
   receivedConnections  UserConnection[] @relation("ConnectionReceiver")
   deviceTokens         DeviceToken[]
@@ -40,6 +42,7 @@ model Business {
   bannerUrl        String?
   description      String?
   industry         String?
+  category         String?
   phone            String?
   email            String?
   address          String?
@@ -63,6 +66,8 @@ model Business {
   products         Product[]
   stocks           Stock[]
   brands           Brand[]
+  transports       Transport[]
+  roleRequests        RoleRequest[]
   connectionsSent     BusinessConnection[] @relation("ConnectionsRequested")
   connectionsReceived BusinessConnection[] @relation("ConnectionsReceived")
 }
@@ -74,10 +79,12 @@ model Location {
   address          String?
   phone            String?
   email            String?
+  locationType     String?
   latitude         Float?
   longitude        Float?
   operatingMode    LocationMode      @default(DEPENDENT)
   isPublic         Boolean           @default(false)
+  isPrimary        Boolean           @default(false)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   chats            Chat[]
@@ -105,6 +112,23 @@ model Brand {
   products    Product[]
 
   @@unique([businessId, name])
+  @@index([businessId])
+}
+
+model Transport {
+  id              String   @id
+  businessId      String
+  name            String
+  vehicleType     String
+  licensePlate    String?
+  capacity        String?
+  status          String   @default("available")
+  assignedStaffId String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
   @@index([businessId])
 }
 
@@ -403,10 +427,48 @@ model Delivery {
   business                 Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location                 Location?       @relation(fields: [locationId], references: [id])
   order                    Order?          @relation(fields: [orderId], references: [id])
+  staffAssignments         DeliveryStaff[]
 
   @@index([businessId])
   @@index([locationId])
   @@index([orderId])
+}
+
+model DeliveryStaff {
+  id           String            @id @default(uuid())
+  deliveryId   String
+  userId       String
+  role         DeliveryStaffRole @default(driver)
+  assignedBy   String?
+  assignedAt   DateTime          @default(now())
+  delivery     Delivery          @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  user         User              @relation("DeliveryStaffUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([deliveryId, userId])
+  @@index([deliveryId])
+  @@index([userId])
+}
+
+model RoleRequest {
+  id               String            @id @default(uuid())
+  businessId       String
+  userId           String
+  requestedRole    String            @default("admin")
+  currentRole      String            @default("staff")
+  status           RoleRequestStatus @default(PENDING)
+  message          String?
+  rejectionReason  String?
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  resolvedByName   String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user             User              @relation("RoleRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([userId])
+  @@index([businessId, userId, status])
 }
 
 model FeedPost {
@@ -556,6 +618,19 @@ enum PaymentStatus {
   REFUNDED
   PARTIALLY_REFUNDED
   DISPUTED
+}
+
+enum DeliveryStaffRole {
+  driver
+  teamLeader
+  support
+}
+
+enum RoleRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }
 
 model UserConnection {
