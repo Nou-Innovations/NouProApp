@@ -70,6 +70,11 @@ model Business {
   roleRequests        RoleRequest[]
   connectionsSent     BusinessConnection[] @relation("ConnectionsRequested")
   connectionsReceived BusinessConnection[] @relation("ConnectionsReceived")
+  suppliers           Supplier[]
+  supplierOf          Supplier[]           @relation("SupplierBusiness")
+  purchaseRequests    PurchaseRequest[]
+  purchaseOrders      PurchaseOrder[]
+  goodsReceipts       GoodsReceipt[]
 }
 
 model Location {
@@ -168,6 +173,7 @@ model Product {
   business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   brandRef         Brand?            @relation(fields: [brandId], references: [id], onDelete: SetNull)
   stocks           Stock[]
+  supplierProducts SupplierProduct[]
 
   @@index([businessId])
   @@index([brandId])
@@ -631,6 +637,189 @@ enum RoleRequestStatus {
   APPROVED
   REJECTED
   CANCELLED
+}
+
+// ── Procurement Enums ──
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum PurchaseRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CONVERTED
+}
+
+enum PurchaseRequestPriority {
+  LOW
+  NORMAL
+  URGENT
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  CONFIRMED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELED
+}
+
+enum GoodsReceiptStatus {
+  PENDING
+  COMPLETED
+  DISPUTED
+}
+
+// ── Procurement Models ──
+
+model Supplier {
+  id                 String          @id
+  businessId         String
+  supplierBusinessId String?
+  name               String
+  contactName        String?
+  email              String?
+  phone              String?
+  address            String?
+  paymentTerms       String?
+  leadTimeDays       Int?
+  creditLimit        Float?
+  rating             Float?
+  status             SupplierStatus  @default(ACTIVE)
+  notes              String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  business           Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplierBusiness   Business?       @relation("SupplierBusiness", fields: [supplierBusinessId], references: [id], onDelete: SetNull)
+  products           SupplierProduct[]
+  purchaseRequests   PurchaseRequest[]
+  purchaseOrders     PurchaseOrder[]
+
+  @@index([businessId])
+  @@index([supplierBusinessId])
+  @@unique([businessId, supplierBusinessId])
+}
+
+model SupplierProduct {
+  id            String   @id @default(uuid())
+  supplierId    String
+  productId     String
+  supplierPrice Float
+  minOrderQty   Int?
+  bulkPrice     Float?
+  bulkMinQty    Int?
+  supplierSKU   String?
+  leadTimeDays  Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  supplier      Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, productId])
+  @@index([productId])
+}
+
+model PurchaseRequest {
+  id              String                  @id
+  businessId      String
+  locationId      String?
+  supplierId      String?
+  requestedBy     String
+  priority        PurchaseRequestPriority @default(NORMAL)
+  status          PurchaseRequestStatus   @default(DRAFT)
+  items           Json
+  totalAmount     Float?
+  notes           String?
+  requiredByDate  DateTime?
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  purchaseOrderId String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  business        Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplier        Supplier?               @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([status])
+}
+
+model PurchaseOrder {
+  id                   String                       @id
+  businessId           String
+  supplierId           String
+  purchaseRequestId    String?
+  locationId           String?
+  poNumber             String?
+  items                Json
+  totalAmount          Float?
+  status               PurchaseOrderStatus          @default(DRAFT)
+  paymentStatus        PaymentStatus?               @default(UNPAID)
+  paymentTerms         String?
+  expectedDeliveryDate DateTime?
+  notes                String?
+  sentAt               DateTime?
+  createdBy            String
+  approvedBy           String?
+  statusChangedAt      DateTime?
+  statusChangedBy      String?
+  statusReason         String?
+  lastActivityAt       DateTime?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  business             Business                     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplier             Supplier                     @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  statusHistory        PurchaseOrderStatusHistory[]
+  goodsReceipts        GoodsReceipt[]
+
+  @@index([businessId])
+  @@index([supplierId])
+  @@index([status])
+  @@unique([businessId, poNumber])
+}
+
+model PurchaseOrderStatusHistory {
+  id              String              @id @default(uuid())
+  purchaseOrderId String
+  from            PurchaseOrderStatus
+  to              PurchaseOrderStatus
+  reason          String?
+  changedBy       String?
+  createdAt       DateTime            @default(now())
+
+  purchaseOrder   PurchaseOrder       @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId])
+}
+
+model GoodsReceipt {
+  id              String             @id
+  businessId      String
+  purchaseOrderId String
+  locationId      String?
+  receivedBy      String
+  items           Json
+  status          GoodsReceiptStatus @default(PENDING)
+  receivedAt      DateTime?
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  business        Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  purchaseOrder   PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([purchaseOrderId])
 }
 
 model UserConnection {

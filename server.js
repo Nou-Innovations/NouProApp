@@ -365,6 +365,26 @@ function deriveCapabilities(business) {
 
     // Price privacy (Business+ only)
     canEnablePricePrivacy: isBusiness || isEnterprise,
+
+    // Procurement (PRO+)
+    canViewSuppliers: isPaidTier,
+    canManageSuppliers: isPaidTier,
+    canCreatePurchaseRequests: isPaidTier,
+    canCreatePurchaseOrders: isPaidTier,
+
+    // Procurement (BUSINESS+)
+    canApprovePurchaseRequests: isBusiness || isEnterprise,
+    canReceiveGoods: isBusiness || isEnterprise,
+    canUseSupplierPricing: isBusiness || isEnterprise,
+    canUse3WayMatching: isBusiness || isEnterprise,
+
+    // Procurement (ENTERPRISE)
+    canUseBudgetControls: isEnterprise,
+
+    // Procurement limits
+    maxSuppliers: tier === SUBSCRIPTION_TIERS.FREE ? 0 :
+                  tier === SUBSCRIPTION_TIERS.PRO ? 5 :
+                  tier === SUBSCRIPTION_TIERS.BUSINESS ? 20 : 999,
   };
 }
 
@@ -2318,6 +2338,156 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 });
 
 // ============================================================================
+// Phone & Email OTP Verification (Twilio Verify)
+// ============================================================================
+
+let twilioClient = null;
+
+function getTwilioClient() {
+  if (twilioClient) return twilioClient;
+
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+
+  if (!sid || !token || !serviceSid) {
+    console.warn('[Twilio] Not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID in .env');
+    return null;
+  }
+
+  twilioClient = require('twilio')(sid, token);
+  return twilioClient;
+}
+
+// Send phone OTP via SMS
+app.post('/api/auth/send-phone-otp', authLimiter, async (req, res) => {
+  try {
+    const { phone, countryCode } = req.body;
+
+    if (!phone || !countryCode) {
+      return res.status(400).json(errorResponse('Phone number and country code are required'));
+    }
+
+    const client = getTwilioClient();
+    if (!client) {
+      return res.status(503).json(errorResponse('SMS service is not configured'));
+    }
+
+    const fullNumber = countryCode + phone;
+    const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+
+    await client.verify.v2.services(serviceSid)
+      .verifications
+      .create({ to: fullNumber, channel: 'sms' });
+
+    console.log('[OTP] Phone verification sent to:', fullNumber);
+    res.json(successResponse({ message: 'Verification code sent' }));
+  } catch (err) {
+    console.error('[OTP] Send phone OTP error:', err.message);
+    if (err.code === 60200) {
+      return res.status(400).json(errorResponse('Invalid phone number'));
+    }
+    res.status(500).json(errorResponse('Failed to send verification code'));
+  }
+});
+
+// Verify phone OTP
+app.post('/api/auth/verify-phone', authLimiter, async (req, res) => {
+  try {
+    const { phone, countryCode, code } = req.body;
+
+    if (!phone || !countryCode || !code) {
+      return res.status(400).json(errorResponse('Phone, country code, and verification code are required'));
+    }
+
+    const client = getTwilioClient();
+    if (!client) {
+      return res.status(503).json(errorResponse('SMS service is not configured'));
+    }
+
+    const fullNumber = countryCode + phone;
+    const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+
+    const check = await client.verify.v2.services(serviceSid)
+      .verificationChecks
+      .create({ to: fullNumber, code });
+
+    if (check.status === 'approved') {
+      console.log('[OTP] Phone verified:', fullNumber);
+      res.json(successResponse(null, 'Phone number verified successfully'));
+    } else {
+      res.status(400).json(errorResponse('Incorrect verification code'));
+    }
+  } catch (err) {
+    console.error('[OTP] Verify phone error:', err.message);
+    if (err.code === 60200) {
+      return res.status(400).json(errorResponse('Invalid verification code'));
+    }
+    res.status(500).json(errorResponse('Verification failed'));
+  }
+});
+
+// Send email OTP
+app.post('/api/auth/send-email-otp', authLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json(errorResponse('Email is required'));
+    }
+
+    const client = getTwilioClient();
+    if (!client) {
+      return res.status(503).json(errorResponse('Verification service is not configured'));
+    }
+
+    const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+
+    await client.verify.v2.services(serviceSid)
+      .verifications
+      .create({ to: email, channel: 'email' });
+
+    console.log('[OTP] Email verification sent to:', email);
+    res.json(successResponse({ message: 'Verification code sent to email' }));
+  } catch (err) {
+    console.error('[OTP] Send email OTP error:', err.message);
+    res.status(500).json(errorResponse('Failed to send verification code'));
+  }
+});
+
+// Verify email OTP
+app.post('/api/auth/verify-email', authLimiter, async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json(errorResponse('Email and verification code are required'));
+    }
+
+    const client = getTwilioClient();
+    if (!client) {
+      return res.status(503).json(errorResponse('Verification service is not configured'));
+    }
+
+    const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+
+    const check = await client.verify.v2.services(serviceSid)
+      .verificationChecks
+      .create({ to: email, code });
+
+    if (check.status === 'approved') {
+      console.log('[OTP] Email verified:', email);
+      res.json(successResponse(null, 'Email verified successfully'));
+    } else {
+      res.status(400).json(errorResponse('Incorrect verification code'));
+    }
+  } catch (err) {
+    console.error('[OTP] Verify email error:', err.message);
+    res.status(500).json(errorResponse('Verification failed'));
+  }
+});
+
+// ============================================================================
 // Two-Factor Authentication (2FA / TOTP)
 // ============================================================================
 
@@ -3776,6 +3946,95 @@ app.delete('/api/companies/:companyId/products/:productId', requireAuth, async (
   }
 });
 
+// GET products with supplier pricing (for "Supplier Pricing" view)
+app.get('/api/companies/:companyId/products/with-supplier-pricing', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canManageSuppliers) {
+      return res.status(403).json(errorResponse('Supplier pricing requires Pro plan or higher.', 'CAPABILITY_REQUIRED'));
+    }
+
+    // Find all SupplierProduct records for this business's suppliers, with product + supplier details
+    const supplierProducts = await prisma.supplierProduct.findMany({
+      where: {
+        supplier: { businessId: req.params.companyId },
+      },
+      include: {
+        product: true,
+        supplier: { select: { id: true, name: true, contactName: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Group by product and attach supplierPricing array
+    const productMap = new Map();
+    for (const sp of supplierProducts) {
+      if (!sp.product) continue;
+      if (!productMap.has(sp.productId)) {
+        productMap.set(sp.productId, {
+          ...sp.product,
+          supplierPricing: [],
+        });
+      }
+      productMap.get(sp.productId).supplierPricing.push({
+        supplierId: sp.supplier.id,
+        supplierName: sp.supplier.name,
+        supplierPrice: sp.supplierPrice,
+        minOrderQty: sp.minOrderQty,
+        bulkPrice: sp.bulkPrice,
+        bulkMinQty: sp.bulkMinQty,
+        leadTimeDays: sp.leadTimeDays,
+        supplierSKU: sp.supplierSKU,
+      });
+    }
+
+    res.json(successResponse(Array.from(productMap.values())));
+  } catch (e) {
+    console.error('Error fetching products with supplier pricing:', e);
+    res.status(500).json(errorResponse('Failed to fetch products with supplier pricing'));
+  }
+});
+
+// GET suppliers for a specific product (for "Reorder" button)
+app.get('/api/companies/:companyId/products/:productId/suppliers', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const supplierProducts = await prisma.supplierProduct.findMany({
+      where: {
+        productId: req.params.productId,
+        supplier: { businessId: req.params.companyId },
+      },
+      include: {
+        supplier: { select: { id: true, name: true, contactName: true, email: true, phone: true } },
+      },
+    });
+
+    const result = supplierProducts.map((sp) => ({
+      supplierId: sp.supplier.id,
+      supplierName: sp.supplier.name,
+      contactName: sp.supplier.contactName,
+      email: sp.supplier.email,
+      phone: sp.supplier.phone,
+      supplierPrice: sp.supplierPrice,
+      minOrderQty: sp.minOrderQty,
+      bulkPrice: sp.bulkPrice,
+      bulkMinQty: sp.bulkMinQty,
+      leadTimeDays: sp.leadTimeDays,
+      supplierSKU: sp.supplierSKU,
+    }));
+
+    res.json(successResponse(result));
+  } catch (e) {
+    console.error('Error fetching suppliers for product:', e);
+    res.status(500).json(errorResponse('Failed to fetch suppliers for product'));
+  }
+});
+
 // ============================================================================
 // BRAND ROUTES
 // ============================================================================
@@ -5062,6 +5321,956 @@ app.get('/api/companies/:companyId/stock', requireAuth, async (req, res) => {
   } catch (e) {
     console.error('Error fetching business stock:', e);
     res.status(500).json(errorResponse('Failed to load business stock'));
+  }
+});
+
+// ============================================================================
+// PROCUREMENT ROUTES
+// ============================================================================
+
+const purchaseOrderStatusService = require('./src/services/purchaseOrderStatus');
+
+// Rate limiter for procurement write operations (20 per minute per user)
+const procurementLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  keyGenerator: (req) => req.user?.id ?? 'anonymous',
+  message: { success: false, message: 'Too many procurement requests, please slow down' },
+  validate: { xForwardedForHeader: false },
+});
+
+// ── Supplier CRUD ──
+
+// GET /api/companies/:companyId/suppliers — list suppliers
+app.get('/api/companies/:companyId/suppliers', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canViewSuppliers) {
+      return res.status(403).json(errorResponse('Viewing suppliers requires a paid subscription.', 'CAPABILITY_REQUIRED'));
+    }
+
+    const suppliers = await repos.procurementRepo.getSuppliers(req.params.companyId);
+    res.json(successResponse(suppliers));
+  } catch (e) {
+    console.error('Error fetching suppliers:', e);
+    res.status(500).json(errorResponse('Failed to load suppliers'));
+  }
+});
+
+// POST /api/companies/:companyId/suppliers — create supplier
+app.post('/api/companies/:companyId/suppliers', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canManageSuppliers) {
+      return res.status(403).json(errorResponse('Managing suppliers requires a paid subscription.', 'CAPABILITY_REQUIRED'));
+    }
+
+    // Check supplier limit
+    const currentCount = await repos.procurementRepo.countSuppliers(req.params.companyId);
+    if (currentCount >= capabilities.maxSuppliers) {
+      return res.status(403).json(errorResponse(
+        `Supplier limit reached (${capabilities.maxSuppliers}). Upgrade your plan for more.`,
+        'LIMIT_REACHED'
+      ));
+    }
+
+    const { name, contactName, email, phone, address, paymentTerms, leadTimeDays, creditLimit, notes, supplierBusinessId } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json(errorResponse('Supplier name is required', 'VALIDATION_ERROR'));
+    }
+
+    const supplier = await repos.procurementRepo.createSupplier({
+      id: 'SUP-' + uuidv4().slice(0, 8).toUpperCase(),
+      businessId: req.params.companyId,
+      name: name.trim(),
+      contactName: contactName || null,
+      email: email || null,
+      phone: phone || null,
+      address: address || null,
+      paymentTerms: paymentTerms || null,
+      leadTimeDays: leadTimeDays ? parseInt(leadTimeDays, 10) : null,
+      creditLimit: creditLimit ? parseFloat(creditLimit) : null,
+      notes: notes || null,
+      supplierBusinessId: supplierBusinessId || null,
+    });
+
+    res.status(201).json(successResponse(supplier, 'Supplier created'));
+  } catch (e) {
+    console.error('Error creating supplier:', e);
+    if (e.code === 'P2002') {
+      return res.status(409).json(errorResponse('This business is already linked as a supplier', 'DUPLICATE'));
+    }
+    res.status(500).json(errorResponse('Failed to create supplier'));
+  }
+});
+
+// GET /api/companies/:companyId/suppliers/:supplierId — get supplier detail
+app.get('/api/companies/:companyId/suppliers/:supplierId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const supplier = await repos.procurementRepo.getSupplierById(req.params.supplierId);
+    if (!supplier || supplier.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Supplier not found', 'NOT_FOUND'));
+    }
+    res.json(successResponse(supplier));
+  } catch (e) {
+    console.error('Error fetching supplier:', e);
+    res.status(500).json(errorResponse('Failed to load supplier'));
+  }
+});
+
+// PATCH /api/companies/:companyId/suppliers/:supplierId — update supplier
+app.patch('/api/companies/:companyId/suppliers/:supplierId', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    const supplier = await repos.procurementRepo.getSupplierById(req.params.supplierId);
+    if (!supplier || supplier.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Supplier not found', 'NOT_FOUND'));
+    }
+
+    const allowedFields = ['name', 'contactName', 'email', 'phone', 'address', 'paymentTerms', 'leadTimeDays', 'creditLimit', 'rating', 'status', 'notes'];
+    const patch = {};
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) patch[key] = req.body[key];
+    }
+    if (patch.leadTimeDays) patch.leadTimeDays = parseInt(patch.leadTimeDays, 10);
+    if (patch.creditLimit) patch.creditLimit = parseFloat(patch.creditLimit);
+    if (patch.rating) patch.rating = parseFloat(patch.rating);
+
+    const updated = await repos.procurementRepo.updateSupplier(req.params.supplierId, patch);
+    res.json(successResponse(updated, 'Supplier updated'));
+  } catch (e) {
+    console.error('Error updating supplier:', e);
+    res.status(500).json(errorResponse('Failed to update supplier'));
+  }
+});
+
+// DELETE /api/companies/:companyId/suppliers/:supplierId — delete supplier
+app.delete('/api/companies/:companyId/suppliers/:supplierId', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canManageSuppliers) {
+      return res.status(403).json(errorResponse('Managing suppliers requires a paid subscription.', 'CAPABILITY_REQUIRED'));
+    }
+
+    const supplier = await repos.procurementRepo.getSupplierById(req.params.supplierId);
+    if (!supplier || supplier.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Supplier not found', 'NOT_FOUND'));
+    }
+
+    await repos.procurementRepo.deleteSupplier(req.params.supplierId);
+    res.json(successResponse(null, 'Supplier deleted'));
+  } catch (e) {
+    console.error('Error deleting supplier:', e);
+    res.status(500).json(errorResponse('Failed to delete supplier'));
+  }
+});
+
+// ── Supplier Products ──
+
+// GET /api/companies/:companyId/suppliers/:supplierId/products
+app.get('/api/companies/:companyId/suppliers/:supplierId/products', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const supplier = await repos.procurementRepo.getSupplierById(req.params.supplierId);
+    if (!supplier || supplier.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Supplier not found', 'NOT_FOUND'));
+    }
+
+    const products = await repos.procurementRepo.getSupplierProducts(req.params.supplierId);
+    res.json(successResponse(products));
+  } catch (e) {
+    console.error('Error fetching supplier products:', e);
+    res.status(500).json(errorResponse('Failed to load supplier products'));
+  }
+});
+
+// POST /api/companies/:companyId/suppliers/:supplierId/products
+app.post('/api/companies/:companyId/suppliers/:supplierId/products', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    const supplier = await repos.procurementRepo.getSupplierById(req.params.supplierId);
+    if (!supplier || supplier.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Supplier not found', 'NOT_FOUND'));
+    }
+
+    const { productId, supplierPrice, minOrderQty, bulkPrice, bulkMinQty, supplierSKU, leadTimeDays } = req.body;
+
+    if (!productId) return res.status(400).json(errorResponse('productId is required', 'VALIDATION_ERROR'));
+    if (supplierPrice === undefined || supplierPrice === null) {
+      return res.status(400).json(errorResponse('supplierPrice is required', 'VALIDATION_ERROR'));
+    }
+
+    const result = await repos.procurementRepo.upsertSupplierProduct({
+      supplierId: req.params.supplierId,
+      productId,
+      supplierPrice: parseFloat(supplierPrice),
+      minOrderQty: minOrderQty ? parseInt(minOrderQty, 10) : null,
+      bulkPrice: bulkPrice ? parseFloat(bulkPrice) : null,
+      bulkMinQty: bulkMinQty ? parseInt(bulkMinQty, 10) : null,
+      supplierSKU: supplierSKU || null,
+      leadTimeDays: leadTimeDays ? parseInt(leadTimeDays, 10) : null,
+    });
+
+    res.status(201).json(successResponse(result, 'Supplier product saved'));
+  } catch (e) {
+    console.error('Error saving supplier product:', e);
+    res.status(500).json(errorResponse('Failed to save supplier product'));
+  }
+});
+
+// PATCH /api/companies/:companyId/suppliers/:supplierId/products/:spId
+app.patch('/api/companies/:companyId/suppliers/:supplierId/products/:spId', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    // Validate supplier belongs to this business
+    const supplier = await repos.procurementRepo.getSupplierById(req.params.supplierId);
+    if (!supplier || supplier.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Supplier not found', 'NOT_FOUND'));
+    }
+
+    const { supplierPrice, minOrderQty, bulkPrice, bulkMinQty, supplierSKU, leadTimeDays } = req.body;
+    const patch = {};
+    if (supplierPrice !== undefined) patch.supplierPrice = parseFloat(supplierPrice);
+    if (minOrderQty !== undefined) patch.minOrderQty = minOrderQty ? parseInt(minOrderQty, 10) : null;
+    if (bulkPrice !== undefined) patch.bulkPrice = bulkPrice ? parseFloat(bulkPrice) : null;
+    if (bulkMinQty !== undefined) patch.bulkMinQty = bulkMinQty ? parseInt(bulkMinQty, 10) : null;
+    if (supplierSKU !== undefined) patch.supplierSKU = supplierSKU || null;
+    if (leadTimeDays !== undefined) patch.leadTimeDays = leadTimeDays ? parseInt(leadTimeDays, 10) : null;
+
+    const updated = await repos.procurementRepo.updateSupplierProduct(req.params.spId, patch);
+    res.json(successResponse(updated, 'Supplier product updated'));
+  } catch (e) {
+    console.error('Error updating supplier product:', e);
+    res.status(500).json(errorResponse('Failed to update supplier product'));
+  }
+});
+
+// DELETE /api/companies/:companyId/suppliers/:supplierId/products/:spId
+app.delete('/api/companies/:companyId/suppliers/:supplierId/products/:spId', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    await repos.procurementRepo.deleteSupplierProduct(req.params.spId);
+    res.json(successResponse(null, 'Supplier product removed'));
+  } catch (e) {
+    console.error('Error deleting supplier product:', e);
+    res.status(500).json(errorResponse('Failed to delete supplier product'));
+  }
+});
+
+// ── Purchase Requests ──
+
+// GET /api/companies/:companyId/purchase-requests
+app.get('/api/companies/:companyId/purchase-requests', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canCreatePurchaseRequests) {
+      return res.status(403).json(errorResponse('Purchase requests require a paid subscription.', 'CAPABILITY_REQUIRED'));
+    }
+
+    const filters = {};
+    if (req.query.status) filters.status = req.query.status;
+    if (req.query.locationId) filters.locationId = req.query.locationId;
+    if (req.query.supplierId) filters.supplierId = req.query.supplierId;
+
+    const requests = await repos.procurementRepo.getPurchaseRequests(req.params.companyId, filters);
+    res.json(successResponse(requests));
+  } catch (e) {
+    console.error('Error fetching purchase requests:', e);
+    res.status(500).json(errorResponse('Failed to load purchase requests'));
+  }
+});
+
+// POST /api/companies/:companyId/purchase-requests — create PR
+app.post('/api/companies/:companyId/purchase-requests', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canCreatePurchaseRequests) {
+      return res.status(403).json(errorResponse('Purchase requests require a paid subscription.', 'CAPABILITY_REQUIRED'));
+    }
+
+    const { supplierId, locationId, items, totalAmount, notes, priority, requiredByDate } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json(errorResponse('Items array is required', 'VALIDATION_ERROR'));
+    }
+
+    const pr = await repos.procurementRepo.createPurchaseRequest({
+      id: 'PR-' + uuidv4().slice(0, 8).toUpperCase(),
+      businessId: req.params.companyId,
+      supplierId: supplierId || null,
+      locationId: locationId || null,
+      requestedBy: req.user?.id,
+      priority: priority || 'NORMAL',
+      status: 'DRAFT',
+      items,
+      totalAmount: totalAmount ? parseFloat(totalAmount) : null,
+      notes: notes || null,
+      requiredByDate: requiredByDate ? new Date(requiredByDate) : null,
+    });
+
+    // Activity event (non-blocking)
+    try {
+      const eventMessages = require('./src/services/eventMessages');
+      await eventMessages.createEventMessage({
+        type: 'purchase_request_created',
+        fromBusinessId: req.params.companyId,
+        toBusinessId: null,
+        entityId: pr.id,
+        actorId: req.user?.id,
+        actorName: req.user?.name || 'Staff',
+        metadata: { status: pr.status, priority: pr.priority },
+      });
+    } catch (_) {}
+
+    res.status(201).json(successResponse(pr, 'Purchase request created'));
+  } catch (e) {
+    console.error('Error creating purchase request:', e);
+    res.status(500).json(errorResponse('Failed to create purchase request'));
+  }
+});
+
+// GET /api/companies/:companyId/purchase-requests/:prId
+app.get('/api/companies/:companyId/purchase-requests/:prId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const pr = await repos.procurementRepo.getPurchaseRequestById(req.params.prId);
+    if (!pr || pr.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Purchase request not found', 'NOT_FOUND'));
+    }
+    res.json(successResponse(pr));
+  } catch (e) {
+    console.error('Error fetching purchase request:', e);
+    res.status(500).json(errorResponse('Failed to load purchase request'));
+  }
+});
+
+// PATCH /api/companies/:companyId/purchase-requests/:prId — update PR (only if DRAFT)
+app.patch('/api/companies/:companyId/purchase-requests/:prId', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const pr = await repos.procurementRepo.getPurchaseRequestById(req.params.prId);
+    if (!pr || pr.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Purchase request not found', 'NOT_FOUND'));
+    }
+    if (pr.status !== 'DRAFT') {
+      return res.status(400).json(errorResponse('Only draft purchase requests can be edited', 'INVALID_STATE'));
+    }
+
+    const allowedFields = ['supplierId', 'locationId', 'items', 'totalAmount', 'notes', 'priority', 'requiredByDate'];
+    const patch = {};
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) patch[key] = req.body[key];
+    }
+    if (patch.totalAmount) patch.totalAmount = parseFloat(patch.totalAmount);
+    if (patch.requiredByDate) patch.requiredByDate = new Date(patch.requiredByDate);
+
+    const updated = await repos.procurementRepo.updatePurchaseRequest(req.params.prId, patch);
+    res.json(successResponse(updated, 'Purchase request updated'));
+  } catch (e) {
+    console.error('Error updating purchase request:', e);
+    res.status(500).json(errorResponse('Failed to update purchase request'));
+  }
+});
+
+// POST /api/companies/:companyId/purchase-requests/:prId/submit — DRAFT → SUBMITTED
+app.post('/api/companies/:companyId/purchase-requests/:prId/submit', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const pr = await repos.procurementRepo.getPurchaseRequestById(req.params.prId);
+    if (!pr || pr.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Purchase request not found', 'NOT_FOUND'));
+    }
+    if (pr.status !== 'DRAFT') {
+      return res.status(400).json(errorResponse('Only draft requests can be submitted', 'INVALID_STATE'));
+    }
+
+    const updated = await repos.procurementRepo.updatePurchaseRequest(req.params.prId, { status: 'SUBMITTED' });
+
+    // Activity event (non-blocking)
+    try {
+      const eventMessages = require('./src/services/eventMessages');
+      await eventMessages.createEventMessage({
+        type: 'purchase_request_submitted',
+        fromBusinessId: req.params.companyId,
+        toBusinessId: null,
+        entityId: pr.id,
+        actorId: req.user?.id,
+        actorName: req.user?.name || 'Staff',
+        metadata: { status: 'SUBMITTED', priority: pr.priority },
+      });
+    } catch (_) {}
+
+    res.json(successResponse(updated, 'Purchase request submitted'));
+  } catch (e) {
+    console.error('Error submitting purchase request:', e);
+    res.status(500).json(errorResponse('Failed to submit purchase request'));
+  }
+});
+
+// POST /api/companies/:companyId/purchase-requests/:prId/approve
+app.post('/api/companies/:companyId/purchase-requests/:prId/approve', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canApprovePurchaseRequests) {
+      return res.status(403).json(errorResponse('Approving purchase requests requires Business plan or higher.', 'CAPABILITY_REQUIRED'));
+    }
+
+    const pr = await repos.procurementRepo.getPurchaseRequestById(req.params.prId);
+    if (!pr || pr.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Purchase request not found', 'NOT_FOUND'));
+    }
+    if (pr.status !== 'SUBMITTED') {
+      return res.status(400).json(errorResponse('Only submitted requests can be approved', 'INVALID_STATE'));
+    }
+
+    const updated = await repos.procurementRepo.updatePurchaseRequest(req.params.prId, {
+      status: 'APPROVED',
+      approvedBy: req.user?.id,
+      approvedAt: new Date(),
+    });
+
+    // Activity event (non-blocking)
+    try {
+      const eventMessages = require('./src/services/eventMessages');
+      await eventMessages.createEventMessage({
+        type: 'purchase_request_approved',
+        fromBusinessId: req.params.companyId,
+        toBusinessId: null,
+        entityId: pr.id,
+        actorId: req.user?.id,
+        actorName: req.user?.name || 'Admin',
+        metadata: { status: 'APPROVED' },
+      });
+    } catch (_) {}
+
+    res.json(successResponse(updated, 'Purchase request approved'));
+  } catch (e) {
+    console.error('Error approving purchase request:', e);
+    res.status(500).json(errorResponse('Failed to approve purchase request'));
+  }
+});
+
+// POST /api/companies/:companyId/purchase-requests/:prId/reject
+app.post('/api/companies/:companyId/purchase-requests/:prId/reject', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canApprovePurchaseRequests) {
+      return res.status(403).json(errorResponse('Rejecting purchase requests requires Business plan or higher.', 'CAPABILITY_REQUIRED'));
+    }
+
+    const pr = await repos.procurementRepo.getPurchaseRequestById(req.params.prId);
+    if (!pr || pr.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Purchase request not found', 'NOT_FOUND'));
+    }
+    if (pr.status !== 'SUBMITTED') {
+      return res.status(400).json(errorResponse('Only submitted requests can be rejected', 'INVALID_STATE'));
+    }
+
+    const { reason } = req.body;
+    if (!reason || reason.trim().length < 2) {
+      return res.status(400).json(errorResponse('A rejection reason is required', 'VALIDATION_ERROR'));
+    }
+
+    const updated = await repos.procurementRepo.updatePurchaseRequest(req.params.prId, {
+      status: 'REJECTED',
+      rejectionReason: reason.trim(),
+    });
+
+    // Activity event (non-blocking)
+    try {
+      const eventMessages = require('./src/services/eventMessages');
+      await eventMessages.createEventMessage({
+        type: 'purchase_request_rejected',
+        fromBusinessId: req.params.companyId,
+        toBusinessId: null,
+        entityId: pr.id,
+        actorId: req.user?.id,
+        actorName: req.user?.name || 'Admin',
+        metadata: { status: 'REJECTED', reason: reason.trim() },
+      });
+    } catch (_) {}
+
+    res.json(successResponse(updated, 'Purchase request rejected'));
+  } catch (e) {
+    console.error('Error rejecting purchase request:', e);
+    res.status(500).json(errorResponse('Failed to reject purchase request'));
+  }
+});
+
+// POST /api/companies/:companyId/purchase-requests/:prId/convert — APPROVED → CONVERTED, creates PO
+app.post('/api/companies/:companyId/purchase-requests/:prId/convert', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    const pr = await repos.procurementRepo.getPurchaseRequestById(req.params.prId);
+    if (!pr || pr.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Purchase request not found', 'NOT_FOUND'));
+    }
+    if (pr.status !== 'APPROVED') {
+      return res.status(400).json(errorResponse('Only approved requests can be converted to a purchase order', 'INVALID_STATE'));
+    }
+    if (!pr.supplierId) {
+      return res.status(400).json(errorResponse('A supplier must be assigned before converting', 'VALIDATION_ERROR'));
+    }
+
+    // Create PO from PR
+    const poId = 'PO-' + uuidv4().slice(0, 8).toUpperCase();
+    const po = await repos.procurementRepo.createPurchaseOrder({
+      id: poId,
+      businessId: req.params.companyId,
+      supplierId: pr.supplierId,
+      purchaseRequestId: pr.id,
+      locationId: pr.locationId,
+      items: pr.items,
+      totalAmount: pr.totalAmount,
+      status: 'DRAFT',
+      paymentStatus: 'UNPAID',
+      createdBy: req.user?.id,
+    });
+
+    // Mark PR as converted
+    await repos.procurementRepo.updatePurchaseRequest(pr.id, {
+      status: 'CONVERTED',
+      purchaseOrderId: poId,
+    });
+
+    res.status(201).json(successResponse(po, 'Purchase request converted to purchase order'));
+  } catch (e) {
+    console.error('Error converting purchase request:', e);
+    res.status(500).json(errorResponse('Failed to convert purchase request'));
+  }
+});
+
+// ── Purchase Orders ──
+
+// GET /api/companies/:companyId/purchase-orders
+app.get('/api/companies/:companyId/purchase-orders', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canCreatePurchaseOrders) {
+      return res.status(403).json(errorResponse('Purchase orders require a paid subscription.', 'CAPABILITY_REQUIRED'));
+    }
+
+    const filters = {};
+    if (req.query.status) filters.status = req.query.status;
+    if (req.query.supplierId) filters.supplierId = req.query.supplierId;
+    if (req.query.locationId) filters.locationId = req.query.locationId;
+
+    const orders = await repos.procurementRepo.getPurchaseOrders(req.params.companyId, filters);
+    res.json(successResponse(orders));
+  } catch (e) {
+    console.error('Error fetching purchase orders:', e);
+    res.status(500).json(errorResponse('Failed to load purchase orders'));
+  }
+});
+
+// POST /api/companies/:companyId/purchase-orders — create PO
+app.post('/api/companies/:companyId/purchase-orders', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canCreatePurchaseOrders) {
+      return res.status(403).json(errorResponse('Purchase orders require a paid subscription.', 'CAPABILITY_REQUIRED'));
+    }
+
+    const { supplierId, purchaseRequestId, locationId, items, totalAmount, paymentTerms, expectedDeliveryDate, notes } = req.body;
+
+    if (!supplierId) return res.status(400).json(errorResponse('supplierId is required', 'VALIDATION_ERROR'));
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json(errorResponse('Items array is required', 'VALIDATION_ERROR'));
+    }
+
+    const poId = 'PO-' + uuidv4().slice(0, 8).toUpperCase();
+    const po = await repos.procurementRepo.createPurchaseOrder({
+      id: poId,
+      businessId: req.params.companyId,
+      supplierId,
+      purchaseRequestId: purchaseRequestId || null,
+      locationId: locationId || null,
+      poNumber: poId,
+      items,
+      totalAmount: totalAmount ? parseFloat(totalAmount) : null,
+      status: 'DRAFT',
+      paymentStatus: 'UNPAID',
+      paymentTerms: paymentTerms || null,
+      expectedDeliveryDate: expectedDeliveryDate ? new Date(expectedDeliveryDate) : null,
+      notes: notes || null,
+      createdBy: req.user?.id,
+    });
+
+    res.status(201).json(successResponse(po, 'Purchase order created'));
+  } catch (e) {
+    console.error('Error creating purchase order:', e);
+    res.status(500).json(errorResponse('Failed to create purchase order'));
+  }
+});
+
+// GET /api/companies/:companyId/purchase-orders/:poId
+app.get('/api/companies/:companyId/purchase-orders/:poId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const po = await repos.procurementRepo.getPurchaseOrderById(req.params.poId);
+    if (!po || po.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Purchase order not found', 'NOT_FOUND'));
+    }
+    res.json(successResponse(po));
+  } catch (e) {
+    console.error('Error fetching purchase order:', e);
+    res.status(500).json(errorResponse('Failed to load purchase order'));
+  }
+});
+
+// PATCH /api/companies/:companyId/purchase-orders/:poId — update PO (only if DRAFT)
+app.patch('/api/companies/:companyId/purchase-orders/:poId', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    const po = await repos.procurementRepo.getPurchaseOrderById(req.params.poId);
+    if (!po || po.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Purchase order not found', 'NOT_FOUND'));
+    }
+    if (po.status !== 'DRAFT') {
+      return res.status(400).json(errorResponse('Only draft purchase orders can be edited', 'INVALID_STATE'));
+    }
+
+    const allowedFields = ['supplierId', 'locationId', 'items', 'totalAmount', 'paymentTerms', 'expectedDeliveryDate', 'notes'];
+    const patch = {};
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) patch[key] = req.body[key];
+    }
+    if (patch.totalAmount) patch.totalAmount = parseFloat(patch.totalAmount);
+    if (patch.expectedDeliveryDate) patch.expectedDeliveryDate = new Date(patch.expectedDeliveryDate);
+
+    const updated = await repos.procurementRepo.updatePurchaseOrder(req.params.poId, patch);
+    res.json(successResponse(updated, 'Purchase order updated'));
+  } catch (e) {
+    console.error('Error updating purchase order:', e);
+    res.status(500).json(errorResponse('Failed to update purchase order'));
+  }
+});
+
+// PATCH /api/companies/:companyId/purchase-orders/:poId/status — change PO status (state machine)
+app.patch('/api/companies/:companyId/purchase-orders/:poId/status', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    const po = await repos.procurementRepo.getPurchaseOrderById(req.params.poId);
+    if (!po || po.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Purchase order not found', 'NOT_FOUND'));
+    }
+
+    const { status: nextStatus, reason } = req.body;
+    if (!nextStatus) return res.status(400).json(errorResponse('status is required', 'VALIDATION_ERROR'));
+
+    const updatedPO = await purchaseOrderStatusService.changePurchaseOrderStatus({
+      purchaseOrderId: req.params.poId,
+      nextStatus,
+      reason,
+      userId: req.user?.id,
+    });
+
+    // Activity event (non-blocking)
+    try {
+      const eventMessages = require('./src/services/eventMessages');
+      const eventType = nextStatus === 'SENT' ? 'purchase_order_sent'
+        : nextStatus === 'CONFIRMED' ? 'purchase_order_confirmed'
+        : nextStatus === 'RECEIVED' ? 'purchase_order_received'
+        : 'purchase_order_status_changed';
+
+      await eventMessages.createEventMessage({
+        type: eventType,
+        fromBusinessId: req.params.companyId,
+        toBusinessId: null,
+        entityId: po.id,
+        actorId: req.user?.id,
+        actorName: req.user?.name || 'Admin',
+        metadata: { fromStatus: po.status, toStatus: nextStatus, reason },
+      });
+    } catch (_) {}
+
+    // Auto-create incoming delivery when PO is confirmed
+    if (nextStatus === 'CONFIRMED') {
+      try {
+        const fullPO = await repos.procurementRepo.getPurchaseOrderById(req.params.poId);
+        // PO can only be confirmed once (SENT → CONFIRMED), but check for duplicate just in case
+        const existingDelivery = await repos.deliveryRepo.getByOrderId(fullPO.id);
+        if (!existingDelivery) {
+          const deliveryItems = (fullPO.items || []).map(item => ({
+            productId: item.productId || null,
+            name: item.productName || item.name || 'Unknown',
+            price: item.unitPrice || 0,
+            quantity: item.quantity || 0,
+            quantityOrdered: item.quantity || 0,
+            status: 'In Stock',
+          }));
+
+          await repos.deliveryRepo.create({
+            id: uuidv4(),
+            businessId: req.params.companyId,
+            type: 'delivery',
+            direction: 'incoming',
+            locationId: fullPO.locationId || null,
+            clientCompanyName: fullPO.supplier?.name || null,
+            clientAddress: fullPO.supplier?.address || null,
+            distributorName: fullPO.supplier?.name || null,
+            distributorNotes: `PO:${fullPO.poNumber || fullPO.id}`,
+            orderTime: new Date().toISOString(),
+            expectedDeliveryDateTime: fullPO.expectedDeliveryDate
+              ? fullPO.expectedDeliveryDate.toISOString()
+              : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            items: deliveryItems,
+            itemCount: deliveryItems.length,
+            totalAmount: fullPO.totalAmount || 0,
+            orderId: fullPO.id,
+            deliveryStatus: 'NOT_ASSIGNED',
+            paymentStatus: fullPO.paymentStatus || 'UNPAID',
+          });
+        }
+      } catch (deliveryErr) {
+        console.error('Auto-delivery creation failed (non-blocking):', deliveryErr);
+      }
+    }
+
+    res.json(successResponse(updatedPO, `Purchase order status changed to ${nextStatus}`));
+  } catch (e) {
+    if (e.code === 'INVALID_STATUS_TRANSITION' || e.code === 'STATUS_REASON_REQUIRED' || e.code === 'INVALID_STATUS') {
+      return res.status(400).json(errorResponse(e.message, e.code));
+    }
+    if (e.code === 'PO_NOT_FOUND') {
+      return res.status(404).json(errorResponse(e.message, e.code));
+    }
+    console.error('Error changing PO status:', e);
+    res.status(500).json(errorResponse('Failed to change purchase order status'));
+  }
+});
+
+// GET /api/companies/:companyId/purchase-orders/:poId/history
+app.get('/api/companies/:companyId/purchase-orders/:poId/history', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const po = await repos.procurementRepo.getPurchaseOrderById(req.params.poId);
+    if (!po || po.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Purchase order not found', 'NOT_FOUND'));
+    }
+
+    const history = await repos.procurementRepo.getPOStatusHistory(req.params.poId);
+    res.json(successResponse(history));
+  } catch (e) {
+    console.error('Error fetching PO history:', e);
+    res.status(500).json(errorResponse('Failed to load purchase order history'));
+  }
+});
+
+// ── Goods Receipts ──
+
+// POST /api/companies/:companyId/purchase-orders/:poId/receive — create goods receipt
+app.post('/api/companies/:companyId/purchase-orders/:poId/receive', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canReceiveGoods) {
+      return res.status(403).json(errorResponse('Receiving goods requires Business plan or higher.', 'CAPABILITY_REQUIRED'));
+    }
+
+    const po = await repos.procurementRepo.getPurchaseOrderById(req.params.poId);
+    if (!po || po.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Purchase order not found', 'NOT_FOUND'));
+    }
+    if (!['CONFIRMED', 'PARTIALLY_RECEIVED'].includes(po.status)) {
+      return res.status(400).json(errorResponse('Purchase order must be confirmed before receiving goods', 'INVALID_STATE'));
+    }
+
+    const { items, notes, locationId } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json(errorResponse('Items array is required', 'VALIDATION_ERROR'));
+    }
+
+    const receivingLocationId = locationId || po.locationId;
+
+    const grn = await repos.procurementRepo.createGoodsReceipt({
+      id: 'GRN-' + uuidv4().slice(0, 8).toUpperCase(),
+      businessId: req.params.companyId,
+      purchaseOrderId: req.params.poId,
+      locationId: receivingLocationId || null,
+      receivedBy: req.user?.id,
+      items,
+      status: 'COMPLETED',
+      receivedAt: new Date(),
+      notes: notes || null,
+    });
+
+    // Increment stock for received items
+    if (receivingLocationId) {
+      await purchaseOrderStatusService.incrementStockForReceivedItems(
+        repos, req.params.companyId, receivingLocationId, items
+      );
+    }
+
+    // Determine if all items are fully received → RECEIVED, or partial → PARTIALLY_RECEIVED
+    const poItems = po.items || [];
+    const allGRNs = await repos.procurementRepo.getGoodsReceiptsByPO(req.params.poId);
+
+    // Calculate total received per product across all GRNs
+    const totalReceived = {};
+    for (const receipt of allGRNs) {
+      for (const item of (receipt.items || [])) {
+        totalReceived[item.productId] = (totalReceived[item.productId] || 0) + (item.receivedQty || 0);
+      }
+    }
+
+    const allFullyReceived = poItems.every(poItem => {
+      const received = totalReceived[poItem.productId] || 0;
+      return received >= (poItem.quantity || 0);
+    });
+
+    const newPOStatus = allFullyReceived ? 'RECEIVED' : 'PARTIALLY_RECEIVED';
+    if (po.status !== newPOStatus) {
+      await purchaseOrderStatusService.changePurchaseOrderStatus({
+        purchaseOrderId: req.params.poId,
+        nextStatus: newPOStatus,
+        userId: req.user?.id,
+      });
+    }
+
+    // Activity event (non-blocking)
+    try {
+      const eventMessages = require('./src/services/eventMessages');
+      await eventMessages.createEventMessage({
+        type: 'goods_received',
+        fromBusinessId: req.params.companyId,
+        toBusinessId: null,
+        entityId: grn.id,
+        actorId: req.user?.id,
+        actorName: req.user?.name || 'Staff',
+        metadata: { purchaseOrderId: po.id, itemCount: items.length, status: newPOStatus },
+      });
+    } catch (_) {}
+
+    res.status(201).json(successResponse(grn, 'Goods receipt recorded'));
+  } catch (e) {
+    if (e.code === 'INVALID_STATUS_TRANSITION') {
+      return res.status(400).json(errorResponse(e.message, e.code));
+    }
+    console.error('Error creating goods receipt:', e);
+    res.status(500).json(errorResponse('Failed to record goods receipt'));
+  }
+});
+
+// GET /api/companies/:companyId/goods-receipts — list all goods receipts
+app.get('/api/companies/:companyId/goods-receipts', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canReceiveGoods) {
+      return res.status(403).json(errorResponse('Viewing goods receipts requires Business plan or higher.', 'CAPABILITY_REQUIRED'));
+    }
+
+    const receipts = await repos.procurementRepo.getGoodsReceipts(req.params.companyId);
+    res.json(successResponse(receipts));
+  } catch (e) {
+    console.error('Error fetching goods receipts:', e);
+    res.status(500).json(errorResponse('Failed to load goods receipts'));
+  }
+});
+
+// GET /api/companies/:companyId/goods-receipts/:grnId
+app.get('/api/companies/:companyId/goods-receipts/:grnId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const grn = await repos.procurementRepo.getGoodsReceiptById(req.params.grnId);
+    if (!grn || grn.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Goods receipt not found', 'NOT_FOUND'));
+    }
+    res.json(successResponse(grn));
+  } catch (e) {
+    console.error('Error fetching goods receipt:', e);
+    res.status(500).json(errorResponse('Failed to load goods receipt'));
+  }
+});
+
+// PATCH /api/companies/:companyId/goods-receipts/:grnId
+app.patch('/api/companies/:companyId/goods-receipts/:grnId', requireAuth, procurementLimiter, async (req, res) => {
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  try {
+    const grn = await repos.procurementRepo.getGoodsReceiptById(req.params.grnId);
+    if (!grn || grn.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Goods receipt not found', 'NOT_FOUND'));
+    }
+
+    const allowedFields = ['notes', 'status'];
+    const patch = {};
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) patch[key] = req.body[key];
+    }
+
+    const updated = await repos.procurementRepo.updateGoodsReceipt(req.params.grnId, patch);
+    res.json(successResponse(updated, 'Goods receipt updated'));
+  } catch (e) {
+    console.error('Error updating goods receipt:', e);
+    res.status(500).json(errorResponse('Failed to update goods receipt'));
   }
 });
 
@@ -9204,7 +10413,69 @@ app.get('/api/companies/:companyId/activity-feed', requireAuth, async (req, res)
         },
       }));
     activities.push(...recentOrders);
-    
+
+    // 4. Recent purchase orders
+    try {
+      const businessPOs = await repos.procurementRepo.getPurchaseOrders(companyId);
+      const recentPOs = businessPOs
+        .slice(0, 20)
+        .map(po => {
+          const statusMap = {
+            'DRAFT': 'purchase_order_created',
+            'SENT': 'purchase_order_sent',
+            'CONFIRMED': 'purchase_order_confirmed',
+            'PARTIALLY_RECEIVED': 'purchase_order_receiving',
+            'RECEIVED': 'purchase_order_received',
+            'CANCELED': 'purchase_order_canceled',
+          };
+          return {
+            id: `po-${po.id}`,
+            type: statusMap[po.status] || 'purchase_order_created',
+            title: `PO ${po.id} ${po.status.toLowerCase().replace('_', ' ')}`,
+            description: `${po.supplier?.name || 'Supplier'} - ${formatCurrency(po.totalAmount)}`,
+            timestamp: po.updatedAt || po.createdAt,
+            entityId: po.id,
+            entityType: 'purchase_order',
+            metadata: {
+              status: po.status,
+              amount: po.totalAmount,
+              supplierName: po.supplier?.name,
+            },
+          };
+        });
+      activities.push(...recentPOs);
+    } catch (_) {}
+
+    // 5. Recent purchase requests
+    try {
+      const businessPRs = await repos.procurementRepo.getPurchaseRequests(companyId);
+      const recentPRs = businessPRs
+        .slice(0, 20)
+        .map(pr => {
+          const statusMap = {
+            'DRAFT': 'purchase_request_created',
+            'SUBMITTED': 'purchase_request_submitted',
+            'APPROVED': 'purchase_request_approved',
+            'REJECTED': 'purchase_request_rejected',
+            'CONVERTED': 'purchase_request_approved',
+          };
+          return {
+            id: `pr-${pr.id}`,
+            type: statusMap[pr.status] || 'purchase_request_created',
+            title: `Request ${pr.id} ${pr.status.toLowerCase()}`,
+            description: `${pr.supplier?.name || 'No supplier'} - ${pr.priority} priority`,
+            timestamp: pr.updatedAt || pr.createdAt,
+            entityId: pr.id,
+            entityType: 'purchase_request',
+            metadata: {
+              status: pr.status,
+              priority: pr.priority,
+            },
+          };
+        });
+      activities.push(...recentPRs);
+    } catch (_) {}
+
     // Sort by timestamp (newest first) and limit
     activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     activities = activities.slice(0, maxLimit);
