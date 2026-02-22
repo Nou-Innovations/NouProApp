@@ -104,8 +104,8 @@ const bcrypt = require('bcryptjs');
 
 console.log(`📦 Data source: ${getDataSource()}`);
 
-// Import constants from memory store (used by both memory and prisma modes)
-const { 
+// Import pure enum constants (no entity data)
+const {
   SUBSCRIPTION_TIERS: TIERS_FROM_STORE,
   LOCATION_MODES: MODES_FROM_STORE,
   ORDER_STATUS: ORDER_STATUS_FROM_STORE,
@@ -113,31 +113,11 @@ const {
   INVOICE_SCOPE: INVOICE_SCOPE_FROM_STORE,
   MEMBER_ROLES: MEMBER_ROLES_FROM_STORE,
   MEMBER_STATUS: MEMBER_STATUS_FROM_STORE
-} = require('./src/data/memoryStore');
-
-// ---------------------------------------------------------------------------
-// IMPORTANT: Single source of truth for in-memory data
-// This prevents "split-brain" between repos (memoryStore) and routes.
-// When DATA_SOURCE=memory, both repos and direct array access use the same data.
-// ---------------------------------------------------------------------------
-const store = require('./src/data/memoryStore');
-
-// Keep existing variable names to avoid large refactors in routes not yet migrated
-let companies = store.companies;
-let locations = store.locations;
-let users = store.users;
-let businessMembers = store.businessMembers;
-let locationMembers = store.locationMembers;
-let products = store.products;
-let stocks = store.stocks;
-let orders = store.orders;
-let invoices = store.invoices;
-let chats = store.chats;
-let messages = store.messages;
-let deliveries = store.deliveries;
-let locationProducts = store.locationProducts;
-let feedPosts = store.feedPosts;
-// notificationReads now accessed via repos.notificationReadRepo
+} = require('./src/constants');
+const LOCATION_MODES = MODES_FROM_STORE;
+const ORDER_SCOPE = ORDER_SCOPE_FROM_STORE;
+const MEMBER_ROLES = MEMBER_ROLES_FROM_STORE;
+const MEMBER_STATUS = MEMBER_STATUS_FROM_STORE;
 
 // ---------------------------------------------------------------------------
 // Cross-entity sync loop guard
@@ -836,42 +816,7 @@ function verifyOrderLocationAccess(order, locationId, location) {
 // This prevents breaking live businesses while enforcing tier limits.
 // ============================================================================
 
-// ============================================================================
-// MOCK DATABASE - Data is now sourced from memoryStore (see store import above)
-// The `companies`, `locations`, etc. variables reference store arrays.
-// ============================================================================
-
-// Products, locationProducts, stocks data sourced from memoryStore (see store import above)
-
-// ============================================================================
-// MOCK DATABASE - ORDERS (with scope: PARENT vs LOCATION)
-// ============================================================================
-// NOTE: ORDER_STATUS is imported from memoryStore as ORDER_STATUS_FROM_STORE
-// which aligns with the Prisma enum and orderStatus service.
-// Valid statuses: NEW, ACCEPTED, ONGOING, PENDING, IN_REVIEW, DONE, CANCELED, REJECTED
-
-const ORDER_SCOPE = {
-  PARENT: 'PARENT',    // Created by parent business
-  LOCATION: 'LOCATION' // Created by independent location
-};
-
-// Orders data sourced from memoryStore (see store import above)
-
-// ============================================================================
-// MOCK DATABASE - MEMBERSHIP (business & location level)
-// ============================================================================
-
-const MEMBER_ROLES = {
-  SUPER_ADMIN: 'super_admin',
-  ADMIN: 'admin',
-  STAFF: 'staff'
-};
-
-const MEMBER_STATUS = {
-  INVITED: 'invited',
-  ACCEPTED: 'accepted',
-  SUSPENDED: 'suspended'
-};
+// Valid ORDER_STATUS values: NEW, ACCEPTED, ONGOING, PENDING, IN_REVIEW, DONE, CANCELED, REJECTED
 
 const VALID_MESSAGE_TYPES = new Set([
   'text', 'image', 'pdf', 'location', 'voice',
@@ -880,899 +825,6 @@ const VALID_MESSAGE_TYPES = new Set([
 ]);
 
 const MAX_MESSAGE_LENGTH = 10000; // 10k characters
-
-// Membership data (businessMembers, locationMembers) sourced from memoryStore
-// Deliveries data sourced from memoryStore
-
-// DUPLICATE REMOVED - using store.deliveries instead
-const _deliveries_removed = [
-  {
-    id: 'DEL-001',
-    companyId: 'comp-1',
-    type: 'delivery',
-    direction: 'outgoing',
-    locationId: 'loc-1',
-    clientId: 'client-1',
-    clientCompanyLogo: 'https://picsum.photos/seed/grocerymart/100/100',
-    clientCompanyName: 'Grocery Mart Ltd',
-    clientAddress: '123 Main Street, Port Louis',
-    clientEmail: 'orders@grocerymart.mu',
-    clientPhone: '+230 5123 4567',
-    clientNotes: 'Please call before delivery',
-    distributorNotes: '',
-    orderTime: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    expectedDeliveryDateTime: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
-    itemCount: 5,
-    items: [
-      { id: 'I001', productId: 'P001', name: 'Coca-Cola 0.5L x10', image: 'https://picsum.photos/seed/product1/100/100', price: 25.99, quantityOrdered: 3, isLoaded: false, status: 'In Stock' },
-      { id: 'I002', productId: 'P002', name: 'Fanta Orange 1L x6', image: 'https://picsum.photos/seed/product2/100/100', price: 19.50, quantityOrdered: 2, isLoaded: false, status: 'Available' }
-    ],
-    totalAmount: 116.97,
-    trackingNumber: 'TRK-001-2025',
-    deliveryStatus: 'NOT_ASSIGNED',
-    paymentStatus: 'UNPAID',
-    assignedStaffId: null,
-    assignedTo: null,
-    transportMode: null,
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'DEL-002',
-    companyId: 'comp-1',
-    type: 'delivery',
-    direction: 'outgoing',
-    locationId: 'loc-1',
-    clientId: 'client-2',
-    clientCompanyLogo: 'https://picsum.photos/seed/superstore/100/100',
-    clientCompanyName: 'Super Store Express',
-    clientAddress: '456 Commerce Ave, Curepipe',
-    clientEmail: 'purchasing@superstore.mu',
-    clientPhone: '+230 5234 5678',
-    clientNotes: 'Delivery dock at back entrance',
-    distributorNotes: 'High priority customer',
-    orderTime: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-    expectedDeliveryDateTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-    itemCount: 8,
-    items: [
-      { id: 'I003', productId: 'P003', name: 'Sprite 2L x4', image: 'https://picsum.photos/seed/product3/100/100', price: 16.75, quantityOrdered: 4, isLoaded: true, status: 'Available' },
-      { id: 'I004', productId: 'P004', name: 'Juice Box x12', image: 'https://picsum.photos/seed/product4/100/100', price: 35.00, quantityOrdered: 4, isLoaded: true, status: 'In Stock' }
-    ],
-    totalAmount: 207.00,
-    trackingNumber: 'TRK-002-2025',
-    deliveryStatus: 'OUT_FOR_DELIVERY',
-    paymentStatus: 'PAID',
-    assignedStaffId: 'S001',
-    assignedTo: 'John Doe',
-    transportMode: 'Truck',
-    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'DEL-003',
-    companyId: 'comp-1',
-    type: 'delivery',
-    direction: 'outgoing',
-    locationId: 'loc-2',
-    clientId: 'client-3',
-    clientCompanyLogo: 'https://picsum.photos/seed/minimart/100/100',
-    clientCompanyName: 'Mini Mart Plus',
-    clientAddress: '789 Industrial Rd, Vacoas',
-    clientEmail: 'orders@minimart.mu',
-    clientPhone: '+230 5345 6789',
-    clientNotes: '',
-    distributorNotes: '',
-    orderTime: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-    expectedDeliveryDateTime: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-    itemCount: 3,
-    totalAmount: 89.50,
-    trackingNumber: 'TRK-003-2025',
-    deliveryStatus: 'DELIVERED',
-    paymentStatus: 'PAID',
-    assignedStaffId: 'S002',
-    assignedTo: 'Jane Smith',
-    transportMode: 'Van',
-    createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'DEL-004',
-    companyId: 'comp-1',
-    type: 'delivery',
-    direction: 'incoming',
-    locationId: 'loc-1',
-    clientId: 'supplier-1',
-    clientCompanyLogo: 'https://picsum.photos/seed/supplier/100/100',
-    clientCompanyName: 'Phoenix Beverages Ltd',
-    clientAddress: 'Industrial Zone, Phoenix',
-    clientEmail: 'orders@phoenix.mu',
-    clientPhone: '+230 5456 7890',
-    clientNotes: 'Receiving at warehouse dock A',
-    distributorNotes: '',
-    orderTime: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-    expectedDeliveryDateTime: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(),
-    itemCount: 50,
-    totalAmount: 2500.00,
-    trackingNumber: 'TRK-004-2025',
-    deliveryStatus: 'ASSIGNED',
-    paymentStatus: 'UNPAID',
-    assignedStaffId: null,
-    assignedTo: null,
-    transportMode: null,
-    createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'DEL-005',
-    companyId: 'comp-1',
-    type: 'transfer',
-    direction: 'outgoing',
-    locationId: 'loc-1',
-    fromLocation: 'Warehouse A - Port Louis',
-    toLocation: 'Warehouse B - Curepipe',
-    clientCompanyName: 'Internal Transfer',
-    clientAddress: 'Warehouse B, Industrial Zone, Curepipe',
-    clientNotes: 'Stock replenishment',
-    distributorNotes: '',
-    orderTime: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    expectedDeliveryDateTime: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
-    itemCount: 20,
-    totalAmount: 0,
-    deliveryStatus: 'ASSIGNED',
-    paymentStatus: 'PAID',
-    assignedStaffId: 'S003',
-    assignedTo: 'Bob Johnson',
-    transportMode: 'Truck',
-    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'DEL-006',
-    companyId: 'comp-1',
-    type: 'delivery',
-    direction: 'outgoing',
-    locationId: 'loc-2',
-    clientId: 'client-4',
-    clientCompanyLogo: 'https://picsum.photos/seed/freshmart/100/100',
-    clientCompanyName: 'Fresh Mart Central',
-    clientAddress: '321 Market Street, Quatre Bornes',
-    clientEmail: 'supply@freshmart.mu',
-    clientPhone: '+230 5567 8901',
-    clientNotes: 'Urgent - Low stock alert',
-    distributorNotes: 'Express delivery requested',
-    orderTime: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-    expectedDeliveryDateTime: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
-    itemCount: 12,
-    totalAmount: 345.75,
-    trackingNumber: 'TRK-006-2025',
-    deliveryStatus: 'NOT_ASSIGNED',
-    paymentStatus: 'PENDING_CONFIRMATION',
-    assignedStaffId: null,
-    assignedTo: null,
-    transportMode: null,
-    createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
-  }
-];
-
-// ============================================================================
-// MOCK DATABASE - INVOICES (with scope: PARENT vs LOCATION)
-// ============================================================================
-
-const INVOICE_SCOPE = {
-  PARENT: 'PARENT',    // Issued by parent business
-  LOCATION: 'LOCATION' // Issued by independent location
-};
-
-// DUPLICATE REMOVED - using store.invoices instead
-const _invoices_removed = [
-  {
-    id: 'inv-1',
-    businessId: 'comp-1',
-    issuedByScope: INVOICE_SCOPE.PARENT,
-    issuedByLocationId: null,
-    orderId: 'ORD-001',
-    invoiceNumber: 'INV-2025-001',
-    clientName: 'Grocery Mart Ltd',
-    clientEmail: 'orders@grocerymart.mu',
-    amount: 116.97,
-    taxAmount: 17.55,
-    totalAmount: 134.52,
-    status: 'SENT',
-    type: 'invoice',
-    issueDate: '2025-01-15',
-    dueDate: '2025-02-14',
-    items: [
-      { productId: 'PRD-001', description: 'Coca-Cola 0.5L x10', quantity: 3, unitPrice: 25.99, totalPrice: 77.97 },
-      { productId: 'PRD-002', description: 'Fanta Orange 1L x6', quantity: 2, unitPrice: 19.50, totalPrice: 39.00 }
-    ],
-    notes: 'Payment terms: Net 30',
-    createdAt: '2025-01-15T09:00:00Z',
-    updatedAt: '2025-01-15T09:00:00Z'
-  },
-  {
-    id: 'inv-2',
-    businessId: 'comp-1',
-    issuedByScope: INVOICE_SCOPE.LOCATION,
-    issuedByLocationId: 'loc-1',
-    orderId: 'ORD-002',
-    invoiceNumber: 'WHA-2025-001',
-    clientName: 'Super Store Express',
-    clientEmail: 'purchasing@superstore.mu',
-    amount: 450.00,
-    taxAmount: 67.50,
-    totalAmount: 517.50,
-    status: 'PAID',
-    type: 'invoice',
-    issueDate: '2025-01-14',
-    dueDate: '2025-02-13',
-    items: [
-      { productId: 'PRD-004', description: 'Rice Premium 5kg', quantity: 10, unitPrice: 45.00, totalPrice: 450.00 }
-    ],
-    notes: '',
-    createdAt: '2025-01-14T10:00:00Z',
-    updatedAt: '2025-01-14T14:00:00Z'
-  },
-  {
-    id: 'inv-3',
-    businessId: 'comp-1',
-    issuedByScope: INVOICE_SCOPE.LOCATION,
-    issuedByLocationId: 'loc-3',
-    orderId: 'ORD-004',
-    invoiceNumber: 'DIS-2025-001',
-    clientName: 'Fresh Mart Central',
-    clientEmail: 'supply@freshmart.mu',
-    amount: 249.50,
-    taxAmount: 37.43,
-    totalAmount: 286.93,
-    status: 'PAID',
-    type: 'invoice',
-    issueDate: '2025-01-06',
-    dueDate: '2025-02-05',
-    items: [
-      { productId: 'PRD-007', description: 'Fresh Milk 1L', quantity: 50, unitPrice: 4.99, totalPrice: 249.50 }
-    ],
-    notes: '',
-    createdAt: '2025-01-06T08:00:00Z',
-    updatedAt: '2025-01-07T10:00:00Z'
-  }
-];
-
-// DUPLICATE REMOVED - using store.chats instead
-const _chats_removed = [
-  {
-    id: 'chat-1',
-    companyId: 'comp-1',
-    locationId: null,
-    type: 'client',
-    name: '📋 Message Types Showcase',
-    participants: ['user-1', 'demo-1'],
-    lastMessage: {
-      id: 'msg-showcase',
-      content: 'View all chat bubble types here',
-      type: 'text',
-      senderId: 'demo-1',
-      senderName: 'Demo Contact',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-      isRead: false,
-      isOutgoing: false,
-      status: 'delivered'
-    },
-    unreadCount: 10,
-    avatar: 'https://picsum.photos/seed/showcase/40/40',
-    createdAt: '2025-01-15T09:00:00Z',
-    updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'chat-2',
-    companyId: 'comp-1',
-    locationId: null,
-    type: 'client',
-    name: 'Sarah Johnson',
-    participants: ['user-1', 'sarah-1'],
-    lastMessage: {
-      id: 'msg-sarah',
-      content: 'Photo',
-      type: 'photo',
-      senderId: 'sarah-1',
-      senderName: 'Sarah Johnson',
-      timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-      isRead: false,
-      isOutgoing: false,
-      status: 'delivered'
-    },
-    unreadCount: 1,
-    avatar: 'https://picsum.photos/seed/sarah/40/40',
-    createdAt: '2025-01-14T10:00:00Z',
-    updatedAt: new Date(Date.now() - 45 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'chat-3',
-    companyId: 'comp-1',
-    locationId: null,
-    type: 'supplier',
-    name: 'XYZ Suppliers',
-    participants: ['user-1', 'xyz-1'],
-    lastMessage: {
-      id: 'msg-xyz',
-      content: 'New_Products_Catalog.pdf',
-      type: 'pdf',
-      senderId: 'xyz-1',
-      senderName: 'XYZ Suppliers',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      isRead: false,
-      isOutgoing: false,
-      status: 'seen'
-    },
-    unreadCount: 1,
-    avatar: 'https://picsum.photos/seed/xyz/40/40',
-    createdAt: '2025-01-13T14:00:00Z',
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'chat-4',
-    companyId: 'comp-1',
-    locationId: null,
-    type: 'client',
-    name: 'Mike Chen',
-    participants: ['user-1', 'mike-1'],
-    lastMessage: {
-      id: 'msg-mike',
-      content: 'Video call ended (15 min)',
-      type: 'video_call',
-      senderId: 'user-1',
-      senderName: 'You',
-      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-      isRead: true,
-      isOutgoing: true,
-      status: 'delivered'
-    },
-    unreadCount: 0,
-    avatar: 'https://picsum.photos/seed/mike/40/40',
-    createdAt: '2025-01-12T09:00:00Z',
-    updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'chat-5',
-    companyId: 'comp-1',
-    locationId: 'loc-1',
-    type: 'internal',
-    name: 'Warehouse A Team',
-    participants: ['user-1', 'john-1', 'maria-1'],
-    lastMessage: {
-      id: 'msg-warehouse',
-      content: 'Inventory_Report_Jan2025.pdf',
-      type: 'pdf',
-      senderId: 'user-1',
-      senderName: 'You',
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-      isRead: true,
-      isOutgoing: true,
-      status: 'sent'
-    },
-    unreadCount: 0,
-    avatar: null,
-    createdAt: '2025-01-10T08:00:00Z',
-    updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'chat-6',
-    companyId: 'comp-1',
-    locationId: null,
-    type: 'client',
-    name: 'Tech Solutions Inc',
-    participants: ['user-1', 'tech-1'],
-    lastMessage: {
-      id: 'msg-tech',
-      content: 'Invoice #INV-2025-001',
-      type: 'invoice',
-      senderId: 'user-1',
-      senderName: 'You',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      isRead: false,
-      isOutgoing: true,
-      status: 'delivered'
-    },
-    unreadCount: 3,
-    avatar: 'https://picsum.photos/seed/tech/40/40',
-    createdAt: '2025-01-08T11:00:00Z',
-    updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'chat-7',
-    companyId: 'comp-1',
-    locationId: null,
-    type: 'client',
-    name: 'Global Distributors',
-    participants: ['user-1', 'global-1'],
-    lastMessage: {
-      id: 'msg-global',
-      content: 'Voice Note',
-      type: 'voice_note',
-      senderId: 'global-1',
-      senderName: 'Global Distributors',
-      timestamp: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
-      isRead: false,
-      isOutgoing: false,
-      status: 'sent'
-    },
-    unreadCount: 1,
-    avatar: 'https://picsum.photos/seed/global/40/40',
-    createdAt: '2025-01-05T15:00:00Z',
-    updatedAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'chat-8',
-    companyId: 'comp-1',
-    locationId: null,
-    type: 'client',
-    name: 'Premium Foods Ltd',
-    participants: ['user-1', 'premium-1'],
-    lastMessage: {
-      id: 'msg-premium',
-      content: 'Payment completed! Looking forward to our next order.',
-      type: 'text',
-      senderId: 'premium-1',
-      senderName: 'Premium Foods Ltd',
-      timestamp: new Date(Date.now() - 28 * 60 * 60 * 1000).toISOString(),
-      isRead: true,
-      isOutgoing: false,
-      status: 'seen'
-    },
-    unreadCount: 0,
-    avatar: 'https://picsum.photos/seed/premium/40/40',
-    createdAt: '2025-01-03T10:00:00Z',
-    updatedAt: new Date(Date.now() - 28 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'chat-9',
-    companyId: 'comp-1',
-    locationId: 'loc-3',
-    type: 'internal',
-    name: 'Distribution Center Updates',
-    participants: ['user-1', 'alex-1'],
-    lastMessage: {
-      id: 'msg-dist',
-      content: 'Delivery #DEL-001 completed ✓',
-      type: 'delivery',
-      senderId: 'user-1',
-      senderName: 'You',
-      timestamp: new Date(Date.now() - 28 * 60 * 60 * 1000).toISOString(),
-      isRead: true,
-      isOutgoing: true,
-      status: 'seen',
-      deliveryStatus: 'order_done'
-    },
-    unreadCount: 0,
-    avatar: null,
-    createdAt: '2025-01-02T08:00:00Z',
-    updatedAt: new Date(Date.now() - 28 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'chat-10',
-    companyId: 'comp-1',
-    locationId: 'loc-2',
-    type: 'internal',
-    name: 'Logistics Team',
-    participants: ['user-1', 'alex-1', 'maria-1'],
-    lastMessage: {
-      id: 'msg-logistics',
-      content: 'Pickup Location',
-      type: 'location',
-      senderId: 'alex-1',
-      senderName: 'Alex',
-      timestamp: new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString(),
-      isRead: false,
-      isOutgoing: false,
-      status: 'delivered',
-      deliveryStatus: 'order_ongoing'
-    },
-    unreadCount: 2,
-    avatar: null,
-    createdAt: '2025-01-01T09:00:00Z',
-    updatedAt: new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'chat-11',
-    companyId: 'comp-1',
-    locationId: 'loc-1',
-    type: 'internal',
-    name: 'Warehouse B Team',
-    participants: ['user-1', 'maria-1'],
-    lastMessage: {
-      id: 'msg-warehouseb',
-      content: 'New delivery order received',
-      type: 'delivery',
-      senderId: 'user-1',
-      senderName: 'You',
-      timestamp: new Date(Date.now() - 32 * 60 * 60 * 1000).toISOString(),
-      isRead: false,
-      isOutgoing: true,
-      status: 'sent',
-      deliveryStatus: 'new_order_received'
-    },
-    unreadCount: 1,
-    avatar: null,
-    createdAt: '2024-12-28T08:00:00Z',
-    updatedAt: new Date(Date.now() - 32 * 60 * 60 * 1000).toISOString()
-  }
-];
-
-// Mock messages for each chat
-// DUPLICATE REMOVED - using store.messages instead
-const _messages_removed = {
-  'chat-1': [
-    {
-      id: 'msg-1-1',
-      chatId: 'chat-1',
-      type: 'event',
-      event: 'Conversation started',
-      isOutgoing: false,
-      sender: { id: 'system', name: 'System', avatar: '', role: 'system' },
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'msg-1-2',
-      chatId: 'chat-1',
-      type: 'text',
-      text: '📝 TEXT MESSAGE (Incoming)\nThis is a regular text message received from another user.',
-      isOutgoing: false,
-      sender: { id: 'demo-1', name: 'Demo Contact', avatar: 'https://picsum.photos/seed/demo/40/40', role: 'client' },
-      timestamp: new Date(Date.now() - 90 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'msg-1-3',
-      chatId: 'chat-1',
-      type: 'text',
-      text: '📝 TEXT MESSAGE (Outgoing)\nThis is a text message you sent.',
-      isOutgoing: true,
-      sender: { id: 'user-1', name: 'You', avatar: '', role: 'business' },
-      timestamp: new Date(Date.now() - 85 * 60 * 1000).toISOString(),
-      status: 'read'
-    },
-    {
-      id: 'msg-1-4',
-      chatId: 'chat-1',
-      type: 'pdf',
-      fileName: 'Product_Catalog_2025.pdf',
-      isOutgoing: false,
-      sender: { id: 'demo-1', name: 'Demo Contact', avatar: 'https://picsum.photos/seed/demo/40/40', role: 'client' },
-      timestamp: new Date(Date.now() - 80 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'msg-1-5',
-      chatId: 'chat-1',
-      type: 'order',
-      orderId: 'ORD-NEW-001',
-      itemCount: 5,
-      totalAmount: 150.00,
-      orderStatus: 'New',
-      paymentStatus: 'UNPAID',
-      isOutgoing: false,
-      sender: { id: 'demo-1', name: 'Demo Contact', avatar: 'https://picsum.photos/seed/demo/40/40', role: 'client' },
-      timestamp: new Date(Date.now() - 70 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'msg-1-6',
-      chatId: 'chat-1',
-      type: 'invoice',
-      invoiceId: 'INV-2025-DEMO',
-      isOutgoing: true,
-      sender: { id: 'user-1', name: 'You', avatar: '', role: 'business' },
-      timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-      status: 'delivered'
-    },
-    {
-      id: 'msg-1-7',
-      chatId: 'chat-1',
-      type: 'text',
-      text: 'View all chat bubble types here',
-      isOutgoing: false,
-      sender: { id: 'demo-1', name: 'Demo Contact', avatar: 'https://picsum.photos/seed/demo/40/40', role: 'client' },
-      timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString()
-    }
-  ],
-  'chat-2': [
-    {
-      id: 'msg-2-1',
-      chatId: 'chat-2',
-      type: 'text',
-      text: 'Hi! I wanted to share some photos of the product issue.',
-      isOutgoing: false,
-      sender: { id: 'sarah-1', name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'client' },
-      timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'msg-2-2',
-      chatId: 'chat-2',
-      type: 'image',
-      imageUrl: 'https://picsum.photos/seed/product1/300/200',
-      isOutgoing: false,
-      sender: { id: 'sarah-1', name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'client' },
-      timestamp: new Date(Date.now() - 55 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'msg-2-3',
-      chatId: 'chat-2',
-      type: 'text',
-      text: 'The packaging was damaged. Can we get a replacement?',
-      isOutgoing: false,
-      sender: { id: 'sarah-1', name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'client' },
-      timestamp: new Date(Date.now() - 50 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'msg-2-4',
-      chatId: 'chat-2',
-      type: 'text',
-      text: "I apologize for the inconvenience. We'll send a replacement immediately.",
-      isOutgoing: true,
-      sender: { id: 'user-1', name: 'You', avatar: '', role: 'business' },
-      timestamp: new Date(Date.now() - 47 * 60 * 1000).toISOString(),
-      status: 'read'
-    },
-    {
-      id: 'msg-2-5',
-      chatId: 'chat-2',
-      type: 'image',
-      imageUrl: 'https://picsum.photos/seed/product2/300/200',
-      isOutgoing: false,
-      sender: { id: 'sarah-1', name: 'Sarah Johnson', avatar: 'https://picsum.photos/seed/sarah/40/40', role: 'client' },
-      timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString()
-    }
-  ],
-  'chat-3': [
-    {
-      id: 'msg-3-1',
-      chatId: 'chat-3',
-      type: 'text',
-      text: 'Hi! We have new products available for order.',
-      isOutgoing: false,
-      sender: { id: 'xyz-1', name: 'XYZ Suppliers', avatar: 'https://picsum.photos/seed/xyz/40/40', role: 'supplier' },
-      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'msg-3-2',
-      chatId: 'chat-3',
-      type: 'pdf',
-      fileName: 'New_Products_Catalog.pdf',
-      isOutgoing: false,
-      sender: { id: 'xyz-1', name: 'XYZ Suppliers', avatar: 'https://picsum.photos/seed/xyz/40/40', role: 'supplier' },
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-    }
-  ]
-};
-
-// ============================================================================
-// MOCK DATABASE - USERS
-// ============================================================================
-
-// DUPLICATE REMOVED - using store.users instead
-const _users_removed = [
-  {
-    id: 'user-1',
-    email: 'admin@noupro.com',
-    name: 'Admin User',
-    avatar: 'https://picsum.photos/seed/admin/100/100',
-    phone: '+230-5123-4567',
-    createdAt: '2024-01-01T00:00:00Z',
-    lastLoginAt: '2025-01-15T08:00:00Z'
-  },
-  {
-    id: 'user-2',
-    email: 'manager@noupro.com',
-    name: 'Marie Manager',
-    avatar: 'https://picsum.photos/seed/marie/100/100',
-    phone: '+230-5234-5678',
-    createdAt: '2024-03-01T00:00:00Z',
-    lastLoginAt: '2025-01-14T09:00:00Z'
-  },
-  {
-    id: 'user-3',
-    email: 'owner@globalsupply.mu',
-    name: 'Global Owner',
-    avatar: 'https://picsum.photos/seed/global/100/100',
-    phone: '+230-5345-6789',
-    createdAt: '2024-01-01T00:00:00Z',
-    lastLoginAt: '2025-01-15T07:00:00Z'
-  },
-  {
-    id: 'user-4',
-    email: 'driver@noupro.com',
-    name: 'John Driver',
-    avatar: 'https://picsum.photos/seed/driver/100/100',
-    phone: '+230-5456-7890',
-    createdAt: '2024-06-01T00:00:00Z',
-    lastLoginAt: '2025-01-15T06:00:00Z'
-  }
-];
-
-// Feed posts (3 types: brand_presentation, company_presentation, new_products)
-// Using real brand logos where possible
-// DUPLICATE REMOVED - using store.feedPosts instead
-const _feedPosts_removed = [
-  {
-    id: 'post-1',
-    type: 'brand_presentation',
-    timestamp: '2h ago',
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    data: {
-      brandId: 'brand-001',
-      brandName: 'Tropicana',
-      brandLogo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Tropicana_Logo.svg/512px-Tropicana_Logo.svg.png',
-      distributorName: 'NouPro Distribution',
-      distributorId: 'comp-1',
-      products: [
-        { id: 'prod-1', name: 'Premium Orange Juice', unit: '1L', price: 125.00, image: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=400', isNew: true },
-        { id: 'prod-2', name: 'Tropical Mango Smoothie', unit: '500ml', price: 145.00, image: 'https://images.unsplash.com/photo-1623065422902-30a2d299bbe4?w=400', isNew: false },
-        { id: 'prod-3', name: 'Coconut Water', unit: '500ml', price: 85.00, image: 'https://images.unsplash.com/photo-1536304929831-ee1ca9d44906?w=400', isNew: false },
-        { id: 'prod-4', name: 'Passion Fruit Nectar', unit: '750ml', price: 110.00, image: 'https://images.unsplash.com/photo-1546173159-315724a31696?w=400', isNew: true },
-      ],
-    },
-  },
-  {
-    id: 'post-2',
-    type: 'company_presentation',
-    timestamp: '4h ago',
-    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-    data: {
-      companyId: 'comp-2',
-      companyName: 'Phoenix Beverages',
-      companyLogo: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/Phoenix_Beverages_Limited_logo.svg/512px-Phoenix_Beverages_Limited_logo.svg.png',
-      location: 'Port Louis, Mauritius',
-      isConnected: false,
-      brands: [
-        { id: 'brand-101', name: 'Phoenix Beer', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/Phoenix_Beverages_Limited_logo.svg/200px-Phoenix_Beverages_Limited_logo.svg.png', productsCount: 24 },
-        { id: 'brand-102', name: 'Coca-Cola', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/512px-Coca-Cola_logo.svg.png', productsCount: 18 },
-        { id: 'brand-103', name: 'Schweppes', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Schweppes_logo.svg/512px-Schweppes_logo.svg.png', productsCount: 32 },
-        { id: 'brand-104', name: 'Sprite', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Sprite_2019.svg/512px-Sprite_2019.svg.png', productsCount: 15 },
-      ],
-    },
-  },
-  {
-    id: 'post-3',
-    type: 'new_products',
-    timestamp: '6h ago',
-    createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-    data: {
-      postType: 'distributor_added',
-      businessId: 'comp-1',
-      businessName: 'Fresh Farms Mauritius',
-      businessLogo: 'https://images.unsplash.com/photo-1560493676-04071c5f467b?w=200',
-      products: [
-        { id: 'new-1', name: 'Organic Honey', unit: '500g', price: 350.00, image: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=400', brandName: 'Bee Natural' },
-        { id: 'new-2', name: 'Fresh Avocados', unit: 'Pack of 4', price: 180.00, image: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=400', brandName: 'Green Valley' },
-        { id: 'new-3', name: 'Premium Coffee Beans', unit: '250g', price: 450.00, image: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400', brandName: 'Island Roast' },
-        { id: 'new-4', name: 'Vanilla Extract', unit: '100ml', price: 275.00, image: 'https://images.unsplash.com/photo-1631207464094-5c88e2c4e7e3?w=400', brandName: 'Pure Essence' },
-      ],
-    },
-  },
-  {
-    id: 'post-4',
-    type: 'brand_presentation',
-    timestamp: '8h ago',
-    createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-    data: {
-      brandId: 'brand-lays',
-      brandName: "Lay's",
-      brandLogo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Lays_brand_logo.png/512px-Lays_brand_logo.png',
-      distributorName: 'Snack Masters Ltd',
-      distributorId: 'comp-3',
-      products: [
-        { id: 'lays-1', name: "Lay's Classic", unit: '150g', price: 85.00, image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400', isNew: false },
-        { id: 'lays-2', name: "Lay's Sour Cream & Onion", unit: '150g', price: 95.00, image: 'https://images.unsplash.com/photo-1621447504864-d8686e12698c?w=400', isNew: true },
-        { id: 'lays-3', name: "Lay's BBQ", unit: '150g', price: 95.00, image: 'https://images.unsplash.com/photo-1600952841320-db92ec4047ca?w=400', isNew: false },
-        { id: 'lays-4', name: "Lay's Salt & Vinegar", unit: '150g', price: 95.00, image: 'https://images.unsplash.com/photo-1613919113640-25732ec5e61f?w=400', isNew: true },
-      ],
-    },
-  },
-  {
-    id: 'post-5',
-    type: 'new_products',
-    timestamp: '12h ago',
-    createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    data: {
-      postType: 'business_received',
-      businessId: 'comp-2',
-      businessName: 'QuickMart Superstore',
-      businessLogo: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=200',
-      products: [
-        { id: 'recv-1', name: 'Sparkling Water', unit: '6-Pack', price: 240.00, image: 'https://images.unsplash.com/photo-1560023907-5f339617ea30?w=400', brandName: 'Perrier' },
-        { id: 'recv-2', name: 'Organic Pasta', unit: '500g', price: 95.00, image: 'https://images.unsplash.com/photo-1551462147-ff29053bfc14?w=400', brandName: 'Barilla' },
-      ],
-    },
-  },
-  {
-    id: 'post-6',
-    type: 'company_presentation',
-    timestamp: '1d ago',
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    data: {
-      companyId: 'comp-3',
-      companyName: 'Innodis Ltd',
-      companyLogo: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200',
-      location: 'Quatre Bornes, Mauritius',
-      isConnected: true,
-      brands: [
-        { id: 'brand-201', name: 'Fairy', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Fairy_logo.svg/512px-Fairy_logo.svg.png', productsCount: 42 },
-        { id: 'brand-202', name: 'Ariel', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Ariel_logo.svg/512px-Ariel_logo.svg.png', productsCount: 28 },
-        { id: 'brand-203', name: 'Tide', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Tide_logo.svg/512px-Tide_logo.svg.png', productsCount: 35 },
-      ],
-    },
-  },
-  {
-    id: 'post-7',
-    type: 'brand_presentation',
-    timestamp: '1d ago',
-    createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
-    data: {
-      brandId: 'brand-schweppes',
-      brandName: 'Schweppes',
-      brandLogo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Schweppes_logo.svg/512px-Schweppes_logo.svg.png',
-      distributorName: 'Phoenix Beverages',
-      distributorId: 'comp-2',
-      products: [
-        { id: 'schw-1', name: 'Schweppes Tonic Water', unit: '1L', price: 75.00, image: 'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?w=400', isNew: false },
-        { id: 'schw-2', name: 'Schweppes Ginger Ale', unit: '1L', price: 75.00, image: 'https://images.unsplash.com/photo-1625772299848-391b6a87d7b3?w=400', isNew: true },
-        { id: 'schw-3', name: 'Schweppes Soda Water', unit: '1L', price: 65.00, image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400', isNew: false },
-      ],
-    },
-  },
-  {
-    id: 'post-8',
-    type: 'company_presentation',
-    timestamp: '2d ago',
-    createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-    data: {
-      companyId: 'comp-4',
-      companyName: 'Snack Masters Ltd',
-      companyLogo: 'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=200',
-      location: 'Ebene, Mauritius',
-      isConnected: false,
-      brands: [
-        { id: 'brand-lays', name: "Lay's", logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Lays_brand_logo.png/512px-Lays_brand_logo.png', productsCount: 18 },
-        { id: 'brand-doritos', name: 'Doritos', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Doritos_logo_%282013%29.svg/512px-Doritos_logo_%282013%29.svg.png', productsCount: 12 },
-        { id: 'brand-pringles', name: 'Pringles', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Pringles.svg/512px-Pringles.svg.png', productsCount: 15 },
-        { id: 'brand-cheetos', name: 'Cheetos', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/ab/Cheetos_Logo.svg/512px-Cheetos_Logo.svg.png', productsCount: 10 },
-      ],
-    },
-  },
-  {
-    id: 'post-9',
-    type: 'brand_presentation',
-    timestamp: '2d ago',
-    createdAt: new Date(Date.now() - 50 * 60 * 60 * 1000).toISOString(),
-    data: {
-      brandId: 'brand-fanta',
-      brandName: 'Fanta',
-      brandLogo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Fanta_logo_%282023%29.svg/512px-Fanta_logo_%282023%29.svg.png',
-      distributorName: 'Phoenix Beverages',
-      distributorId: 'comp-2',
-      products: [
-        { id: 'fanta-1', name: 'Fanta Orange', unit: '1.5L', price: 65.00, image: 'https://images.unsplash.com/photo-1624517452488-04869289c4ca?w=400', isNew: false },
-        { id: 'fanta-2', name: 'Fanta Grape', unit: '1.5L', price: 65.00, image: 'https://images.unsplash.com/photo-1632818924360-68d4994cfdb2?w=400', isNew: true },
-        { id: 'fanta-3', name: 'Fanta Pineapple', unit: '1.5L', price: 65.00, image: 'https://images.unsplash.com/photo-1581636625402-29b2a704ef13?w=400', isNew: false },
-        { id: 'fanta-4', name: 'Fanta Strawberry', unit: '1.5L', price: 65.00, image: 'https://images.unsplash.com/photo-1622766815178-641bef2b4630?w=400', isNew: true },
-      ],
-    },
-  },
-  {
-    id: 'post-10',
-    type: 'new_products',
-    timestamp: '3d ago',
-    createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
-    data: {
-      postType: 'distributor_added',
-      businessId: 'comp-4',
-      businessName: 'Snack Masters Ltd',
-      businessLogo: 'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=200',
-      products: [
-        { id: 'doritos-1', name: 'Doritos Nacho Cheese', unit: '180g', price: 115.00, image: 'https://images.unsplash.com/photo-1600952841320-db92ec4047ca?w=400', brandName: 'Doritos' },
-        { id: 'doritos-2', name: 'Doritos Cool Ranch', unit: '180g', price: 115.00, image: 'https://images.unsplash.com/photo-1621447504864-d8686e12698c?w=400', brandName: 'Doritos' },
-        { id: 'pringles-1', name: 'Pringles Original', unit: '150g', price: 135.00, image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400', brandName: 'Pringles' },
-      ],
-    },
-  },
-];
 
 // Helper functions
 const successResponse = (data, message = 'Success') => ({
@@ -10282,45 +9334,58 @@ app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
   }
 });
 
-// Feed Routes (paginated)
+// Feed Routes (paginated, Prisma-backed)
 app.get('/api/feed', async (req, res) => {
-  const limit = Math.min(parseInt(req.query.limit || '20', 10), 50);
-  const cursor = req.query.cursor; // post id of the last item (optional)
-  const { viewerBusinessId } = req.query;
+  try {
+    const limit = Math.min(parseInt(req.query.limit || '20', 10), 50);
+    const cursor = req.query.cursor; // post id of the last item (optional)
+    const { viewerBusinessId } = req.query;
 
-  let startIndex = 0;
-  if (cursor) {
-    const idx = feedPosts.findIndex(p => p.id === cursor);
-    startIndex = idx >= 0 ? idx + 1 : 0;
+    const allPosts = await prisma.feedPost.findMany({
+      take: limit + 1,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: {
+        id: true,
+        businessId: true,
+        type: true,
+        timestamp: true,
+        data: true,
+        createdAt: true,
+      },
+    });
+
+    const hasMore = allPosts.length > limit;
+    const items = hasMore ? allPosts.slice(0, limit) : allPosts;
+    const nextCursor = hasMore ? items[items.length - 1].id : null;
+
+    // Apply price privacy to embedded products in feed posts
+    const privacyPage = await Promise.all(items.map(async (post) => {
+      if (!post.data?.products || post.data.products.length === 0) return post;
+
+      // Determine the owner business ID for this post's products
+      const ownerBizId = post.data.distributorId || post.data.businessId;
+      if (!ownerBizId) return post;
+
+      // Apply price privacy to each product in the post
+      const privacyProducts = await applyPricePrivacyBatch(
+        post.data.products.map(p => ({ ...p, ownerBusinessId: ownerBizId })),
+        viewerBusinessId || null
+      );
+
+      return { ...post, data: { ...post.data, products: privacyProducts } };
+    }));
+
+    res.json({
+      success: true,
+      data: privacyPage,
+      nextCursor,
+      message: 'Success'
+    });
+  } catch (err) {
+    console.error('[Feed] Error:', err);
+    res.json({ success: true, data: [], nextCursor: null, message: 'Success' });
   }
-
-  const page = feedPosts.slice(startIndex, startIndex + limit);
-  const nextCursor = page.length ? page[page.length - 1].id : null;
-  const hasMore = (startIndex + limit) < feedPosts.length;
-
-  // Apply price privacy to embedded products in feed posts
-  const privacyPage = await Promise.all(page.map(async (post) => {
-    if (!post.data?.products || post.data.products.length === 0) return post;
-
-    // Determine the owner business ID for this post's products
-    const ownerBizId = post.data.distributorId || post.data.businessId;
-    if (!ownerBizId) return post;
-
-    // Apply price privacy to each product in the post
-    const privacyProducts = await applyPricePrivacyBatch(
-      post.data.products.map(p => ({ ...p, ownerBusinessId: ownerBizId })),
-      viewerBusinessId || null
-    );
-
-    return { ...post, data: { ...post.data, products: privacyProducts } };
-  }));
-
-  res.json({
-    success: true,
-    data: privacyPage,
-    nextCursor: hasMore ? nextCursor : null,
-    message: 'Success'
-  });
 });
 
 // Activity Feed - Aggregates invoices, deliveries, orders for business timeline
@@ -11276,129 +10341,106 @@ app.get('/api/products/:productId', async (req, res) => {
 //
 
 // Get public location storefront (products, info) - no auth required
-app.get('/api/public/locations/:locationId', (req, res) => {
-  const location = locations.find(l => l.id === req.params.locationId);
-  
-  if (!location) {
-    return res.status(404).json(errorResponse('Location not found'));
-  }
-  
-  const business = companies.find(c => c.id === location.companyId);
-  if (!business) {
-    return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
-  }
-  
-  // Check effective public status (accounts for subscription tier)
-  if (!isLocationPublicEffective(business, location)) {
-    // Distinguish between "not public" and "plan required"
-    if (location.operatingMode === LOCATION_MODES.INDEPENDENT && location.isPublic) {
-      // Location is marked public but Enterprise plan is required
-      return res.status(403).json({
-        success: false,
-        error: {
-          code: 'PLAN_REQUIRED',
-          message: 'This location\'s public storefront requires an Enterprise subscription.'
-        }
-      });
+app.get('/api/public/locations/:locationId', async (req, res) => {
+  try {
+    const location = await prisma.location.findUnique({ where: { id: req.params.locationId } });
+    if (!location) {
+      return res.status(404).json(errorResponse('Location not found'));
     }
-    // Location is genuinely not public
-    return res.status(404).json(errorResponse('This location does not have a public storefront'));
+
+    const business = await prisma.business.findUnique({ where: { id: location.businessId } });
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    }
+
+    if (!isLocationPublicEffective(business, location)) {
+      if (location.operatingMode === LOCATION_MODES.INDEPENDENT && location.isPublic) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 'PLAN_REQUIRED', message: 'This location\'s public storefront requires an Enterprise subscription.' }
+        });
+      }
+      return res.status(404).json(errorResponse('This location does not have a public storefront'));
+    }
+
+    res.json(successResponse({
+      id: location.id,
+      name: location.name,
+      address: location.address,
+      phone: location.phone,
+      email: location.email,
+      business: { id: business.id, name: business.name, logoUrl: business.logoUrl }
+    }));
+  } catch (err) {
+    return sendError(res, err);
   }
-  
-  // Return public info only (no sensitive business data)
-  res.json(successResponse({
-    id: location.id,
-    name: location.name,
-    address: location.address,
-    phone: location.phone,
-    email: location.email,
-    business: business ? {
-      id: business.id,
-      name: business.name,
-      logoUrl: business.logoUrl
-    } : null
-  }));
 });
 
 // Get products for public storefront - no auth required
 app.get('/api/public/locations/:locationId/products', async (req, res) => {
-  const { viewerBusinessId } = req.query;
-  const location = locations.find(l => l.id === req.params.locationId);
-
-  if (!location) {
-    return res.status(404).json(errorResponse('Location not found'));
-  }
-
-  const business = companies.find(c => c.id === location.companyId);
-  if (!business) {
-    return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
-  }
-
-  // Check effective public status (accounts for subscription tier)
-  if (!isLocationPublicEffective(business, location)) {
-    if (location.operatingMode === LOCATION_MODES.INDEPENDENT && location.isPublic) {
-      return res.status(403).json({
-        success: false,
-        error: {
-          code: 'PLAN_REQUIRED',
-          message: 'This location\'s public storefront requires an Enterprise subscription.'
-        }
-      });
+  try {
+    const { viewerBusinessId } = req.query;
+    const location = await prisma.location.findUnique({ where: { id: req.params.locationId } });
+    if (!location) {
+      return res.status(404).json(errorResponse('Location not found'));
     }
-    return res.status(404).json(errorResponse('This location does not have a public storefront'));
+
+    const business = await prisma.business.findUnique({ where: { id: location.businessId } });
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    }
+
+    if (!isLocationPublicEffective(business, location)) {
+      if (location.operatingMode === LOCATION_MODES.INDEPENDENT && location.isPublic) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 'PLAN_REQUIRED', message: 'This location\'s public storefront requires an Enterprise subscription.' }
+        });
+      }
+      return res.status(404).json(errorResponse('This location does not have a public storefront'));
+    }
+
+    let listedProducts = await prisma.product.findMany({
+      where: { businessId: location.businessId, isListed: true },
+    });
+
+    listedProducts = await applyPricePrivacyBatch(listedProducts, viewerBusinessId || null);
+    res.json(successResponse(listedProducts.map(withProductVisibility)));
+  } catch (err) {
+    return sendError(res, err);
   }
-
-  // Get products from parent business that are listed
-  let locationProducts = products.filter(p =>
-    p.companyId === location.companyId && p.is_listed === true
-  );
-
-  // TODO: Apply location-specific price overrides from locationProducts table
-
-  // Apply price privacy
-  locationProducts = await applyPricePrivacyBatch(locationProducts, viewerBusinessId || null);
-
-  res.json(successResponse(locationProducts.map(withProductVisibility)));
 });
 
 // Create order from public storefront - STUB (not yet implemented)
-// This is reserved for customer-facing order creation
-app.post('/api/public/locations/:locationId/orders', (req, res) => {
-  const location = locations.find(l => l.id === req.params.locationId);
-  
-  if (!location) {
-    return res.status(404).json(errorResponse('Location not found'));
-  }
-  
-  const business = companies.find(c => c.id === location.companyId);
-  if (!business) {
-    return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
-  }
-  
-  // Check effective public status (accounts for subscription tier)
-  if (!isLocationPublicEffective(business, location)) {
-    if (location.operatingMode === LOCATION_MODES.INDEPENDENT && location.isPublic) {
-      return res.status(403).json({
-        success: false,
-        error: {
-          code: 'PLAN_REQUIRED',
-          message: 'This location\'s public storefront requires an Enterprise subscription.'
-        }
-      });
+app.post('/api/public/locations/:locationId/orders', async (req, res) => {
+  try {
+    const location = await prisma.location.findUnique({ where: { id: req.params.locationId } });
+    if (!location) {
+      return res.status(404).json(errorResponse('Location not found'));
     }
-    return res.status(404).json(errorResponse('This location does not accept public orders'));
+
+    const business = await prisma.business.findUnique({ where: { id: location.businessId } });
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    }
+
+    if (!isLocationPublicEffective(business, location)) {
+      if (location.operatingMode === LOCATION_MODES.INDEPENDENT && location.isPublic) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 'PLAN_REQUIRED', message: 'This location\'s public storefront requires an Enterprise subscription.' }
+        });
+      }
+      return res.status(404).json(errorResponse('This location does not accept public orders'));
+    }
+
+    return res.status(501).json(errorResponse(
+      'Public order creation is not yet implemented. Use internal endpoints for now.',
+      'NOT_IMPLEMENTED'
+    ));
+  } catch (err) {
+    return sendError(res, err);
   }
-  
-  // TODO: Implement customer order creation
-  // - Validate customer info from req.body (no x-user-id)
-  // - Rate limit by IP
-  // - CAPTCHA validation
-  // - Create order with customerSource: 'PUBLIC_STOREFRONT'
-  
-  return res.status(501).json(errorResponse(
-    'Public order creation is not yet implemented. Use internal endpoints for now.',
-    'NOT_IMPLEMENTED'
-  ));
 });
 
 // ============================================================================
