@@ -277,10 +277,7 @@ const SUBSCRIPTION_TIERS = {
   ENTERPRISE: 'ENTERPRISE' // Top tier - can have independent locations + public pages
 };
 
-const LOCATION_MODES = {
-  DEPENDENT: 'DEPENDENT',   // Orders created by parent only
-  INDEPENDENT: 'INDEPENDENT' // Can create own orders, has public page
-};
+// LOCATION_MODES is already imported from constants.js (line 117)
 
 // Derive capabilities from subscription tier (centralized logic)
 // RULE: Only ENTERPRISE can have independent locations with public pages
@@ -10622,6 +10619,8 @@ async function sendPushToOfflineParticipants(chatId, senderName, messagePreview,
 }
 
 // Start server (using HTTP server for Socket.IO support)
+// Skip listen when imported for testing (supertest manages its own port)
+if (process.env.NODE_ENV !== 'test') {
 server.listen(PORT, HOST, () => {
   const lanIP = getNetworkIP();
   console.log('');
@@ -10702,4 +10701,8 @@ server.listen(PORT, HOST, () => {
   console.log('    GET  /api/feed');
   console.log('    POST /api/upload');
   console.log('    GET  /api/health');
-}); 
+});
+} // end if (NODE_ENV !== 'test')
+
+// Export app for testing (supertest)
+module.exports = { app };
