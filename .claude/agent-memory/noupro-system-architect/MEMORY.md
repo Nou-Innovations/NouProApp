@@ -1,0 +1,6 @@
+- [Architecture Audit Apr 2026](architecture-audit-apr2026.md) -- Comprehensive audit findings, severity, and remediation plan
+- [Frontend Audit Apr 2026](frontend-audit-apr2026.md) -- Frontend-specific audit: imports, state, components, navigation, API, types, perf
+- [Backend server.js Structure](backend-structure.md) -- Key line ranges and domain sections in the 10.7K-line monolith
+- [Schema Design Notes](schema-design.md) -- Prisma schema findings: JSON columns, missing indexes, naming inconsistencies
+- [Cross-Feature Coupling](cross-feature-coupling.md) -- Frontend feature module coupling map and violations (updated Apr 10 2026)
+- [User Profile](user-profile.md) -- Arnaud's role, preferences, and working style

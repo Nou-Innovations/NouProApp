@@ -288,6 +288,23 @@ const ProductCard: React.FC<ProductCardProps> = ({
               {formatNumber(product.price, 'currency')}
             </Text>
           </View>
+          {/* Supplier pricing row (shown when product has supplierPricing data) */}
+          {(product as any).supplierPricing?.length > 0 && (
+            <View style={[styles.supplierPricingRow, { borderTopColor: appTheme.colors.borderColor }]}>
+              <Icon name="shopping-cart" size={14} color={appTheme.colors.primary} />
+              <Text style={[styles.supplierPricingText, { color: appTheme.colors.primary }]}>
+                {(product as any).supplierPricing[0].supplierName}
+              </Text>
+              <Text style={[styles.supplierPriceValue, { color: appTheme.colors.success }]}>
+                Rs {(product as any).supplierPricing[0].supplierPrice?.toFixed(2)}
+              </Text>
+              {(product as any).supplierPricing.length > 1 && (
+                <Text style={[styles.supplierPricingMore, { color: appTheme.colors.textMuted }]}>
+                  +{(product as any).supplierPricing.length - 1} more
+                </Text>
+              )}
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -444,10 +461,31 @@ const styles = StyleSheet.create({
     borderRadius: 6, 
     marginRight: theme.spacing.sm 
   },
-  statusModalItemText: { 
+  statusModalItemText: {
     fontSize: theme.fontSize.base,
     fontFamily: theme.fonts.primary.medium,
-  }
+  },
+  supplierPricingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    gap: 6,
+  },
+  supplierPricingText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.medium,
+    flex: 1,
+  },
+  supplierPriceValue: {
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.medium,
+  },
+  supplierPricingMore: {
+    fontSize: 12,
+    fontFamily: theme.fonts.primary.regular,
+  },
 });
 
-export default ProductCard; 
+export default React.memo(ProductCard); 

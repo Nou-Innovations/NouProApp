@@ -16,9 +16,10 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
+import { Icon } from '@/shared/utils/icons';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
 import { AppButton } from '@/shared/components/ui/AppButton';
@@ -185,6 +186,21 @@ export function DeliveryDetailClientView({
           onPressProfile={navigateToSupplierProfile}
         />
 
+        {/* Link to Purchase Order (when delivery was auto-created from a PO) */}
+        {delivery.orderId && delivery.distributorNotes?.startsWith('PO:') && (
+          <TouchableOpacity
+            style={[styles.poLinkCard, { backgroundColor: appTheme.colors.cardBackground, borderColor: appTheme.colors.borderColor }]}
+            onPress={() => navigation.navigate('PurchaseOrderDetail', { orderId: delivery.orderId })}
+            activeOpacity={0.7}
+          >
+            <Icon name="document-text" size={20} color={appTheme.colors.primary} />
+            <Text style={[styles.poLinkText, { color: appTheme.colors.text }]}>
+              Purchase Order: {delivery.distributorNotes.replace('PO:', '')}
+            </Text>
+            <Icon name="chevron-forward" size={16} color={appTheme.colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
         {/* Order Details - Read-only */}
         <OrderDetailsSection
           delivery={delivery}
@@ -257,6 +273,21 @@ const styles = StyleSheet.create({
   },
   rejectButton: {
     flex: 1,
+  },
+  poLinkCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 10,
+  },
+  poLinkText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

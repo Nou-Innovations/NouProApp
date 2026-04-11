@@ -438,17 +438,44 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
 
   const validateForm = (): boolean => {
     const newErrors: ValidationError[] = [];
-    
+
     if (!selectedClient) {
       newErrors.push({ field: 'client', message: 'Please select a client' });
     }
-    
+
     if (selectedItems.length === 0) {
       newErrors.push({ field: 'items', message: 'Please add at least one item' });
     }
-    
+
+    // Validate monetary fields are non-negative
+    for (const item of selectedItems) {
+      if (item.unit_price < 0) {
+        newErrors.push({ field: 'items', message: `Price for "${item.product_name}" cannot be negative` });
+        break;
+      }
+      if (item.quantity <= 0) {
+        newErrors.push({ field: 'items', message: `Quantity for "${item.product_name}" must be greater than 0` });
+        break;
+      }
+    }
+    if (globalDiscount < 0) {
+      newErrors.push({ field: 'discount', message: 'Discount cannot be negative' });
+    }
+    if (globalDiscountType === 'percentage' && globalDiscount > 100) {
+      newErrors.push({ field: 'discount', message: 'Discount percentage cannot exceed 100%' });
+    }
+    if (totalTax < 0) {
+      newErrors.push({ field: 'tax', message: 'Tax cannot be negative' });
+    }
+    if (shipping < 0) {
+      newErrors.push({ field: 'shipping', message: 'Shipping cannot be negative' });
+    }
+    if (total < 0) {
+      newErrors.push({ field: 'total', message: 'Total amount cannot be negative' });
+    }
+
     setErrors(newErrors);
-    
+
     if (newErrors.length > 0) {
       const firstError = newErrors[0];
       if (firstError.field === 'client') {
@@ -459,7 +486,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
         scrollViewRef.current?.scrollTo({ y: 200, animated: true });
       }
     }
-    
+
     return newErrors.length === 0;
   };
 

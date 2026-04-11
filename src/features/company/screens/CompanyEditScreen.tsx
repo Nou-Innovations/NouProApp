@@ -95,7 +95,8 @@ const TIME_OPTIONS = generateTimeOptions();
 export default function CompanyEditScreen() {
   const { theme: appTheme } = useTheme();
   const navigation = useNavigation();
-  const { currentCompany, updateBusiness } = useBusinessStore();
+  const currentCompany = useBusinessStore((state) => state.currentCompany);
+  const updateBusiness = useBusinessStore((state) => state.updateBusiness);
 
   // Parse stored phone number into country code + local number
   const rawPhone = currentCompany?.phone || '';

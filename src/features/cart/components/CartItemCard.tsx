@@ -269,4 +269,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CartItemCard; 
+export default React.memo(CartItemCard); 

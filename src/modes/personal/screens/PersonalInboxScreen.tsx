@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AppSearchBar, { AppSearchBarRef } from '@/shared/components/ui/AppSearchBar';
-import FilterBar from '@/features/search/components/FilterBar';
+import FilterBar from '@/shared/components/ui/FilterBar';
 import MessageCard from '@/features/inbox/components/MessageCard';
 import NewChatModalList from '@/features/inbox/components/NewChatModalList';
 import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
@@ -223,6 +223,10 @@ export default function PersonalInboxScreen() {
         onScrollBeginDrag={handleScroll}
         onRefresh={refresh}
         refreshing={refreshing}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={10}
         renderItem={({ item }: { item: Chat }) => (
           <MessageCard
             chatId={item.id}

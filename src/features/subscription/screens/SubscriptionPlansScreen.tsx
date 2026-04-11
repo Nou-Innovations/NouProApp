@@ -23,7 +23,7 @@ import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppButton from '@/shared/components/ui/AppButton';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { API_BASE_URL } from '@/config/env';
+import { patch } from '@/shared/services/api';
 import {
   SubscriptionPlan,
   BillingPeriod,
@@ -257,38 +257,14 @@ export default function SubscriptionPlansScreen() {
       return;
     }
     
-    // Get access token for authentication
-    const accessToken = useProfileStore.getState().accessToken;
-    if (!accessToken) {
-      Alert.alert('Error', 'Please log in again to update your subscription.');
-      return;
-    }
-    
     setIsUpdating(true);
-    
+
     try {
       // Call API to update subscription
-      const response = await fetch(
-        `${API_BASE_URL}/companies/${activeBusiness.id}/subscription`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            subscriptionTier: selectedPlan.toUpperCase(),
-            billingPeriod: billingPeriod, // Already UPPERCASE
-          }),
-        }
-      );
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to update subscription');
-      }
-      
-      const result = await response.json();
+      await patch(`/companies/${activeBusiness.id}/subscription`, {
+        subscriptionTier: selectedPlan.toUpperCase(),
+        billingPeriod: billingPeriod,
+      });
       
       // Update the store with the new subscription data
       useProfileStore.getState().updateUserBusiness(activeBusiness.id, {

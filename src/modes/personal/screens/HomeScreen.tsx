@@ -72,7 +72,6 @@ export default function HomeScreen() {
     refreshing, 
     loadingMore,
     error, 
-    isMockData, 
     hasMore,
     refresh, 
     loadMore 
@@ -338,12 +337,6 @@ export default function HomeScreen() {
               {renderGreeting()}
               {/* Error banner with retry */}
               {renderErrorBanner()}
-              {/* Mock Data Indicator (DEV only) */}
-              {__DEV__ && isMockData && (
-                <View style={[styles.mockDataBanner, { backgroundColor: appTheme.colors.warning }]}>
-                  <Text style={styles.mockDataText}>Using mock data (API unavailable)</Text>
-                </View>
-              )}
             </>
           }
           ListEmptyComponent={renderEmptyFeed}
@@ -358,6 +351,10 @@ export default function HomeScreen() {
           onEndReached={hasMore ? loadMore : undefined}
           onEndReachedThreshold={0.5}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={10}
           contentContainerStyle={styles.listContent}
         />
       )}
@@ -499,18 +496,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontFamily: theme.fonts.primary.bold,
-  },
-  mockDataBanner: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    marginHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    borderRadius: 6,
-  },
-  mockDataText: {
-    color: '#000',
-    fontSize: 12,
-    fontFamily: theme.fonts.primary.medium,
   },
 });

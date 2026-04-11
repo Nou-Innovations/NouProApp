@@ -232,9 +232,9 @@ export interface UIProduct {
 /**
  * Product view types for filter dropdown
  */
-export type ProductViewType = 'All Products' | 'My Products' | 'Imported' | 'Display';
+export type ProductViewType = 'All Products' | 'My Products' | 'Imported' | 'Display' | 'Supplier Pricing';
 
-export const PRODUCT_VIEW_TYPES: ProductViewType[] = ['All Products', 'My Products', 'Imported', 'Display'];
+export const PRODUCT_VIEW_TYPES: ProductViewType[] = ['All Products', 'My Products', 'Imported', 'Display', 'Supplier Pricing'];
 
 export const UI_PRODUCT_STATUSES: (UIProductStatus | 'All')[] = ['All', 'Available', 'Out of Stock', 'In Production', 'Inactive'];
 

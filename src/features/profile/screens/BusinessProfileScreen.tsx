@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
-  View, Text, Image, TouchableOpacity, Dimensions, StyleSheet, Linking, StatusBar, ScrollView, Alert, Share, ActivityIndicator,
+  View, Text, Image, TouchableOpacity, Dimensions, StyleSheet, Linking, StatusBar, ScrollView, Alert, Share,
 } from 'react-native';
-import { mockBrands, mockBusinessAbout } from '@/shared/data/businessProfile';
+import { Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn } from '@/shared/components/ui/Skeleton';
 import { get as apiGet } from '@/shared/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
@@ -78,6 +78,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
   const [business, setBusiness] = useState<any>(null);
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const activeBusinessId = useProfileStore((state) => state.activeBusinessId);
   const activeMode = useProfileStore((state) => state.activeMode);
   const userBusinesses = useProfileStore((state) => state.userBusinesses);
@@ -93,6 +94,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     if (!businessId) return;
     try {
       setLoading(true);
+      setError(null);
       const viewerParam = activeBusinessId ? `?viewerBusinessId=${activeBusinessId}` : '';
       const [bizData, brandsData] = await Promise.all([
         apiGet<any>(`/companies/${businessId}`),
@@ -102,6 +104,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       setBrands(brandsData || []);
     } catch (err) {
       console.error('Failed to load business profile:', err);
+      setError('Failed to load profile');
     } finally {
       setLoading(false);
     }
@@ -113,15 +116,14 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
 
   // Derived about info from API data
   const aboutInfo = useMemo(() => {
-    if (!business) return mockBusinessAbout;
     return {
-      description: business.description || '',
-      website: business.website || '',
-      phone: business.phone || business.locations?.[0]?.phone || '',
-      businessHours: mockBusinessAbout.businessHours, // No business hours in DB yet
-      mapLocation: business.locations?.[0]
+      description: business?.description || '',
+      website: business?.website || '',
+      phone: business?.phone || business?.locations?.[0]?.phone || '',
+      businessHours: mockBusinessHours,
+      mapLocation: business?.locations?.[0]
         ? { latitude: business.locations[0].latitude || -20.232, longitude: business.locations[0].longitude || 57.498 }
-        : mockBusinessAbout.mapLocation,
+        : mockMapLocation,
     };
   }, [business]);
 
@@ -643,12 +645,74 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     );
   };
 
-  // Loading state
-  if (loading || !business) {
+  // Loading state - skeleton that mimics the profile layout
+  if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: appTheme.colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        <ActivityIndicator size="large" color={appTheme.colors.primary} />
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {/* Cover image skeleton */}
+          <Skeleton width={SCREEN_WIDTH} height={COVER_HEIGHT} borderRadius={0} />
+          {/* Profile section skeleton */}
+          <View style={{ paddingHorizontal: 12, paddingTop: 16 }}>
+            <SkeletonCircle size={80} />
+            <Skeleton width="50%" height={24} style={{ marginTop: 12 }} />
+            <Skeleton width="35%" height={16} style={{ marginTop: 8 }} />
+            <Skeleton width="80%" height={14} style={{ marginTop: 16 }} />
+            <Skeleton width="60%" height={14} style={{ marginTop: 6 }} />
+            {/* Stats skeleton */}
+            <SkeletonRow gap={8} style={{ marginTop: 16 }}>
+              <Skeleton width={30} height={16} />
+              <Skeleton width={80} height={14} />
+            </SkeletonRow>
+            {/* Action buttons skeleton */}
+            <SkeletonRow gap={10} style={{ marginTop: 16 }}>
+              <Skeleton width="48%" height={40} borderRadius={8} />
+              <Skeleton width="48%" height={40} borderRadius={8} />
+            </SkeletonRow>
+          </View>
+          {/* Tab bar skeleton */}
+          <SkeletonRow gap={0} style={{ marginTop: 20, paddingHorizontal: 16, justifyContent: 'space-around' }}>
+            <Skeleton width={70} height={14} />
+            <Skeleton width={70} height={14} />
+          </SkeletonRow>
+          {/* Product list skeleton */}
+          <View style={{ paddingTop: 16 }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonRow key={i} gap={12} style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                <Skeleton width={48} height={48} borderRadius={8} />
+                <SkeletonColumn gap={6} style={{ flex: 1 }}>
+                  <Skeleton width="50%" height={16} />
+                  <Skeleton width="30%" height={13} />
+                </SkeletonColumn>
+              </SkeletonRow>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error || !business) {
+    return (
+      <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: insets.top + 10, left: 12, width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="chevron-back" size={24} color={appTheme.colors.text} />
+          </TouchableOpacity>
+          <Icon name="business-outline" size={48} color={appTheme.colors.textMuted} />
+          <Text style={{ fontSize: 16, fontFamily: theme.fonts.primary.medium, color: appTheme.colors.secondary, marginTop: 12 }}>
+            {error || 'Business not found'}
+          </Text>
+          <TouchableOpacity onPress={fetchBusinessData} style={{ marginTop: 16, paddingHorizontal: 16, paddingVertical: 8 }}>
+            <Text style={{ fontSize: 16, fontFamily: theme.fonts.primary.semiBold, color: appTheme.colors.primary }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }

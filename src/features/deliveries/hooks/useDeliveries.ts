@@ -8,7 +8,7 @@
  * - Client-side filtering by status, view type, search
  * - Pull-to-refresh
  * - Count of new deliveries for badge
- * - Fallback to mock data if API fails
+ * - Error handling if API fails
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -35,8 +35,6 @@ interface UseDeliveriesResult {
   refreshing: boolean;
   /** Error message if any */
   error: string | null;
-  /** Whether data came from mock (fallback) */
-  isMockData: boolean;
   /** Current status filter tab */
   statusFilter: DeliveryFilterTab;
   /** Current view type (all/outgoing/incoming/transfers) */
@@ -69,8 +67,9 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
   // Use canonical source: useProfileStore.activeBusiness for company context
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const companyId = activeBusiness?.id || '';
-  // Location data comes from businessStore - persisted across sessions
-  const { currentLocation, setLocation } = useBusinessStore();
+  // Location data comes from businessStore - persisted across sessions (use selectors to avoid full-store re-renders)
+  const currentLocation = useBusinessStore((state) => state.currentLocation);
+  const setLocation = useBusinessStore((state) => state.setLocation);
   
   // selectedLocationId is derived from store's currentLocation (persisted)
   const selectedLocationId = currentLocation?.id || null;
@@ -92,13 +91,11 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
   const loading = store.isLoading;
   const refreshing = store.isRefreshing;
   const error = store.error;
-  const isMockData = store.isMockData;
-  
+
   const setDeliveries = store.setDeliveries;
   const setLoading = store.setLoading;
   const setRefreshing = store.setRefreshing;
   const setError = store.setError;
-  const setIsMockData = store.setIsMockData;
   
   // Filters
   const [statusFilter, setStatusFilter] = useState<DeliveryFilterTab>('all');
@@ -122,12 +119,10 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
         locationId: selectedLocationId || undefined,
       });
       setDeliveries(result);
-      setIsMockData(false);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Failed to load deliveries';
       setError(message);
       setDeliveries([]);
-      setIsMockData(false);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -178,15 +173,8 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
   
   // Update delivery status
   const updateStatus = useCallback(async (deliveryId: string, status: DeliveryStatus) => {
-    if (isMockData) {
-      // Update store for mock data
-      store.updateDeliveryStatus(deliveryId, status);
-      return;
-    }
-    
     try {
       await updateDeliveryStatus(companyId, deliveryId, status);
-      // Update store
       store.updateDeliveryStatus(deliveryId, status);
     } catch (err) {
       if (__DEV__) {
@@ -194,19 +182,12 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
       }
       throw err;
     }
-  }, [companyId, isMockData, store]);
-  
+  }, [companyId, store]);
+
   // Assign delivery
   const assign = useCallback(async (deliveryId: string, staffId: string, staffName: string) => {
-    if (isMockData) {
-      // Update store for mock data
-      store.assignDelivery(deliveryId, staffId, staffName);
-      return;
-    }
-    
     try {
       await assignDelivery(companyId, deliveryId, staffId, staffName);
-      // Update store
       store.assignDelivery(deliveryId, staffId, staffName);
     } catch (err) {
       if (__DEV__) {
@@ -214,7 +195,7 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
       }
       throw err;
     }
-  }, [companyId, isMockData, store]);
+  }, [companyId, store]);
   
   // Refresh function
   const refresh = useCallback(() => fetchDeliveries(true), [fetchDeliveries]);
@@ -232,7 +213,6 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
     loading,
     refreshing,
     error,
-    isMockData,
     statusFilter,
     viewType,
     search,

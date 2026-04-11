@@ -116,6 +116,10 @@ const BrandSelectionScreen: React.FC<Props> = ({ navigation, route }) => {
             data={brands}
             renderItem={renderBrandItem}
             keyExtractor={(item) => item.id}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            initialNumToRender={10}
             contentContainerStyle={styles.listContainer}
             ListEmptyComponent={
               <View style={styles.centered}>

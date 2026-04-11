@@ -29,7 +29,7 @@ import { useNotifications } from '@/shared/context/NotificationContext';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
-import FilterBar from '@/features/search/components/FilterBar';
+import FilterBar from '@/shared/components/ui/FilterBar';
 import { AppModal, ListItemCard, EmptyState, SkeletonListItem } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 import {
@@ -625,6 +625,10 @@ export default function NotificationsScreen() {
           contentContainerStyle={styles.listContent}
           style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={10}
         />
       )}
 

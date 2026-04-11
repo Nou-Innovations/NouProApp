@@ -97,7 +97,7 @@ const MESSAGE_CARD = {
   },
 } as const;
 
-export default function MessageCard({
+function MessageCard({
   chatId,
   userId = chatId,
   avatar,
@@ -365,3 +365,5 @@ const styles = StyleSheet.create({
     marginHorizontal: MESSAGE_CARD.divider.marginHorizontal,
   },
 });
+
+export default React.memo(MessageCard);

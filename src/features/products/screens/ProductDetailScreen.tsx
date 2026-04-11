@@ -51,6 +51,9 @@ import {
   DEFAULT_CURRENCY,
   RelatedProduct,
 } from '@/shared/types/productDetails';
+import { getSuppliersForProduct, type ProductSupplierPricing } from '@/features/procurement/services/procurement.service';
+import SupplierPickerModal from '@/features/procurement/components/SupplierPickerModal';
+import type { Supplier } from '@/shared/types/procurement';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Image must be 3:4 ratio (width:height = 3:4)
@@ -218,6 +221,10 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [sameCompanyProducts, setSameCompanyProducts] = useState<RelatedProduct[]>([]);
   const [sameCategoryProducts, setSameCategoryProducts] = useState<RelatedProduct[]>([]);
 
+  // Supplier pricing (owner mode - for reorder)
+  const [supplierPricingData, setSupplierPricingData] = useState<ProductSupplierPricing[]>([]);
+  const [showSupplierPicker, setShowSupplierPicker] = useState(false);
+
   const scrollViewRef = useRef<ScrollView>(null);
   const imageScrollRef = useRef<ScrollView>(null);
 
@@ -225,6 +232,15 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   useEffect(() => {
     fetchProduct();
   }, [fetchProduct]);
+
+  // Fetch supplier pricing for owner's products
+  useEffect(() => {
+    if (dto?.viewerContext.isOwner && activeCompanyId && productId) {
+      getSuppliersForProduct(activeCompanyId, productId)
+        .then(setSupplierPricingData)
+        .catch(() => setSupplierPricingData([]));
+    }
+  }, [dto?.viewerContext.isOwner, activeCompanyId, productId]);
 
   const mapToRelatedProduct = (p: any): RelatedProduct => ({
     id: p.id,
@@ -385,6 +401,43 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       retailPriceLimit: dto.pricing.retailPriceLimit,
     };
     navigation.navigate('CreateProduct' as never, { product: editData } as never);
+  };
+
+  // Owner action - Reorder from supplier
+  const handleReorder = () => {
+    if (supplierPricingData.length === 0) {
+      Alert.alert(
+        'No Suppliers Linked',
+        'This product has no linked suppliers. Add a supplier first.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Go to Suppliers', onPress: () => (navigation as any).navigate('Suppliers') },
+        ]
+      );
+      return;
+    }
+
+    if (supplierPricingData.length === 1) {
+      // Single supplier — go directly to CreatePurchaseOrder
+      const sp = supplierPricingData[0];
+      (navigation as any).navigate('CreatePurchaseOrder', {
+        supplierId: sp.supplierId,
+        supplierName: sp.supplierName,
+        productId,
+      });
+    } else {
+      // Multiple suppliers — show picker
+      setShowSupplierPicker(true);
+    }
+  };
+
+  const handleSupplierPickForReorder = (supplier: Supplier) => {
+    setShowSupplierPicker(false);
+    (navigation as any).navigate('CreatePurchaseOrder', {
+      supplierId: supplier.id,
+      supplierName: supplier.name,
+      productId,
+    });
   };
 
   // Buyer actions
@@ -747,6 +800,54 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Text style={[styles.detailValue, { color: appTheme.colors.text }]}>{product.supplier}</Text>
                 </View>
               )}
+
+              {/* Supplier Pricing Section */}
+              {supplierPricingData.length > 0 && (
+                <View style={styles.supplierPricingSection}>
+                  <Text style={[styles.supplierPricingSectionTitle, { color: appTheme.colors.text }]}>
+                    Supplier Pricing
+                  </Text>
+                  {supplierPricingData.map((sp, index) => (
+                    <View
+                      key={sp.supplierId}
+                      style={[
+                        styles.supplierPricingCard,
+                        {
+                          backgroundColor: appTheme.colors.surface,
+                          borderBottomColor: index < supplierPricingData.length - 1 ? appTheme.colors.borderColor : 'transparent',
+                          borderBottomWidth: index < supplierPricingData.length - 1 ? 1 : 0,
+                        },
+                      ]}
+                    >
+                      <View style={styles.supplierPricingCardHeader}>
+                        <Text style={[styles.supplierPricingName, { color: appTheme.colors.text }]}>
+                          {sp.supplierName}
+                        </Text>
+                        <Text style={[styles.supplierPricingPrice, { color: appTheme.colors.success }]}>
+                          {formatPrice(sp.supplierPrice, pricing.currency)}/unit
+                        </Text>
+                      </View>
+                      <View style={styles.supplierPricingMeta}>
+                        {sp.minOrderQty && (
+                          <Text style={[styles.supplierPricingMetaText, { color: appTheme.colors.textSecondary }]}>
+                            Min: {sp.minOrderQty}
+                          </Text>
+                        )}
+                        {sp.leadTimeDays && (
+                          <Text style={[styles.supplierPricingMetaText, { color: appTheme.colors.textSecondary }]}>
+                            Lead: {sp.leadTimeDays} days
+                          </Text>
+                        )}
+                        {sp.supplierSKU && (
+                          <Text style={[styles.supplierPricingMetaText, { color: appTheme.colors.textSecondary }]}>
+                            SKU: {sp.supplierSKU}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           )}
 
@@ -870,15 +971,27 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       {showActionBar && (
         <View style={[styles.bottomBar, { backgroundColor: appTheme.colors.cardBackground, borderTopColor: appTheme.colors.borderColor }]}>
           {isProductOwner ? (
-            /* Business Owner Mode: Edit button only */
-            <TouchableOpacity
-              style={[styles.editButton, { backgroundColor: appTheme.colors.primary }]}
-              onPress={handleEdit}
-              activeOpacity={0.8}
-            >
-              <Icon name="create-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.editButtonText}>Edit</Text>
-            </TouchableOpacity>
+            /* Business Owner Mode: Edit + Reorder buttons */
+            <View style={styles.ownerButtonsRow}>
+              <TouchableOpacity
+                style={[styles.editButton, { backgroundColor: appTheme.colors.primary, flex: (availability.isLowStock || availability.isOutOfStock) ? 1 : undefined }]}
+                onPress={handleEdit}
+                activeOpacity={0.8}
+              >
+                <Icon name="create-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.editButtonText}>Edit</Text>
+              </TouchableOpacity>
+              {(availability.isLowStock || availability.isOutOfStock) && (
+                <TouchableOpacity
+                  style={[styles.reorderButton, { backgroundColor: appTheme.colors.warning }]}
+                  onPress={handleReorder}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="refresh" size={20} color="#FFFFFF" />
+                  <Text style={styles.editButtonText}>Reorder</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           ) : isOrdering ? (
             /* Business Buyer Mode: Order flow expanded */
             <View style={styles.orderFlowContainer}>
@@ -943,6 +1056,19 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           )}
         </View>
       )}
+      {/* Supplier Picker Modal for Reorder (when multiple suppliers) */}
+      <SupplierPickerModal
+        visible={showSupplierPicker}
+        onClose={() => setShowSupplierPicker(false)}
+        onSelect={handleSupplierPickForReorder}
+        suppliers={supplierPricingData.map((sp) => ({
+          id: sp.supplierId,
+          name: sp.supplierName,
+          contactName: sp.contactName,
+          email: sp.email,
+          phone: sp.phone,
+        })) as Supplier[]}
+      />
     </View>
   );
 };
@@ -1291,6 +1417,11 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     borderTopWidth: 0.5,
   },
+  // Owner Buttons Row
+  ownerButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   // Owner Edit Button
   editButton: {
     flexDirection: 'row',
@@ -1304,6 +1435,55 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontFamily: theme.fonts.primary.semiBold,
+  },
+  reorderButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  // Supplier Pricing Section (owner detail)
+  supplierPricingSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(0,0,0,0.08)',
+  },
+  supplierPricingSectionTitle: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.semiBold,
+    marginBottom: 12,
+  },
+  supplierPricingCard: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 2,
+  },
+  supplierPricingCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  supplierPricingName: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+    flex: 1,
+  },
+  supplierPricingPrice: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.semiBold,
+  },
+  supplierPricingMeta: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  supplierPricingMetaText: {
+    fontSize: 12,
+    fontFamily: theme.fonts.primary.regular,
   },
   // Buyer Order Button
   orderButton: {

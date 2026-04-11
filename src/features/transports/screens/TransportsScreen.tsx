@@ -500,6 +500,10 @@ export default function TransportsScreen() {
         <FlatList
           data={[1]} // Single item to render sections
           keyExtractor={() => 'sections'}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={10}
           renderItem={() => (
             <View style={styles.sectionsContainer}>
               {/* Active Vehicles Section */}

@@ -37,9 +37,6 @@ export interface DeliveriesState {
   isRefreshing: boolean;
   error: string | null;
   
-  // Track if data is from mock fallback
-  isMockData: boolean;
-  
   // Last fetch timestamp (for staleness checks)
   lastFetchedAt: number | null;
 }
@@ -68,7 +65,6 @@ export interface DeliveriesActions {
   setLoading: (isLoading: boolean) => void;
   setRefreshing: (isRefreshing: boolean) => void;
   setError: (error: string | null) => void;
-  setIsMockData: (isMockData: boolean) => void;
   
   // Reset
   resetDeliveries: () => void;
@@ -84,7 +80,6 @@ const initialState: DeliveriesState = {
   isLoading: true,
   isRefreshing: false,
   error: null,
-  isMockData: false,
   lastFetchedAt: null,
 };
 
@@ -193,7 +188,6 @@ export const useDeliveriesStore = create<DeliveriesState & DeliveriesActions>((s
   setLoading: (isLoading) => set({ isLoading }),
   setRefreshing: (isRefreshing) => set({ isRefreshing }),
   setError: (error) => set({ error }),
-  setIsMockData: (isMockData) => set({ isMockData }),
 
   // ========== Reset ==========
   

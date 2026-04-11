@@ -19,7 +19,7 @@ interface ProfileCardProps {
   isOutgoing: boolean;
 }
 
-export default function ProfileCard({ profileName, profileAvatar, profileType, onPress, isOutgoing }: ProfileCardProps) {
+function ProfileCard({ profileName, profileAvatar, profileType, onPress, isOutgoing }: ProfileCardProps) {
   const { theme: appTheme } = useTheme();
 
   const initials = profileName
@@ -89,3 +89,5 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
+
+export default React.memo(ProfileCard);

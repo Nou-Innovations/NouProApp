@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Alert, Share, ActivityIndicator } from 'react-native';
+import { Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn } from '@/shared/components/ui/Skeleton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -240,13 +241,43 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   };
 
-  // Loading state
+  // Loading state - skeleton that mimics the user profile layout
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
         {renderHeader()}
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={appTheme.colors.primary} />
+        <View style={{ paddingHorizontal: 12, paddingTop: 0 }}>
+          {/* Avatar skeleton */}
+          <SkeletonCircle size={80} />
+          {/* Name */}
+          <Skeleton width="45%" height={24} style={{ marginTop: 12 }} />
+          {/* Job title */}
+          <Skeleton width="30%" height={16} style={{ marginTop: 8 }} />
+          {/* Description */}
+          <Skeleton width="90%" height={14} style={{ marginTop: 16 }} />
+          <Skeleton width="70%" height={14} style={{ marginTop: 6 }} />
+          {/* Connections */}
+          <SkeletonRow gap={8} style={{ marginTop: 16 }}>
+            <Skeleton width={30} height={16} />
+            <Skeleton width={80} height={14} />
+          </SkeletonRow>
+          {/* Action buttons */}
+          <SkeletonRow gap={10} style={{ marginTop: 16 }}>
+            <Skeleton width="48%" height={40} borderRadius={8} />
+            <Skeleton width="48%" height={40} borderRadius={8} />
+          </SkeletonRow>
+          {/* Experience section */}
+          <Skeleton width="30%" height={18} style={{ marginTop: 24 }} />
+          {Array.from({ length: 2 }).map((_, i) => (
+            <SkeletonRow key={i} gap={12} style={{ paddingVertical: 12 }}>
+              <Skeleton width={48} height={48} borderRadius={8} />
+              <SkeletonColumn gap={5} style={{ flex: 1 }}>
+                <Skeleton width="50%" height={16} />
+                <Skeleton width="35%" height={13} />
+                <Skeleton width="25%" height={12} />
+              </SkeletonColumn>
+            </SkeletonRow>
+          ))}
         </View>
       </SafeAreaView>
     );

@@ -21,7 +21,7 @@ type OrderOptionCardProps = {
   badge?: number;
 };
 
-export default function OrderOptionCard({
+function OrderOptionCard({
   type,
   title,
   description,
@@ -100,4 +100,6 @@ export default function OrderOptionCard({
       </View>
     </TouchableOpacity>
   );
-} 
+}
+
+export default React.memo(OrderOptionCard);

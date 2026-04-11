@@ -74,23 +74,31 @@ export default function EmailVerificationScreen({ navigation, route }: Props) {
   };
 
   const handleResendCode = async () => {
-    // Simulate resending code
-    Alert.alert(
-      'Code Sent',
-      `A new verification code has been sent to ${userData.email}`,
-      [{ text: 'OK' }]
-    );
+    try {
+      await authAPI.sendEmailOTP(userData.email!);
+      Alert.alert(
+        'Code Sent',
+        `A new verification code has been sent to ${userData.email}`,
+        [{ text: 'OK' }]
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to resend code. Please try again.');
+    }
     setError('');
     setCode('');
     setCodeInputKey(prev => prev + 1);
   };
 
-  const handleSendOnMessage = () => {
-    // Navigate to phone verification
-    navigation.replace('PhoneVerification', {
-      userData,
-      verificationMethod: 'phone',
-    });
+  const handleSendOnMessage = async () => {
+    try {
+      await authAPI.sendPhoneOTP(userData.phone, userData.countryCode);
+      navigation.replace('PhoneVerification', {
+        userData,
+        verificationMethod: 'phone',
+      });
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to send SMS code. Please try again.');
+    }
   };
 
   return (

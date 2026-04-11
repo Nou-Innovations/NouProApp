@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -9,8 +9,9 @@ import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { mockBrands } from '@/shared/data/businessProfile';
-import { formatCurrency } from '@/shared/data/mockOrders';
+import { formatCurrency } from '@/shared/utils/format';
+import { getProducts } from '@/features/products/products.service';
+import { useProfileStore } from '@/shared/store/profileStore';
 
 // Product type for selection
 interface SelectableProduct {
@@ -29,20 +30,25 @@ const SelectProductsForBrandScreen: React.FC<Props> = ({ navigation, route }) =>
   const [selectedProducts, setSelectedProducts] = useState<SelectableProduct[]>(initialProducts || []);
   const [searchQuery, setSearchQuery] = useState('');
   const { theme: appTheme } = useTheme();
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
 
-  // Get all products from mock data
-  const allProducts = useMemo(() => {
-    return mockBrands.flatMap((brand) => 
-      brand.products.map((product) => ({
-        id: product.id,
-        name: product.name,
-        brandName: brand.name,
-        price: product.price,
-        imageUrl: product.productPicture,
-        unit: product.unit,
-      }))
-    );
-  }, []);
+  // Fetch all products from API
+  const [allProducts, setAllProducts] = useState<SelectableProduct[]>([]);
+
+  useEffect(() => {
+    const companyId = activeBusiness?.id;
+    if (!companyId) return;
+    getProducts({ companyId }).then(products => {
+      setAllProducts(products.map(p => ({
+        id: p.id,
+        name: p.name,
+        brandName: p.brand || '',
+        price: p.price || 0,
+        imageUrl: p.productPicture,
+        unit: p.unit,
+      })));
+    }).catch(() => setAllProducts([]));
+  }, [activeBusiness?.id]);
 
   // Filtered products based on search
   const filteredProducts = useMemo(() => {
@@ -154,6 +160,10 @@ const SelectProductsForBrandScreen: React.FC<Props> = ({ navigation, route }) =>
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={renderEmptyState}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={10}
         />
 
         {/* Bottom Buttons */}

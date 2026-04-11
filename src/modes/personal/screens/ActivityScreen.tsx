@@ -22,7 +22,7 @@ import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { get } from '@/shared/services/api';
 import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
-import FilterBar from '@/features/search/components/FilterBar';
+import FilterBar from '@/shared/components/ui/FilterBar';
 import TaskCard, { TaskStatus } from '@/features/tasks/components/TaskCard';
 import { EmptyState, Skeleton, SkeletonRow, SkeletonListItem } from '@/shared/components/ui';
 import type { RootStackParamList } from '@/shared/types/navigation';

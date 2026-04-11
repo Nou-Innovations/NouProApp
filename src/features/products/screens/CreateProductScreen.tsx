@@ -18,7 +18,7 @@ import ImagePlaceholder from '@/shared/components/ui/ImagePlaceholder';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
-import PaywallModal from '@/features/subscription/components/PaywallModal';
+import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { checkPaywall, getLimitTriggerId, PaywallCheck } from '@/shared/utils/permissions';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { createProduct, updateProduct, getProducts } from '../products.service';

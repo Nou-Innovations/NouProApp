@@ -1,0 +1,4 @@
+- [Subscription Schema](subscription_schema.md) -- Prisma models, tiers, billing period, capabilities function
+- [Backend Enforcement](backend_enforcement.md) -- Which endpoints have plan checks, which are missing
+- [Frontend Gating](frontend_gating.md) -- PaywallModal usage, permissions utility, usePermissions hook
+- [Audit Findings 2026-04-10](audit_findings_2026_04_10.md) -- First comprehensive audit results

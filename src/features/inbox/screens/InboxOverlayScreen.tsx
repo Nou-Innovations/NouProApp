@@ -20,7 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AppSearchBar, { AppSearchBarRef } from '@/shared/components/ui/AppSearchBar';
-import FilterBar from '@/features/search/components/FilterBar';
+import FilterBar from '@/shared/components/ui/FilterBar';
 import MessageCard from '@/features/inbox/components/MessageCard';
 import NewChatModalList from '@/features/inbox/components/NewChatModalList';
 import { SecondaryHeader } from '@/shared/components/layout/headers';

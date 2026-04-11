@@ -33,7 +33,7 @@ import { getCapabilities } from '@/shared/auth/capabilities';
 import { hasPricePrivacy, checkPaywall, PaywallCheck } from '@/shared/utils/permissions';
 import BusinessAdminGuard from '@/shared/guards/BusinessAdminGuard';
 import AppButton from '@/shared/components/ui/AppButton';
-import PaywallModal from '@/features/subscription/components/PaywallModal';
+import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { patch } from '@/shared/services/api';
 import theme from '@/shared/theme';
@@ -88,7 +88,7 @@ const SettingsOption: React.FC<SettingsOptionProps> = ({
 export default function CompanySettingsScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
-  const { currentCompany } = useBusinessStore();
+  const currentCompany = useBusinessStore((state) => state.currentCompany);
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const removeUserBusiness = useProfileStore((state) => state.removeUserBusiness);

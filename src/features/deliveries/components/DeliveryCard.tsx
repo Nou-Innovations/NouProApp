@@ -265,4 +265,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default DeliveryCard; 
+export default React.memo(DeliveryCard); 

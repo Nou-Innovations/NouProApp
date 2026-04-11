@@ -10,7 +10,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { OrderWithItems } from '@/shared/types/order';
 import type { OrderStatus } from '@/shared/constants/orderStatus';
-import { formatRelativeTime, formatCurrency } from '@/shared/data/mockOrders';
+import { formatRelativeTime, formatCurrency } from '@/shared/utils/format';
 import { ListItemCard, OrderStatusBadge } from '@/shared/components/ui';
 import { Text } from '@/shared/components/ui/Typography';
 
@@ -80,4 +80,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OrderCard;
+export default React.memo(OrderCard);

@@ -56,20 +56,6 @@
           <key>NSIncludesSubdomains</key>
           <true/>
         </dict>
-        <key>192.168.100.136</key>
-        <dict>
-          <key>NSExceptionAllowsInsecureHTTPLoads</key>
-          <true/>
-          <key>NSIncludesSubdomains</key>
-          <false/>
-        </dict>
-        <key>172.20.10.3</key>
-        <dict>
-          <key>NSExceptionAllowsInsecureHTTPLoads</key>
-          <true/>
-          <key>NSIncludesSubdomains</key>
-          <false/>
-        </dict>
       </dict>
     </dict>
     <key>NSCameraUsageDescription</key>

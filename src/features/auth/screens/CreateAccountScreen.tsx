@@ -22,6 +22,7 @@ import { Text } from '@/shared/components/ui/Typography';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import AppButton from '@/shared/components/ui/AppButton';
 import PhoneNumberField from '@/shared/components/ui/PhoneNumberField';
+import { authAPI } from '@/shared/services/api';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'CreateAccount'>;
 
@@ -38,13 +39,14 @@ export default function CreateAccountScreen({ navigation }: Props) {
   const [error, setError] = useState('');
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [isSendingOTP, setIsSendingOTP] = useState(false);
 
   // Check if form is valid
   const isFormValid = firstName.trim() && lastName.trim() && phoneNumber.trim() && email.trim() && acceptedTerms;
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     setHasAttemptedSubmit(true);
-    
+
     if (!isFormValid) {
       setError('Please fill in all required fields');
       return;
@@ -68,16 +70,27 @@ export default function CreateAccountScreen({ navigation }: Props) {
 
     const sanitize = (str: string) => str.replace(/[<>]/g, '').trim();
 
-    // Navigate directly to create password (OTP screens disabled for now)
-    navigation.navigate('CreatePassword', {
-      userData: {
-        firstName: sanitize(firstName),
-        lastName: sanitize(lastName),
-        phone: phoneNumber.replace(/\D/g, ''), // Strip non-digits before sending to backend
-        countryCode,
-        email: email.trim() || undefined,
-      },
-    });
+    const userData = {
+      firstName: sanitize(firstName),
+      lastName: sanitize(lastName),
+      phone: phoneNumber.replace(/\D/g, ''),
+      countryCode,
+      email: email.trim() || undefined,
+    };
+
+    // Send OTP to phone and navigate to verification screen
+    setIsSendingOTP(true);
+    try {
+      await authAPI.sendPhoneOTP(userData.phone, userData.countryCode);
+      navigation.navigate('PhoneVerification', {
+        userData,
+        verificationMethod: 'phone',
+      });
+    } catch (err: any) {
+      setError(err?.message || 'Failed to send verification code. Please try again.');
+    } finally {
+      setIsSendingOTP(false);
+    }
   };
 
   return (
@@ -208,7 +221,8 @@ export default function CreateAccountScreen({ navigation }: Props) {
               title="Continue"
               onPress={handleContinue}
               variant={isFormValid ? 'primary' : 'disabled'}
-              disabled={!isFormValid}
+              disabled={!isFormValid || isSendingOTP}
+              loading={isSendingOTP}
               style={styles.continueButton}
             />
           </View>

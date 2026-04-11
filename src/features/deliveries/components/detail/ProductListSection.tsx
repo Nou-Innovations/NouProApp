@@ -12,7 +12,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import theme from '@/shared/theme';
-import LocationDropdown from '@/features/company/components/LocationDropdown';
+import LocationDropdown from '@/shared/components/ui/LocationDropdown';
 import type { DeliveryItem } from '@/shared/types/delivery';
 
 interface ProductListSectionProps {

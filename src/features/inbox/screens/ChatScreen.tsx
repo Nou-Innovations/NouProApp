@@ -32,6 +32,7 @@ import AppButton from '@/shared/components/ui/AppButton';
 import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
 import ImageViewerModal from '@/shared/components/ui/ImageViewerModal';
 import { ListItemCard } from '@/shared/components/ui/ListItemCard';
+import { Skeleton } from '@/shared/components/ui/Skeleton';
 import {
   sendMessage,
   sendUserMessage,
@@ -170,12 +171,6 @@ export default function ChatScreen() {
   const { typingUsers, handleTyping, stopTyping } = useTypingIndicator(id);
   // Voice recorder
   const { state: voiceState, duration: voiceDuration, recordingUri, startRecording, stopRecording, cancelRecording } = useVoiceRecorder();
-  // Mentions (for group chats)
-  const mentionParticipants = React.useMemo(() =>
-    participants.filter(p => !p.isCurrentUser).map(p => ({ id: p.id, name: p.name, avatar: p.avatar, role: p.role })),
-    [participants]
-  );
-  const { showSuggestions: showMentionSuggestions, suggestions: mentionSuggestionsList, onTextChange: onMentionTextChange, onSelectMention, getMentionedUserIds } = useMentions(mentionParticipants);
   // Network status for offline support
   const { isConnected } = useNetworkStatus();
   // Edit message state
@@ -237,6 +232,13 @@ export default function ChatScreen() {
   // Detect if this is a group chat (3+ participants including "You", or explicitly marked as group)
   // participants.length > 2 means You + 2+ others = group chat
   const isGroupChat = isGroup || partnerType === 'group' || participants.length > 2;
+
+  // Mentions (for group chats)
+  const mentionParticipants = React.useMemo(() =>
+    participants.filter(p => !p.isCurrentUser).map(p => ({ id: p.id, name: p.name, avatar: p.avatar, role: p.role })),
+    [participants]
+  );
+  const { showSuggestions: showMentionSuggestions, suggestions: mentionSuggestionsList, onTextChange: onMentionTextChange, onSelectMention, getMentionedUserIds } = useMentions(mentionParticipants);
 
   // Mark this specific chat as viewed when screen is focused and reduce unread count
   useFocusEffect(
@@ -339,6 +341,10 @@ export default function ChatScreen() {
     
     return (
       <View>
+        {/* Date separator renders BEFORE the message so it appears ABOVE in the inverted list */}
+        {showDateSeparator && dateLabel && (
+          <DateSeparator date={dateLabel} />
+        )}
         <MessageBubble
           message={item}
           onOrderAction={handleOrderAction}
@@ -361,10 +367,6 @@ export default function ChatScreen() {
           showSenderName={showSenderName}
           isGroupChat={isGroupChat}
         />
-        {/* Date separator appears AFTER the message in inverted list (so it shows ABOVE in UI) */}
-        {showDateSeparator && dateLabel && (
-          <DateSeparator date={dateLabel} />
-        )}
       </View>
     );
   };
@@ -1675,8 +1677,21 @@ export default function ChatScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         {loadingMessages && messages.length === 0 ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: appTheme.colors.surface }}>
-            <ActivityIndicator size="large" color={appTheme.colors.primary} />
+          <View style={{ flex: 1, backgroundColor: appTheme.colors.surface, paddingHorizontal: 12, justifyContent: 'flex-end', paddingBottom: 12 }}>
+            {/* Chat skeleton - mimics message bubbles */}
+            {[
+              { align: 'flex-start' as const, width: '55%' as const, height: 44 },
+              { align: 'flex-end' as const, width: '65%' as const, height: 56 },
+              { align: 'flex-start' as const, width: '45%' as const, height: 36 },
+              { align: 'flex-end' as const, width: '50%' as const, height: 44 },
+              { align: 'flex-start' as const, width: '70%' as const, height: 64 },
+              { align: 'flex-end' as const, width: '40%' as const, height: 36 },
+              { align: 'flex-start' as const, width: '60%' as const, height: 44 },
+            ].map((bubble, i) => (
+              <View key={i} style={{ alignSelf: bubble.align, marginBottom: 10 }}>
+                <Skeleton width={bubble.width} height={bubble.height} borderRadius={12} />
+              </View>
+            ))}
           </View>
         ) : (
         <FlatList
@@ -1690,6 +1705,10 @@ export default function ChatScreen() {
           style={{ backgroundColor: appTheme.colors.surface }}
           onEndReached={loadMoreMessages}
           onEndReachedThreshold={0.3}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          initialNumToRender={15}
           ListFooterComponent={
             loadingMore ? (
               <View style={{ paddingVertical: 16, alignItems: 'center' }}>

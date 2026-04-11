@@ -99,4 +99,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default BusinessCard; 
+export default React.memo(BusinessCard); 

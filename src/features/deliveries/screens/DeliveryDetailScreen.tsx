@@ -91,7 +91,7 @@ export default function DeliveryDetailScreen() {
   const currentStaffEntry = useProfileStore((state) => state.currentStaffEntry);
 
   // Fetch delivery data
-  const { delivery, loading, error, isMockData } = useDelivery(deliveryId);
+  const { delivery, loading, error } = useDelivery(deliveryId);
   const actions = useDeliveryActions(deliveryId);
 
   // Accept/Reject callbacks

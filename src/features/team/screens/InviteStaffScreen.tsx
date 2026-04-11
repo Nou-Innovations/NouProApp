@@ -20,7 +20,7 @@ import { useBusinessStore } from '@/shared/store/businessStore';
 import { post, get } from '@/shared/services/api';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { AppSearchBar, Avatar } from '@/shared/components/ui';
-import PaywallModal from '@/features/subscription/components/PaywallModal';
+import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { checkPaywall, getLimitTriggerId, PaywallCheck } from '@/shared/utils/permissions';
 
 interface User {
@@ -34,7 +34,7 @@ export default function InviteStaffScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
-  const { currentLocation } = useBusinessStore();
+  const currentLocation = useBusinessStore((state) => state.currentLocation);
 
   // Email fields - start with one empty email
   const [emails, setEmails] = useState<string[]>(['']);

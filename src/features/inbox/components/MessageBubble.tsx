@@ -1327,5 +1327,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MessageBubble;
+export default React.memo(MessageBubble);
 

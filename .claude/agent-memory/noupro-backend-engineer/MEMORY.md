@@ -1,0 +1,2 @@
+- [Security Audit Patterns](security-audit-2026-04.md) -- Key security findings from backend audit including IDOR, missing auth, mass assignment
+- [Backend Architecture](backend-architecture.md) -- Server.js patterns, repo layer, middleware, naming conventions discovered during audit

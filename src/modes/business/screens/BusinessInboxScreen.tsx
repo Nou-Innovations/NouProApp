@@ -32,7 +32,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import PrimaryHeader from '@/shared/components/layout/headers/PrimaryHeader';
 import AppSearchBar, { AppSearchBarRef } from '@/shared/components/ui/AppSearchBar';
 import AppButton from '@/shared/components/ui/AppButton';
-import FilterBar from '@/features/search/components/FilterBar';
+import FilterBar from '@/shared/components/ui/FilterBar';
 import MessageCard from '@/features/inbox/components/MessageCard';
 import NewChatModalList from '@/features/inbox/components/NewChatModalList';
 import { MessageSquare, Pencil } from '@/shared/utils/icons';
@@ -391,6 +391,7 @@ export default function BusinessInboxScreen() {
                   ...item,
                   onPress: () => handleActivityPress(item),
                 }))}
+                isLoading={loadingActivity}
                 maxItems={4}
                 onSeeAll={() => navigation.navigate('AllActivity' as never)}
               />
@@ -454,6 +455,10 @@ export default function BusinessInboxScreen() {
                 ListEmptyComponent={loadingChats ? renderChatSkeleton : renderEmptyState}
                 onScrollBeginDrag={handleScroll}
                 showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={10}
                 refreshControl={
                   <RefreshControl
                     refreshing={refreshing || localRefreshing}

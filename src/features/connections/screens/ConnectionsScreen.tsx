@@ -93,14 +93,20 @@ export default function ConnectionsScreen() {
         type: 'user' as const,
       }));
 
-      const bizConns: CompanyConnection[] = (bizRes.data || []).map((c: any) => ({
-        id: c.company?.id || c.connectionId,
-        name: c.company?.name || 'Unknown Business',
-        industry: c.company?.industry || undefined,
-        description: c.company?.description || undefined,
-        avatar_url: c.company?.logoUrl || '',
-        type: 'company' as const,
-      }));
+      const bizConns: CompanyConnection[] = (bizRes.data || []).map((c: any) => {
+        // Determine the "other" business in the connection
+        const otherBiz = c.requesterBusinessId === activeBusiness?.id
+          ? c.targetBusiness
+          : c.requesterBusiness;
+        return {
+          id: otherBiz?.id || c.id,
+          name: otherBiz?.name || 'Unknown Business',
+          industry: otherBiz?.industry || undefined,
+          description: otherBiz?.description || undefined,
+          avatar_url: otherBiz?.logoUrl || '',
+          type: 'company' as const,
+        };
+      });
 
       setAllConnections([...userConns, ...bizConns]);
     } catch {
@@ -369,6 +375,10 @@ export default function ConnectionsScreen() {
           showsVerticalScrollIndicator={false}
           onRefresh={fetchConnections}
           refreshing={loading}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={10}
         />
       )}
     </SafeAreaView>

@@ -35,9 +35,9 @@ import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/
 import { Icon } from '@/shared/utils/icons';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
-import { AppButton } from '@/shared/components/ui/AppButton';
-import AssignStaffModal from '@/features/team/components/AssignStaffModal';
-import PaywallModal from '@/features/subscription/components/PaywallModal';
+import AppButton from '@/shared/components/ui/AppButton';
+import AssignStaffModal from '@/shared/components/ui/AssignStaffModal';
+import PaywallModal from '@/shared/components/ui/PaywallModal';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import type { Delivery, DeliveryStatus, PaymentStatus, DeliveryItem, Staff } from '@/shared/types/delivery';
@@ -86,7 +86,7 @@ export function DeliveryDetailSupplierView({
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const { theme: appTheme } = useTheme();
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
-  const { currentLocation } = useBusinessStore();
+  const currentLocation = useBusinessStore((state) => state.currentLocation);
   const actions = useDeliveryActions(delivery.id);
 
   // Animation constants
@@ -266,7 +266,8 @@ export function DeliveryDetailSupplierView({
 
   // Navigate to client profile
   const navigateToClientProfile = () => {
-    navigation.navigate('ViewBusinessProfile', { businessId: delivery.clientId || '1' });
+    if (!delivery.clientId) return;
+    navigation.navigate('ViewBusinessProfile', { businessId: delivery.clientId });
   };
 
   // Staff display text

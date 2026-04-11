@@ -184,4 +184,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default BusinessListCard;
+export default React.memo(BusinessListCard);

@@ -53,6 +53,31 @@ export class ApiError extends Error {
 }
 
 // ============================================================================
+// Paywall Event System
+// ============================================================================
+
+/** Paywall event data emitted when backend returns a PAYWALL error */
+export interface PaywallEvent {
+  triggerId: string;
+  requiredPlan: string;
+  message: string;
+}
+
+type PaywallListener = (event: PaywallEvent) => void;
+
+const paywallListeners = new Set<PaywallListener>();
+
+/** Subscribe to paywall events (e.g., to show PaywallModal reactively) */
+export function onPaywallEvent(listener: PaywallListener): () => void {
+  paywallListeners.add(listener);
+  return () => paywallListeners.delete(listener);
+}
+
+function emitPaywallEvent(event: PaywallEvent) {
+  paywallListeners.forEach(fn => fn(event));
+}
+
+// ============================================================================
 // Client Setup
 // ============================================================================
 
@@ -133,13 +158,14 @@ const createApiClient = (): AxiosInstance => {
               return null;
             } finally {
               isRefreshing = false;
-              refreshPromise = null;
+              // Don't null refreshPromise here — other 401 handlers may still be awaiting it
             }
           })();
         }
 
-        // Wait for the refresh to complete
-        const newToken = await refreshPromise;
+        // Capture ref before awaiting — prevents reading null if finally already ran
+        const pendingRefresh = refreshPromise;
+        const newToken = pendingRefresh ? await pendingRefresh : null;
         if (newToken && error.config) {
           // Retry the original request with the new token
           error.config.headers.Authorization = `Bearer ${newToken}`;
@@ -153,6 +179,19 @@ const createApiClient = (): AxiosInstance => {
           await AsyncStorage.removeItem('noupro_push_token');
         } catch {}
         useProfileStore.getState().logout();
+      }
+
+      // Detect PAYWALL errors and emit event for reactive PaywallModal display
+      if (status === 403) {
+        const errorData = error.response?.data as any;
+        const paywallError = errorData?.error;
+        if (paywallError?.code === 'PAYWALL' && paywallError?.triggerId) {
+          emitPaywallEvent({
+            triggerId: paywallError.triggerId,
+            requiredPlan: paywallError.requiredPlan || 'pro',
+            message: paywallError.message || message,
+          });
+        }
       }
 
       throw new ApiError(message, status, code, error.response?.data);
@@ -401,8 +440,18 @@ export const authAPI = {
     }
   },
 
+  sendPhoneOTP: async (phone: string, countryCode: string): Promise<ApiResponse<{ message: string }>> => {
+    const response = await apiClient.post('/auth/send-phone-otp', { phone, countryCode });
+    return response.data;
+  },
+
   verifyPhoneOTP: async (phone: string, countryCode: string, code: string): Promise<ApiResponse<null>> => {
     const response = await apiClient.post('/auth/verify-phone', { phone, countryCode, code });
+    return response.data;
+  },
+
+  sendEmailOTP: async (email: string): Promise<ApiResponse<{ message: string }>> => {
+    const response = await apiClient.post('/auth/send-email-otp', { email });
     return response.data;
   },
 

@@ -20,6 +20,7 @@ import {
   UpdateUIProductData,
 } from '@/shared/types/product';
 import { getProducts, updateProduct, updateProductStatus, updateProductStock, toggleProductDisplayable, toggleProductListed } from '../products.service';
+import { getProductsWithSupplierPricing } from '@/features/procurement/services/procurement.service';
 import { ApiError } from '@/shared/services/api';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
@@ -61,6 +62,9 @@ const processProductsToBrands = (products: UIProduct[], currentView: ProductView
       if (product.isDisplayable) {
         brandEntry.products.push(product);
       }
+    } else if (currentView === 'Supplier Pricing') {
+      // In Supplier Pricing view, all fetched products already have supplier pricing
+      brandEntry.products.push(product);
     }
   });
 
@@ -97,8 +101,6 @@ interface UseProductsResult {
   refreshing: boolean;
   /** Error message if any */
   error: string | null;
-  /** Whether data came from mock (fallback) */
-  isMockData: boolean;
   /** Current status filter */
   statusFilter: UIProductStatus | 'All';
   /** Current view type */
@@ -138,14 +140,19 @@ export function useProducts(options: UseProductsOptions = {}): UseProductsResult
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isMockData, setIsMockData] = useState(false);
-  
   // Filters
   const [statusFilter, setStatusFilter] = useState<UIProductStatus | 'All'>('All');
   const [viewType, setViewType] = useState<ProductViewType>('All Products');
   const [search, setSearch] = useState('');
   const [expandedBrand, setExpandedBrand] = useState<string | null>(null);
-  
+
+  // Debounce search to avoid API call on every keystroke
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   // Fetch products
   const fetchProducts = useCallback(async (isRefresh = false) => {
     if (!companyId) {
@@ -162,25 +169,30 @@ export function useProducts(options: UseProductsOptions = {}): UseProductsResult
     setError(null);
 
     try {
-      const result = await getProducts({
-        companyId,
-        locationId,
-        status: statusFilter,
-        search,
-        viewType,
-      });
+      let result: UIProduct[];
+      if (viewType === 'Supplier Pricing') {
+        // Fetch products enriched with supplier pricing from procurement endpoint
+        const enriched = await getProductsWithSupplierPricing(companyId!);
+        result = enriched as UIProduct[];
+      } else {
+        result = await getProducts({
+          companyId,
+          locationId,
+          status: statusFilter,
+          search: debouncedSearch,
+          viewType,
+        });
+      }
       setProducts(result);
-      setIsMockData(false);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Failed to load products';
       setError(message);
       setProducts([]);
-      setIsMockData(false);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [companyId, locationId, statusFilter, search, viewType]);
+  }, [companyId, locationId, statusFilter, debouncedSearch, viewType]);
   
   // All brands (processed from products)
   const brands = useMemo(() => {
@@ -230,24 +242,27 @@ export function useProducts(options: UseProductsOptions = {}): UseProductsResult
   // Refresh function
   const refresh = useCallback(() => fetchProducts(true), [fetchProducts]);
 
-  // Track whether initial fetch has happened
+  // Track whether initial fetch has happened and when
   const hasFetchedRef = useRef(false);
+  const lastFetchTimeRef = useRef(0);
 
   // Auto-fetch on mount
   useEffect(() => {
     if (autoFetch) {
       fetchProducts();
       hasFetchedRef.current = true;
+      lastFetchTimeRef.current = Date.now();
     }
   }, [autoFetch, fetchProducts]);
 
-  // Re-fetch when screen regains focus (e.g. coming back from CreateProduct)
+  // Re-fetch when screen regains focus, but only if data is stale (>30s)
   useFocusEffect(
     useCallback(() => {
       // Skip the very first focus (already handled by useEffect above)
       if (!hasFetchedRef.current) return;
-      if (autoFetch) {
+      if (autoFetch && Date.now() - lastFetchTimeRef.current > 30_000) {
         fetchProducts(true);
+        lastFetchTimeRef.current = Date.now();
       }
     }, [autoFetch, fetchProducts])
   );
@@ -259,7 +274,6 @@ export function useProducts(options: UseProductsOptions = {}): UseProductsResult
     loading,
     refreshing,
     error,
-    isMockData,
     statusFilter,
     viewType,
     search,

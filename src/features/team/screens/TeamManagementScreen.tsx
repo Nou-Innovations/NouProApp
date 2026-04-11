@@ -15,7 +15,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { AppSearchBar, StaffCard, StaffMember, StaffRole as StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard, EmptyState } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
-import LocationDropdown from '@/features/company/components/LocationDropdown';
+import LocationDropdown from '@/shared/components/ui/LocationDropdown';
 import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import {
@@ -514,6 +514,10 @@ export default function TeamManagementScreen() {
         <FlatList
           data={[1]} // Single item to render all sections
           keyExtractor={() => 'sections'}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={10}
           renderItem={() => (
             <View style={styles.sectionsContainer}>
               {/* Section 1: Join Requests - Only show if there are requests AND tab allows */}

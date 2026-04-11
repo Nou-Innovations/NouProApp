@@ -29,7 +29,7 @@ import invoicesService, { Invoice, convertEstimateToInvoice, getInvoicePdfUrl, d
 import { formatInvoiceCurrency, InvoiceStatus } from '@/shared/types/invoice';
 import { useProfileStore } from '@/shared/store/profileStore';
 import * as FileSystem from 'expo-file-system';
-import PaywallModal from '@/features/subscription/components/PaywallModal';
+import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { checkPaywall, PaywallCheck, shouldShowNouProBranding } from '@/shared/utils/permissions';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InvoiceDetails'>;

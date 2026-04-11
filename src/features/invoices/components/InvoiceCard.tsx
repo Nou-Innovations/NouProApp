@@ -187,4 +187,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default InvoiceCard; 
+export default React.memo(InvoiceCard); 

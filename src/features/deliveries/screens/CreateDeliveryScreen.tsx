@@ -52,16 +52,15 @@ interface BusinessVehicle {
 const getVehicleStatusColor = (status: VehicleStatus): string => {
   return VEHICLE_STATUS_COLORS[status] || '#9CA3AF';
 };
-import { mockBrands } from '@/shared/data/businessProfile';
-import { formatCurrency } from '@/shared/data/mockOrders';
+import { formatCurrency } from '@/shared/utils/format';
 import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, TimeSelector, ListItemCard } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { canUseAdvancedPermissions } from '@/shared/utils/permissions';
 import { createDelivery } from '@/features/deliveries/deliveries.service';
 import { useDeliveriesStore } from '@/features/deliveries/deliveries.store';
-import AssignStaffModal from '@/features/team/components/AssignStaffModal';
-import PaywallModal from '@/features/subscription/components/PaywallModal';
+import AssignStaffModal from '@/shared/components/ui/AssignStaffModal';
+import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { checkPaywall, PaywallCheck } from '@/shared/utils/permissions';
 import type { DeliveryStaffRole } from '@/shared/types/delivery';
 
@@ -75,14 +74,6 @@ interface SelectedStaffMember {
 
 type CreateDeliveryRouteProp = RouteProp<RootStackParamList, 'CreateDelivery'>;
 
-// Mock clients for delivery
-const mockClients = [
-  { id: 'biz-003', name: 'FreshMart Retailers', type: 'Retailer', address: 'Port Louis, Mauritius' },
-  { id: 'biz-004', name: 'Tech Haven Store', type: 'Electronics', address: 'Curepipe, Mauritius' },
-  { id: 'biz-005', name: 'GreenLife Supermarket', type: 'Supermarket', address: 'Rose Hill, Mauritius' },
-  { id: 'biz-006', name: 'Island Electronics', type: 'Electronics', address: 'Quatre Bornes, Mauritius' },
-  { id: 'biz-010', name: 'Corner Shop Mauritius', type: 'Convenience', address: 'Vacoas, Mauritius' },
-];
 
 // Item type for selection
 interface SelectedItem {
@@ -112,7 +103,8 @@ export default function CreateDeliveryScreen() {
   // Store state
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const currentUser = useProfileStore((state) => state.currentUser);
-  const { locations, currentLocation } = useBusinessStore();
+  const locations = useBusinessStore((state) => state.locations);
+  const currentLocation = useBusinessStore((state) => state.currentLocation);
   
   // Defensive check for locations (with single location logic)
   const safeLocations = Array.isArray(locations) ? locations : [];
@@ -123,7 +115,7 @@ export default function CreateDeliveryScreen() {
   const canEditId = canUseAdvancedPermissions(activeBusiness?.plan || null);
   
   // Form state
-  const [selectedClient, setSelectedClient] = useState<typeof mockClients[0] | null>(null);
+  const [selectedClient, setSelectedClient] = useState<{ id: string; name: string; type: string; address: string } | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<typeof locations[0] | null>(null);
   const [documentId, setDocumentId] = useState(generateId(isTransfer ? 'TRF-' : 'ORD-'));
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
@@ -160,7 +152,7 @@ export default function CreateDeliveryScreen() {
   // Fetched data state
   const [apiProducts, setApiProducts] = useState<any[]>([]);
   const [apiStaff, setApiStaff] = useState<Staff[]>([]);
-  const [apiClients, setApiClients] = useState<typeof mockClients>([]);
+  const [apiClients, setApiClients] = useState<{ id: string; name: string; type: string; address: string }[]>([]);
   const [businessVehicles, setBusinessVehicles] = useState<BusinessVehicle[]>([]);
 
   // Fetch real data on mount
@@ -178,14 +170,7 @@ export default function CreateDeliveryScreen() {
         brandName: p.brand || '',
       })));
     }).catch(() => {
-      // Fallback to mock brands
-      const fallbackProducts = mockBrands.flatMap((brand) =>
-        brand.products.map((product) => ({
-          ...product,
-          brandName: brand.name,
-        }))
-      );
-      setApiProducts(fallbackProducts);
+      setApiProducts([]);
     });
 
     // Fetch team members (staff)
@@ -225,24 +210,16 @@ export default function CreateDeliveryScreen() {
             type: c.role || 'Business',
             address: '',
           }));
-        setApiClients(businessContacts.length > 0 ? businessContacts : mockClients);
+        setApiClients(businessContacts);
       }).catch(() => {
-        setApiClients(mockClients);
+        setApiClients([]);
       });
-    } else {
-      setApiClients(mockClients);
     }
   }, [activeBusiness?.id, currentUser?.id]);
 
-  // Get all products (real API or fallback)
+  // All products from API
   const allProducts = useMemo(() => {
-    if (apiProducts.length > 0) return apiProducts;
-    return mockBrands.flatMap((brand) => 
-      brand.products.map((product) => ({
-        ...product,
-        brandName: brand.name,
-      }))
-    );
+    return apiProducts;
   }, [apiProducts]);
 
   // Filtered products based on search
@@ -258,10 +235,9 @@ export default function CreateDeliveryScreen() {
 
   // Filtered clients based on search
   const filteredClients = useMemo(() => {
-    const clients = apiClients.length > 0 ? apiClients : mockClients;
-    if (!clientSearch) return clients;
+    if (!clientSearch) return apiClients;
     const searchLower = clientSearch.toLowerCase();
-    return clients.filter(
+    return apiClients.filter(
       (client) =>
         client.name.toLowerCase().includes(searchLower) ||
         client.address.toLowerCase().includes(searchLower) ||

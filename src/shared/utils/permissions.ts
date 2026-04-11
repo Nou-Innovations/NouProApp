@@ -531,6 +531,62 @@ export const hasFullAnalytics = (plan: SubscriptionPlan | null): boolean => {
   return PLAN_FEATURES[plan].analytics_full;
 };
 
+// ========== Procurement Permission Checks ==========
+
+/**
+ * Check if user can view procurement (suppliers, POs, PRs)
+ * Admin and Super Admin with paid plan
+ */
+export const canViewProcurement = (
+  role: StaffRole | null,
+  staffRoleType?: StaffRoleType
+): boolean => {
+  return role === 'admin' || role === 'super_admin';
+};
+
+/**
+ * Check if user can manage procurement (create/edit suppliers, POs, PRs)
+ * Admin and Super Admin only
+ */
+export const canManageProcurement = (role: StaffRole | null): boolean => {
+  return role === 'admin' || role === 'super_admin';
+};
+
+/**
+ * Check if user can approve purchase requests
+ * Admin and Super Admin only
+ */
+export const canApproveProcurement = (role: StaffRole | null): boolean => {
+  return role === 'admin' || role === 'super_admin';
+};
+
+/**
+ * Check if plan allows procurement features
+ * Pro+ only
+ */
+export const canCreateProcurementOrders = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return plan === 'pro' || plan === 'business' || plan === 'enterprise';
+};
+
+/**
+ * Check if plan allows goods receipt
+ * Business+ only
+ */
+export const canReceiveGoodsReceipts = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return plan === 'business' || plan === 'enterprise';
+};
+
+/**
+ * Check if plan allows approval workflows
+ * Business+ only
+ */
+export const canUseProcurementApproval = (plan: SubscriptionPlan | null): boolean => {
+  if (!plan) return false;
+  return plan === 'business' || plan === 'enterprise';
+};
+
 // ========== Tab Visibility Checks ==========
 
 /**
@@ -867,6 +923,70 @@ export const PAYWALL_TRIGGERS: PaywallTrigger[] = [
     modalType: 'enterprise_control',
     title: 'Priority support',
     description: 'Get priority support with Enterprise.',
+  },
+
+  // Procurement triggers
+  {
+    id: 'create_procurement',
+    featureKey: 'create_procurement',
+    action: 'procurement.create',
+    requiredPlan: 'pro',
+    appliesTo: ['free'],
+    modalType: 'feature_gate',
+    title: 'Procurement & Suppliers',
+    description: 'Manage suppliers and purchase orders with Pro.',
+  },
+  {
+    id: 'approve_procurement',
+    featureKey: 'approve_procurement',
+    action: 'procurement.approve',
+    requiredPlan: 'business',
+    appliesTo: ['free', 'pro'],
+    modalType: 'feature_gate',
+    title: 'Approval workflows',
+    description: 'Approve purchase requests and manage workflows with Business.',
+  },
+  {
+    id: 'receive_goods',
+    featureKey: 'receive_goods',
+    action: 'procurement.receive',
+    requiredPlan: 'business',
+    appliesTo: ['free', 'pro'],
+    modalType: 'feature_gate',
+    title: 'Goods receipt',
+    description: 'Receive goods and auto-update stock with Business.',
+  },
+  {
+    id: 'supplier_limit_reached_pro',
+    limitKey: 'maxSuppliers',
+    action: 'suppliers.create',
+    requiredPlan: 'business',
+    appliesTo: ['pro'],
+    currentLimit: 5,
+    modalType: 'limit_reached',
+    title: 'Supplier limit reached',
+    description: 'Upgrade to Business to manage up to 20 suppliers.',
+  },
+  {
+    id: 'supplier_limit_reached_business',
+    limitKey: 'maxSuppliers',
+    action: 'suppliers.create',
+    requiredPlan: 'enterprise',
+    appliesTo: ['business'],
+    currentLimit: 20,
+    modalType: 'limit_reached',
+    title: 'Supplier limit reached',
+    description: 'Upgrade to Enterprise for unlimited suppliers.',
+  },
+  {
+    id: 'budget_controls',
+    featureKey: 'budget_controls',
+    action: 'procurement.budget',
+    requiredPlan: 'enterprise',
+    appliesTo: ['free', 'pro', 'business'],
+    modalType: 'enterprise_control',
+    title: 'Budget controls',
+    description: 'Set spending limits and budget controls with Enterprise.',
   },
 ];
 

@@ -39,16 +39,11 @@ import { userAvatarService } from '@/shared/services/userAvatarService';
 import * as SecureStore from 'expo-secure-store';
 import { authAPI } from '@/shared/services/api';
 
-// Dev data
-import { mockUser, mockBusinesses } from '@/dev/seed';
-import { IS_DEV } from '@/config/env';
-
 // Screens - Auth
 import LoginScreen from '@/features/auth/screens/LoginScreen';
 import CreateAccountScreen from '@/features/auth/screens/CreateAccountScreen';
-// OTP screens disabled for now - keeping code but not linking to navigation
-// import PhoneVerificationScreen from '@/features/auth/screens/PhoneVerificationScreen';
-// import EmailVerificationScreen from '@/features/auth/screens/EmailVerificationScreen';
+import PhoneVerificationScreen from '@/features/auth/screens/PhoneVerificationScreen';
+import EmailVerificationScreen from '@/features/auth/screens/EmailVerificationScreen';
 import CreatePasswordScreen from '@/features/auth/screens/CreatePasswordScreen';
 import UploadProfilePictureScreen from '@/features/auth/screens/UploadProfilePictureScreen';
 import ChoosePathScreen from '@/features/auth/screens/ChoosePathScreen';
@@ -93,6 +88,20 @@ import CompanyEditScreen from '@/features/company/screens/CompanyEditScreen';
 // Screens - Deliveries
 import DeliveryDetailScreen from '@/features/deliveries/screens/DeliveryDetailScreen';
 import CreateDeliveryScreen from '@/features/deliveries/screens/CreateDeliveryScreen';
+
+// Screens - Procurement
+import ProcurementDashboardScreen from '@/features/procurement/screens/ProcurementDashboardScreen';
+import SuppliersScreen from '@/features/procurement/screens/SuppliersScreen';
+import AddSupplierScreen from '@/features/procurement/screens/AddSupplierScreen';
+import SupplierDetailScreen from '@/features/procurement/screens/SupplierDetailScreen';
+import SupplierProductsScreen from '@/features/procurement/screens/SupplierProductsScreen';
+import PurchaseRequestsScreen from '@/features/procurement/screens/PurchaseRequestsScreen';
+import CreatePurchaseRequestScreen from '@/features/procurement/screens/CreatePurchaseRequestScreen';
+import PurchaseRequestDetailScreen from '@/features/procurement/screens/PurchaseRequestDetailScreen';
+import PurchaseOrdersScreen from '@/features/procurement/screens/PurchaseOrdersScreen';
+import CreatePurchaseOrderScreen from '@/features/procurement/screens/CreatePurchaseOrderScreen';
+import PurchaseOrderDetailScreen from '@/features/procurement/screens/PurchaseOrderDetailScreen';
+import GoodsReceiptScreen from '@/features/procurement/screens/GoodsReceiptScreen';
 
 // Screens - Notifications
 import NotificationsScreen from '@/features/notifications/screens/NotificationsScreen';
@@ -139,9 +148,6 @@ import ConnectionsScreen from '@/features/connections/screens/ConnectionsScreen'
 
 // Types
 import { RootStackParamList, AuthStackParamList } from '@/shared/types/navigation';
-
-// Dev seed data (only imported in dev mode)
-import { initializeDevData } from '@/dev/seed';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -224,9 +230,8 @@ function AuthNavigator() {
       
       {/* Personal Registration Flow */}
       <AuthStack.Screen name="CreateAccount" component={CreateAccountScreen} />
-      {/* OTP screens disabled for now - code kept but not linked to navigation */}
-      {/* <AuthStack.Screen name="PhoneVerification" component={PhoneVerificationScreen} /> */}
-      {/* <AuthStack.Screen name="EmailVerification" component={EmailVerificationScreen} /> */}
+      <AuthStack.Screen name="PhoneVerification" component={PhoneVerificationScreen} />
+      <AuthStack.Screen name="EmailVerification" component={EmailVerificationScreen} />
       <AuthStack.Screen name="CreatePassword" component={CreatePasswordScreen} />
       <AuthStack.Screen name="UploadProfilePicture" component={UploadProfilePictureScreen} />
       <AuthStack.Screen name="ChoosePath" component={ChoosePathScreen} />
@@ -339,6 +344,20 @@ function AppNavigator() {
         {/* Delivery Screens */}
         <RootStack.Screen name="DeliveryDetail" component={DeliveryDetailScreen} />
         <RootStack.Screen name="CreateDelivery" component={CreateDeliveryScreen} />
+
+        {/* Procurement Screens */}
+        <RootStack.Screen name="ProcurementDashboard" component={ProcurementDashboardScreen} />
+        <RootStack.Screen name="Suppliers" component={SuppliersScreen} />
+        <RootStack.Screen name="AddSupplier" component={AddSupplierScreen} />
+        <RootStack.Screen name="SupplierDetail" component={SupplierDetailScreen} />
+        <RootStack.Screen name="SupplierProducts" component={SupplierProductsScreen} />
+        <RootStack.Screen name="PurchaseRequests" component={PurchaseRequestsScreen} />
+        <RootStack.Screen name="CreatePurchaseRequest" component={CreatePurchaseRequestScreen} />
+        <RootStack.Screen name="PurchaseRequestDetail" component={PurchaseRequestDetailScreen} />
+        <RootStack.Screen name="PurchaseOrders" component={PurchaseOrdersScreen} />
+        <RootStack.Screen name="CreatePurchaseOrder" component={CreatePurchaseOrderScreen} />
+        <RootStack.Screen name="PurchaseOrderDetail" component={PurchaseOrderDetailScreen} />
+        <RootStack.Screen name="GoodsReceipt" component={GoodsReceiptScreen} />
 
         {/* Settings Screens */}
         <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
@@ -464,8 +483,7 @@ function ProfileStoreInitializer({ children }: { children: React.ReactNode }) {
     // TEMPORARILY DISABLED to test real backend login
     // if (!isInitialized && __DEV__) {
     //   console.log('[Dev] Loading mock seed data...');
-    //   initializeDevData(setCurrentUser, setUserBusinesses);
-    // }
+        // }
   }, [isInitialized, setCurrentUser, setUserBusinesses]);
 
   // Restore active business if we were in business mode
@@ -506,18 +524,12 @@ const AppWithTheme = () => {
   const logout = useProfileStore((state) => state.logout);
   const biometricEnabled = useProfileStore((state) => state.biometricEnabled);
   const staySignedIn = useProfileStore((state) => state.staySignedIn);
+  const isRehydrated = useProfileStore((state) => state.isRehydrated);
 
   // Force logout removed - JWT auth is now properly implemented
 
   // Determine if user is signed in
   const isSignedIn = Boolean(accessToken && currentUser);
-
-  // Dev auto-login: skip auth screen in development only (not in preview/production builds)
-  useEffect(() => {
-    if (IS_DEV && !isSignedIn) {
-      login(mockUser, 'dev-token', 'dev-refresh-token', mockBusinesses);
-    }
-  }, []);
 
   // Biometric auto-login: prompt biometric auth on app launch if enabled
   useEffect(() => {
@@ -573,15 +585,25 @@ const AppWithTheme = () => {
         // Initialize user avatar service
         await userAvatarService.initialize();
         
-        // Pre-load fonts (using InterCustom- prefix to avoid iOS CTFontManager conflicts)
-        await Font.loadAsync({
+        // Pre-load fonts individually (skip already-registered fonts to avoid
+        // CTFontManagerError 104 conflicts with expo-dev-menu in dev builds)
+        const fontsToLoad: Record<string, ReturnType<typeof require>> = {
           ...Ionicons.font,
           'InterCustom-Regular': require('./assets/fonts/Inter-Regular.ttf'),
           'InterCustom-Medium': require('./assets/fonts/Inter-Medium.ttf'),
           'InterCustom-SemiBold': require('./assets/fonts/Inter-SemiBold.ttf'),
           'InterCustom-Bold': require('./assets/fonts/Inter-Bold.ttf'),
           'InterCustom-ExtraBold': require('./assets/fonts/Inter-ExtraBold.ttf'),
-        });
+        };
+        for (const [name, source] of Object.entries(fontsToLoad)) {
+          if (!Font.isLoaded(name)) {
+            try {
+              await Font.loadAsync({ [name]: source });
+            } catch {
+              // Font may already be registered natively (e.g. expo-dev-menu) — safe to skip
+            }
+          }
+        }
 
         // Pre-load critical images
         await Asset.loadAsync([
@@ -597,16 +619,17 @@ const AppWithTheme = () => {
     prepare();
   }, []);
 
-  // Hide native splash once resources are ready
+  // Hide native splash once resources AND auth tokens are ready
+  const appReady = resourcesReady && isRehydrated;
   const onLayoutRootView = useCallback(async () => {
-    if (resourcesReady) {
+    if (appReady) {
       try {
         await SplashScreen.hideAsync();
       } catch (e) {
         console.warn('Could not hide splash screen:', e);
       }
     }
-  }, [resourcesReady]);
+  }, [appReady]);
 
   // Watch auth state changes (login / logout / session expiry)
   useEffect(() => {
@@ -619,8 +642,8 @@ const AppWithTheme = () => {
     }
   }, [isSignedIn, currentScreen]);
 
-  // Show nothing while resources load (native splash is visible)
-  if (!resourcesReady) {
+  // Show nothing while resources/auth load (native splash is visible)
+  if (!appReady) {
     return null;
   }
 

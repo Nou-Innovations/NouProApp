@@ -20,8 +20,6 @@ interface UseDeliveryResult {
   loading: boolean;
   /** Error message if any */
   error: string | null;
-  /** Whether data came from mock (fallback) */
-  isMockData: boolean;
   /** Refresh the delivery data from the API */
   refresh: () => Promise<void>;
 }
@@ -40,8 +38,6 @@ export function useDelivery(deliveryId: string): UseDeliveryResult {
   // Show loading only when there's no cached data at all
   const [loading, setLoading] = useState(!storeDelivery);
   const [error, setError] = useState<string | null>(null);
-  const [isMockData, setIsMockData] = useState(false);
-
   const fetchDelivery = useCallback(async (background = false) => {
     if (!companyId) return;
 
@@ -60,7 +56,6 @@ export function useDelivery(deliveryId: string): UseDeliveryResult {
         addDeliveryToStore(result);
       }
 
-      setIsMockData(false);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Failed to load delivery';
       setError(message);
@@ -86,7 +81,6 @@ export function useDelivery(deliveryId: string): UseDeliveryResult {
     delivery: storeDelivery,
     loading,
     error,
-    isMockData,
     refresh: fetchDelivery,
   };
 }

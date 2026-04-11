@@ -36,6 +36,12 @@ const productViewItems = [
     description: 'Show only the brands and products that are visible to other businesses',
     icon: 'eye',
   },
+  {
+    id: 'Supplier Pricing',
+    title: 'Supplier Pricing',
+    description: 'Products with supplier pricing for reordering',
+    icon: 'shopping-cart',
+  },
 ];
 
 export default function ProductActionsModal({

@@ -162,6 +162,10 @@ export default function RoleRequestsScreen() {
           <FlatList
             data={requests}
             keyExtractor={(item) => item.id}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            initialNumToRender={10}
             renderItem={({ item, index }) => (
               <ListItemCard
                 avatar={{

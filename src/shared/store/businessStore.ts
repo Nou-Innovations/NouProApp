@@ -19,7 +19,6 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { get as apiGet, put as apiPut, patch as apiPatch, post as apiPost, del as apiDel } from '@/shared/services/api';
 import { Business, BusinessLocation, UpdateBusinessPayload } from '@/shared/types/business';
-import { updateLocation as updateLocationService } from '@/features/locations/locations.service';
 import { useProfileStore, normalizeBusiness } from '@/shared/store/profileStore';
 
 /**
@@ -310,22 +309,32 @@ export const useBusinessStore = create<BusinessStoreState>()(
   updateLocation: async (businessId: string, locationId: string, data: Partial<LegacyLocation>) => {
     set({ isLoading: true, error: null });
     try {
-      const result = await updateLocationService(locationId, data);
-      // Map service response back to LegacyLocation shape
+      // Map snake_case frontend fields → camelCase backend fields
+      const backendPayload: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(data)) {
+        if (value === undefined) continue;
+        if (key === 'operating_mode') backendPayload.operatingMode = value;
+        else if (key === 'is_public') backendPayload.isPublic = value;
+        else if (key === 'location_type') backendPayload.locationType = value;
+        else if (key === 'is_primary') continue; // not a backend field
+        else backendPayload[key] = value;
+      }
+      const result = await apiPatch<Record<string, any>>(`/locations/${locationId}`, backendPayload);
+      // Map camelCase backend response → LegacyLocation shape
       const updatedLocation: LegacyLocation = {
         id: result.id,
-        companyId: result.business_id,
+        companyId: result.businessId || result.business_id,
         name: result.name,
         address: result.address || '',
         phone: result.phone,
         email: result.email,
-        location_type: result.location_type,
+        location_type: result.locationType || result.location_type,
         latitude: result.latitude,
         longitude: result.longitude,
-        operating_mode: result.operating_mode,
-        is_public: result.is_public,
+        operating_mode: result.operatingMode || result.operating_mode,
+        is_public: result.isPublic ?? result.is_public,
         is_primary: result.is_primary,
-        staff_count: result.staff_count,
+        staff_count: result.staffCount || result.staff_count,
       };
 
       const state = get();

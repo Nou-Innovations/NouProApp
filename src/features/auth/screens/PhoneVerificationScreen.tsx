@@ -84,20 +84,23 @@ export default function PhoneVerificationScreen({ navigation, route }: Props) {
   };
 
   const handleResendCode = async () => {
-    // Simulate resending code
-    Alert.alert(
-      'Code Sent',
-      `A new verification code has been sent to ${maskedPhone}`,
-      [{ text: 'OK' }]
-    );
+    try {
+      await authAPI.sendPhoneOTP(userData.phone, userData.countryCode);
+      Alert.alert(
+        'Code Sent',
+        `A new verification code has been sent to ${maskedPhone}`,
+        [{ text: 'OK' }]
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to resend code. Please try again.');
+    }
     setError('');
     setCode('');
     setCodeInputKey(prev => prev + 1);
   };
 
-  const handleSendOnEmail = () => {
+  const handleSendOnEmail = async () => {
     if (!userData.email) {
-      // No email provided - go back with message
       Alert.alert(
         'Email Required',
         'You need to provide an email address to receive the code via email.',
@@ -112,11 +115,15 @@ export default function PhoneVerificationScreen({ navigation, route }: Props) {
       return;
     }
 
-    // Navigate to email verification
-    navigation.replace('EmailVerification', {
-      userData,
-      verificationMethod: 'email',
-    });
+    try {
+      await authAPI.sendEmailOTP(userData.email);
+      navigation.replace('EmailVerification', {
+        userData,
+        verificationMethod: 'email',
+      });
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to send email code. Please try again.');
+    }
   };
 
   return (

@@ -23,8 +23,6 @@ interface UseInvoicesResult {
   loading: boolean;
   /** Error message if any */
   error: string | null;
-  /** Whether data came from mock (fallback) */
-  isMockData: boolean;
   /** Refetch invoices */
   refetch: () => Promise<void>;
   /** Filter invoices client-side (for search/status) */
@@ -48,8 +46,6 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isMockData, setIsMockData] = useState(false);
-  
   // Get business ID from profile store
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const businessId = activeBusiness?.id;
@@ -74,12 +70,10 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
       // Normalize status and type to lowercase (backend returns UPPERCASE Prisma enums)
       const normalized = normalizeInvoices(data);
       setInvoices(normalized);
-      setIsMockData(false);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Failed to load invoices';
       setError(message);
       setInvoices([]);
-      setIsMockData(false);
     } finally {
       setLoading(false);
     }
@@ -127,7 +121,6 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
     invoices,
     loading,
     error,
-    isMockData,
     refetch: fetchInvoices,
     filteredInvoices,
   };

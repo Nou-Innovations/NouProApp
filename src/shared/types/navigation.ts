@@ -233,6 +233,20 @@ export type RootStackParamList = {
   
   // Business Activity
   AllActivity: undefined;
+
+  // Procurement screens
+  ProcurementDashboard: undefined;
+  Suppliers: undefined;
+  AddSupplier: { supplierBusinessId?: string; supplierId?: string };
+  SupplierDetail: { supplierId: string };
+  SupplierProducts: { supplierId: string; supplierName?: string };
+  PurchaseRequests: undefined;
+  CreatePurchaseRequest: { supplierId?: string; productId?: string; supplierName?: string };
+  PurchaseRequestDetail: { requestId: string };
+  PurchaseOrders: undefined;
+  CreatePurchaseOrder: { purchaseRequestId?: string; supplierId?: string; supplierName?: string; productId?: string };
+  PurchaseOrderDetail: { orderId: string };
+  GoodsReceipt: { purchaseOrderId: string };
   
   // Feedback screens
   FeedbackCategories: undefined;

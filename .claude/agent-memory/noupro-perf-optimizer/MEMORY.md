@@ -1,0 +1,2 @@
+- [Performance Audit Findings](perf-audit-2026-04.md) -- N+1 in notifications/auth/transports/contacts, unbounded queries, FlatList gaps, 80 eager imports, no expo-image
+- [Database Index Gaps](db-index-gaps.md) -- Missing composite indexes on Invoice(businessId,status), PurchaseOrder(businessId,status), BusinessMember(userId,status)

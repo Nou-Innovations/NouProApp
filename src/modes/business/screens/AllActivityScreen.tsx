@@ -44,6 +44,19 @@ const TYPE_CONFIG: Record<string, { icon: string; color: string; label: string }
   product_added: { icon: 'add-circle', color: '#007AFF', label: 'Product' },
   stock_updated: { icon: 'cube', color: '#FF9500', label: 'Stock' },
   message_received: { icon: 'mail', color: '#007AFF', label: 'Message' },
+  // Procurement events
+  purchase_request_created: { icon: 'document-text', color: '#0075FF', label: 'Purchase Request' },
+  purchase_request_submitted: { icon: 'paper-plane', color: '#0075FF', label: 'Purchase Request' },
+  purchase_request_approved: { icon: 'checkmark-circle', color: '#2ACF01', label: 'Purchase Request' },
+  purchase_request_rejected: { icon: 'close-circle', color: '#FF2400', label: 'Purchase Request' },
+  purchase_order_created: { icon: 'cart', color: '#A4AAB8', label: 'Purchase Order' },
+  purchase_order_sent: { icon: 'cart', color: '#0075FF', label: 'Purchase Order' },
+  purchase_order_confirmed: { icon: 'checkmark-circle', color: '#2ACF01', label: 'Purchase Order' },
+  purchase_order_receiving: { icon: 'cube', color: '#FFB600', label: 'Purchase Order' },
+  purchase_order_received: { icon: 'cube', color: '#2ACF01', label: 'Purchase Order' },
+  purchase_order_canceled: { icon: 'close-circle', color: '#FF6B6B', label: 'Purchase Order' },
+  purchase_order_status_changed: { icon: 'cart', color: '#0075FF', label: 'Purchase Order' },
+  goods_received: { icon: 'archive', color: '#A76AF0', label: 'Goods Receipt' },
 };
 
 export default function AllActivityScreen() {
@@ -111,6 +124,12 @@ export default function AllActivityScreen() {
         break;
       case 'product':
         navigation.navigate('ProductDetail', { productId: item.entityId });
+        break;
+      case 'purchase_order':
+        navigation.navigate('PurchaseOrderDetail', { orderId: item.entityId });
+        break;
+      case 'purchase_request':
+        navigation.navigate('PurchaseRequestDetail', { requestId: item.entityId });
         break;
       default:
         break;
@@ -216,6 +235,10 @@ export default function AllActivityScreen() {
           ]}
           style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={10}
         />
       )}
     </SafeAreaView>

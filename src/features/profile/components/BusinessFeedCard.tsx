@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export default BusinessFeedCard;
+export default React.memo(BusinessFeedCard);
 
 
 

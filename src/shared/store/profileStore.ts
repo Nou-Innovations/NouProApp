@@ -47,7 +47,6 @@ import { Business, BusinessStaff, StaffRole, StaffRoleType, UserBusiness } from 
 import { ProfileMode } from '@/shared/types/roles';
 import { SubscriptionPlan, PLAN_FEATURES } from '@/shared/types/subscription';
 import { chatService } from '@/shared/services/chat';
-import { get as apiGet } from '@/shared/services/api';
 
 /**
  * Profile Store State
@@ -90,6 +89,9 @@ interface ProfileState {
   
   // New user flag - true when user just registered, false after first home screen view
   isNewUser: boolean;
+
+  // True once SecureStore tokens have been loaded (prevents API calls before auth is ready)
+  isRehydrated: boolean;
 }
 
 /**
@@ -229,6 +231,7 @@ const initialState: ProfileState = {
   isInitialized: false,
   error: null,
   isNewUser: false,
+  isRehydrated: false,
 };
 
 /**
@@ -340,6 +343,7 @@ export const useProfileStore = create<ProfileStore>()(
         try { require('@/shared/store/index').useAppStore.getState().reset(); } catch {}
         try { require('@/features/inbox/inbox.store').useInboxStore.getState().resetInbox(); } catch {}
         try { require('@/features/deliveries/deliveries.store').useDeliveriesStore.getState().resetDeliveries(); } catch {}
+        try { require('@/features/procurement/store/procurement.store').useProcurementStore.getState().resetProcurement(); } catch {}
 
         set({
           ...initialState,
@@ -503,9 +507,10 @@ export const useProfileStore = create<ProfileStore>()(
        */
       refreshBusinesses: async () => {
         try {
+          const { get: apiGet } = require('@/shared/services/api') as typeof import('@/shared/services/api');
           const response = await apiGet<{ user: any; businesses: UserBusiness[] }>('/auth/me');
           const businesses = response?.businesses ?? [];
-          const normalized = businesses.map(ub => ({
+          const normalized = businesses.map((ub: UserBusiness) => ({
             ...ub,
             business: normalizeBusiness(ub.business),
           }));
@@ -726,6 +731,8 @@ export const useProfileStore = create<ProfileStore>()(
           }
         } catch (err) {
           console.warn('[ProfileStore] Failed to load tokens from SecureStore:', err);
+        } finally {
+          useProfileStore.setState({ isRehydrated: true });
         }
       },
     }
@@ -778,6 +785,11 @@ export const useIsBusinessMode = () => useProfileStore((state) => state.activeMo
  * Check if in personal mode
  */
 export const useIsPersonalMode = () => useProfileStore((state) => state.activeMode === 'personal');
+
+/**
+ * True once SecureStore tokens have been loaded on startup
+ */
+export const useIsRehydrated = () => useProfileStore((state) => state.isRehydrated);
 
 // ========== Helper Functions ==========
 

@@ -104,6 +104,10 @@ const UserSearchScreen = () => {
         data={filteredUsers}
         keyExtractor={(item) => item.id}
         renderItem={renderUserItem}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={10}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>

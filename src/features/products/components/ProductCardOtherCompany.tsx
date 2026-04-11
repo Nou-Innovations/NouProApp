@@ -406,4 +406,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProductCardOtherCompany; 
+export default React.memo(ProductCardOtherCompany); 

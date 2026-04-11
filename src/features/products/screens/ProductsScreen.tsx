@@ -12,13 +12,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
-import FilterBar from '@/features/search/components/FilterBar';
+import FilterBar from '@/shared/components/ui/FilterBar';
 import BrandCard from '@/features/brands/components/BrandCard';
 import ProductCard from '@/features/products/components/ProductCard';
-import LocationDropdown from '@/features/company/components/LocationDropdown';
+import LocationDropdown from '@/shared/components/ui/LocationDropdown';
 import ProductActionsModal from '@/features/products/components/ProductActionsModal';
 import ProductCreateModal from '@/features/products/components/ProductCreateModal';
-import PaywallModal from '@/features/subscription/components/PaywallModal';
+import PaywallModal from '@/shared/components/ui/PaywallModal';
 import AppButton from '@/shared/components/ui/AppButton';
 import IconButton from '@/shared/components/ui/IconButton';
 import { AppModal, AppBottomSheet, ListItemCard } from '@/shared/components/ui';
@@ -55,7 +55,7 @@ const ProductsScreen: React.FC = () => {
   const isAdmin = useProfileStore((state) => state.isAdmin);
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
-  const { currentCompany } = useBusinessStore();
+  const currentCompany = useBusinessStore((state) => state.currentCompany);
   
   // Profile store for RBAC
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
@@ -72,7 +72,6 @@ const ProductsScreen: React.FC = () => {
     loading,
     refreshing,
     error,
-    isMockData,
     statusFilter: selectedStatus,
     viewType: currentViewTitle,
     search: searchTerm,
@@ -376,13 +375,6 @@ const ProductsScreen: React.FC = () => {
         }
         ListHeaderComponent={
           <>
-            {/* Dev mode mock data indicator */}
-            {__DEV__ && isMockData && (
-              <View style={[styles.mockDataBanner, { backgroundColor: '#FEF3C7' }]}>
-                <Text style={{ color: '#92400E', fontSize: 12 }}>Using mock data (API unavailable)</Text>
-              </View>
-            )}
-            
             {/* Loading skeleton */}
             {loading && (
               <View style={{ paddingVertical: 8 }}>
@@ -474,6 +466,10 @@ const ProductsScreen: React.FC = () => {
         }}
         contentContainerStyle={{ flexGrow: 1 }}
         style={{ flex: 1 }}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={10}
         extraData={{ editMode: isEditing, expandedBrand: expandedBrandName, edits: editedProducts, currentView: currentViewTitle }}
       />
 
@@ -629,10 +625,6 @@ const styles = StyleSheet.create({
   },
   categoryChevron: {
     flexDirection: 'row',
-    alignItems: 'center',
-  },
-  mockDataBanner: {
-    padding: 8,
     alignItems: 'center',
   },
   loadingContainer: {

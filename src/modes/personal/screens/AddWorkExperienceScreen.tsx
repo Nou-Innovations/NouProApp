@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,15 +17,8 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { AppModal } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { feedCompanies } from '@/shared/data/businessProfile';
 import Avatar from '@/shared/components/ui/Avatar';
-
-// Convert feedCompanies to an array for easier searching
-const allCompanies = Object.values(feedCompanies).map((company) => ({
-  id: company.id,
-  name: company.name,
-  logo: company.logo,
-}));
+import { get as apiGet } from '@/shared/services/api';
 
 export default function AddWorkExperienceScreen() {
   const navigation = useNavigation();
@@ -46,13 +39,27 @@ export default function AddWorkExperienceScreen() {
 
   const hasChanges = companyName.trim() !== '' || role.trim() !== '';
 
-  // Filter companies based on input
-  const filteredCompanies = useMemo(() => {
-    if (!companyName.trim()) return [];
-    const searchTerm = companyName.toLowerCase();
-    return allCompanies
-      .filter((company) => company.name.toLowerCase().includes(searchTerm))
-      .slice(0, 10);
+  // Search companies from API with debounce
+  const [filteredCompanies, setFilteredCompanies] = useState<{ id: string; name: string; logo: string }[]>([]);
+
+  useEffect(() => {
+    if (!companyName.trim()) {
+      setFilteredCompanies([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const results = await apiGet<any[]>(`/companies/search?q=${encodeURIComponent(companyName.trim())}&limit=10`);
+        setFilteredCompanies((results || []).map(r => ({
+          id: r.id,
+          name: r.name,
+          logo: r.logoUrl || '',
+        })));
+      } catch {
+        setFilteredCompanies([]);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
   }, [companyName]);
 
   const handleCompanyInputChange = (text: string) => {

@@ -18,7 +18,23 @@
       "Bash(python3:*)",
       "Bash(eas:*)",
       "Bash(npm --version:*)",
-      "Bash(node --version:*)"
+      "Bash(node --version:*)",
+      "Bash(npx expo prebuild:*)",
+      "Bash(find:*)",
+      "Bash(for color in \"expoSecondarySystemBackground\" \"expoSecondarySystemGroupedBackground\" \"expoSystemBackground\" \"expoSystemGray4\" \"expoSystemGray5\" \"expoSystemGray6\" \"expoSystemGroupedBackground\")",
+      "Bash(do echo \"=== Searching for: $color ===\" grep -r \"static var $color\\\\|let $color\\\\|var $color.*=\" /Users/arnaudlabonne/NouPro/NouProApp/node_modules --include=\"*.swift\")",
+      "Bash(done)",
+      "Bash(npx create-next-app:*)",
+      "mcp__c1da8898-30fc-4b44-b82c-5aec9288f95f__use_figma",
+      "Bash(node -c server.js)",
+      "Bash(git stash:*)",
+      "Bash(node -c backend/server.js)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(rm -f /Users/arnaudlabonne/Nou/NouPro/NouProApp/.git/index.lock)",
+      "Bash(git commit -m 'Add Phase 1 design spec: Professional Profiles + Tasks:*)",
+      "Bash(npx prisma:*)"
     ]
   }
 }

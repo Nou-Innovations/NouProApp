@@ -12,13 +12,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
-import FilterBar from '@/features/search/components/FilterBar';
+import FilterBar from '@/shared/components/ui/FilterBar';
 import DeliveryCard from '@/features/deliveries/components/DeliveryCard';
-import LocationDropdown from '@/features/company/components/LocationDropdown';
+import LocationDropdown from '@/shared/components/ui/LocationDropdown';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
 import DeliveryActionsModal from '@/features/deliveries/components/DeliveryActionsModal';
 import DeliveryCreateModal from '@/features/deliveries/components/DeliveryCreateModal';
-import PaywallModal from '@/features/subscription/components/PaywallModal';
+import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -34,6 +34,8 @@ import {
 } from '@/shared/utils/permissions';
 import { useDeliveries } from '../hooks/useDeliveries';
 import { Delivery, DeliveryFilterTab, DeliveryViewType } from '@/shared/types/delivery';
+import { useProcurementStore, selectPendingProcurementCount } from '@/features/procurement/store/procurement.store';
+import { canCreateProcurementOrders } from '@/shared/utils/permissions';
 
 // Grouped filter tabs for the delivery filter bar
 const DELIVERY_FILTER_TABS: DeliveryFilterTab[] = [
@@ -65,6 +67,10 @@ export default function DeliveryScreen() {
   const hasManagePermission = canManageDeliveries(currentUserRole);
   const canUpdateStatus = canUpdateDeliveryStatus(currentUserRole, currentStaffRoleType ?? undefined);
   const planAllowsDeliveries = canCreateDeliveries(activeBusiness?.plan || null);
+  const planAllowsProcurement = canCreateProcurementOrders(activeBusiness?.plan || null);
+
+  // Procurement badge count
+  const pendingProcurementCount = useProcurementStore(selectPendingProcurementCount);
 
   // Get business ID
   const businessId = activeBusiness?.id || '';
@@ -75,7 +81,6 @@ export default function DeliveryScreen() {
     loading,
     refreshing,
     error,
-    isMockData,
     statusFilter,
     viewType: activeTab,
     search,
@@ -100,6 +105,18 @@ export default function DeliveryScreen() {
   useEffect(() => {
     setDeliveriesUnreadCount(unviewedDeliveriesCount);
   }, [unviewedDeliveriesCount, setDeliveriesUnreadCount]);
+
+  const handleOpenProcurement = () => {
+    if (!planAllowsProcurement) {
+      const check = checkPaywall('create_procurement', activeBusiness?.plan || null);
+      if (!check.allowed) {
+        setPaywallCheckResult(check);
+        setShowPaywall(true);
+        return;
+      }
+    }
+    (navigation as any).navigate('ProcurementDashboard');
+  };
 
   const handleCreateNew = () => {
     if (!hasManagePermission) {
@@ -159,6 +176,7 @@ export default function DeliveryScreen() {
         title={getTabTitle()}
         onTitlePress={toggleViewDropdown}
         actions={[
+          { icon: 'shopping-cart', onPress: handleOpenProcurement, badge: pendingProcurementCount, accessibilityLabel: 'Procurement' },
           { icon: 'plus', onPress: handleCreateNew, accessibilityLabel: 'Create delivery' },
         ]}
       />
@@ -204,13 +222,6 @@ export default function DeliveryScreen() {
         }
         ListHeaderComponent={
           <>
-            {/* Dev mode mock data indicator */}
-            {__DEV__ && isMockData && !loading && (
-              <View style={[styles.mockDataBanner, { backgroundColor: '#FEF3C7' }]}>
-                <Text style={{ color: '#92400E', fontSize: 12 }}>Using mock data (API unavailable)</Text>
-              </View>
-            )}
-            
             {/* Error state */}
             {error && !loading && (
               <View style={styles.errorContainer}>
@@ -311,6 +322,10 @@ export default function DeliveryScreen() {
         }}
         contentContainerStyle={filteredDeliveries.length === 0 ? { flex: 1 } : { flexGrow: 1 }}
         style={{ flex: 1 }}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={10}
       />
 
       {/* Delivery Type Selection Modal (View Dropdown) */}
@@ -368,10 +383,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 0,
     marginBottom: 8,
-  },
-  mockDataBanner: {
-    padding: 8,
-    alignItems: 'center',
   },
   errorContainer: {
     flex: 1,

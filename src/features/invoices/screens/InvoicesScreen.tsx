@@ -13,13 +13,13 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { EmptyState, Skeleton, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
-import FilterBar from '@/features/search/components/FilterBar';
+import FilterBar from '@/shared/components/ui/FilterBar';
 import InvoiceCard from '@/features/invoices/components/InvoiceCard';
-import LocationDropdown from '@/features/company/components/LocationDropdown';
+import LocationDropdown from '@/shared/components/ui/LocationDropdown';
 import { AppBottomSheet } from '@/shared/components/ui';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
 import InvoiceActionsModal from '@/features/invoices/components/InvoiceActionsModal';
-import PaywallModal from '@/features/subscription/components/PaywallModal';
+import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { useBusinessStore } from '@/shared/store/businessStore';
@@ -47,7 +47,7 @@ export default function InvoicesScreen() {
   const [paywallCheck, setPaywallCheck] = useState<PaywallCheck | null>(null);
   const { theme: appTheme } = useTheme();
   const { setInvoicesUnreadCount, isItemViewed } = useNotifications();
-  const { currentLocation } = useBusinessStore();
+  const currentLocation = useBusinessStore((state) => state.currentLocation);
   const selectedLocationId = currentLocation?.id || null;
   
   // Profile store for RBAC (single source of truth)
@@ -68,8 +68,7 @@ export default function InvoicesScreen() {
     invoices, 
     loading, 
     error, 
-    isMockData, 
-    refetch, 
+    refetch,
     filteredInvoices 
   } = useInvoices({ 
     locationId: selectedLocationId 
@@ -198,14 +197,7 @@ export default function InvoicesScreen() {
           />
         )}
         ListHeaderComponent={
-          <>
-            {/* Mock Data Indicator (DEV only) */}
-            {__DEV__ && isMockData && !loading && (
-              <View style={[styles.mockDataBanner, { backgroundColor: appTheme.colors.warning }]}>
-                <Text style={styles.mockDataText}>Using mock data (API unavailable)</Text>
-              </View>
-            )}
-          </>
+          <></>
         }
         ListEmptyComponent={() => {
           if (loading) {
@@ -271,6 +263,10 @@ export default function InvoicesScreen() {
         }}
         contentContainerStyle={{ flexGrow: 1 }}
         style={{ flex: 1 }}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={10}
       />
 
       {/* Document Type Selection Modal */}
@@ -450,19 +446,6 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: 'white',
     fontWeight: '600',
-  },
-  mockDataBanner: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 6,
-  },
-  mockDataText: {
-    color: '#000',
-    fontSize: 12,
-    fontWeight: '500',
   },
   // AppBottomSheet item styles
   bottomSheetItem: {

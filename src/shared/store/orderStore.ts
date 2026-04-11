@@ -325,19 +325,27 @@ export const useOrderStore = create<OrderStore>()(
 
         try {
           // Build payload for the backend
+          const orderItems = cart.items.map((item) => ({
+            productId: item.productId,
+            productName: item.product.name,
+            quantity: item.quantity,
+            unitPrice: item.product.price,
+            subtotal: item.product.price * item.quantity,
+          }));
+
+          // Recalculate total from items to prevent corrupted store state
+          const calculatedTotal = orderItems.reduce(
+            (sum, item) => sum + item.subtotal,
+            0
+          );
+
           const payload: Omit<CreateOrderPayload, 'businessId'> = {
             buyerBusinessId: fromBusinessId,
             buyerBusinessName: fromBusinessName,
             customerName: fromBusinessName,
             createdBy,
-            items: cart.items.map((item) => ({
-              productId: item.productId,
-              productName: item.product.name,
-              quantity: item.quantity,
-              unitPrice: item.product.price,
-              subtotal: item.product.price * item.quantity,
-            })),
-            totalAmount: cart.total,
+            items: orderItems,
+            totalAmount: calculatedTotal,
             notes,
           };
 

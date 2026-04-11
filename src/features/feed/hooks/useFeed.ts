@@ -8,7 +8,7 @@
  * - Pull-to-refresh
  * - Infinite scroll (load more)
  * - Loading/error states
- * - Fallback to mock data if API fails
+ * - Error handling if API fails
  * - Special welcome feed for new users
  */
 
@@ -215,8 +215,6 @@ interface UseFeedResult {
   loadingMore: boolean;
   /** Error message if any */
   error: string | null;
-  /** Whether data came from mock (fallback) */
-  isMockData: boolean;
   /** Whether there are more posts to load */
   hasMore: boolean;
   /** Refresh the feed (pull-to-refresh) */
@@ -234,8 +232,6 @@ export function useFeed(): UseFeedResult {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isMockData, setIsMockData] = useState(false);
-  
   // Capture isNewUser at mount time via ref so that clearing the flag
   // after 5 seconds in HomeScreen does NOT trigger a feed reload.
   const isNewUserAtMount = useRef(useProfileStore.getState().isNewUser);
@@ -255,7 +251,6 @@ export function useFeed(): UseFeedResult {
     if (isNewUserAtMount.current) {
       setPosts(newUserFeedPosts);
       setNextCursor(null);
-      setIsMockData(true);
       setLoading(false);
       return;
     }
@@ -269,13 +264,11 @@ export function useFeed(): UseFeedResult {
 
       setPosts(dedup([...feedResult.posts, ...publicPosts]));
       setNextCursor(feedResult.nextCursor);
-      setIsMockData(false);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Failed to load feed';
       setError(message);
       setPosts([]);
       setNextCursor(null);
-      setIsMockData(false);
     } finally {
       setLoading(false);
     }
@@ -298,7 +291,6 @@ export function useFeed(): UseFeedResult {
 
       setPosts(dedup([...feedResult.posts, ...publicPosts]));
       setNextCursor(feedResult.nextCursor);
-      setIsMockData(false);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Failed to refresh feed';
       setError(message);
@@ -344,7 +336,6 @@ export function useFeed(): UseFeedResult {
     refreshing,
     loadingMore,
     error,
-    isMockData,
     hasMore: nextCursor !== null,
     refresh,
     loadMore,
