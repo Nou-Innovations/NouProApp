@@ -3,8 +3,10 @@
  */
 const { prisma } = require('../../db/prisma');
 
-async function list() {
-  return prisma.stock.findMany();
+async function list(limit = 500) {
+  return prisma.stock.findMany({
+    take: limit,
+  });
 }
 
 async function getById(id) {

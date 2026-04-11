@@ -176,6 +176,8 @@ model Product {
   supplierProducts SupplierProduct[]
 
   @@index([businessId])
+  @@index([businessId, category])
+  @@index([businessId, isListed])
   @@index([brandId])
 }
 
@@ -236,12 +238,14 @@ model Order {
   statusReason          String?
   lastActivityAt        DateTime?
   business              Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  fulfillmentLocation   Location?       @relation("OrdersFulfilledByLocation", fields: [fulfillmentLocationId], references: [id])
-  soldByLocation        Location?       @relation("OrdersSoldByLocation", fields: [soldByLocationId], references: [id])
+  fulfillmentLocation   Location?       @relation("OrdersFulfilledByLocation", fields: [fulfillmentLocationId], references: [id], onDelete: SetNull)
+  soldByLocation        Location?       @relation("OrdersSoldByLocation", fields: [soldByLocationId], references: [id], onDelete: SetNull)
   statusHistory         OrderStatusHistory[]
   deliveries            Delivery[]
 
   @@index([businessId])
+  @@index([businessId, status])
+  @@index([businessId, createdAt])
   @@index([soldByLocationId])
   @@index([fulfillmentLocationId])
   @@index([buyerBusinessId])
@@ -289,10 +293,11 @@ model Invoice {
   updatedAt          DateTime       @updatedAt
   status             InvoiceStatus? @default(DRAFT)
   business           Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  location           Location?      @relation(fields: [issuedByLocationId], references: [id])
+  location           Location?      @relation(fields: [issuedByLocationId], references: [id], onDelete: SetNull)
 
   @@unique([businessId, invoiceNumber])
   @@index([businessId])
+  @@index([businessId, status])
   @@index([issuedByLocationId])
   @@index([status])
   @@index([createdAt])
@@ -431,11 +436,14 @@ model Delivery {
   deliveryStatus           DeliveryStatus? @default(NOT_ASSIGNED)
   paymentStatus            PaymentStatus?  @default(UNPAID)
   business                 Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  location                 Location?       @relation(fields: [locationId], references: [id])
+  location                 Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
   order                    Order?          @relation(fields: [orderId], references: [id])
   staffAssignments         DeliveryStaff[]
 
   @@index([businessId])
+  @@index([businessId, deliveryStatus])
+  @@index([businessId, paymentStatus])
+  @@index([businessId, createdAt])
   @@index([locationId])
   @@index([orderId])
 }
@@ -783,6 +791,7 @@ model PurchaseOrder {
   goodsReceipts        GoodsReceipt[]
 
   @@index([businessId])
+  @@index([businessId, paymentStatus])
   @@index([supplierId])
   @@index([status])
   @@unique([businessId, poNumber])

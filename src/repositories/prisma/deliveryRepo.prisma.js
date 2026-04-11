@@ -10,10 +10,11 @@ const STAFF_INCLUDE = {
   },
 };
 
-async function list() {
+async function list(limit = 500) {
   return prisma.delivery.findMany({
     orderBy: { createdAt: 'desc' },
     include: STAFF_INCLUDE,
+    take: limit,
   });
 }
 

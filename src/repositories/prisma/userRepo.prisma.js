@@ -3,9 +3,10 @@
  */
 const { prisma } = require('../../db/prisma');
 
-async function list() {
+async function list(limit = 500) {
   return prisma.user.findMany({
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: limit,
   });
 }
 

@@ -7,9 +7,27 @@ const multer = require('multer');
 const path = require('path');
 const { Server: SocketIOServer } = require('socket.io');
 const { Expo } = require('expo-server-sdk');
+const { z } = require('zod');
 
 // Load environment variables (create a .env file in backend/ if needed)
 require('dotenv').config();
+
+// ============================================================================
+// ENVIRONMENT VALIDATION — fail fast on missing critical vars
+// ============================================================================
+const REQUIRED_ENV = ['JWT_SECRET', 'DATABASE_URL', 'DIRECT_URL'];
+const missing = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missing.length > 0) {
+  console.error(`\n[FATAL] Missing required environment variables: ${missing.join(', ')}`);
+  console.error('Create a .env file in backend/ — see .env.example for reference.\n');
+  process.exit(1);
+}
+
+if (process.env.JWT_SECRET === 'your-secret-here-generate-with-openssl-rand-base64-48') {
+  console.error('\n[FATAL] JWT_SECRET is still the placeholder value from .env.example.');
+  console.error('Generate a real secret: openssl rand -base64 48\n');
+  process.exit(1);
+}
 
 // ============================================================================
 // EMAIL SERVICE - Nodemailer for transactional emails
@@ -150,17 +168,28 @@ function isValidDeliveryTransition(currentStatus, nextStatus) {
 
 const app = express();
 const server = http.createServer(app);
-const io = new SocketIOServer(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
-});
 
 // Configuration from environment variables with sensible defaults
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0'; // Listen on all interfaces for LAN access
 
-// CORS Configuration - whitelist-based for security
+// CORS Configuration - whitelist-based for security (must be before Socket.IO init)
 const corsRaw = process.env.CORS_ORIGIN || '';
 const corsAllowlist = corsRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, Postman, curl)
+      if (!origin) return callback(null, true);
+      if (corsAllowlist.length === 0) return callback(new Error('CORS_NOT_CONFIGURED'), false);
+      if (corsAllowlist.includes(origin)) return callback(null, true);
+      return callback(new Error('CORS_BLOCKED'), false);
+    },
+    methods: ['GET', 'POST'],
+    credentials: true,
+  }
+});
 
 // Middleware
 app.use(cors({
@@ -187,7 +216,7 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static('uploads'));
 
 // Rate limiter for message-sending endpoints (30 msgs / minute / user)
@@ -277,15 +306,23 @@ const SUBSCRIPTION_TIERS = {
   ENTERPRISE: 'ENTERPRISE' // Top tier - can have independent locations + public pages
 };
 
-const LOCATION_MODES = {
-  DEPENDENT: 'DEPENDENT',   // Orders created by parent only
-  INDEPENDENT: 'INDEPENDENT' // Can create own orders, has public page
-};
+// LOCATION_MODES already imported from constants at line 117
 
 // Derive capabilities from subscription tier (centralized logic)
 // RULE: Only ENTERPRISE can have independent locations with public pages
+// RULE: Expired subscriptions are treated as FREE (with 3-day grace period)
 function deriveCapabilities(business) {
-  const tier = business.subscriptionTier || SUBSCRIPTION_TIERS.FREE;
+  let tier = business.subscriptionTier || SUBSCRIPTION_TIERS.FREE;
+
+  // SECURITY: Enforce subscription expiration
+  if (tier !== SUBSCRIPTION_TIERS.FREE && business.currentPeriodEnd) {
+    const expiryDate = new Date(business.currentPeriodEnd);
+    const gracePeriodMs = 3 * 24 * 60 * 60 * 1000; // 3 days grace
+    if (Date.now() > expiryDate.getTime() + gracePeriodMs) {
+      tier = SUBSCRIPTION_TIERS.FREE; // Expired + grace period passed → treat as FREE
+    }
+  }
+
   const isEnterprise = tier === SUBSCRIPTION_TIERS.ENTERPRISE;
   const isBusiness = tier === SUBSCRIPTION_TIERS.BUSINESS;
   const isPaidTier = tier !== SUBSCRIPTION_TIERS.FREE;
@@ -839,6 +876,80 @@ const errorResponse = (message, code = 'ERROR') => ({
   message,
 });
 
+// Standardized paywall/plan-gated error response
+const paywallResponse = (message, triggerId, requiredPlan = 'pro') => ({
+  success: false,
+  error: { code: 'PAYWALL', triggerId, requiredPlan, message },
+  message,
+});
+
+// ============================================================================
+// ZOD VALIDATION SCHEMAS
+// ============================================================================
+
+const createProductSchema = z.object({
+  name: z.string().min(1).max(200),
+  brand: z.string().max(100).optional(),
+  description: z.string().max(2000).optional(),
+  unit: z.string().max(50).optional(),
+  price: z.number().min(0).optional(),
+  taxRate: z.number().min(0).max(100).optional(),
+  minOrderQty: z.number().int().min(0).optional(),
+  stock: z.number().int().min(0).optional(),
+  sku: z.string().max(100).optional(),
+  barcode: z.string().max(100).optional(),
+  isAvailable: z.boolean().optional(),
+  isListed: z.boolean().optional(),
+  is_listed: z.boolean().optional(),
+  isDisplayable: z.boolean().optional(),
+  images: z.array(z.string()).optional(),
+  categoryId: z.string().optional(),
+  subcategoryId: z.string().optional(),
+  category: z.string().max(100).optional(),
+  variants: z.array(z.object({
+    name: z.string(),
+    price: z.number().min(0).optional(),
+    sku: z.string().optional(),
+  })).optional(),
+}).strict();
+
+const createOrderSchema = z.object({
+  customerName: z.string().max(200).optional(),
+  customerAddress: z.string().max(500).optional(),
+  customerPhone: z.string().max(50).optional(),
+  items: z.array(z.object({
+    productId: z.string().optional(),
+    product_id: z.string().optional(),
+    name: z.string().optional(),
+    quantity: z.number().min(0),
+    unitPrice: z.number().min(0).optional(),
+    unit_price: z.number().min(0).optional(),
+    price: z.number().min(0).optional(),
+    unit: z.string().optional(),
+  })).min(1),
+  totalAmount: z.number().min(0),
+  notes: z.string().max(2000).optional().nullable(),
+  fulfillmentLocationId: z.string().optional().nullable(),
+  buyerBusinessId: z.string().optional().nullable(),
+  buyerBusinessName: z.string().max(200).optional().nullable(),
+  createdBy: z.string().optional().nullable(),
+});
+
+// Validates req.body against a zod schema, returns parsed data or sends 400
+function validateBody(schema, req, res) {
+  const result = schema.safeParse(req.body);
+  if (!result.success) {
+    const firstError = result.error.errors[0];
+    const path = firstError.path.join('.');
+    res.status(400).json(errorResponse(
+      `Validation error: ${path ? path + ' — ' : ''}${firstError.message}`,
+      'VALIDATION_ERROR'
+    ));
+    return null;
+  }
+  return result.data;
+}
+
 // Helper to format timestamp to relative time (e.g., "5 min ago")
 const formatRelativeTime = (timestamp) => {
   const now = new Date();
@@ -900,12 +1011,24 @@ io.on('connection', (socket) => {
       const chat = await repos.chatRepo.getById(chatId);
       if (!chat) return;
 
-      // Check membership: either a direct participant or a company member
+      // Check membership: either a direct participant or a company/location member
       const isParticipant = Array.isArray(chat.participants) && chat.participants.includes(socket.userId);
       let isCompanyMember = false;
       if (!isParticipant && chat.companyId) {
         const member = await findBusinessMember(chat.companyId, socket.userId);
-        isCompanyMember = !!member;
+        if (member) {
+          isCompanyMember = true;
+          // If chat is scoped to a location, verify location access (unless super_admin)
+          if (chat.locationId && member.role !== 'super_admin') {
+            const locationMembers = await repos.memberRepo.listLocationMembers(chat.locationId);
+            const hasLocationAccess = locationMembers.some(
+              lm => lm.userId === socket.userId && lm.status === 'accepted'
+            );
+            if (!hasLocationAccess) {
+              isCompanyMember = false;
+            }
+          }
+        }
       }
 
       if (!isParticipant && !isCompanyMember) {
@@ -1035,24 +1158,26 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       }, 'Two-factor authentication required'));
     }
 
-    // Get user's businesses from database
+    // Get user's businesses from database (parallel fetch to avoid N+1)
     const memberships = await repos.memberRepo.getByUserId(dbUser.id);
-    const userBusinesses = [];
-    for (const m of memberships) {
-      if (m.status !== 'accepted') continue;
-      const business = await repos.businessRepo.getById(m.businessId);
-      if (!business) continue;
-      userBusinesses.push({
-        business: { ...business, capabilities: deriveCapabilities(business) },
-        role: m.role,
-        staff_entry: {
-          id: m.id,
-          status: m.status,
-          role_type: m.roleType || null,
-          joinedAt: m.createdAt,
-        },
-      });
-    }
+    const acceptedMemberships = memberships.filter(m => m.status === 'accepted');
+    const businesses = await Promise.all(acceptedMemberships.map(m => repos.businessRepo.getById(m.businessId)));
+    const userBusinesses = acceptedMemberships
+      .map((m, i) => {
+        const business = businesses[i];
+        if (!business) return null;
+        return {
+          business: { ...business, capabilities: deriveCapabilities(business) },
+          role: m.role,
+          staff_entry: {
+            id: m.id,
+            status: m.status,
+            role_type: m.roleType || null,
+            joinedAt: m.createdAt,
+          },
+        };
+      })
+      .filter(Boolean);
     
     // Generate real JWT tokens
     const token = generateToken({ 
@@ -1189,8 +1314,8 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
   }
 });
 
-// Refresh access token (no rate limiter -- already protected by requiring a valid refresh token)
-app.post('/api/auth/refresh', async (req, res) => {
+// Refresh access token
+app.post('/api/auth/refresh', authLimiter, async (req, res) => {
   try {
     const { refreshToken } = req.body;
     
@@ -1662,7 +1787,7 @@ app.post('/api/auth/2fa/disable', requireAuth, async (req, res) => {
 });
 
 // Verify 2FA code during login
-app.post('/api/auth/2fa/verify', async (req, res) => {
+app.post('/api/auth/2fa/verify', authLimiter, async (req, res) => {
   try {
     const { authenticator } = require('otplib');
     const { tempToken, code } = req.body;
@@ -1712,22 +1837,19 @@ app.post('/api/auth/2fa/verify', async (req, res) => {
 
     // Issue real tokens (same as login success)
     const memberships = await repos.memberRepo.getByUserId(dbUser.id);
-    const userBusinesses = [];
-    for (const m of memberships) {
-      if (m.status !== 'accepted') continue;
-      const business = await repos.businessRepo.getById(m.businessId);
-      if (!business) continue;
-      userBusinesses.push({
-        business: { ...business, capabilities: deriveCapabilities(business) },
-        role: m.role,
-        staff_entry: {
-          id: m.id,
-          status: m.status,
-          role_type: m.roleType || null,
-          joinedAt: m.createdAt,
-        },
-      });
-    }
+    const acceptedMs = memberships.filter(m => m.status === 'accepted');
+    const bizResults = await Promise.all(acceptedMs.map(m => repos.businessRepo.getById(m.businessId)));
+    const userBusinesses = acceptedMs
+      .map((m, i) => {
+        const business = bizResults[i];
+        if (!business) return null;
+        return {
+          business: { ...business, capabilities: deriveCapabilities(business) },
+          role: m.role,
+          staff_entry: { id: m.id, status: m.status, role_type: m.roleType || null, joinedAt: m.createdAt },
+        };
+      })
+      .filter(Boolean);
 
     const token = generateToken({
       sub: dbUser.id,
@@ -1812,24 +1934,21 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
     // Strip sensitive fields from response
     const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = user;
 
-    // Get businesses from Prisma
+    // Get businesses from Prisma (parallel fetch)
     const memberships = await repos.memberRepo.getByUserId(user.id);
-    const userBusinesses = [];
-    for (const m of memberships) {
-      if (m.status !== 'accepted') continue;
-      const business = await repos.businessRepo.getById(m.businessId);
-      if (!business) continue;
-      userBusinesses.push({
-        business: { ...business, capabilities: deriveCapabilities(business) },
-        role: m.role,
-        staff_entry: {
-          id: m.id,
-          status: m.status,
-          role_type: m.roleType || null,
-          joinedAt: m.createdAt,
-        },
-      });
-    }
+    const acceptedMs = memberships.filter(m => m.status === 'accepted');
+    const bizResults = await Promise.all(acceptedMs.map(m => repos.businessRepo.getById(m.businessId)));
+    const userBusinesses = acceptedMs
+      .map((m, i) => {
+        const business = bizResults[i];
+        if (!business) return null;
+        return {
+          business: { ...business, capabilities: deriveCapabilities(business) },
+          role: m.role,
+          staff_entry: { id: m.id, status: m.status, role_type: m.roleType || null, joinedAt: m.createdAt },
+        };
+      })
+      .filter(Boolean);
 
     // Get connection count
     const connectionsCount = await repos.connectionRepo.countByUserId(user.id);
@@ -1904,21 +2023,23 @@ app.get('/api/users/:userId', requireAuth, async (req, res) => {
     // Get connection status with requester
     const connectionStatus = isSelf ? null : await repos.connectionRepo.getStatus(req.user.id, req.params.userId);
 
-    // Get user's businesses (public info for experience section)
+    // Get user's businesses (public info for experience section, parallel fetch)
     const memberships = await repos.memberRepo.getByUserId(req.params.userId);
-    const experiences = [];
-    for (const m of memberships) {
-      if (m.status !== 'accepted') continue;
-      const biz = await repos.businessRepo.getById(m.businessId);
-      if (!biz) continue;
-      experiences.push({
-        business_id: biz.id,
-        business_name: biz.name,
-        business_logo: biz.logoUrl,
-        role: m.role,
-        started_at: m.createdAt,
-      });
-    }
+    const acceptedMs = memberships.filter(m => m.status === 'accepted');
+    const bizResults = await Promise.all(acceptedMs.map(m => repos.businessRepo.getById(m.businessId)));
+    const experiences = acceptedMs
+      .map((m, i) => {
+        const biz = bizResults[i];
+        if (!biz) return null;
+        return {
+          business_id: biz.id,
+          business_name: biz.name,
+          business_logo: biz.logoUrl,
+          role: m.role,
+          started_at: m.createdAt,
+        };
+      })
+      .filter(Boolean);
 
     res.json(successResponse({
       ...safeUser,
@@ -2124,16 +2245,25 @@ app.get('/api/companies/:companyId', async (req, res) => {
 
 // Update business
 app.patch('/api/companies/:companyId', requireAuth, async (req, res) => {
-  // Require business membership
-  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  // SECURITY: Require business admin (settings, profile changes are admin-only)
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
 
   const existing = await repos.businessRepo.getById(req.params.companyId);
   if (!existing) {
     return res.status(404).json(errorResponse('Business not found'));
   }
 
-  // Don't allow changing subscription tier via this endpoint
-  const { subscriptionTier, ...allowedUpdates } = req.body;
+  // Don't allow changing subscription tier or publish status via this endpoint
+  const { subscriptionTier, billingPeriod: _bp, currentPeriodEnd: _cpe, isPublished: _ip, ...allowedUpdates } = req.body;
+
+  // SECURITY: If isPublished is being set, verify plan allows it
+  if (req.body.isPublished !== undefined) {
+    const capabilities = deriveCapabilities(existing);
+    if (req.body.isPublished === true && !capabilities.canPublishBusinessPage) {
+      return res.status(403).json(paywallResponse('Upgrade your plan to publish your business page', 'publish_business_page', 'pro'));
+    }
+    allowedUpdates.isPublished = req.body.isPublished;
+  }
 
   // Input validation
   if (allowedUpdates.name !== undefined) {
@@ -2168,6 +2298,13 @@ app.patch('/api/companies/:companyId', requireAuth, async (req, res) => {
 
   // Merge settings instead of overwriting
   if (allowedUpdates.settings) {
+    // SECURITY: Check plan capability before enabling price privacy
+    if (allowedUpdates.settings.pricePrivacyEnabled === true) {
+      const capabilities = deriveCapabilities(existing);
+      if (!capabilities.canEnablePricePrivacy) {
+        return res.status(403).json(paywallResponse('Upgrade to Business for price privacy', 'price_privacy', 'business'));
+      }
+    }
     allowedUpdates.settings = {
       ...(existing.settings || {}),
       ...allowedUpdates.settings,
@@ -2184,8 +2321,15 @@ app.patch('/api/companies/:companyId', requireAuth, async (req, res) => {
 
 // Update business subscription
 app.patch('/api/companies/:companyId/subscription', requireAuth, async (req, res) => {
-  // PERMISSION: Require business membership
-  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  // SECURITY: Require business admin (super_admin only should change subscription)
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
+  // Verify caller is super_admin specifically
+  const userId = req.user?.id;
+  const membership = await findBusinessMember(req.params.companyId, userId);
+  if (!membership || membership.role !== 'super_admin') {
+    return res.status(403).json(errorResponse('Only the business owner (super admin) can change the subscription', 'PERMISSION_DENIED'));
+  }
 
   const existing = await repos.businessRepo.getById(req.params.companyId);
   if (!existing) {
@@ -2233,24 +2377,38 @@ app.patch('/api/companies/:companyId/subscription', requireAuth, async (req, res
 // Legacy company routes (for backwards compatibility)
 app.get('/api/companies', async (req, res) => {
   const businesses = await repos.businessRepo.list();
-  const businessesWithCaps = businesses.map(b => ({
-    ...b,
-    capabilities: deriveCapabilities(b),
-  }));
-  res.json(successResponse(businessesWithCaps));
+  // SECURITY: Strip internal/sensitive fields from public listing
+  const publicBusinesses = businesses.map(({ subscriptionTier, settings, ...b }) => b);
+  res.json(successResponse(publicBusinesses));
 });
 
 // PUT /api/companies/:id -- legacy route used by businessStore
 app.put('/api/companies/:id', requireAuth, async (req, res) => {
-  // Require business membership
-  if (!(await requireBusinessMembership(req, res, req.params.id))) return;
+  // SECURITY: Require business admin
+  if (!(await requireBusinessAdmin(req, res, req.params.id))) return;
 
   const existing = await repos.businessRepo.getById(req.params.id);
   if (!existing) {
     return res.status(404).json(errorResponse('Company not found'));
   }
 
-  const updated = await repos.businessRepo.update(req.params.id, req.body);
+  // SECURITY: Whitelist allowed fields -- prevent mass assignment
+  const { name, description, email, phone, address, logoUrl, coverUrl, website,
+          industry, businessType, tagline } = req.body;
+  const safeUpdates = {};
+  if (name !== undefined) safeUpdates.name = name;
+  if (description !== undefined) safeUpdates.description = description;
+  if (email !== undefined) safeUpdates.email = email;
+  if (phone !== undefined) safeUpdates.phone = phone;
+  if (address !== undefined) safeUpdates.address = address;
+  if (logoUrl !== undefined) safeUpdates.logoUrl = logoUrl;
+  if (coverUrl !== undefined) safeUpdates.coverUrl = coverUrl;
+  if (website !== undefined) safeUpdates.website = website;
+  if (industry !== undefined) safeUpdates.industry = industry;
+  if (businessType !== undefined) safeUpdates.businessType = businessType;
+  if (tagline !== undefined) safeUpdates.tagline = tagline;
+
+  const updated = await repos.businessRepo.update(req.params.id, safeUpdates);
 
     res.json(successResponse({
     ...updated,
@@ -2371,7 +2529,7 @@ app.get('/api/connections', requireAuth, async (req, res) => {
     // Map to return the other user in each connection
     const result = connections.map(conn => {
       const otherUser = conn.senderId === req.user.id ? conn.receiver : conn.sender;
-      const { passwordHash, ...safeUser } = otherUser;
+      const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = otherUser;
       return {
         connectionId: conn.id,
         user: safeUser,
@@ -2390,7 +2548,7 @@ app.get('/api/connections/pending', requireAuth, async (req, res) => {
   try {
     const pending = await repos.connectionRepo.listPending(req.user.id);
     const result = pending.map(conn => {
-      const { passwordHash, ...safeSender } = conn.sender;
+      const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeSender } = conn.sender;
       return {
         connectionId: conn.id,
         sender: safeSender,
@@ -2572,33 +2730,37 @@ app.get('/api/companies/:companyId/locations', async (req, res) => {
 
 // Create location with mode enforcement
 app.post('/api/companies/:companyId/locations', requireAuth, async (req, res) => {
+  // SECURITY: Require business membership
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
   const business = await repos.businessRepo.getById(req.params.companyId);
   if (!business) {
     return res.status(404).json(errorResponse('Business not found'));
   }
 
   const capabilities = deriveCapabilities(business);
-  let { operatingMode, locationType, ...locationData } = req.body;
+  // SECURITY: Extract only allowed fields to prevent mass assignment
+  let { operatingMode, locationType, name, address, phone, email, latitude, longitude } = req.body;
 
   // INPUT VALIDATION
-  if (!locationData.name || typeof locationData.name !== 'string' || locationData.name.trim().length === 0) {
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return res.status(400).json(errorResponse('Location name is required'));
   }
-  if (locationData.name.length > 100) {
+  if (name.length > 100) {
     return res.status(400).json(errorResponse('Location name must be 100 characters or less'));
   }
-  if (locationData.phone && locationData.phone.length > 30) {
+  if (phone && phone.length > 30) {
     return res.status(400).json(errorResponse('Phone number must be 30 characters or less'));
   }
-  if (locationData.email && typeof locationData.email === 'string' && locationData.email.length > 0) {
-    if (!locationData.email.includes('@')) {
+  if (email && typeof email === 'string' && email.length > 0) {
+    if (!email.includes('@')) {
       return res.status(400).json(errorResponse('Invalid email format'));
     }
   }
-  if (locationData.latitude != null && (locationData.latitude < -90 || locationData.latitude > 90)) {
+  if (latitude != null && (latitude < -90 || latitude > 90)) {
     return res.status(400).json(errorResponse('Latitude must be between -90 and 90'));
   }
-  if (locationData.longitude != null && (locationData.longitude < -180 || locationData.longitude > 180)) {
+  if (longitude != null && (longitude < -180 || longitude > 180)) {
     return res.status(400).json(errorResponse('Longitude must be between -180 and 180'));
   }
 
@@ -2615,18 +2777,27 @@ app.post('/api/companies/:companyId/locations', requireAuth, async (req, res) =>
   // Check max locations limit
   const currentLocations = await repos.locationRepo.getByBusinessId(req.params.companyId);
   if (currentLocations.length >= capabilities.maxLocations) {
-    return res.status(403).json(errorResponse(
+    return res.status(403).json(paywallResponse(
       `Location limit reached (${capabilities.maxLocations}). Upgrade your subscription to add more locations.`,
-      'LOCATION_LIMIT_REACHED'
+      'location_limit_reached',
+      capabilities.maxLocations >= 7 ? 'enterprise' : 'business'
     ));
   }
+
+  const safeData = {};
+  if (name !== undefined) safeData.name = name.trim();
+  if (address !== undefined) safeData.address = address;
+  if (phone !== undefined) safeData.phone = phone;
+  if (email !== undefined) safeData.email = email;
+  if (latitude !== undefined) safeData.latitude = latitude;
+  if (longitude !== undefined) safeData.longitude = longitude;
 
   const newLocationPayload = {
     id: 'loc-' + uuidv4().slice(0, 8),
     operatingMode: operatingMode || LOCATION_MODES.DEPENDENT,
     isPublic: operatingMode === LOCATION_MODES.INDEPENDENT ? (req.body.isPublic ?? false) : false,
     locationType: locationType || null,
-    ...locationData,
+    ...safeData,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -2677,40 +2848,53 @@ app.patch('/api/locations/:locationId', requireAuth, async (req, res) => {
   }
   
   const capabilities = deriveCapabilities(business);
-  let { operatingMode, ...updates } = req.body;
+  // SECURITY: Extract only allowed fields to prevent mass assignment
+  let { operatingMode, name, address, phone, email, latitude, longitude, isPublic, locationType } = req.body;
 
   // INPUT VALIDATION on update fields
-  if (updates.name !== undefined) {
-    if (typeof updates.name !== 'string' || updates.name.trim().length === 0) {
+  if (name !== undefined) {
+    if (typeof name !== 'string' || name.trim().length === 0) {
       return res.status(400).json(errorResponse('Location name cannot be empty'));
     }
-    if (updates.name.length > 100) {
+    if (name.length > 100) {
       return res.status(400).json(errorResponse('Location name must be 100 characters or less'));
     }
   }
-  if (updates.phone !== undefined && updates.phone && updates.phone.length > 30) {
+  if (phone !== undefined && phone && phone.length > 30) {
     return res.status(400).json(errorResponse('Phone number must be 30 characters or less'));
   }
-  if (updates.email !== undefined && updates.email && typeof updates.email === 'string') {
-    if (updates.email.length > 0 && !updates.email.includes('@')) {
+  if (email !== undefined && email && typeof email === 'string') {
+    if (email.length > 0 && !email.includes('@')) {
       return res.status(400).json(errorResponse('Invalid email format'));
     }
   }
-  if (updates.latitude != null && (updates.latitude < -90 || updates.latitude > 90)) {
+  if (latitude != null && (latitude < -90 || latitude > 90)) {
     return res.status(400).json(errorResponse('Latitude must be between -90 and 90'));
   }
-  if (updates.longitude != null && (updates.longitude < -180 || updates.longitude > 180)) {
+  if (longitude != null && (longitude < -180 || longitude > 180)) {
     return res.status(400).json(errorResponse('Longitude must be between -180 and 180'));
   }
+
+  // Build safe updates object from whitelisted fields only
+  const updates = {};
+  if (name !== undefined) updates.name = name.trim();
+  if (address !== undefined) updates.address = address;
+  if (phone !== undefined) updates.phone = phone;
+  if (email !== undefined) updates.email = email;
+  if (latitude !== undefined) updates.latitude = latitude;
+  if (longitude !== undefined) updates.longitude = longitude;
+  if (isPublic !== undefined) updates.isPublic = isPublic;
+  if (locationType !== undefined) updates.locationType = locationType;
 
   // MODE CHANGE ENFORCEMENT with grandfathering policy
   if (operatingMode && operatingMode !== location.operatingMode) {
     // Trying to switch DEPENDENT → INDEPENDENT
     if (location.operatingMode === LOCATION_MODES.DEPENDENT && operatingMode === LOCATION_MODES.INDEPENDENT) {
       if (!capabilities.canChooseLocationMode || !capabilities.canHaveIndependentLocations) {
-        return res.status(403).json(errorResponse(
+        return res.status(403).json(paywallResponse(
           'Switching to Independent mode requires an Enterprise subscription.',
-          'CAPABILITY_REQUIRED'
+          'independent_locations',
+          'enterprise'
         ));
       }
     }
@@ -2732,6 +2916,14 @@ app.patch('/api/locations/:locationId', requireAuth, async (req, res) => {
 
 // Delete location
 app.delete('/api/locations/:locationId', requireAuth, async (req, res) => {
+  // SECURITY: Verify ownership before deleting
+  const location = await repos.locationRepo.getById(req.params.locationId);
+  if (!location) {
+    return res.status(404).json(errorResponse('Location not found'));
+  }
+  const locationBusinessId = location.businessId || location.companyId;
+  if (!(await requireBusinessAdmin(req, res, locationBusinessId))) return;
+
   const ok = await repos.locationRepo.delete(req.params.locationId);
   if (!ok) {
     return res.status(404).json(errorResponse('Location not found'));
@@ -2740,24 +2932,59 @@ app.delete('/api/locations/:locationId', requireAuth, async (req, res) => {
 });
 
 app.put('/api/companies/:companyId/locations/:locationId', requireAuth, async (req, res) => {
+  // SECURITY: Require business admin (not just membership)
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
   const location = await repos.locationRepo.getById(req.params.locationId);
   const businessId = location?.businessId || location?.companyId;
-  
+
   if (!location || businessId !== req.params.companyId) {
     return res.status(404).json(errorResponse('Location not found'));
   }
 
-  const updated = await repos.locationRepo.update(req.params.locationId, {
-    ...req.body,
-    updatedAt: new Date().toISOString(),
-  });
+  // SECURITY: Whitelist allowed fields — prevent mass assignment
+  const { name, address, phone, email, latitude, longitude, locationType,
+          isPublic, operatingMode } = req.body;
+  const safeUpdates = {};
+  if (name !== undefined) safeUpdates.name = name;
+  if (address !== undefined) safeUpdates.address = address;
+  if (phone !== undefined) safeUpdates.phone = phone;
+  if (email !== undefined) safeUpdates.email = email;
+  if (latitude !== undefined) safeUpdates.latitude = latitude;
+  if (longitude !== undefined) safeUpdates.longitude = longitude;
+  if (locationType !== undefined) safeUpdates.locationType = locationType;
+
+  // Plan-gated fields: check capabilities before allowing
+  if (operatingMode !== undefined) {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    const capabilities = deriveCapabilities(business);
+    if (operatingMode === 'INDEPENDENT' && !capabilities.canHaveIndependentLocations) {
+      return res.status(403).json(paywallResponse('Upgrade to Enterprise for independent locations', 'independent_location', 'enterprise'));
+    }
+    safeUpdates.operatingMode = operatingMode;
+  }
+  if (isPublic !== undefined) {
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    const capabilities = deriveCapabilities(business);
+    if (isPublic === true && !capabilities.canEnablePublicLocationPages) {
+      return res.status(403).json(paywallResponse('Upgrade to Enterprise for public location pages', 'public_location_page', 'enterprise'));
+    }
+    safeUpdates.isPublic = isPublic;
+  }
+
+  safeUpdates.updatedAt = new Date().toISOString();
+
+  const updated = await repos.locationRepo.update(req.params.locationId, safeUpdates);
   res.json(successResponse(updated));
 });
 
 app.delete('/api/companies/:companyId/locations/:locationId', requireAuth, async (req, res) => {
+  // SECURITY: Require business admin
+  if (!(await requireBusinessAdmin(req, res, req.params.companyId))) return;
+
   const location = await repos.locationRepo.getById(req.params.locationId);
   const businessId = location?.businessId || location?.companyId;
-  
+
   if (!location || businessId !== req.params.companyId) {
     return res.status(404).json(errorResponse('Location not found'));
   }
@@ -2831,18 +3058,18 @@ app.get('/api/companies/:companyId/products', requireAuth, async (req, res) => {
       return (a.name || '').localeCompare(b.name || '');
     });
 
-    // Enrich products with aggregated stock data
-    const enrichedProducts = await Promise.all(
-      companyProducts.map(async (product) => {
-        try {
-          const stocks = await repos.stockRepo.getByProductId(product.id);
-          const totalStock = stocks.reduce((sum, s) => sum + (s.qtyOnHand || 0), 0);
-          return { ...product, stockQuantity: totalStock, locationStocks: stocks };
-        } catch {
-          return product;
-        }
-      })
-    );
+    // Enrich products with aggregated stock data (batch-fetch to avoid N+1)
+    const allStocks = await repos.stockRepo.getByBusinessId(companyId);
+    const stockByProduct = new Map();
+    for (const s of allStocks) {
+      if (!stockByProduct.has(s.productId)) stockByProduct.set(s.productId, []);
+      stockByProduct.get(s.productId).push(s);
+    }
+    const enrichedProducts = companyProducts.map(product => {
+      const stocks = stockByProduct.get(product.id) || [];
+      const totalStock = stocks.reduce((sum, s) => sum + (s.qtyOnHand || 0), 0);
+      return { ...product, stockQuantity: totalStock, locationStocks: stocks };
+    });
     
     res.json(successResponse(enrichedProducts));
   } catch (e) {
@@ -2877,7 +3104,11 @@ app.get('/api/companies/:companyId/products/:productId', async (req, res) => {
 app.post('/api/companies/:companyId/products', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
-    const productData = req.body;
+    // SECURITY: Require business membership
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+    const productData = validateBody(createProductSchema, req, res);
+    if (!productData) return;
 
     // Verify business exists
     const business = await repos.businessRepo.getById(companyId);
@@ -2892,8 +3123,11 @@ app.post('/api/companies/:companyId/products', requireAuth, async (req, res) => 
       const currentListedCount = allProducts.filter(p => p.isListed === true || p.is_listed === true).length;
 
       if (currentListedCount >= capabilities.maxListedProducts) {
-        return res.status(403).json(errorResponse(
-          `Listed product limit reached (${capabilities.maxListedProducts}). Upgrade your plan to list more products.`
+        const requiredPlan = capabilities.maxListedProducts >= 150 ? 'enterprise' : (capabilities.maxListedProducts >= 50 ? 'business' : 'pro');
+        return res.status(403).json(paywallResponse(
+          `Listed product limit reached (${capabilities.maxListedProducts}). Upgrade your plan to list more products.`,
+          `listed_limit_reached_${requiredPlan === 'enterprise' ? 'business' : (requiredPlan === 'business' ? 'pro' : 'free')}`,
+          requiredPlan
         ));
       }
     }
@@ -2916,6 +3150,7 @@ app.post('/api/companies/:companyId/products', requireAuth, async (req, res) => 
 
 // Update a product
 app.patch('/api/companies/:companyId/products/:productId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
   try {
     const { companyId, productId } = req.params;
     const { name, description, unit, price, taxRate, minOrderQty, stock, sku, barcode, isAvailable, images, categoryId, subcategoryId } = req.body;
@@ -2956,8 +3191,11 @@ app.patch('/api/companies/:companyId/products/:productId', requireAuth, async (r
       const currentListedCount = allProducts.filter(p => p.isListed === true || p.is_listed === true).length;
 
       if (currentListedCount >= capabilities.maxListedProducts) {
-        return res.status(403).json(errorResponse(
-          `Listed product limit reached (${capabilities.maxListedProducts}). Upgrade your plan to list more products.`
+        const requiredPlan = capabilities.maxListedProducts >= 150 ? 'enterprise' : (capabilities.maxListedProducts >= 50 ? 'business' : 'pro');
+        return res.status(403).json(paywallResponse(
+          `Listed product limit reached (${capabilities.maxListedProducts}). Upgrade your plan to list more products.`,
+          `listed_limit_reached_${requiredPlan === 'enterprise' ? 'business' : (requiredPlan === 'business' ? 'pro' : 'free')}`,
+          requiredPlan
         ));
       }
     }
@@ -2976,6 +3214,7 @@ app.patch('/api/companies/:companyId/products/:productId', requireAuth, async (r
 
 // Delete a product
 app.delete('/api/companies/:companyId/products/:productId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
   try {
     const { companyId, productId } = req.params;
 
@@ -3007,7 +3246,7 @@ app.get('/api/companies/:companyId/products/with-supplier-pricing', requireAuth,
     if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canManageSuppliers) {
-      return res.status(403).json(errorResponse('Supplier pricing requires Pro plan or higher.', 'CAPABILITY_REQUIRED'));
+      return res.status(403).json(paywallResponse('Supplier pricing requires Pro plan or higher.', 'create_procurement', 'pro'));
     }
 
     // Find all SupplierProduct records for this business's suppliers, with product + supplier details
@@ -3094,13 +3333,20 @@ app.get('/api/companies/:companyId/products/:productId/suppliers', requireAuth, 
 // List brands for a company
 app.get('/api/companies/:companyId/brands', requireAuth, async (req, res) => {
   try {
-    const { viewerBusinessId } = req.query;
+    // SECURITY: Derive viewerBusinessId from caller's membership, not query params
+    let viewerBusinessId = null;
+    if (req.query.viewerBusinessId && req.user?.id) {
+      const viewerMember = await findBusinessMember(req.query.viewerBusinessId, req.user.id);
+      if (viewerMember && viewerMember.status === 'accepted') {
+        viewerBusinessId = req.query.viewerBusinessId;
+      }
+    }
     const brands = await repos.brandRepo.getByBusinessId(req.params.companyId);
 
     // Apply price privacy to products within each brand
     const brandsWithPrivacy = await Promise.all(brands.map(async (brand) => {
       if (!brand.products || brand.products.length === 0) return brand;
-      const privacyProducts = await applyPricePrivacyBatch(brand.products, viewerBusinessId || null);
+      const privacyProducts = await applyPricePrivacyBatch(brand.products, viewerBusinessId);
       return { ...brand, products: privacyProducts };
     }));
 
@@ -3115,6 +3361,8 @@ app.get('/api/companies/:companyId/brands', requireAuth, async (req, res) => {
 app.post('/api/companies/:companyId/brands', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
+    // SECURITY: Require business membership
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
     const { name, logoUrl, description } = req.body;
 
     if (!name || !name.trim()) {
@@ -3144,6 +3392,9 @@ app.post('/api/companies/:companyId/brands', requireAuth, async (req, res) => {
 app.patch('/api/companies/:companyId/brands/:brandId', requireAuth, async (req, res) => {
   try {
     const { companyId, brandId } = req.params;
+    // SECURITY: Require business membership
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
     const brand = await repos.brandRepo.getById(brandId);
 
     if (!brand || brand.businessId !== companyId) {
@@ -3175,6 +3426,9 @@ app.patch('/api/companies/:companyId/brands/:brandId', requireAuth, async (req, 
 app.delete('/api/companies/:companyId/brands/:brandId', requireAuth, async (req, res) => {
   try {
     const { companyId, brandId } = req.params;
+    // SECURITY: Require business admin to delete brands
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
+
     const brand = await repos.brandRepo.getById(brandId);
 
     if (!brand || brand.businessId !== companyId) {
@@ -3552,35 +3806,21 @@ app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
 
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canCreateSellingOrders) {
-      return res.status(403).json(errorResponse(
+      return res.status(403).json(paywallResponse(
         'Creating orders requires a paid subscription.',
-        'CAPABILITY_REQUIRED'
+        'create_selling_order',
+        'pro'
       ));
     }
 
-    const { 
-      customerName, customerAddress, customerPhone, 
+    const orderData = validateBody(createOrderSchema, req, res);
+    if (!orderData) return;
+
+    const {
+      customerName, customerAddress, customerPhone,
       items, totalAmount, notes, fulfillmentLocationId,
       buyerBusinessId, buyerBusinessName, createdBy
-    } = req.body;
-
-    // Validate required fields
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json(errorResponse('Items array is required and cannot be empty', 'VALIDATION_ERROR'));
-    }
-    if (totalAmount === undefined || totalAmount === null || totalAmount < 0) {
-      return res.status(400).json(errorResponse('Total amount is required and must be non-negative', 'VALIDATION_ERROR'));
-    }
-    // Validate each item has required fields
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (!item.productId && !item.product_id) {
-        return res.status(400).json(errorResponse(`Item at index ${i} is missing productId`, 'VALIDATION_ERROR'));
-      }
-      if (!item.quantity && item.quantity !== 0) {
-        return res.status(400).json(errorResponse(`Item at index ${i} is missing quantity`, 'VALIDATION_ERROR'));
-      }
-    }
+    } = orderData;
 
     const isB2B = !!buyerBusinessId;
 
@@ -3917,6 +4157,15 @@ app.patch('/api/companies/:companyId/orders/:orderId/delivery-status', requireAu
       ));
     }
 
+    // Validate state machine transition
+    const currentDeliveryStatus = order.deliveryStatus || 'NOT_ASSIGNED';
+    if (!isValidDeliveryTransition(currentDeliveryStatus, deliveryStatus)) {
+      return res.status(400).json(errorResponse(
+        `Invalid delivery status transition from ${currentDeliveryStatus} to ${deliveryStatus}`,
+        'INVALID_STATUS_TRANSITION'
+      ));
+    }
+
     // Update order with new delivery status
     const updated = await repos.orderRepo.update(req.params.orderId, {
       deliveryStatus,
@@ -4077,24 +4326,23 @@ app.post('/api/locations/:locationId/orders', requireAuth, async (req, res) => {
 
     // ENFORCE: Business must have Enterprise capability for location-scoped orders
     if (!capabilities.canHaveIndependentLocations) {
-      return res.status(403).json({
-        success: false,
-        error: {
-          code: 'PLAN_REQUIRED',
-          message: 'Creating orders from independent locations requires an Enterprise subscription.'
-        }
-      });
+      return res.status(403).json(paywallResponse('Creating orders from independent locations requires an Enterprise subscription.', 'independent_locations', 'enterprise'));
     }
 
     if (!capabilities.canCreateSellingOrders) {
-      return res.status(403).json(errorResponse(
+      return res.status(403).json(paywallResponse(
         'Creating orders requires a paid subscription.',
-        'CAPABILITY_REQUIRED'
+        'create_selling_order',
+        'pro'
       ));
     }
 
+    // Validate request body with Zod schema (same as company-level order create)
+    const orderData = validateBody(createOrderSchema, req, res);
+    if (!orderData) return;
+
     const { customerName, customerAddress, customerPhone, items, totalAmount, notes,
-            buyerBusinessId, buyerBusinessName, createdBy } = req.body;
+            buyerBusinessId, buyerBusinessName, createdBy } = orderData;
 
     const isB2B = !!buyerBusinessId;
 
@@ -4346,10 +4594,11 @@ app.patch('/api/locations/:locationId/stock/:productId', requireAuth, async (req
 
 // Get stock for a business (all locations)
 app.get('/api/companies/:companyId/stock', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
   try {
-    const { businessId } = req.params;
+    const { companyId } = req.params;
 
-    const businessStock = await repos.stockRepo.getByBusinessId(businessId);
+    const businessStock = await repos.stockRepo.getByBusinessId(companyId);
 
     // Enrich with product + location
     const productIds = [...new Set(businessStock.map(s => s.productId))];
@@ -4403,7 +4652,7 @@ app.get('/api/companies/:companyId/suppliers', requireAuth, async (req, res) => 
 
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canViewSuppliers) {
-      return res.status(403).json(errorResponse('Viewing suppliers requires a paid subscription.', 'CAPABILITY_REQUIRED'));
+      return res.status(403).json(paywallResponse('Viewing suppliers requires a paid subscription.', 'create_procurement', 'pro'));
     }
 
     const suppliers = await repos.procurementRepo.getSuppliers(req.params.companyId);
@@ -4424,7 +4673,7 @@ app.post('/api/companies/:companyId/suppliers', requireAuth, procurementLimiter,
 
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canManageSuppliers) {
-      return res.status(403).json(errorResponse('Managing suppliers requires a paid subscription.', 'CAPABILITY_REQUIRED'));
+      return res.status(403).json(paywallResponse('Managing suppliers requires a paid subscription.', 'create_procurement', 'pro'));
     }
 
     // Check supplier limit
@@ -4519,7 +4768,7 @@ app.delete('/api/companies/:companyId/suppliers/:supplierId', requireAuth, procu
     if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canManageSuppliers) {
-      return res.status(403).json(errorResponse('Managing suppliers requires a paid subscription.', 'CAPABILITY_REQUIRED'));
+      return res.status(403).json(paywallResponse('Managing suppliers requires a paid subscription.', 'create_procurement', 'pro'));
     }
 
     const supplier = await repos.procurementRepo.getSupplierById(req.params.supplierId);
@@ -4643,7 +4892,7 @@ app.get('/api/companies/:companyId/purchase-requests', requireAuth, async (req, 
 
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canCreatePurchaseRequests) {
-      return res.status(403).json(errorResponse('Purchase requests require a paid subscription.', 'CAPABILITY_REQUIRED'));
+      return res.status(403).json(paywallResponse('Purchase requests require a paid subscription.', 'create_procurement', 'pro'));
     }
 
     const filters = {};
@@ -4669,7 +4918,7 @@ app.post('/api/companies/:companyId/purchase-requests', requireAuth, procurement
 
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canCreatePurchaseRequests) {
-      return res.status(403).json(errorResponse('Purchase requests require a paid subscription.', 'CAPABILITY_REQUIRED'));
+      return res.status(403).json(paywallResponse('Purchase requests require a paid subscription.', 'create_procurement', 'pro'));
     }
 
     const { supplierId, locationId, items, totalAmount, notes, priority, requiredByDate } = req.body;
@@ -4803,7 +5052,7 @@ app.post('/api/companies/:companyId/purchase-requests/:prId/approve', requireAut
     if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canApprovePurchaseRequests) {
-      return res.status(403).json(errorResponse('Approving purchase requests requires Business plan or higher.', 'CAPABILITY_REQUIRED'));
+      return res.status(403).json(paywallResponse('Approving purchase requests requires Business plan or higher.', 'approve_procurement', 'business'));
     }
 
     const pr = await repos.procurementRepo.getPurchaseRequestById(req.params.prId);
@@ -4850,7 +5099,7 @@ app.post('/api/companies/:companyId/purchase-requests/:prId/reject', requireAuth
     if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canApprovePurchaseRequests) {
-      return res.status(403).json(errorResponse('Rejecting purchase requests requires Business plan or higher.', 'CAPABILITY_REQUIRED'));
+      return res.status(403).json(paywallResponse('Rejecting purchase requests requires Business plan or higher.', 'approve_procurement', 'business'));
     }
 
     const pr = await repos.procurementRepo.getPurchaseRequestById(req.params.prId);
@@ -4948,7 +5197,7 @@ app.get('/api/companies/:companyId/purchase-orders', requireAuth, async (req, re
 
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canCreatePurchaseOrders) {
-      return res.status(403).json(errorResponse('Purchase orders require a paid subscription.', 'CAPABILITY_REQUIRED'));
+      return res.status(403).json(paywallResponse('Purchase orders require a paid subscription.', 'create_procurement', 'pro'));
     }
 
     const filters = {};
@@ -4974,7 +5223,7 @@ app.post('/api/companies/:companyId/purchase-orders', requireAuth, procurementLi
 
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canCreatePurchaseOrders) {
-      return res.status(403).json(errorResponse('Purchase orders require a paid subscription.', 'CAPABILITY_REQUIRED'));
+      return res.status(403).json(paywallResponse('Purchase orders require a paid subscription.', 'create_procurement', 'pro'));
     }
 
     const { supplierId, purchaseRequestId, locationId, items, totalAmount, paymentTerms, expectedDeliveryDate, notes } = req.body;
@@ -5178,7 +5427,7 @@ app.post('/api/companies/:companyId/purchase-orders/:poId/receive', requireAuth,
     if (!business) return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canReceiveGoods) {
-      return res.status(403).json(errorResponse('Receiving goods requires Business plan or higher.', 'CAPABILITY_REQUIRED'));
+      return res.status(403).json(paywallResponse('Receiving goods requires Business plan or higher.', 'receive_goods', 'business'));
     }
 
     const po = await repos.procurementRepo.getPurchaseOrderById(req.params.poId);
@@ -5275,7 +5524,7 @@ app.get('/api/companies/:companyId/goods-receipts', requireAuth, async (req, res
 
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canReceiveGoods) {
-      return res.status(403).json(errorResponse('Viewing goods receipts requires Business plan or higher.', 'CAPABILITY_REQUIRED'));
+      return res.status(403).json(paywallResponse('Viewing goods receipts requires Business plan or higher.', 'receive_goods', 'business'));
     }
 
     const receipts = await repos.procurementRepo.getGoodsReceipts(req.params.companyId);
@@ -5376,14 +5625,7 @@ app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =
     // Check plan capability
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canCreateDeliveries) {
-      return res.status(403).json({
-        error: {
-          code: 'PAYWALL',
-          triggerId: 'create_deliveries',
-          requiredPlan: 'pro',
-          message: 'Upgrade to Pro to create deliveries'
-        }
-      });
+      return res.status(403).json(paywallResponse('Upgrade to Pro to create deliveries', 'create_deliveries', 'pro'));
     }
 
     const body = req.body;
@@ -5475,8 +5717,9 @@ app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =
       assignedStaffId: body.assignedStaffId || null,
       assignedTo: body.assignedTo || null,
       transportMode: body.transportMode || null,
-      deliveryStatus: body.deliveryStatus || 'NOT_ASSIGNED',
-      paymentStatus: body.paymentStatus || 'UNPAID',
+      // SECURITY: Always default — caller cannot skip lifecycle by setting status at creation
+      deliveryStatus: 'NOT_ASSIGNED',
+      paymentStatus: 'UNPAID',
       orderId: body.orderId || null,
     });
 
@@ -5662,14 +5905,7 @@ app.post('/api/companies/:companyId/orders/:orderId/create-delivery', requireAut
     }
     const capabilities = deriveCapabilities(sellerBusiness);
     if (!capabilities.canCreateDeliveries) {
-      return res.status(403).json({
-        error: {
-          code: 'PAYWALL',
-          triggerId: 'create_deliveries',
-          requiredPlan: 'pro',
-          message: 'Upgrade to Pro to create deliveries'
-        }
-      });
+      return res.status(403).json(paywallResponse('Upgrade to Pro to create deliveries', 'create_deliveries', 'pro'));
     }
 
     const delivery = await repos.deliveryRepo.create({
@@ -5795,18 +6031,16 @@ app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => 
     
     // Allow all tiers to create invoice drafts
     if (!capabilities.canCreateInvoiceDraft) {
-      return res.status(403).json(errorResponse(
+      return res.status(403).json(paywallResponse(
         'Cannot create invoices',
-        'CAPABILITY_REQUIRED'
+        'send_invoice',
+        'pro'
       ));
     }
     
     // If trying to create as SENT directly, check canSendInvoice (Pro+ only)
     if (req.body.status === 'SENT' && !capabilities.canSendInvoice) {
-      return res.status(403).json(errorResponse(
-        { code: 'PAYWALL', triggerId: 'send_invoice', requiredPlan: 'pro' },
-        'Upgrade to Pro to send invoices'
-      ));
+      return res.status(403).json(paywallResponse('Upgrade to Pro to send invoices', 'send_invoice', 'pro'));
     }
 
     // ---- Request body validation ----
@@ -5863,23 +6097,39 @@ app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => 
     const MAX_RETRIES = 3;
     let created;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      const existingInvoices = await repos.invoiceRepo.getByBusinessId(req.params.companyId);
       const prefix = business.settings?.invoicePrefix || 'INV';
-      const maxNum = existingInvoices.reduce((max, inv) => {
+      // Efficient: only scan recent invoices for the highest number suffix
+      const recentInvoices = await prisma.invoice.findMany({
+        where: { businessId: req.params.companyId },
+        orderBy: { createdAt: 'desc' },
+        select: { invoiceNumber: true },
+        take: 50,
+      });
+      const maxNum = recentInvoices.reduce((max, inv) => {
         const match = (inv.invoiceNumber || '').match(/-(\d+)$/);
         return match ? Math.max(max, parseInt(match[1], 10)) : max;
       }, 0);
       const invoiceNumber = `${prefix}-${new Date().getFullYear()}-${String(maxNum + 1).padStart(3, '0')}`;
 
+      // SECURITY: Extract only allowed fields from req.body to prevent mass assignment
+      const { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId,
+              items, notes, currency, taxRate, discountAmount, dueDate, type: invoiceType,
+              totalAmount, subtotal, taxAmount } = req.body;
+      const safeBody = { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId,
+                         items, notes, currency, taxRate, discountAmount, dueDate,
+                         totalAmount, subtotal, taxAmount };
+      // Remove undefined keys
+      Object.keys(safeBody).forEach(k => safeBody[k] === undefined && delete safeBody[k]);
+
       const newInvoice = {
+        ...safeBody,
         id: 'inv-' + uuidv4().slice(0, 8),
         businessId: req.params.companyId,
         issuedByScope: INVOICE_SCOPE_FROM_STORE.PARENT,
         issuedByLocationId: null,
         invoiceNumber,
         status: 'DRAFT',
-        type: 'invoice',
-        ...req.body,
+        type: invoiceType || 'invoice',
       };
 
       try {
@@ -5998,29 +6248,21 @@ app.post('/api/locations/:locationId/invoices', requireAuth, async (req, res) =>
 
     // ENFORCE: Business must have Enterprise capability for location-scoped invoices
     if (!capabilities.canHaveIndependentLocations) {
-      return res.status(403).json({
-        success: false,
-        error: {
-          code: 'PLAN_REQUIRED',
-          message: 'Creating invoices from independent locations requires an Enterprise subscription.'
-        }
-      });
+      return res.status(403).json(paywallResponse('Creating invoices from independent locations requires an Enterprise subscription.', 'independent_locations', 'enterprise'));
     }
 
     // Allow all tiers to create invoice drafts
     if (!capabilities.canCreateInvoiceDraft) {
-      return res.status(403).json(errorResponse(
+      return res.status(403).json(paywallResponse(
         'Cannot create invoices',
-        'CAPABILITY_REQUIRED'
+        'send_invoice',
+        'pro'
       ));
     }
     
     // If trying to create as SENT directly, check canSendInvoice (Pro+ only)
     if (req.body.status === 'SENT' && !capabilities.canSendInvoice) {
-      return res.status(403).json(errorResponse(
-        { code: 'PAYWALL', triggerId: 'send_invoice', requiredPlan: 'pro' },
-        'Upgrade to Pro to send invoices'
-      ));
+      return res.status(403).json(paywallResponse('Upgrade to Pro to send invoices', 'send_invoice', 'pro'));
     }
 
     // ---- Request body validation (mirrors parent POST route) ----
@@ -6077,22 +6319,38 @@ app.post('/api/locations/:locationId/invoices', requireAuth, async (req, res) =>
     const MAX_RETRIES = 3;
     let created;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      const locationInvoices = await repos.invoiceRepo.getByLocationId(location.id);
+      const locationInvoices = await prisma.invoice.findMany({
+        where: { issuedByLocationId: location.id },
+        orderBy: { createdAt: 'desc' },
+        select: { invoiceNumber: true },
+        take: 50,
+      });
       const maxLocNum = locationInvoices.reduce((max, inv) => {
         const match = (inv.invoiceNumber || '').match(/-(\d+)$/);
         return match ? Math.max(max, parseInt(match[1], 10)) : max;
       }, 0);
       const invoiceNumber = `${prefix}-${new Date().getFullYear()}-${String(maxLocNum + 1).padStart(3, '0')}`;
 
+      // SECURITY: Extract only allowed fields from req.body to prevent mass assignment
+      const { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId,
+              items, notes, currency, taxRate, discountAmount, dueDate, type: invoiceType,
+              totalAmount, subtotal, taxAmount, issueDate } = req.body;
+      const safeBody = { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId,
+                         items, notes, currency, taxRate, discountAmount, dueDate,
+                         totalAmount, subtotal, taxAmount };
+      if (issueDate) safeBody.issueDate = new Date(issueDate);
+      if (dueDate && typeof dueDate === 'string') safeBody.dueDate = new Date(dueDate);
+      Object.keys(safeBody).forEach(k => safeBody[k] === undefined && delete safeBody[k]);
+
       const newInvoice = {
+        ...safeBody,
         id: 'inv-' + uuidv4().slice(0, 8),
         businessId,
         issuedByScope: INVOICE_SCOPE_FROM_STORE.LOCATION,
         issuedByLocationId: location.id,
         invoiceNumber,
-        status: 'DRAFT',
-        type: 'invoice',
-        ...req.body,
+        status: req.body.status === 'SENT' ? 'SENT' : 'DRAFT',
+        type: invoiceType || 'invoice',
       };
 
       try {
@@ -6221,23 +6479,31 @@ app.patch('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
       if (business) {
         const capabilities = deriveCapabilities(business);
         if (!capabilities.canSendInvoice) {
-          return res.status(403).json(errorResponse(
-            { code: 'PAYWALL', triggerId: 'send_invoice', requiredPlan: 'pro' },
-            'Upgrade to Pro to send invoices'
-          ));
+          return res.status(403).json(paywallResponse('Upgrade to Pro to send invoices', 'send_invoice', 'pro'));
         }
       }
     }
 
+    // SECURITY: Whitelist allowed fields — prevent mass assignment
+    const { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId,
+            items, notes, currency, taxRate, discountAmount, dueDate, issueDate,
+            totalAmount, subtotal, taxAmount, paidAmount, status: newStat, type,
+            discount, shipping } = req.body;
+    const updatePayload = { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId,
+                            items, notes, currency, taxRate, discountAmount, dueDate, issueDate,
+                            totalAmount, subtotal, taxAmount, paidAmount, status: newStat, type,
+                            discount, shipping };
+    Object.keys(updatePayload).forEach(k => updatePayload[k] === undefined && delete updatePayload[k]);
+
     // Parse date strings to Date objects for DateTime columns
-    if (req.body.issueDate && typeof req.body.issueDate === 'string') {
-      req.body.issueDate = new Date(req.body.issueDate);
+    if (updatePayload.issueDate && typeof updatePayload.issueDate === 'string') {
+      updatePayload.issueDate = new Date(updatePayload.issueDate);
     }
-    if (req.body.dueDate && typeof req.body.dueDate === 'string') {
-      req.body.dueDate = new Date(req.body.dueDate);
+    if (updatePayload.dueDate && typeof updatePayload.dueDate === 'string') {
+      updatePayload.dueDate = new Date(updatePayload.dueDate);
     }
 
-    const updated = await repos.invoiceRepo.update(req.params.invoiceId, req.body);
+    const updated = await repos.invoiceRepo.update(req.params.invoiceId, updatePayload);
 
     // Emit estimate_confirmed when type changes from estimate to invoice
     const wasEstimate = (invoice.type || '').toLowerCase() === 'estimate';
@@ -6342,14 +6608,11 @@ app.post('/api/invoices/:invoiceId/accept', requireAuth, async (req, res) => {
     if (invoice.status !== 'SENT') {
       return res.status(400).json(errorResponse('Estimate is not in a valid state for acceptance', 'VALIDATION_ERROR'));
     }
-    // Check caller is admin/super_admin of ANY business (RBAC)
+    // SECURITY: Check caller is admin/super_admin of the INVOICE'S business specifically (not any business)
     const userId = req.user?.id;
-    const memberships = await repos.memberRepo.listUserMemberships(userId);
-    const isAdminOrSuperAdmin = memberships.some(m =>
-      m.status === 'accepted' && (m.role === 'admin' || m.role === 'super_admin')
-    );
-    if (!isAdminOrSuperAdmin) {
-      return res.status(403).json(errorResponse('Only admin or super admin can accept estimates', 'PERMISSION_DENIED'));
+    const membership = await findBusinessMember(invoice.businessId, userId);
+    if (!membership || membership.status !== 'accepted' || (membership.role !== 'admin' && membership.role !== 'super_admin')) {
+      return res.status(403).json(errorResponse('Only admin or super admin of this business can accept estimates', 'PERMISSION_DENIED'));
     }
     // Convert: change type to invoice
     const updated = await repos.invoiceRepo.update(req.params.invoiceId, { type: 'invoice' });
@@ -7641,6 +7904,9 @@ app.post('/api/users/:userId/chats/:chatId/remove-participant', requireAuth, asy
 // Get business members
 app.get('/api/companies/:companyId/members', requireAuth, async (req, res) => {
   try {
+    // SECURITY: Require business membership to view member list
+    if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
     const members = await repos.memberRepo.listBusinessMembers(req.params.companyId);
     const enrichedMembers = members.map(m => ({
       ...m,
@@ -7653,6 +7919,12 @@ app.get('/api/companies/:companyId/members', requireAuth, async (req, res) => {
 // Get location members
 app.get('/api/locations/:locationId/members', requireAuth, async (req, res) => {
   try {
+    // SECURITY: Verify user belongs to the location's business
+    const location = await repos.locationRepo.getById(req.params.locationId);
+    if (!location) return res.status(404).json(errorResponse('Location not found'));
+    const bizId = location.businessId || location.companyId;
+    if (!(await requireBusinessMembership(req, res, bizId))) return;
+
     const members = await repos.memberRepo.listLocationMembers(req.params.locationId);
     const enrichedMembers = members.map(m => ({
       ...m,
@@ -7665,6 +7937,11 @@ app.get('/api/locations/:locationId/members', requireAuth, async (req, res) => {
 // Get user's business memberships
 app.get('/api/users/:userId/businesses', requireAuth, async (req, res) => {
   try {
+    // SECURITY: Only allow users to view their own business memberships
+    if (req.user?.id !== req.params.userId) {
+      return res.status(403).json(errorResponse('You can only view your own business memberships', 'FORBIDDEN'));
+    }
+
     const userBusinessMembers = await repos.memberRepo.getByUserId(req.params.userId);
     const accepted = userBusinessMembers.filter(m => m.status === MEMBER_STATUS.ACCEPTED);
 
@@ -7684,6 +7961,11 @@ app.get('/api/users/:userId/businesses', requireAuth, async (req, res) => {
 // Get user's location memberships
 app.get('/api/users/:userId/locations', requireAuth, async (req, res) => {
   try {
+    // SECURITY: Only allow users to view their own location memberships
+    if (req.user?.id !== req.params.userId) {
+      return res.status(403).json(errorResponse('You can only view your own location memberships', 'FORBIDDEN'));
+    }
+
     const allLocMembers = await repos.memberRepo.listLocationMembersByUserId(req.params.userId);
     const accepted = allLocMembers.filter(m => m.status === MEMBER_STATUS.ACCEPTED);
 
@@ -7707,89 +7989,87 @@ app.get('/api/users/:userId/contacts', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     const { search } = req.query;
-    const searchLower = search ? search.toString().toLowerCase() : '';
+    const searchTerm = search ? search.toString().trim() : '';
 
-    // 1) Find all businessIds the requesting user belongs to (via Prisma)
+    // 1) Find all businessIds the requesting user belongs to
     const myMemberships = await repos.memberRepo.getByUserId(userId);
     const acceptedMemberships = myMemberships.filter(m => m.status === 'accepted');
     const userBusinessIds = acceptedMemberships.map(m => m.businessId);
 
-    // 2) Get all users from DB
-    const allUsers = await repos.userRepo.list();
-    const userResults = allUsers
-      .filter(u => u.id !== userId) // exclude self
-      .filter(u => {
-        if (!searchLower) return true;
-        return (u.name || '').toLowerCase().includes(searchLower) ||
-               (u.email || '').toLowerCase().includes(searchLower);
-      })
-      .map(u => {
-        // Check if this user shares a business with the requesting user
-        // We need all memberships for this target user — query inline
-        // For efficiency, we batch-check: find any membership row for u.id in one of userBusinessIds
-        // Since we already have myMemberships, we check if the target user is also in any of those businesses
-        // We'll resolve this after the map with a bulk query below
-        return {
-          id: u.id,
-          name: u.name || 'Unknown',
-          avatar: u.avatar || null,
-          email: u.email || null,
-          type: 'user',
-          is_connected: false, // placeholder, resolved below
-          role: null,          // placeholder, resolved below
-        };
-      });
-
-    // Batch-resolve connection status for all user results
-    // Get all business members for the businesses the requesting user belongs to
-    const allMembersInMyBusinesses = [];
-    for (const bizId of userBusinessIds) {
-      const members = await repos.memberRepo.listBusinessMembers(bizId);
-      allMembersInMyBusinesses.push(...members);
+    // Build search filter for Prisma (push filtering to DB instead of loading all records)
+    const userWhere = { id: { not: userId } };
+    const businessWhere = {};
+    if (searchTerm) {
+      userWhere.OR = [
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+        { email: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+      businessWhere.OR = [
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+        { description: { contains: searchTerm, mode: 'insensitive' } },
+      ];
     }
 
-    // Build a map: userId -> { businessId, role } for accepted members in shared businesses
+    // 2) Fetch users, businesses, and shared members in parallel (all DB-filtered)
+    const [matchedUsers, matchedBusinesses, allMembersInMyBusinesses] = await Promise.all([
+      prisma.user.findMany({
+        where: userWhere,
+        select: { id: true, name: true, avatar: true, email: true },
+        take: 100,
+        orderBy: { name: 'asc' },
+      }),
+      prisma.business.findMany({
+        where: businessWhere,
+        select: { id: true, name: true, logoUrl: true, email: true },
+        take: 100,
+        orderBy: { name: 'asc' },
+      }),
+      // Single query for all members across user's businesses (replaces N+1 loop)
+      userBusinessIds.length > 0
+        ? prisma.businessMember.findMany({
+            where: { businessId: { in: userBusinessIds }, status: 'accepted', userId: { not: userId } },
+            select: { userId: true, businessId: true, role: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    // Build a map: userId -> { businessId, role } for connection status
     const sharedMemberMap = new Map();
     for (const m of allMembersInMyBusinesses) {
-      if (m.status === 'accepted' && m.userId !== userId) {
-        if (!sharedMemberMap.has(m.userId)) {
-          sharedMemberMap.set(m.userId, { businessId: m.businessId, role: m.role });
-        }
+      if (!sharedMemberMap.has(m.userId)) {
+        sharedMemberMap.set(m.userId, { businessId: m.businessId, role: m.role });
       }
     }
 
-    // Apply connection info to user results
-    for (const ur of userResults) {
-      const shared = sharedMemberMap.get(ur.id);
-      if (shared) {
-        ur.is_connected = true;
-        ur.role = shared.role;
-      }
-    }
+    // Map user results with connection info
+    const userResults = matchedUsers.map(u => {
+      const shared = sharedMemberMap.get(u.id);
+      return {
+        id: u.id,
+        name: u.name || 'Unknown',
+        avatar: u.avatar || null,
+        email: u.email || null,
+        type: 'user',
+        is_connected: !!shared,
+        role: shared ? shared.role : null,
+      };
+    });
 
-    // 3) Get all businesses from DB
-    const allBusinesses = await repos.businessRepo.list();
-    const businessResults = allBusinesses
-      .filter(c => {
-        if (!searchLower) return true;
-        return (c.name || '').toLowerCase().includes(searchLower) ||
-               (c.description || '').toLowerCase().includes(searchLower);
-      })
-      .map(c => {
-        const isMember = userBusinessIds.includes(c.id);
-        const membership = isMember
-          ? acceptedMemberships.find(m => m.businessId === c.id)
-          : null;
-        return {
-          id: c.id,
-          name: c.name,
-          avatar: c.logoUrl || null,
-          email: c.email || null,
-          type: 'business',
-          is_connected: isMember,
-          role: membership ? membership.role : null,
-        };
-      });
+    // Map business results with membership info
+    const userBusinessIdSet = new Set(userBusinessIds);
+    const businessResults = matchedBusinesses.map(c => {
+      const isMember = userBusinessIdSet.has(c.id);
+      const membership = isMember ? acceptedMemberships.find(m => m.businessId === c.id) : null;
+      return {
+        id: c.id,
+        name: c.name,
+        avatar: c.logoUrl || null,
+        email: c.email || null,
+        type: 'business',
+        is_connected: isMember,
+        role: membership ? membership.role : null,
+      };
+    });
 
     // Combine, sort alphabetically
     const allResults = [...userResults, ...businessResults].sort((a, b) =>
@@ -7804,7 +8084,9 @@ app.get('/api/users/:userId/contacts', requireAuth, async (req, res) => {
 });
 
 // Legacy User Management Routes — now Prisma-backed
-app.get('/api/companies/:companyId/users', async (req, res) => {
+app.get('/api/companies/:companyId/users', requireAuth, async (req, res) => {
+  // SECURITY: Require business membership
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
   try {
     // Get members of this company from Prisma
     const members = await repos.memberRepo.listBusinessMembers(req.params.companyId);
@@ -8120,13 +8402,16 @@ app.post('/api/companies/:companyId/locations/:locationId/staff', requireAuth, a
     if (business) {
       const capabilities = deriveCapabilities(business);
       if (!capabilities.canHaveStaff) {
-        return res.status(403).json({
-          error: { code: 'PAYWALL', triggerId: 'accept_staff', requiredPlan: 'pro', message: 'Upgrade to Pro to add staff members' }
-        });
+        return res.status(403).json(paywallResponse('Upgrade to Pro to add staff members', 'accept_staff', 'pro'));
       }
       const currentCount = await getStaffCount(companyId);
       if (currentCount >= capabilities.maxStaff) {
-        return res.status(403).json(errorResponse(`Staff limit reached (${capabilities.maxStaff}). Upgrade your plan to add more staff.`));
+        const requiredPlan = capabilities.maxStaff >= 9 ? 'enterprise' : (capabilities.maxStaff >= 3 ? 'business' : 'pro');
+        return res.status(403).json(paywallResponse(
+          `Staff limit reached (${capabilities.maxStaff}). Upgrade your plan to add more staff.`,
+          `staff_limit_reached_${requiredPlan === 'enterprise' ? 'business' : (requiredPlan === 'business' ? 'pro' : 'free')}`,
+          requiredPlan
+        ));
       }
     }
 
@@ -8316,11 +8601,16 @@ app.get('/api/companies/:companyId/access/locations', requireAuth, async (req, r
 // Get capabilities for a user (for frontend Pro vs Personal mode gating)
 // GET /api/companies/:companyId/access/capabilities?userId=usr-004
 // Returns: { role, canAccessBusinessProfile, canAccessAllLocations }
-app.get('/api/companies/:companyId/access/capabilities', async (req, res) => {
+app.get('/api/companies/:companyId/access/capabilities', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
-    const { userId } = req.query;
+    const userId = req.query.userId || req.user?.id;
     if (!userId) return res.status(400).json(errorResponse('userId is required'));
+
+    // SECURITY: Only allow querying own capabilities or if requester is admin
+    if (userId !== req.user?.id) {
+      if (!(await requireBusinessAdmin(req, res, companyId))) return;
+    }
 
     const bm = await repos.memberRepo.getBusinessMember(companyId, userId);
     if (!bm || bm.status !== 'accepted') {
@@ -8381,21 +8671,17 @@ app.post('/api/companies/:companyId/users/invite', requireAuth, async (req, res)
       
       // Check if plan allows inviting staff
       if (!capabilities.canInviteStaff) {
-        return res.status(403).json({
-          error: {
-            code: 'PAYWALL',
-            triggerId: 'accept_staff',
-            requiredPlan: 'pro',
-            message: 'Upgrade to Pro to invite staff members'
-          }
-        });
+        return res.status(403).json(paywallResponse('Upgrade to Pro to invite staff members', 'accept_staff', 'pro'));
       }
       
       // Check staff limit
       const currentStaffCount = await getStaffCount(companyId);
       if (currentStaffCount >= capabilities.maxStaff) {
-        return res.status(403).json(errorResponse(
-          `Staff limit reached (${capabilities.maxStaff}). Upgrade your plan to add more staff.`
+        const requiredPlan = capabilities.maxStaff >= 9 ? 'enterprise' : (capabilities.maxStaff >= 3 ? 'business' : 'pro');
+        return res.status(403).json(paywallResponse(
+          `Staff limit reached (${capabilities.maxStaff}). Upgrade your plan to add more staff.`,
+          `staff_limit_reached_${requiredPlan === 'enterprise' ? 'business' : (requiredPlan === 'business' ? 'pro' : 'free')}`,
+          requiredPlan
         ));
       }
     }
@@ -8780,13 +9066,16 @@ app.patch('/api/companies/:companyId/role-requests/:requestId', requireAuth, asy
         if (business) {
           const capabilities = deriveCapabilities(business);
           if (!capabilities.canHaveStaff) {
-            return res.status(403).json({
-              error: { code: 'PAYWALL', triggerId: 'accept_staff', requiredPlan: 'pro', message: 'Upgrade to Pro to accept join requests' }
-            });
+            return res.status(403).json(paywallResponse('Upgrade to Pro to accept join requests', 'accept_staff', 'pro'));
           }
           const currentCount = await getStaffCount(businessId);
           if (currentCount >= capabilities.maxStaff) {
-            return res.status(403).json(errorResponse(`Staff limit reached (${capabilities.maxStaff}). Upgrade your plan to accept more members.`));
+            const requiredPlan = capabilities.maxStaff >= 9 ? 'enterprise' : (capabilities.maxStaff >= 3 ? 'business' : 'pro');
+            return res.status(403).json(paywallResponse(
+              `Staff limit reached (${capabilities.maxStaff}). Upgrade your plan to accept more members.`,
+              `staff_limit_reached_${requiredPlan === 'enterprise' ? 'business' : (requiredPlan === 'business' ? 'pro' : 'free')}`,
+              requiredPlan
+            ));
           }
         }
 
@@ -8922,14 +9211,7 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/assign', requireAuth
     
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canAssignTransport) {
-      return res.status(403).json({
-        error: {
-          code: 'PAYWALL',
-          triggerId: 'assign_transport',
-          requiredPlan: 'pro',
-          message: 'Upgrade to Pro to assign transport'
-        }
-      });
+      return res.status(403).json(paywallResponse('Upgrade to Pro to assign transport', 'assign_transport', 'pro'));
     }
 
     // Use repository instead of raw array access
@@ -9082,7 +9364,7 @@ app.post('/api/companies/:companyId/deliveries/:deliveryId/staff', requireAuth, 
     if (!business) return res.status(404).json(errorResponse('Business not found'));
     const capabilities = deriveCapabilities(business);
     if (!capabilities.canAssignTransport) {
-      return res.status(403).json({ error: { code: 'PAYWALL', triggerId: 'assign_transport', requiredPlan: 'pro', message: 'Upgrade to Pro to assign transport' } });
+      return res.status(403).json(paywallResponse('Upgrade to Pro to assign transport', 'assign_transport', 'pro'));
     }
 
     // Validate delivery exists and belongs to business
@@ -9284,6 +9566,7 @@ app.get('/api/users/:userId/activities', requireAuth, async (req, res) => {
 // Get Activities for a user scoped to a specific business
 // GET /api/companies/:companyId/users/:userId/activities
 app.get('/api/companies/:companyId/users/:userId/activities', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
   try {
     const { companyId, userId } = req.params;
 
@@ -9339,7 +9622,8 @@ app.get('/api/feed', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit || '20', 10), 50);
     const cursor = req.query.cursor; // post id of the last item (optional)
-    const { viewerBusinessId } = req.query;
+    // SECURITY: Public endpoint — do not trust viewerBusinessId from query params
+    const viewerBusinessId = null;
 
     const allPosts = await prisma.feedPost.findMany({
       take: limit + 1,
@@ -9407,11 +9691,13 @@ app.get('/api/companies/:companyId/activity-feed', requireAuth, async (req, res)
     
     let activities = [];
     
-    // 1. Recent invoices
-    const businessInvoices = await repos.invoiceRepo.getByBusinessId(companyId);
+    // 1. Recent invoices (fetch only what we need via Prisma directly)
+    const businessInvoices = await prisma.invoice.findMany({
+      where: { businessId: companyId, ...(locationId ? { issuedByLocationId: locationId } : {}) },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
     const recentInvoices = businessInvoices
-      .filter(inv => locationId ? inv.issuedByLocationId === locationId : true)
-      .slice(0, 20)
       .map(inv => ({
         id: `inv-${inv.id}`,
         type: 'invoice_sent',
@@ -9428,11 +9714,13 @@ app.get('/api/companies/:companyId/activity-feed', requireAuth, async (req, res)
       }));
     activities.push(...recentInvoices);
     
-    // 2. Recent deliveries
-    const businessDeliveries = await repos.deliveryRepo.getByBusinessId(companyId);
+    // 2. Recent deliveries (fetch only what we need via Prisma directly)
+    const businessDeliveries = await prisma.delivery.findMany({
+      where: { businessId: companyId, ...(locationId ? { locationId } : {}) },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
     const recentDeliveries = businessDeliveries
-      .filter(del => locationId ? del.locationId === locationId : true)
-      .slice(0, 20)
       .map(del => {
         const statusMap = {
           'PENDING': 'delivery_pending',
@@ -9459,11 +9747,13 @@ app.get('/api/companies/:companyId/activity-feed', requireAuth, async (req, res)
       });
     activities.push(...recentDeliveries);
     
-    // 3. Recent orders (if separate from deliveries)
-    const businessOrders = await repos.orderRepo.getByBusinessId(companyId);
+    // 3. Recent orders (fetch only what we need via Prisma directly)
+    const businessOrders = await prisma.order.findMany({
+      where: { businessId: companyId, ...(locationId ? { soldByLocationId: locationId } : {}) },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
     const recentOrders = businessOrders
-      .filter(ord => locationId ? ord.locationId === locationId : true)
-      .slice(0, 20)
       .map(ord => ({
         id: `ord-${ord.id}`,
         type: 'order_created',
@@ -9570,318 +9860,253 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
     let notifications = [];
 
     // =========================================================================
-    // BUSINESS MODE
+    // BUSINESS MODE — parallelized with DB-level filtering
     // =========================================================================
     if (mode === 'business') {
     const userBusinesses = await repos.memberRepo.getByUserId(userId);
-    
-      // 1. Pending join requests — staff_request
-      for (const ub of userBusinesses) {
-        if (ub.role === 'admin' || ub.role === 'super_admin') {
-          const pendingRequests = await repos.roleRequestRepo.getByBusinessId(ub.businessId, 'PENDING');
-          for (const rr of pendingRequests) {
-            const isJoinRequest = !rr.currentRole || rr.currentRole === 'none';
-            notifications.push({
-              id: `req-${rr.id}`,
-              type: 'staff_request',
-              title: isJoinRequest ? 'Join request' : 'Role upgrade request',
-              description: isJoinRequest
-                ? `${rr.user?.name || 'Someone'} wants to join your company`
-                : `${rr.user?.name || 'Someone'} is requesting admin access`,
-              time: formatRelativeTime(rr.createdAt),
-              timestamp: rr.createdAt,
-              read: false,
-              avatar: rr.user?.avatar || null,
-              status: 'pending',
-              requestData: {
-                requestId: rr.id,
-                userId: rr.userId,
-                userName: rr.user?.name,
-                userEmail: rr.user?.email,
-                businessId: rr.businessId,
-                currentRole: rr.currentRole,
-              },
-            });
-          }
-        }
-      }
+    const allBusinessIds = userBusinesses.map(ub => ub.businessId);
+    const adminBusinesses = userBusinesses.filter(ub => ub.role === 'admin' || ub.role === 'super_admin');
+    const adminBusinessIds = adminBusinesses.map(ub => ub.businessId);
 
-      // 2. Recently approved requests needing role assignment — join_accepted
-      for (const ub of userBusinesses) {
-        if (ub.role === 'admin' || ub.role === 'super_admin') {
-          const approvedRequests = await repos.roleRequestRepo.getByBusinessId(ub.businessId, 'APPROVED');
-          const recentApproved = approvedRequests.filter(
-            rr => rr.resolvedAt && new Date(rr.resolvedAt) > THIRTY_DAYS_AGO
-          );
-          for (const rr of recentApproved) {
-            notifications.push({
-              id: `join-accepted-${rr.id}`,
-              type: 'join_accepted',
-              title: 'Request accepted',
-              description: `${rr.user?.name || 'Someone'} joined your company — assign their role`,
-              time: formatRelativeTime(rr.resolvedAt),
-              timestamp: rr.resolvedAt,
-              read: false,
-              avatar: rr.user?.avatar || null,
-              status: 'accepted',
-              requestData: {
-                requestId: rr.id,
-                userId: rr.userId,
-                userName: rr.user?.name,
-                userEmail: rr.user?.email,
-                businessId: rr.businessId,
-              },
-            });
-          }
-        }
-      }
+    // Run all notification fetches in parallel
+    const results = await Promise.allSettled([
+      // 1. Pending join requests — staff_request (admin only)
+      adminBusinessIds.length > 0
+        ? prisma.roleRequest.findMany({
+            where: { businessId: { in: adminBusinessIds }, status: 'PENDING' },
+            include: { user: { select: { name: true, avatar: true, email: true } } },
+            take: 50,
+          })
+        : Promise.resolve([]),
 
-      // 3. Pending invites sent by the business — invite_pending
-      for (const ub of userBusinesses) {
-        if (ub.role === 'admin' || ub.role === 'super_admin') {
-          const allMembers = await repos.memberRepo.listBusinessMembers(ub.businessId);
-          const pendingInvites = allMembers.filter(m => m.status === 'invited');
-          for (const inv of pendingInvites) {
-            notifications.push({
-              id: `inv-${inv.id}`,
-              type: 'invite_pending',
-              title: 'Invite pending',
-              description: `Invitation sent to ${inv.email || inv.user?.email || 'unknown'}`,
-              time: formatRelativeTime(inv.createdAt),
-              timestamp: inv.createdAt,
-              read: false,
-              avatar: null,
-              status: 'pending',
-              requestData: {
-                inviteId: inv.id,
-                email: inv.email || inv.user?.email,
-                role: inv.role,
-                businessId: ub.businessId,
-              },
-            });
-          }
-        }
-      }
+      // 2. Recently approved requests — join_accepted (admin only)
+      adminBusinessIds.length > 0
+        ? prisma.roleRequest.findMany({
+            where: { businessId: { in: adminBusinessIds }, status: 'APPROVED', resolvedAt: { gte: THIRTY_DAYS_AGO } },
+            include: { user: { select: { name: true, avatar: true, email: true } } },
+            take: 50,
+          })
+        : Promise.resolve([]),
 
-      // 4. Business connection requests received — company_request
-      for (const ub of userBusinesses) {
-        if (ub.role === 'admin' || ub.role === 'super_admin') {
-          try {
-            const pendingBizConns = await repos.connectionRepo.listPendingBusinessRequests(ub.businessId);
-            for (const conn of pendingBizConns) {
-              const requester = conn.requesterBusiness;
-              notifications.push({
-                id: `biz-conn-req-${conn.id}`,
-                type: 'company_request',
-                title: 'Connection request',
-                description: `${requester?.name || 'A company'} wants to connect with your business`,
-                time: formatRelativeTime(conn.createdAt),
-                timestamp: conn.createdAt,
-                read: false,
-                avatar: requester?.logoUrl || null,
-                status: 'pending',
-                requestData: {
-                  connectionId: conn.id,
-                  companyId: requester?.id,
-                  companyName: requester?.name,
-                  businessId: ub.businessId,
-                },
-              });
+      // 3. Pending invites — invite_pending (admin only)
+      adminBusinessIds.length > 0
+        ? prisma.businessMember.findMany({
+            where: { businessId: { in: adminBusinessIds }, status: 'invited' },
+            include: { user: { select: { email: true } } },
+            take: 50,
+          })
+        : Promise.resolve([]),
+
+      // 4. Business connection requests — company_request (admin only)
+      adminBusinessIds.length > 0
+        ? (async () => {
+            const conns = [];
+            for (const bizId of adminBusinessIds) {
+              try { conns.push(...await repos.connectionRepo.listPendingBusinessRequests(bizId)); } catch {}
             }
-          } catch (err) {
-            console.error('Error fetching business connection requests:', err);
-          }
-        }
-      }
+            return conns;
+          })()
+        : Promise.resolve([]),
 
-      // 5. Recently accepted business connections — connection_accepted
-      for (const ub of userBusinesses) {
-        if (ub.role === 'admin' || ub.role === 'super_admin') {
-          try {
-            const acceptedConns = await repos.connectionRepo.listBusinessConnections(ub.businessId, 'accepted');
-            const recentAccepted = acceptedConns
-              .filter(c => c.createdAt && new Date(c.createdAt) > THIRTY_DAYS_AGO)
-              .slice(0, 5);
-            for (const conn of recentAccepted) {
-              const otherBiz = conn.requesterBusinessId === ub.businessId
-                ? conn.targetBusiness
-                : conn.requesterBusiness;
-              notifications.push({
-                id: `biz-conn-accepted-${conn.id}`,
-                type: 'connection_accepted',
-                title: 'Connection accepted',
-                description: `You are now connected with ${otherBiz?.name || 'a company'}`,
-                time: formatRelativeTime(conn.createdAt),
-                timestamp: conn.createdAt,
-                read: false,
-                avatar: otherBiz?.logoUrl || null,
-                requestData: {
-                  connectionId: conn.id,
-                  companyId: otherBiz?.id,
-                  companyName: otherBiz?.name,
-                },
-              });
+      // 5. Recently accepted business connections — connection_accepted (admin only)
+      adminBusinessIds.length > 0
+        ? (async () => {
+            const conns = [];
+            for (const bizId of adminBusinessIds) {
+              try {
+                const accepted = await repos.connectionRepo.listBusinessConnections(bizId, 'accepted');
+                conns.push(...accepted.filter(c => c.createdAt && new Date(c.createdAt) > THIRTY_DAYS_AGO).slice(0, 5).map(c => ({ ...c, _sourceBizId: bizId })));
+              } catch {}
             }
-          } catch (err) {
-            console.error('Error fetching accepted business connections:', err);
-          }
-        }
-      }
+            return conns;
+          })()
+        : Promise.resolve([]),
 
-      // 6. Paid invoices — invoice
-      for (const ub of userBusinesses) {
-        try {
-          const allInvoices = await repos.invoiceRepo.getByBusinessId(ub.businessId);
-          const paidInvoices = allInvoices
-            .filter(inv => inv.status === 'PAID')
-            .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
-            .slice(0, 5);
-          for (const inv of paidInvoices) {
-            notifications.push({
-              id: `inv-paid-${inv.id}`,
-              type: 'invoice',
-              title: 'Invoice payment received',
-              description: `Payment of ${formatCurrency(inv.totalAmount)} received for invoice #${inv.id}`,
-              time: formatRelativeTime(inv.updatedAt || inv.createdAt),
-              timestamp: inv.updatedAt || inv.createdAt,
-              read: false,
-              avatar: null,
-            });
-          }
-        } catch (err) {
-          console.error('Error fetching invoices for notifications:', err);
-        }
-      }
+      // 6. Paid invoices — DB-filtered instead of loading all
+      allBusinessIds.length > 0
+        ? prisma.invoice.findMany({
+            where: { businessId: { in: allBusinessIds }, status: 'PAID' },
+            orderBy: { updatedAt: 'desc' },
+            select: { id: true, totalAmount: true, updatedAt: true, createdAt: true },
+            take: 10,
+          })
+        : Promise.resolve([]),
 
-      // 7. Completed deliveries — delivery
-      for (const ub of userBusinesses) {
-        try {
-          const allDeliveries = await repos.deliveryRepo.getByBusinessId(ub.businessId);
-          const completedDeliveries = allDeliveries
-            .filter(del => del.deliveryStatus === 'DELIVERED')
-            .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
-            .slice(0, 3);
-          for (const del of completedDeliveries) {
-            notifications.push({
-              id: `del-completed-${del.id}`,
-              type: 'delivery',
-              title: 'Delivery completed',
-              description: `Delivery #${del.id} to ${del.clientCompanyName || 'client'} completed`,
-              time: formatRelativeTime(del.updatedAt || del.createdAt),
-              timestamp: del.updatedAt || del.createdAt,
-              read: false,
-              avatar: null,
-              requestData: { deliveryId: del.id, businessId: ub.businessId },
-            });
-          }
-        } catch (err) {
-          console.error('Error fetching deliveries for notifications:', err);
-        }
-      }
+      // 7. Completed deliveries — DB-filtered
+      allBusinessIds.length > 0
+        ? prisma.delivery.findMany({
+            where: { businessId: { in: allBusinessIds }, deliveryStatus: 'DELIVERED' },
+            orderBy: { updatedAt: 'desc' },
+            select: { id: true, clientCompanyName: true, businessId: true, updatedAt: true, createdAt: true },
+            take: 10,
+          })
+        : Promise.resolve([]),
 
-      // 8. Low stock alerts — stock_alert
-      for (const ub of userBusinesses) {
-        if (ub.role === 'admin' || ub.role === 'super_admin') {
-          try {
-            const allStocks = await repos.stockRepo.getByBusinessId(ub.businessId);
-            const LOW_STOCK_THRESHOLD = 10;
-            const lowStocks = allStocks.filter(s => (s.qtyOnHand || 0) <= LOW_STOCK_THRESHOLD);
-            for (const stock of lowStocks.slice(0, 10)) {
-              const product = await repos.productRepo.getById(stock.productId);
-              if (!product) continue;
-              notifications.push({
-                id: `stock-low-${stock.id}`,
-                type: 'stock_alert',
-                title: 'Low stock alert',
-                description: `${product.name} has only ${stock.qtyOnHand} units remaining`,
-                time: formatRelativeTime(stock.updatedAt || stock.createdAt),
-                timestamp: stock.updatedAt || stock.createdAt,
-                read: false,
-                avatar: product.productPicture || null,
-                productData: {
-                  productId: product.id,
-                  productName: product.name,
-                  currentStock: stock.qtyOnHand,
-                  locationId: stock.locationId,
-                },
-              });
-            }
-          } catch (err) {
-            console.error('Error fetching low stock alerts for notifications:', err);
-          }
-        }
-      }
+      // 8. Low stock alerts — DB-filtered with product join (admin only)
+      adminBusinessIds.length > 0
+        ? prisma.stock.findMany({
+            where: { businessId: { in: adminBusinessIds }, qtyOnHand: { lte: 10 } },
+            include: { product: { select: { id: true, name: true, productPicture: true } } },
+            take: 20,
+          })
+        : Promise.resolve([]),
 
-      // 9. Recent order status updates — order_update
-      for (const ub of userBusinesses) {
-        try {
-          const allOrders = await repos.orderRepo.getByBusinessId(ub.businessId);
-          const recentOrders = allOrders
-            .filter(o => ['CANCELED', 'REJECTED', 'DONE', 'PENDING', 'ACCEPTED'].includes(o.status))
-            .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
-            .slice(0, 5);
-          for (const order of recentOrders) {
-            const statusLabel = {
-              CANCELED: 'Canceled', REJECTED: 'Rejected', DONE: 'Completed',
-              PENDING: 'Pending', ACCEPTED: 'Accepted',
-            }[order.status] || order.status;
-            notifications.push({
-              id: `order-update-${order.id}`,
-              type: 'order_update',
-              title: `Order ${statusLabel.toLowerCase()}`,
-              description: `Order #${order.id} is now ${statusLabel.toLowerCase()}${order.customerName ? ` — ${order.customerName}` : ''}`,
-              time: formatRelativeTime(order.updatedAt || order.createdAt),
-              timestamp: order.updatedAt || order.createdAt,
-              read: false,
-              avatar: null,
-              requestData: { orderId: order.id, businessId: ub.businessId },
-            });
-          }
-        } catch (err) {
-          console.error('Error fetching order updates for notifications:', err);
-        }
-      }
+      // 9. Recent order status updates — DB-filtered
+      allBusinessIds.length > 0
+        ? prisma.order.findMany({
+            where: { businessId: { in: allBusinessIds }, status: { in: ['CANCELED', 'REJECTED', 'DONE', 'PENDING', 'ACCEPTED'] } },
+            orderBy: { updatedAt: 'desc' },
+            select: { id: true, status: true, customerName: true, businessId: true, updatedAt: true, createdAt: true },
+            take: 10,
+          })
+        : Promise.resolve([]),
 
-      // 10. Subscription due / expired — subscription_due
-      for (const ub of userBusinesses) {
-        if (ub.role === 'admin' || ub.role === 'super_admin') {
-          try {
-            const business = await repos.businessRepo.getById(ub.businessId);
-            if (!business || business.subscriptionTier === 'FREE') continue;
-            const periodEnd = business.currentPeriodEnd ? new Date(business.currentPeriodEnd) : null;
-            if (!periodEnd) continue;
-            const now = new Date();
-            const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-            if (periodEnd < now) {
-              notifications.push({
-                id: `sub-expired-${ub.businessId}`,
-                type: 'subscription_due',
-                title: 'Subscription expired',
-                description: `Your ${business.subscriptionTier} subscription for ${business.name} has expired — renew to keep access`,
-                time: formatRelativeTime(periodEnd),
-                timestamp: periodEnd,
-                read: false,
-                avatar: null,
-                requestData: { businessId: ub.businessId, severity: 'critical' },
-              });
-            } else if (periodEnd <= sevenDaysFromNow) {
-              notifications.push({
-                id: `sub-due-${ub.businessId}`,
-                type: 'subscription_due',
-                title: 'Subscription renewing soon',
-                description: `Your ${business.subscriptionTier} subscription for ${business.name} renews on ${periodEnd.toLocaleDateString()}`,
-                time: formatRelativeTime(periodEnd),
-                timestamp: periodEnd,
-                read: false,
-                avatar: null,
-                requestData: { businessId: ub.businessId, severity: 'warning' },
-              });
-            }
-          } catch (err) {
-            console.error('Error fetching subscription status for notifications:', err);
-          }
-        }
+      // 10. Subscription status — batch-fetch admin businesses
+      adminBusinessIds.length > 0
+        ? prisma.business.findMany({
+            where: { id: { in: adminBusinessIds }, subscriptionTier: { not: 'FREE' }, currentPeriodEnd: { not: null } },
+            select: { id: true, name: true, subscriptionTier: true, currentPeriodEnd: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    // Extract results (use empty array if any section failed)
+    const extract = (i) => results[i].status === 'fulfilled' ? results[i].value : [];
+
+    // 1. Pending join requests
+    for (const rr of extract(0)) {
+      const isJoinRequest = !rr.currentRole || rr.currentRole === 'none';
+      notifications.push({
+        id: `req-${rr.id}`, type: 'staff_request',
+        title: isJoinRequest ? 'Join request' : 'Role upgrade request',
+        description: isJoinRequest
+          ? `${rr.user?.name || 'Someone'} wants to join your company`
+          : `${rr.user?.name || 'Someone'} is requesting admin access`,
+        time: formatRelativeTime(rr.createdAt), timestamp: rr.createdAt, read: false,
+        avatar: rr.user?.avatar || null, status: 'pending',
+        requestData: { requestId: rr.id, userId: rr.userId, userName: rr.user?.name, userEmail: rr.user?.email, businessId: rr.businessId, currentRole: rr.currentRole },
+      });
+    }
+
+    // 2. Recently approved requests
+    for (const rr of extract(1)) {
+      notifications.push({
+        id: `join-accepted-${rr.id}`, type: 'join_accepted',
+        title: 'Request accepted',
+        description: `${rr.user?.name || 'Someone'} joined your company — assign their role`,
+        time: formatRelativeTime(rr.resolvedAt), timestamp: rr.resolvedAt, read: false,
+        avatar: rr.user?.avatar || null, status: 'accepted',
+        requestData: { requestId: rr.id, userId: rr.userId, userName: rr.user?.name, userEmail: rr.user?.email, businessId: rr.businessId },
+      });
+    }
+
+    // 3. Pending invites
+    for (const inv of extract(2)) {
+      notifications.push({
+        id: `inv-${inv.id}`, type: 'invite_pending',
+        title: 'Invite pending',
+        description: `Invitation sent to ${inv.email || inv.user?.email || 'unknown'}`,
+        time: formatRelativeTime(inv.createdAt), timestamp: inv.createdAt, read: false, avatar: null, status: 'pending',
+        requestData: { inviteId: inv.id, email: inv.email || inv.user?.email, role: inv.role, businessId: inv.businessId },
+      });
+    }
+
+    // 4. Business connection requests
+    for (const conn of extract(3)) {
+      const requester = conn.requesterBusiness;
+      notifications.push({
+        id: `biz-conn-req-${conn.id}`, type: 'company_request',
+        title: 'Connection request',
+        description: `${requester?.name || 'A company'} wants to connect with your business`,
+        time: formatRelativeTime(conn.createdAt), timestamp: conn.createdAt, read: false,
+        avatar: requester?.logoUrl || null, status: 'pending',
+        requestData: { connectionId: conn.id, companyId: requester?.id, companyName: requester?.name, businessId: conn.targetBusinessId },
+      });
+    }
+
+    // 5. Accepted business connections
+    for (const conn of extract(4)) {
+      const otherBiz = conn.requesterBusinessId === conn._sourceBizId ? conn.targetBusiness : conn.requesterBusiness;
+      notifications.push({
+        id: `biz-conn-accepted-${conn.id}`, type: 'connection_accepted',
+        title: 'Connection accepted',
+        description: `You are now connected with ${otherBiz?.name || 'a company'}`,
+        time: formatRelativeTime(conn.createdAt), timestamp: conn.createdAt, read: false,
+        avatar: otherBiz?.logoUrl || null,
+        requestData: { connectionId: conn.id, companyId: otherBiz?.id, companyName: otherBiz?.name },
+      });
+    }
+
+    // 6. Paid invoices
+    for (const inv of extract(5)) {
+      notifications.push({
+        id: `inv-paid-${inv.id}`, type: 'invoice',
+        title: 'Invoice payment received',
+        description: `Payment of ${formatCurrency(inv.totalAmount)} received for invoice #${inv.id}`,
+        time: formatRelativeTime(inv.updatedAt || inv.createdAt), timestamp: inv.updatedAt || inv.createdAt, read: false, avatar: null,
+      });
+    }
+
+    // 7. Completed deliveries
+    for (const del of extract(6)) {
+      notifications.push({
+        id: `del-completed-${del.id}`, type: 'delivery',
+        title: 'Delivery completed',
+        description: `Delivery #${del.id} to ${del.clientCompanyName || 'client'} completed`,
+        time: formatRelativeTime(del.updatedAt || del.createdAt), timestamp: del.updatedAt || del.createdAt, read: false, avatar: null,
+        requestData: { deliveryId: del.id, businessId: del.businessId },
+      });
+    }
+
+    // 8. Low stock alerts (product data already joined via include)
+    for (const stock of extract(7)) {
+      if (!stock.product) continue;
+      const stockTime = new Date(); // Stock model has no timestamps; use current time
+      notifications.push({
+        id: `stock-low-${stock.id}`, type: 'stock_alert',
+        title: 'Low stock alert',
+        description: `${stock.product.name} has only ${stock.qtyOnHand} units remaining`,
+        time: 'now', timestamp: stockTime, read: false,
+        avatar: stock.product.productPicture || null,
+        productData: { productId: stock.product.id, productName: stock.product.name, currentStock: stock.qtyOnHand, locationId: stock.locationId },
+      });
+    }
+
+    // 9. Recent order updates
+    for (const order of extract(8)) {
+      const statusLabel = { CANCELED: 'Canceled', REJECTED: 'Rejected', DONE: 'Completed', PENDING: 'Pending', ACCEPTED: 'Accepted' }[order.status] || order.status;
+      notifications.push({
+        id: `order-update-${order.id}`, type: 'order_update',
+        title: `Order ${statusLabel.toLowerCase()}`,
+        description: `Order #${order.id} is now ${statusLabel.toLowerCase()}${order.customerName ? ` — ${order.customerName}` : ''}`,
+        time: formatRelativeTime(order.updatedAt || order.createdAt), timestamp: order.updatedAt || order.createdAt, read: false, avatar: null,
+        requestData: { orderId: order.id, businessId: order.businessId },
+      });
+    }
+
+    // 10. Subscription due/expired
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    for (const business of extract(9)) {
+      const periodEnd = new Date(business.currentPeriodEnd);
+      if (periodEnd < now) {
+        notifications.push({
+          id: `sub-expired-${business.id}`, type: 'subscription_due',
+          title: 'Subscription expired',
+          description: `Your ${business.subscriptionTier} subscription for ${business.name} has expired — renew to keep access`,
+          time: formatRelativeTime(periodEnd), timestamp: periodEnd, read: false, avatar: null,
+          requestData: { businessId: business.id, severity: 'critical' },
+        });
+      } else if (periodEnd <= sevenDaysFromNow) {
+        notifications.push({
+          id: `sub-due-${business.id}`, type: 'subscription_due',
+          title: 'Subscription renewing soon',
+          description: `Your ${business.subscriptionTier} subscription for ${business.name} renews on ${periodEnd.toLocaleDateString()}`,
+          time: formatRelativeTime(periodEnd), timestamp: periodEnd, read: false, avatar: null,
+          requestData: { businessId: business.id, severity: 'warning' },
+        });
       }
+    }
     } // end business mode
 
     // =========================================================================
@@ -10220,7 +10445,9 @@ app.patch('/api/notification-preferences', requireAuth, async (req, res) => {
 // GET /api/products?visibility=public (also supported for compatibility)
 app.get('/api/products', async (req, res) => {
   try {
-    const { scope, visibility, companyId, brand, category, viewerBusinessId } = req.query;
+    const { scope, visibility, companyId, brand, category } = req.query;
+    // SECURITY: Public endpoint — do not trust viewerBusinessId from query params
+    const viewerBusinessId = null;
     let catalog = await repos.productRepo.list();
 
     // "public catalog" — only listed products visible to others
@@ -10259,7 +10486,8 @@ app.get('/api/products', async (req, res) => {
 // Get single product by ID (public view)
 app.get('/api/products/:productId', async (req, res) => {
   const { productId } = req.params;
-  const { viewerBusinessId } = req.query;
+  // SECURITY: Public endpoint — do not trust viewerBusinessId from query params
+  const viewerBusinessId = null;
 
   try {
     let foundProduct = null;
@@ -10268,49 +10496,6 @@ app.get('/api/products/:productId', async (req, res) => {
     const dbProduct = await repos.productRepo.getById(productId);
     if (dbProduct) {
       foundProduct = withProductVisibility(dbProduct);
-    }
-
-    // Fallback: check in-memory products array
-    if (!foundProduct) {
-      const memProduct = products.find(p => p.id === productId);
-      if (memProduct) {
-        foundProduct = withProductVisibility(memProduct);
-      }
-    }
-
-    // Then check in feed posts (products from feed)
-    if (!foundProduct) {
-      for (const post of feedPosts) {
-        if (post.type === 'brand_presentation' && post.data.products) {
-          const feedProduct = post.data.products.find(p => p.id === productId);
-          if (feedProduct) {
-            foundProduct = {
-              ...feedProduct,
-              brandName: post.data.brandName,
-              brandLogo: post.data.brandLogo,
-              distributorName: post.data.distributorName,
-              distributorId: post.data.distributorId,
-              ownerBusinessId: post.data.distributorId,
-              isPublic: true,
-            };
-            break;
-          }
-        }
-        if (post.type === 'new_products' && post.data.products) {
-          const feedProduct = post.data.products.find(p => p.id === productId);
-          if (feedProduct) {
-            foundProduct = {
-              ...feedProduct,
-              businessName: post.data.businessName,
-              businessLogo: post.data.businessLogo,
-              businessId: post.data.businessId,
-              ownerBusinessId: post.data.businessId,
-              isPublic: true,
-            };
-            break;
-          }
-        }
-      }
     }
 
     if (!foundProduct) {
@@ -10355,10 +10540,7 @@ app.get('/api/public/locations/:locationId', async (req, res) => {
 
     if (!isLocationPublicEffective(business, location)) {
       if (location.operatingMode === LOCATION_MODES.INDEPENDENT && location.isPublic) {
-        return res.status(403).json({
-          success: false,
-          error: { code: 'PLAN_REQUIRED', message: 'This location\'s public storefront requires an Enterprise subscription.' }
-        });
+        return res.status(403).json(paywallResponse('This location\'s public storefront requires an Enterprise subscription.', 'independent_locations', 'enterprise'));
       }
       return res.status(404).json(errorResponse('This location does not have a public storefront'));
     }
@@ -10379,7 +10561,8 @@ app.get('/api/public/locations/:locationId', async (req, res) => {
 // Get products for public storefront - no auth required
 app.get('/api/public/locations/:locationId/products', async (req, res) => {
   try {
-    const { viewerBusinessId } = req.query;
+    // SECURITY: Public endpoint — do not trust viewerBusinessId from query params
+    const viewerBusinessId = null;
     const location = await prisma.location.findUnique({ where: { id: req.params.locationId } });
     if (!location) {
       return res.status(404).json(errorResponse('Location not found'));
@@ -10392,10 +10575,7 @@ app.get('/api/public/locations/:locationId/products', async (req, res) => {
 
     if (!isLocationPublicEffective(business, location)) {
       if (location.operatingMode === LOCATION_MODES.INDEPENDENT && location.isPublic) {
-        return res.status(403).json({
-          success: false,
-          error: { code: 'PLAN_REQUIRED', message: 'This location\'s public storefront requires an Enterprise subscription.' }
-        });
+        return res.status(403).json(paywallResponse('This location\'s public storefront requires an Enterprise subscription.', 'independent_locations', 'enterprise'));
       }
       return res.status(404).json(errorResponse('This location does not have a public storefront'));
     }
@@ -10426,10 +10606,7 @@ app.post('/api/public/locations/:locationId/orders', async (req, res) => {
 
     if (!isLocationPublicEffective(business, location)) {
       if (location.operatingMode === LOCATION_MODES.INDEPENDENT && location.isPublic) {
-        return res.status(403).json({
-          success: false,
-          error: { code: 'PLAN_REQUIRED', message: 'This location\'s public storefront requires an Enterprise subscription.' }
-        });
+        return res.status(403).json(paywallResponse('This location\'s public storefront requires an Enterprise subscription.', 'independent_locations', 'enterprise'));
       }
       return res.status(404).json(errorResponse('This location does not accept public orders'));
     }
@@ -10449,9 +10626,17 @@ app.post('/api/public/locations/:locationId/orders', async (req, res) => {
 // These endpoints can be called by cron services (e.g., Render cron jobs)
 // They require an API key for security
 
-const AUTOMATION_API_KEY = process.env.AUTOMATION_API_KEY || 'dev-automation-key';
+const AUTOMATION_API_KEY = process.env.AUTOMATION_API_KEY;
+if (!AUTOMATION_API_KEY) {
+  console.warn('[SECURITY] AUTOMATION_API_KEY not set -- automation endpoints will reject all requests');
+}
 
 function requireAutomationAuth(req, res) {
+  // SECURITY: Fail closed if no API key is configured
+  if (!AUTOMATION_API_KEY) {
+    res.status(503).json(errorResponse('Automation endpoints are not configured', 'NOT_CONFIGURED'));
+    return false;
+  }
   const apiKey = req.headers['x-automation-key'] || req.query.key;
   if (apiKey !== AUTOMATION_API_KEY) {
     res.status(401).json(errorResponse('Unauthorized', 'UNAUTHORIZED'));
