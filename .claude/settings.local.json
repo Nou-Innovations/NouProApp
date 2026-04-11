@@ -40,7 +40,13 @@
       "Bash(git -C /Users/arnaudlabonne/Nou/NouPro/NouProApp config --list)",
       "Bash(git rm:*)",
       "Bash(rm -rf backend/.git)",
-      "Bash(git remote:*)"
+      "Bash(git remote:*)",
+      "Bash(git commit -m 'Consolidate full app \\(frontend + backend\\) into single repository:*)",
+      "Bash(git config:*)",
+      "Bash(git worktree:*)",
+      "Bash(git branch:*)",
+      "Bash(rm -f .git/index.lock)",
+      "Bash(git push:*)"
     ]
   }
 }
