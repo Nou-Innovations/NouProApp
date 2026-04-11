@@ -176,6 +176,7 @@ export default function DeliveryScreen() {
         title={getTabTitle()}
         onTitlePress={toggleViewDropdown}
         actions={[
+          { icon: 'checkbox-outline', onPress: () => (navigation as any).navigate('Tasks'), accessibilityLabel: 'Tasks' },
           { icon: 'shopping-cart', onPress: handleOpenProcurement, badge: pendingProcurementCount, accessibilityLabel: 'Procurement' },
           { icon: 'plus', onPress: handleCreateNew, accessibilityLabel: 'Create delivery' },
         ]}

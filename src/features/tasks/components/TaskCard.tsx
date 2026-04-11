@@ -12,8 +12,9 @@ import theme from '@/shared/theme';
 import { ListItemCard } from '@/shared/components/ui';
 import Avatar from '@/shared/components/ui/Avatar';
 
-export type TaskType = 'delivery' | 'order' | 'invoice' | 'general';
+export type TaskType = 'delivery' | 'order' | 'invoice' | 'general' | 'inventory';
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type TaskPriorityDisplay = 'LOW' | 'NORMAL' | 'URGENT';
 
 interface TaskCardProps {
   id: string;
@@ -21,6 +22,7 @@ interface TaskCardProps {
   description?: string;
   type: TaskType;
   status: TaskStatus;
+  priority?: TaskPriorityDisplay;
   businessName?: string;
   businessLogo?: string;
   dueDate?: string;
@@ -33,6 +35,13 @@ const TASK_ICONS: Record<TaskType, string> = {
   order: 'receipt-outline',
   invoice: 'document-text-outline',
   general: 'checkbox-outline',
+  inventory: 'cube-outline',
+};
+
+const PRIORITY_INDICATOR: Record<TaskPriorityDisplay, { color: string; show: boolean }> = {
+  LOW: { color: '#6B7280', show: false },
+  NORMAL: { color: '#0EA5E9', show: false },
+  URGENT: { color: '#EF4444', show: true },
 };
 
 const STATUS_COLORS: Record<TaskStatus, string> = {
@@ -55,6 +64,7 @@ export function TaskCard({
   description,
   type,
   status,
+  priority,
   businessName,
   businessLogo,
   dueDate,
@@ -133,9 +143,12 @@ export function TaskCard({
     return elements.length > 0 ? <View>{elements}</View> : null;
   };
 
-  // Container style with overdue indicator
-  const containerStyle: ViewStyle | undefined = isOverdue() 
+  // Container style with overdue or urgent indicator
+  const showPriorityIndicator = priority && PRIORITY_INDICATOR[priority]?.show;
+  const containerStyle: ViewStyle | undefined = isOverdue()
     ? { borderLeftWidth: 3, borderLeftColor: '#EF4444' }
+    : showPriorityIndicator
+    ? { borderLeftWidth: 3, borderLeftColor: PRIORITY_INDICATOR[priority!].color }
     : undefined;
 
   return (

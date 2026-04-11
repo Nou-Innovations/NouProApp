@@ -35,6 +35,12 @@ export interface User {
   notifications_on: boolean;
   privacy_settings?: UserPrivacySettings;
   connections_count?: number;
+  // Professional profile fields
+  headline?: string;
+  bio?: string;
+  industry?: string;
+  cover_photo?: string;
+  profile_slug?: string;
   created_at: string; // ISO timestamp
   updated_at?: string;
 }
@@ -62,6 +68,12 @@ export interface UpdateUserPayload {
   description?: string;
   language?: Language;
   notifications_on?: boolean;
+  // Professional profile fields
+  headline?: string;
+  bio?: string;
+  industry?: string;
+  cover_photo?: string;
+  profile_slug?: string;
 }
 
 /**

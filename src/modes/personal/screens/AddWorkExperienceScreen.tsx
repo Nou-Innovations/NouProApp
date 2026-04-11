@@ -19,6 +19,7 @@ import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import Avatar from '@/shared/components/ui/Avatar';
 import { get as apiGet } from '@/shared/services/api';
+import { addExperience } from '@/features/profile/services/profile.service';
 
 export default function AddWorkExperienceScreen() {
   const navigation = useNavigation();
@@ -29,6 +30,9 @@ export default function AddWorkExperienceScreen() {
   const [companyName, setCompanyName] = useState('');
   const [selectedCompany, setSelectedCompany] = useState<{ id: string; name: string; logo: string } | null>(null);
   const [role, setRole] = useState('');
+  const [description, setDescription] = useState('');
+  const [industry, setIndustry] = useState('');
+  const [location, setLocation] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isCurrentRole, setIsCurrentRole] = useState(false);
@@ -36,6 +40,7 @@ export default function AddWorkExperienceScreen() {
   // UI state
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const hasChanges = companyName.trim() !== '' || role.trim() !== '';
 
@@ -84,7 +89,7 @@ export default function AddWorkExperienceScreen() {
     setShowSuggestions(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!companyName.trim()) {
       Alert.alert('Error', 'Please enter a company name');
       return;
@@ -95,11 +100,26 @@ export default function AddWorkExperienceScreen() {
       return;
     }
 
-    // In a real app, this would search for existing businesses or create a new one
-    // For now, we'll just show a success message
-    // The actual implementation would need backend support
-    
-    setShowSuccessDialog(true);
+    setIsSaving(true);
+    try {
+      await addExperience({
+        companyName: companyName.trim(),
+        companyLogo: selectedCompany?.logo || undefined,
+        position: role.trim(),
+        description: description.trim() || undefined,
+        industry: industry.trim() || undefined,
+        location: location.trim() || undefined,
+        startDate: startDate.trim() || new Date().toISOString(),
+        endDate: isCurrentRole ? undefined : endDate.trim() || undefined,
+        isCurrent: isCurrentRole,
+        linkedBusinessId: selectedCompany?.id?.startsWith('new-') ? undefined : selectedCompany?.id,
+      });
+      setShowSuccessDialog(true);
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to add experience');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -213,6 +233,67 @@ export default function AddWorkExperienceScreen() {
                 value={role}
                 onChangeText={setRole}
                 placeholder="Enter your role"
+                placeholderTextColor="#777777"
+              />
+            </View>
+
+            <View style={styles.infoItem}>
+              <Text style={[styles.infoLabel, { color: '#777777' }]}>Description</Text>
+              <TextInput
+                style={[
+                  styles.infoInput,
+                  {
+                    color: appTheme.colors.text,
+                    borderColor: '#DAD3D1',
+                    backgroundColor: '#FFFFFF',
+                    minHeight: 80,
+                    paddingTop: 12,
+                    paddingBottom: 12,
+                    height: undefined,
+                    textAlignVertical: 'top',
+                  },
+                ]}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Describe your responsibilities..."
+                placeholderTextColor="#777777"
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+
+            <View style={styles.infoItem}>
+              <Text style={[styles.infoLabel, { color: '#777777' }]}>Industry</Text>
+              <TextInput
+                style={[
+                  styles.infoInput,
+                  {
+                    color: appTheme.colors.text,
+                    borderColor: '#DAD3D1',
+                    backgroundColor: '#FFFFFF',
+                  },
+                ]}
+                value={industry}
+                onChangeText={setIndustry}
+                placeholder="e.g., Food & Beverage"
+                placeholderTextColor="#777777"
+              />
+            </View>
+
+            <View style={styles.infoItem}>
+              <Text style={[styles.infoLabel, { color: '#777777' }]}>Location</Text>
+              <TextInput
+                style={[
+                  styles.infoInput,
+                  {
+                    color: appTheme.colors.text,
+                    borderColor: '#DAD3D1',
+                    backgroundColor: '#FFFFFF',
+                  },
+                ]}
+                value={location}
+                onChangeText={setLocation}
+                placeholder="e.g., Paris, France"
                 placeholderTextColor="#777777"
               />
             </View>

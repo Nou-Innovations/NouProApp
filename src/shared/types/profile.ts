@@ -156,3 +156,151 @@ export function isBusinessProfile(viewType: ProfileViewType): boolean {
   return viewType === ProfileViewType.SELF_BUSINESS || viewType === ProfileViewType.OTHER_BUSINESS;
 }
 
+// ========== Professional Profile Types ==========
+
+/**
+ * Work Experience entry on a user's professional profile
+ */
+export interface WorkExperience {
+  id: string;
+  userId: string;
+  companyName: string;
+  companyLogo?: string;
+  position: string;
+  description?: string;
+  industry?: string;
+  location?: string;
+  startDate: string; // ISO date
+  endDate?: string; // ISO date, null = current
+  isCurrent: boolean;
+  linkedBusinessId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWorkExperienceDTO {
+  companyName: string;
+  companyLogo?: string;
+  position: string;
+  description?: string;
+  industry?: string;
+  location?: string;
+  startDate: string;
+  endDate?: string;
+  isCurrent?: boolean;
+  linkedBusinessId?: string;
+}
+
+export interface UpdateWorkExperienceDTO extends Partial<CreateWorkExperienceDTO> {}
+
+/**
+ * Education entry on a user's professional profile
+ */
+export interface Education {
+  id: string;
+  userId: string;
+  institution: string;
+  degree?: string;
+  fieldOfStudy?: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  isCurrent: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEducationDTO {
+  institution: string;
+  degree?: string;
+  fieldOfStudy?: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  isCurrent?: boolean;
+}
+
+export interface UpdateEducationDTO extends Partial<CreateEducationDTO> {}
+
+/**
+ * Certification on a user's professional profile
+ */
+export interface Certification {
+  id: string;
+  userId: string;
+  name: string;
+  issuingOrganization: string;
+  issueDate?: string;
+  expirationDate?: string;
+  credentialId?: string;
+  credentialUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCertificationDTO {
+  name: string;
+  issuingOrganization: string;
+  issueDate?: string;
+  expirationDate?: string;
+  credentialId?: string;
+  credentialUrl?: string;
+}
+
+export interface UpdateCertificationDTO extends Partial<CreateCertificationDTO> {}
+
+/**
+ * Skill from the shared master table
+ */
+export interface Skill {
+  id: string;
+  name: string;
+  category?: string;
+  createdAt: string;
+}
+
+/**
+ * Junction between user and skill with display ordering
+ */
+export interface UserSkill {
+  id: string;
+  userId: string;
+  skillId: string;
+  displayOrder: number;
+  createdAt: string;
+  skill: Skill; // Included via Prisma include
+}
+
+/**
+ * Profile completeness breakdown
+ */
+export interface ProfileCompleteness {
+  percentage: number;
+  completed: string[];
+  missing: string[];
+}
+
+/**
+ * Full professional profile (user + all sections)
+ * Returned by the public profile endpoint
+ */
+export interface ProfessionalProfile {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  avatar_url?: string;
+  headline?: string;
+  bio?: string;
+  industry?: string;
+  cover_photo?: string;
+  profile_slug?: string;
+  job_title?: string;
+  connections_count?: number;
+  workExperiences: WorkExperience[];
+  education: Education[];
+  certifications: Certification[];
+  userSkills: UserSkill[];
+  created_at: string;
+}
+

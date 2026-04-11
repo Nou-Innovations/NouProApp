@@ -34,7 +34,13 @@
       "Bash(git commit -m ':*)",
       "Bash(rm -f /Users/arnaudlabonne/Nou/NouPro/NouProApp/.git/index.lock)",
       "Bash(git commit -m 'Add Phase 1 design spec: Professional Profiles + Tasks:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(gh repo:*)",
+      "Bash(git -C /Users/arnaudlabonne/Nou/NouPro/NouProApp ls-files --stage backend)",
+      "Bash(git -C /Users/arnaudlabonne/Nou/NouPro/NouProApp config --list)",
+      "Bash(git rm:*)",
+      "Bash(rm -rf backend/.git)",
+      "Bash(git remote:*)"
     ]
   }
 }

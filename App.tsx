@@ -113,6 +113,16 @@ import EditWorkExperienceScreen from '@/modes/personal/screens/EditWorkExperienc
 import PersonalSettingsScreen from '@/modes/personal/screens/PersonalSettingsScreen';
 import PersonalDeliveryDetailScreen from '@/modes/personal/screens/PersonalDeliveryDetailScreen';
 
+// Screens - Professional Profile & Tasks
+import AddEducationScreen from '@/features/profile/screens/AddEducationScreen';
+import EditEducationScreen from '@/features/profile/screens/EditEducationScreen';
+import AddCertificationScreen from '@/features/profile/screens/AddCertificationScreen';
+import EditCertificationScreen from '@/features/profile/screens/EditCertificationScreen';
+import SkillsManagementScreen from '@/features/profile/screens/SkillsManagementScreen';
+import TasksScreen from '@/features/tasks/screens/TasksScreen';
+import CreateTaskScreen from '@/features/tasks/screens/CreateTaskScreen';
+import TaskDetailScreen from '@/features/tasks/screens/TaskDetailScreen';
+
 // Screens - Settings
 import ChangePasswordScreen from '@/features/settings/screens/ChangePasswordScreen';
 import SecuritySettingsScreen from '@/features/settings/screens/SecuritySettingsScreen';
@@ -321,7 +331,15 @@ function AppNavigator() {
         <RootStack.Screen name="EditPersonalProfile" component={EditPersonalProfileScreen} />
         <RootStack.Screen name="AddWorkExperience" component={AddWorkExperienceScreen} />
         <RootStack.Screen name="EditWorkExperience" component={EditWorkExperienceScreen} />
-        
+        <RootStack.Screen name="AddEducation" component={AddEducationScreen} />
+        <RootStack.Screen name="EditEducation" component={EditEducationScreen} />
+        <RootStack.Screen name="AddCertification" component={AddCertificationScreen} />
+        <RootStack.Screen name="EditCertification" component={EditCertificationScreen} />
+        <RootStack.Screen name="SkillsManagement" component={SkillsManagementScreen} />
+        <RootStack.Screen name="Tasks" component={TasksScreen} />
+        <RootStack.Screen name="CreateTask" component={CreateTaskScreen} />
+        <RootStack.Screen name="TaskDetail" component={TaskDetailScreen} />
+
         {/* Invoice Screens */}
         <RootStack.Screen name="CreateInvoice" component={CreateInvoiceScreen} />
         <RootStack.Screen name="InvoiceDetails" component={InvoiceDetailsScreen} />

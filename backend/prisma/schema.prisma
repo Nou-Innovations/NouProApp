@@ -1,0 +1,1019 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                   String           @id
+  name                 String?
+  email                String?          @unique
+  avatar               String?
+  phone                String?          @unique
+  passwordHash         String?
+  twoFactorSecret      String?
+  twoFactorEnabled     Boolean          @default(false)
+  twoFactorBackupCodes String?
+  jobTitle             String?
+  description          String?
+  address              String?
+  language             String?          @default("EN")
+  privacySettings      Json?
+  lastLoginAt          DateTime?
+  headline             String?
+  bio                  String?          @db.Text
+  industry             String?
+  coverPhoto           String?
+  profileSlug          String?          @unique
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  businessMembers      BusinessMember[]
+  locationMembers      LocationMember[]
+  deliveryAssignments  DeliveryStaff[]  @relation("DeliveryStaffUser")
+  roleRequests         RoleRequest[]    @relation("RoleRequestUser")
+  sentConnections      UserConnection[] @relation("ConnectionSender")
+  receivedConnections  UserConnection[] @relation("ConnectionReceiver")
+  deviceTokens         DeviceToken[]
+  workExperiences      WorkExperience[]
+  education            Education[]
+  certifications       Certification[]
+  userSkills           UserSkill[]
+}
+
+model Business {
+  id               String            @id
+  name             String
+  logoUrl          String?
+  bannerUrl        String?
+  description      String?
+  industry         String?
+  category         String?
+  phone            String?
+  email            String?
+  address          String?
+  website          String?
+  isPublished      Boolean           @default(false)
+  subscriptionTier SubscriptionTier  @default(FREE)
+  billingPeriod    BillingPeriod     @default(MONTHLY)
+  currentPeriodEnd DateTime?
+  settings         Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  businessMembers  BusinessMember[]
+  chats            Chat[]
+  deliveries       Delivery[]
+  feedPosts        FeedPost[]
+  invoices         Invoice[]
+  locations        Location[]
+  locationMembers  LocationMember[]
+  locationProducts LocationProduct[]
+  orders           Order[]
+  products         Product[]
+  stocks           Stock[]
+  brands           Brand[]
+  transports       Transport[]
+  roleRequests        RoleRequest[]
+  connectionsSent     BusinessConnection[] @relation("ConnectionsRequested")
+  connectionsReceived BusinessConnection[] @relation("ConnectionsReceived")
+  suppliers           Supplier[]
+  supplierOf          Supplier[]           @relation("SupplierBusiness")
+  purchaseRequests    PurchaseRequest[]
+  purchaseOrders      PurchaseOrder[]
+  goodsReceipts       GoodsReceipt[]
+  tasks               Task[]
+}
+
+model Location {
+  id               String            @id
+  businessId       String
+  name             String
+  address          String?
+  phone            String?
+  email            String?
+  locationType     String?
+  latitude         Float?
+  longitude        Float?
+  operatingMode    LocationMode      @default(DEPENDENT)
+  isPublic         Boolean           @default(false)
+  isPrimary        Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  chats            Chat[]
+  deliveries       Delivery[]
+  invoices         Invoice[]
+  business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  locationMembers  LocationMember[]
+  locationProducts LocationProduct[]
+  ordersFulfill    Order[]           @relation("OrdersFulfilledByLocation")
+  ordersSold       Order[]           @relation("OrdersSoldByLocation")
+  stocks           Stock[]
+  tasks            Task[]
+
+  @@index([businessId])
+}
+
+// ── Professional Profile Models ──
+
+model WorkExperience {
+  id               String    @id @default(uuid())
+  userId           String
+  companyName      String
+  companyLogo      String?
+  position         String
+  description      String?   @db.Text
+  industry         String?
+  location         String?
+  startDate        DateTime
+  endDate          DateTime?
+  isCurrent        Boolean   @default(false)
+  linkedBusinessId String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Education {
+  id           String    @id @default(uuid())
+  userId       String
+  institution  String
+  degree       String?
+  fieldOfStudy String?
+  description  String?   @db.Text
+  startDate    DateTime?
+  endDate      DateTime?
+  isCurrent    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Certification {
+  id                  String    @id @default(uuid())
+  userId              String
+  name                String
+  issuingOrganization String
+  issueDate           DateTime?
+  expirationDate      DateTime?
+  credentialId        String?
+  credentialUrl       String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Skill {
+  id         String      @id @default(uuid())
+  name       String      @unique
+  category   String?
+  createdAt  DateTime    @default(now())
+  userSkills UserSkill[]
+}
+
+model UserSkill {
+  id           String   @id @default(uuid())
+  userId       String
+  skillId      String
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill        Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId])
+  @@index([userId])
+}
+
+model Brand {
+  id          String    @id
+  businessId  String
+  name        String
+  logoUrl     String?
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  products    Product[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+}
+
+model Transport {
+  id              String   @id
+  businessId      String
+  name            String
+  vehicleType     String
+  licensePlate    String?
+  capacity        String?
+  status          String   @default("available")
+  assignedStaffId String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+model Product {
+  id               String            @id
+  businessId       String
+  name             String
+  brand            String?
+  brandLogo        String?
+  brandId          String?
+  productPicture   String?
+  price            Float?
+  category         String?
+  status           String?
+  variants         Json?
+  unit             String?
+  stockQuantity    Int?
+  isListed         Boolean?          @map("is_listed")
+  isCreatedByUser  Boolean?
+  isDisplayable    Boolean?
+  isImported       Boolean?
+  description      String?
+  costPrice        Float?
+  salePrice        Float?
+  sku              String?
+  barcode          String?
+  taxRate          Float?
+  supplier         String?
+  hasCarton        Boolean?          @default(false)
+  unitsPerCarton   Int?
+  pricePerCarton   Float?
+  hasRetailPriceLimit Boolean?       @default(false)
+  retailPriceLimit Float?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  locationProducts LocationProduct[]
+  business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  brandRef         Brand?            @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  stocks           Stock[]
+  supplierProducts SupplierProduct[]
+
+  @@index([businessId])
+  @@index([businessId, category])
+  @@index([businessId, isListed])
+  @@index([brandId])
+}
+
+model LocationProduct {
+  id            String   @id
+  businessId    String
+  locationId    String
+  productId     String
+  priceOverride Float?
+  taxOverride   Float?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, productId])
+  @@index([businessId])
+}
+
+model Stock {
+  id         String   @id
+  businessId String
+  locationId String
+  productId  String
+  qtyOnHand  Int      @default(0)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, productId])
+  @@index([businessId])
+}
+
+model Order {
+  id                    String          @id
+  businessId            String
+  soldByScope           OrderScope      @default(PARENT)
+  soldByLocationId      String?
+  fulfillmentLocationId String?
+  customerId            String?
+  customerName          String?
+  customerAddress       String?
+  customerPhone         String?
+  buyerBusinessId       String?
+  buyerBusinessName     String?
+  createdBy             String?
+  items                 Json
+  totalAmount           Float?
+  status                OrderStatus     @default(NEW)
+  paymentStatus         PaymentStatus?  @default(UNPAID)
+  notes                 String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  deliveryStatus        DeliveryStatus? @default(NOT_ASSIGNED)
+  statusChangedAt       DateTime?
+  statusChangedBy       String?
+  statusReason          String?
+  lastActivityAt        DateTime?
+  business              Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  fulfillmentLocation   Location?       @relation("OrdersFulfilledByLocation", fields: [fulfillmentLocationId], references: [id], onDelete: SetNull)
+  soldByLocation        Location?       @relation("OrdersSoldByLocation", fields: [soldByLocationId], references: [id], onDelete: SetNull)
+  statusHistory         OrderStatusHistory[]
+  deliveries            Delivery[]
+
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([businessId, createdAt])
+  @@index([soldByLocationId])
+  @@index([fulfillmentLocationId])
+  @@index([buyerBusinessId])
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(uuid())
+  orderId   String
+  from      OrderStatus
+  to        OrderStatus
+  reason    String?
+  changedBy String?
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model Invoice {
+  id                 String         @id
+  businessId         String
+  issuedByScope      InvoiceScope   @default(PARENT)
+  issuedByLocationId String?
+  orderId            String?
+  invoiceNumber      String?
+  clientName         String?
+  clientEmail        String?
+  clientPhone        String?
+  clientAddress      String?
+  amount             Float?
+  taxAmount          Float?
+  totalAmount        Float?
+  paidAmount         Float?         @default(0)
+  discount           Float?         @default(0)
+  shipping           Float?         @default(0)
+  currency           String?        @default("EUR")
+  type               String?
+  issueDate          DateTime?
+  dueDate            DateTime?
+  items              Json
+  notes              String?
+  terms              String?
+  referenceNumber    String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  status             InvoiceStatus? @default(DRAFT)
+  business           Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location           Location?      @relation(fields: [issuedByLocationId], references: [id], onDelete: SetNull)
+
+  @@unique([businessId, invoiceNumber])
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([issuedByLocationId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Chat {
+  id               String            @id
+  companyId        String?           @map("businessId")
+  locationId       String?
+  type             String?
+  name             String?
+  participants     Json?
+  lastMessage      Json?
+  unreadCount      Int               @default(0)
+  avatar           String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  business         Business?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location         Location?         @relation(fields: [locationId], references: [id])
+  messages         Message[]
+  chatParticipants ChatParticipant[]
+  readReceipts     ReadReceipt[]
+
+  @@index([companyId])
+  @@index([locationId])
+}
+
+model Message {
+  id           String        @id
+  chatId       String
+  senderId     String?
+  senderName   String?
+  content      String?
+  type         String?
+  timestamp    DateTime      @default(now())
+  meta         Json?
+  status       String?
+  isRead       Boolean       @default(false)
+  isOutgoing   Boolean       @default(false)
+  chat         Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  readReceipts ReadReceipt[]
+
+  @@index([chatId])
+  @@index([chatId, timestamp])
+}
+
+model ChatParticipant {
+  id          String   @id @default(uuid())
+  chatId      String
+  userId      String
+  joinedAt    DateTime @default(now())
+  unreadCount Int      @default(0)
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([userId])
+  @@index([chatId])
+}
+
+model ReadReceipt {
+  id        String   @id @default(uuid())
+  chatId    String
+  userId    String
+  messageId String
+  readAt    DateTime @default(now())
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([chatId])
+  @@index([userId])
+  @@index([messageId])
+}
+
+model BusinessMember {
+  id         String       @id
+  businessId String
+  userId     String
+  role       MemberRole
+  status     MemberStatus @default(pending)
+  createdAt  DateTime     @default(now())
+  business   Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
+  @@index([businessId])
+}
+
+model LocationMember {
+  id          String       @id
+  locationId  String
+  businessId  String
+  userId      String
+  role        MemberRole
+  status      MemberStatus @default(pending)
+  permissions Json?
+  createdAt   DateTime     @default(now())
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location    Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, userId])
+  @@index([locationId])
+  @@index([businessId])
+}
+
+model Delivery {
+  id                       String          @id
+  businessId               String
+  locationId               String?
+  direction                DeliveryDirection?
+  type                     DeliveryType?
+  clientId                 String?
+  clientCompanyLogo        String?
+  clientCompanyName        String?
+  clientAddress            String?
+  clientEmail              String?
+  clientPhone              String?
+  clientNotes              String?
+  distributorName          String?
+  distributorNotes         String?
+  fromLocation             String?
+  toLocation               String?
+  orderTime                DateTime?
+  expectedDeliveryDateTime DateTime?
+  itemCount                Int?
+  items                    Json?
+  totalAmount              Float?
+  trackingNumber           String?
+  assignedStaffId          String?
+  assignedTo               String?
+  transportMode            String?
+  orderId                  String?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+  deliveryStatus           DeliveryStatus? @default(NOT_ASSIGNED)
+  paymentStatus            PaymentStatus?  @default(UNPAID)
+  business                 Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location                 Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  order                    Order?          @relation(fields: [orderId], references: [id])
+  staffAssignments         DeliveryStaff[]
+
+  @@index([businessId])
+  @@index([businessId, deliveryStatus])
+  @@index([businessId, paymentStatus])
+  @@index([businessId, createdAt])
+  @@index([locationId])
+  @@index([orderId])
+}
+
+model DeliveryStaff {
+  id           String            @id @default(uuid())
+  deliveryId   String
+  userId       String
+  role         DeliveryStaffRole @default(driver)
+  assignedBy   String?
+  assignedAt   DateTime          @default(now())
+  delivery     Delivery          @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  user         User              @relation("DeliveryStaffUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([deliveryId, userId])
+  @@index([deliveryId])
+  @@index([userId])
+}
+
+model RoleRequest {
+  id               String            @id @default(uuid())
+  businessId       String
+  userId           String
+  requestedRole    String            @default("admin")
+  currentRole      String            @default("staff")
+  status           RoleRequestStatus @default(PENDING)
+  message          String?
+  rejectionReason  String?
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  resolvedByName   String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user             User              @relation("RoleRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([userId])
+  @@index([businessId, userId, status])
+}
+
+model FeedPost {
+  id         String    @id
+  businessId String?
+  type       String
+  timestamp  String?
+  data       Json
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  business   Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([type])
+}
+
+model NotificationRead {
+  id              String   @id
+  userId          String
+  notificationKey String
+  readAt          DateTime @default(now())
+
+  @@unique([userId, notificationKey])
+  @@index([userId])
+}
+
+model PushToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String
+  platform  String
+  deviceId  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, token])
+  @@index([userId])
+}
+
+model NotificationPreference {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  messages   Boolean  @default(true)
+  deliveries Boolean  @default(true)
+  invoices   Boolean  @default(true)
+  orders     Boolean  @default(true)
+  team       Boolean  @default(true)
+  system     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+  BUSINESS
+  ENTERPRISE
+}
+
+enum BillingPeriod {
+  MONTHLY
+  YEARLY
+}
+
+enum LocationMode {
+  DEPENDENT
+  INDEPENDENT
+}
+
+enum MemberRole {
+  super_admin
+  admin
+  staff
+}
+
+enum MemberStatus {
+  pending
+  accepted
+  rejected
+  locked
+}
+
+enum OrderStatus {
+  NEW
+  ACCEPTED
+  ONGOING
+  PENDING
+  IN_REVIEW
+  DONE
+  CANCELED
+  REJECTED
+}
+
+enum OrderScope {
+  PARENT
+  LOCATION
+}
+
+enum InvoiceScope {
+  PARENT
+  LOCATION
+}
+
+enum DeliveryDirection {
+  outgoing
+  incoming
+}
+
+enum DeliveryType {
+  delivery
+  transfer
+}
+
+enum DeliveryStatus {
+  NOT_ASSIGNED
+  ASSIGNED
+  PACKED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  CANCELED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELED
+  VOID
+  REFUNDED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  PAYMENT_PENDING
+  PENDING_CONFIRMATION
+  PROCESSING
+  OVERDUE
+  DUE_TODAY
+  FAILED
+  CANCELED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  DISPUTED
+}
+
+enum DeliveryStaffRole {
+  driver
+  teamLeader
+  support
+}
+
+enum RoleRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// ── Procurement Enums ──
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum PurchaseRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CONVERTED
+}
+
+enum PurchaseRequestPriority {
+  LOW
+  NORMAL
+  URGENT
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  CONFIRMED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELED
+}
+
+enum GoodsReceiptStatus {
+  PENDING
+  COMPLETED
+  DISPUTED
+}
+
+// ── Task Enums ──
+
+enum TaskType {
+  GENERAL
+  DELIVERY
+  ORDER
+  INVOICE
+  INVENTORY
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  URGENT
+}
+
+// ── Task Model ──
+
+model Task {
+  id               String       @id
+  businessId       String
+  locationId       String?
+  title            String
+  description      String?      @db.Text
+  type             TaskType     @default(GENERAL)
+  status           TaskStatus   @default(TODO)
+  priority         TaskPriority @default(NORMAL)
+  assignedToUserId String?
+  assignedByUserId String?
+  createdByUserId  String
+  dueDate          DateTime?
+  completedAt      DateTime?
+  linkedOrderId    String?
+  linkedDeliveryId String?
+  linkedInvoiceId  String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  business         Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location         Location?    @relation(fields: [locationId], references: [id])
+
+  @@index([businessId, status])
+  @@index([businessId, assignedToUserId])
+  @@index([assignedToUserId])
+}
+
+// ── Procurement Models ──
+
+model Supplier {
+  id                 String          @id
+  businessId         String
+  supplierBusinessId String?
+  name               String
+  contactName        String?
+  email              String?
+  phone              String?
+  address            String?
+  paymentTerms       String?
+  leadTimeDays       Int?
+  creditLimit        Float?
+  rating             Float?
+  status             SupplierStatus  @default(ACTIVE)
+  notes              String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  business           Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplierBusiness   Business?       @relation("SupplierBusiness", fields: [supplierBusinessId], references: [id], onDelete: SetNull)
+  products           SupplierProduct[]
+  purchaseRequests   PurchaseRequest[]
+  purchaseOrders     PurchaseOrder[]
+
+  @@index([businessId])
+  @@index([supplierBusinessId])
+  @@unique([businessId, supplierBusinessId])
+}
+
+model SupplierProduct {
+  id            String   @id @default(uuid())
+  supplierId    String
+  productId     String
+  supplierPrice Float
+  minOrderQty   Int?
+  bulkPrice     Float?
+  bulkMinQty    Int?
+  supplierSKU   String?
+  leadTimeDays  Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  supplier      Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, productId])
+  @@index([productId])
+}
+
+model PurchaseRequest {
+  id              String                  @id
+  businessId      String
+  locationId      String?
+  supplierId      String?
+  requestedBy     String
+  priority        PurchaseRequestPriority @default(NORMAL)
+  status          PurchaseRequestStatus   @default(DRAFT)
+  items           Json
+  totalAmount     Float?
+  notes           String?
+  requiredByDate  DateTime?
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  purchaseOrderId String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  business        Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplier        Supplier?               @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([status])
+}
+
+model PurchaseOrder {
+  id                   String                       @id
+  businessId           String
+  supplierId           String
+  purchaseRequestId    String?
+  locationId           String?
+  poNumber             String?
+  items                Json
+  totalAmount          Float?
+  status               PurchaseOrderStatus          @default(DRAFT)
+  paymentStatus        PaymentStatus?               @default(UNPAID)
+  paymentTerms         String?
+  expectedDeliveryDate DateTime?
+  notes                String?
+  sentAt               DateTime?
+  createdBy            String
+  approvedBy           String?
+  statusChangedAt      DateTime?
+  statusChangedBy      String?
+  statusReason         String?
+  lastActivityAt       DateTime?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  business             Business                     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplier             Supplier                     @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  statusHistory        PurchaseOrderStatusHistory[]
+  goodsReceipts        GoodsReceipt[]
+
+  @@index([businessId])
+  @@index([businessId, paymentStatus])
+  @@index([supplierId])
+  @@index([status])
+  @@unique([businessId, poNumber])
+}
+
+model PurchaseOrderStatusHistory {
+  id              String              @id @default(uuid())
+  purchaseOrderId String
+  from            PurchaseOrderStatus
+  to              PurchaseOrderStatus
+  reason          String?
+  changedBy       String?
+  createdAt       DateTime            @default(now())
+
+  purchaseOrder   PurchaseOrder       @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId])
+}
+
+model GoodsReceipt {
+  id              String             @id
+  businessId      String
+  purchaseOrderId String
+  locationId      String?
+  receivedBy      String
+  items           Json
+  status          GoodsReceiptStatus @default(PENDING)
+  receivedAt      DateTime?
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  business        Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  purchaseOrder   PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([purchaseOrderId])
+}
+
+model UserConnection {
+  id         String           @id @default(uuid())
+  senderId   String
+  receiverId String
+  status     ConnectionStatus @default(pending)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  sender     User             @relation("ConnectionSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User             @relation("ConnectionReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+enum ConnectionStatus {
+  pending
+  accepted
+  rejected
+}
+
+model BusinessConnection {
+  id                  String           @id @default(uuid())
+  requesterBusinessId String
+  targetBusinessId    String
+  status              ConnectionStatus @default(pending)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  requesterBusiness   Business         @relation("ConnectionsRequested", fields: [requesterBusinessId], references: [id], onDelete: Cascade)
+  targetBusiness      Business         @relation("ConnectionsReceived", fields: [targetBusinessId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterBusinessId, targetBusinessId])
+  @@index([requesterBusinessId])
+  @@index([targetBusinessId])
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  platform  String   // 'ios' | 'android'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

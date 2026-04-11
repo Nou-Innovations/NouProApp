@@ -226,7 +226,19 @@ export type RootStackParamList = {
   // Profile editing
   EditPersonalProfile: undefined;
   AddWorkExperience: undefined;
-  EditWorkExperience: { businessId: string };
+  EditWorkExperience: { experienceId: string };
+  AddEducation: undefined;
+  EditEducation: { educationId: string };
+  AddCertification: undefined;
+  EditCertification: { certificationId: string };
+  SkillsManagement: undefined;
+  PublicProfile: { slug: string };
+
+  // Tasks
+  Tasks: undefined;
+  CreateTask: { businessId: string; linkedOrderId?: string; linkedDeliveryId?: string; linkedInvoiceId?: string };
+  EditTask: { taskId: string; businessId: string };
+  TaskDetail: { taskId: string; businessId: string };
   
   // Social screens (Connections)
   Connections: { userId: string };

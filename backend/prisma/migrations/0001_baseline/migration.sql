@@ -1,0 +1,2 @@
+-- Baseline migration: schema was applied manually via Supabase SQL Editor.
+-- Intentionally empty.

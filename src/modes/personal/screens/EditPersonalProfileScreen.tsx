@@ -47,6 +47,10 @@ export default function EditPersonalProfileScreen() {
     show_phone_publicly: currentUser?.privacy_settings?.show_phone_publicly ?? false,
     show_email_publicly: currentUser?.privacy_settings?.show_email_publicly ?? false,
     show_address_publicly: currentUser?.privacy_settings?.show_address_publicly ?? false,
+    headline: currentUser?.headline || '',
+    bio: currentUser?.bio || '',
+    industry: currentUser?.industry || '',
+    profile_slug: currentUser?.profile_slug || '',
   });
 
   // Personal information state
@@ -61,6 +65,10 @@ export default function EditPersonalProfileScreen() {
     show_phone_publicly: currentUser?.privacy_settings?.show_phone_publicly ?? false,
     show_email_publicly: currentUser?.privacy_settings?.show_email_publicly ?? false,
     show_address_publicly: currentUser?.privacy_settings?.show_address_publicly ?? false,
+    headline: currentUser?.headline || '',
+    bio: currentUser?.bio || '',
+    industry: currentUser?.industry || '',
+    profile_slug: currentUser?.profile_slug || '',
   });
 
   // Work experience visibility toggles
@@ -98,6 +106,10 @@ export default function EditPersonalProfileScreen() {
         show_phone_publicly: currentUser.privacy_settings?.show_phone_publicly ?? false,
         show_email_publicly: currentUser.privacy_settings?.show_email_publicly ?? false,
         show_address_publicly: currentUser.privacy_settings?.show_address_publicly ?? false,
+        headline: currentUser.headline || '',
+        bio: currentUser.bio || '',
+        industry: currentUser.industry || '',
+        profile_slug: currentUser.profile_slug || '',
       };
       originalInfoRef.current = newOriginal;
       setPersonalInfo(newOriginal);
@@ -117,7 +129,11 @@ export default function EditPersonalProfileScreen() {
       personalInfo.address !== original.address ||
       personalInfo.show_phone_publicly !== original.show_phone_publicly ||
       personalInfo.show_email_publicly !== original.show_email_publicly ||
-      personalInfo.show_address_publicly !== original.show_address_publicly;
+      personalInfo.show_address_publicly !== original.show_address_publicly ||
+      personalInfo.headline !== original.headline ||
+      personalInfo.bio !== original.bio ||
+      personalInfo.industry !== original.industry ||
+      personalInfo.profile_slug !== original.profile_slug;
     setHasChanges(changed);
   }, [personalInfo]);
 
@@ -179,6 +195,10 @@ export default function EditPersonalProfileScreen() {
           show_email_publicly: personalInfo.show_email_publicly,
           show_address_publicly: personalInfo.show_address_publicly,
         },
+        headline: personalInfo.headline || null,
+        bio: personalInfo.bio || null,
+        industry: personalInfo.industry || null,
+        profileSlug: personalInfo.profile_slug || null,
       });
 
       updateCurrentUser({
@@ -193,6 +213,10 @@ export default function EditPersonalProfileScreen() {
           show_email_publicly: personalInfo.show_email_publicly,
           show_address_publicly: personalInfo.show_address_publicly,
         },
+        headline: personalInfo.headline,
+        bio: personalInfo.bio,
+        industry: personalInfo.industry,
+        profile_slug: personalInfo.profile_slug,
       });
 
       originalInfoRef.current = { ...personalInfo };
@@ -335,6 +359,15 @@ export default function EditPersonalProfileScreen() {
       />
 
       <AppTextField
+        label="Headline"
+        value={personalInfo.headline}
+        onChangeText={(text) => updateField('headline', text)}
+        placeholder="e.g., Supply Chain Expert | B2B Operations"
+        maxLength={120}
+        containerStyle={styles.fieldSpacing}
+      />
+
+      <AppTextField
         label="About"
         value={personalInfo.description}
         onChangeText={(text) => updateField('description', text)}
@@ -342,6 +375,34 @@ export default function EditPersonalProfileScreen() {
         isMultiline
         numberOfLines={3}
         maxLength={500}
+        containerStyle={styles.fieldSpacing}
+      />
+
+      <AppTextField
+        label="Bio"
+        value={personalInfo.bio}
+        onChangeText={(text) => updateField('bio', text)}
+        placeholder="Write a detailed professional bio..."
+        isMultiline
+        numberOfLines={5}
+        maxLength={2000}
+        containerStyle={styles.fieldSpacing}
+      />
+
+      <AppTextField
+        label="Industry"
+        value={personalInfo.industry}
+        onChangeText={(text) => updateField('industry', text)}
+        placeholder="e.g., Food & Beverage, Retail"
+        containerStyle={styles.fieldSpacing}
+      />
+
+      <AppTextField
+        label="Profile URL Slug"
+        value={personalInfo.profile_slug}
+        onChangeText={(text) => updateField('profile_slug', text.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+        placeholder="e.g., arnaud-labonne"
+        autoCapitalize="none"
         containerStyle={styles.fieldSpacing}
       />
     </View>

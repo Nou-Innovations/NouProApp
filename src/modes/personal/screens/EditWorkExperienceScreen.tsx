@@ -18,38 +18,73 @@ import Avatar from '@/shared/components/ui/Avatar';
 import { AppModal } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { getExperiences, updateExperience, deleteExperience } from '@/features/profile/services/profile.service';
+import type { WorkExperience } from '@/shared/types/profile';
 
 type RouteParams = {
   EditWorkExperience: {
-    businessId: string;
+    experienceId: string;
   };
 };
 
 export default function EditWorkExperienceScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RouteParams, 'EditWorkExperience'>>();
-  const { businessId } = route.params;
+  const { experienceId } = route.params;
   const { theme: appTheme } = useTheme();
-  
-  const userBusinesses = useProfileStore((state) => state.userBusinesses);
+
+  const currentUserId = useProfileStore((state) => state.currentUser?.id);
   const removeUserBusiness = useProfileStore((state) => state.removeUserBusiness);
 
-  // Find the business experience
-  const experience = userBusinesses.find((ub) => ub.business.id === businessId);
+  // Find the experience (loaded from API)
+  const [experience, setExperience] = useState<WorkExperience | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Form state
-  const [role, setRole] = useState(getRoleDisplayName(experience?.role || null));
-  const [startDate, setStartDate] = useState(experience?.start_date || '');
-  const [endDate, setEndDate] = useState(experience?.end_date || '');
-  const [isCurrentRole, setIsCurrentRole] = useState(!experience?.end_date);
+  const [role, setRole] = useState('');
+  const [description, setDescription] = useState('');
+  const [industry, setIndustry] = useState('');
+  const [location, setLocation] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isCurrentRole, setIsCurrentRole] = useState(false);
 
   // Original values for comparison
-  const originalRef = useRef({
-    role: getRoleDisplayName(experience?.role || null),
-    startDate: experience?.start_date || '',
-    endDate: experience?.end_date || '',
-    isCurrentRole: !experience?.end_date,
-  });
+  const originalRef = useRef<Record<string, any>>({});
+
+  // Fetch experience from API
+  useEffect(() => {
+    (async () => {
+      if (!currentUserId) return;
+      try {
+        const items = await getExperiences(currentUserId);
+        const item = items.find((e) => e.id === experienceId);
+        if (item) {
+          setExperience(item);
+          setRole(item.position || '');
+          setDescription(item.description || '');
+          setIndustry(item.industry || '');
+          setLocation(item.location || '');
+          setStartDate(item.startDate || '');
+          setEndDate(item.endDate || '');
+          setIsCurrentRole(item.isCurrent);
+          originalRef.current = {
+            role: item.position || '',
+            description: item.description || '',
+            industry: item.industry || '',
+            location: item.location || '',
+            startDate: item.startDate || '',
+            endDate: item.endDate || '',
+            isCurrentRole: item.isCurrent,
+          };
+        }
+      } catch {
+        // Will show "not found" state
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [currentUserId, experienceId]);
 
   // UI state
   const [hasChanges, setHasChanges] = useState(false);
@@ -63,17 +98,32 @@ export default function EditWorkExperienceScreen() {
     const original = originalRef.current;
     const changed =
       role !== original.role ||
+      description !== original.description ||
+      industry !== original.industry ||
+      location !== original.location ||
       startDate !== original.startDate ||
       endDate !== original.endDate ||
       isCurrentRole !== original.isCurrentRole;
     setHasChanges(changed);
-  }, [role, startDate, endDate, isCurrentRole]);
+  }, [role, description, industry, location, startDate, endDate, isCurrentRole]);
 
-  const handleSave = () => {
-    // In a real app, this would update the backend
-    // For now, we'll just show a success message
-    setSuccessMessage('Work experience updated successfully!');
-    setShowSuccessDialog(true);
+  const handleSave = async () => {
+    setIsRemoving(false);
+    try {
+      await updateExperience(experienceId, {
+        position: role.trim(),
+        description: description.trim() || undefined,
+        industry: industry.trim() || undefined,
+        location: location.trim() || undefined,
+        startDate: startDate.trim() || undefined,
+        endDate: isCurrentRole ? undefined : endDate.trim() || undefined,
+        isCurrent: isCurrentRole,
+      });
+      setSuccessMessage('Work experience updated successfully!');
+      setShowSuccessDialog(true);
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to update experience');
+    }
   };
 
   const handleDelete = () => {
@@ -83,16 +133,13 @@ export default function EditWorkExperienceScreen() {
   const confirmDelete = async () => {
     setIsRemoving(true);
     try {
-      await removeUserBusiness(businessId);
+      await deleteExperience(experienceId);
       setShowDeleteDialog(false);
       navigation.goBack();
     } catch (error: any) {
       setIsRemoving(false);
-      const msg = error?.response?.data?.error
-        || error?.response?.data?.message
-        || error?.message
-        || 'Failed to leave company. Please try again.';
-      Alert.alert('Cannot Leave Company', msg);
+      const msg = error?.message || 'Failed to remove experience. Please try again.';
+      Alert.alert('Error', msg);
     }
   };
 
@@ -106,6 +153,17 @@ export default function EditWorkExperienceScreen() {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
+        <SecondaryHeader title="Edit Experience" leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }} />
+        <View style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: appTheme.colors.textMuted }]}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!experience) {
     return (
@@ -146,13 +204,13 @@ export default function EditWorkExperienceScreen() {
           {/* Company Card */}
           <View style={styles.companyCard}>
             <Avatar
-              userId={experience.business.id}
-              userName={experience.business.name}
-              imageUri={experience.business.logo_url}
+              userId={experience.id}
+              userName={experience.companyName}
+              imageUri={experience.companyLogo}
               size={64}
             />
             <Text style={[styles.companyName, { color: appTheme.colors.text }]}>
-              {experience.business.name}
+              {experience.companyName}
             </Text>
           </View>
 
@@ -313,7 +371,7 @@ export default function EditWorkExperienceScreen() {
         title={isCurrentRole ? 'Leave Company' : 'Remove Experience'}
         message={
           isCurrentRole
-            ? `Are you sure you want to leave ${experience?.business?.name || 'this company'}? You will lose access immediately.`
+            ? `Are you sure you want to remove ${experience?.companyName || 'this company'} from your profile?`
             : 'Are you sure you want to remove this work experience?'
         }
         primaryButtonText={isCurrentRole ? 'Leave' : 'Remove'}
