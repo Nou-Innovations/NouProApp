@@ -216,6 +216,10 @@ export type RootStackParamList = {
   // Subscription
   Subscription: undefined;
   SubscriptionPlans: undefined;
+
+  // Payments
+  PaymentHistory: undefined;
+  CheckoutScreen: { checkoutUrl: string; paymentType: 'SUBSCRIPTION' | 'INVOICE_PAYMENT'; checkoutId: string };
   
   // Business creation/editing
   CreateBusiness: undefined;

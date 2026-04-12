@@ -45,6 +45,7 @@ import {
 } from '@/shared/utils/permissions';
 import { useProducts } from '@/features/products/hooks/useProducts';
 import type { UIProduct } from '@/shared/types/product';
+import { SubscriptionWarningBanner, useSubscription } from '@/features/payments';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const COVER_HEIGHT = SCREEN_WIDTH * (4 / 3); // 3:4 aspect ratio
@@ -134,6 +135,9 @@ export default function BusinessProfileOwnScreen() {
 
   // Get products from real hook instead of mock data
   const { products, loading: loadingProducts } = useProducts();
+
+  // Subscription status for warning banner
+  const { subscription, isActive: isSubActive, daysRemaining } = useSubscription(activeBusiness?.id || '');
 
   // Process products for display (only show published/displayable products on profile)
   const displayBrands = useMemo(
@@ -879,6 +883,13 @@ export default function BusinessProfileOwnScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {renderCoverImage()}
         {renderProfileSection()}
+        {subscription && !isSubActive && (
+          <SubscriptionWarningBanner
+            status={subscription.status}
+            daysRemaining={daysRemaining}
+            onPress={() => (navigation as any).navigate('SubscriptionPlans')}
+          />
+        )}
         {renderTabBar()}
         {activeTab === 'products' ? renderProductsTab() : renderAboutTab()}
         <View style={{ height: theme.spacing.xl + 34 }} />

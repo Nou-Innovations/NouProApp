@@ -42,6 +42,7 @@ model User {
   education            Education[]
   certifications       Certification[]
   userSkills           UserSkill[]
+  businessFollows      BusinessFollow[]
 }
 
 model Business {
@@ -56,11 +57,16 @@ model Business {
   email            String?
   address          String?
   website          String?
-  isPublished      Boolean           @default(false)
-  subscriptionTier SubscriptionTier  @default(FREE)
-  billingPeriod    BillingPeriod     @default(MONTHLY)
-  currentPeriodEnd DateTime?
-  settings         Json?
+  isPublished              Boolean           @default(false)
+  isVerified               Boolean           @default(false)
+  size                     String?
+  foundedYear              Int?
+  subscriptionTier         SubscriptionTier  @default(FREE)
+  billingPeriod            BillingPeriod     @default(MONTHLY)
+  currentPeriodEnd         DateTime?
+  peachCustomerId          String?           @unique
+  peachCardRegistrationId  String?
+  settings                 Json?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   businessMembers  BusinessMember[]
@@ -85,6 +91,8 @@ model Business {
   purchaseOrders      PurchaseOrder[]
   goodsReceipts       GoodsReceipt[]
   tasks               Task[]
+  followers           BusinessFollow[]
+  payments            Payment[]
 }
 
 model Location {
@@ -381,6 +389,7 @@ model Invoice {
   status             InvoiceStatus? @default(DRAFT)
   business           Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location           Location?      @relation(fields: [issuedByLocationId], references: [id], onDelete: SetNull)
+  payments           Payment[]
 
   @@unique([businessId, invoiceNumber])
   @@index([businessId])
@@ -1016,4 +1025,56 @@ model DeviceToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ── Phase 2: Company Pages + Payments ──
+
+model BusinessFollow {
+  id         String   @id @default(uuid())
+  userId     String
+  businessId String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessId])
+  @@index([userId])
+  @@index([businessId])
+}
+
+model Payment {
+  id                 String                  @id @default(uuid())
+  businessId         String
+  invoiceId          String?
+  type               PaymentType
+  amount             Float
+  currency           String                  @default("MUR")
+  status             PaymentProcessingStatus @default(PENDING)
+  peachCheckoutId    String?                 @unique
+  peachTransactionId String?                 @unique
+  description        String?
+  metadata           Json?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  business           Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invoice            Invoice?                @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([businessId, type])
+  @@index([invoiceId])
+  @@index([peachCheckoutId])
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  INVOICE_PAYMENT
+}
+
+enum PaymentProcessingStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  REFUNDED
 }

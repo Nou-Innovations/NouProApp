@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
-  View, Text, Image, TouchableOpacity, Dimensions, StyleSheet, Linking, StatusBar, ScrollView, Alert, Share,
+  View, Text, Image, TouchableOpacity, Dimensions, StyleSheet, Linking, StatusBar, ScrollView, Alert, Share, ActivityIndicator,
 } from 'react-native';
 import { Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn } from '@/shared/components/ui/Skeleton';
 import { get as apiGet } from '@/shared/services/api';
@@ -12,6 +12,7 @@ import CartPopup from '@/features/cart/components/CartPopup';
 import CartItemCard from '@/features/cart/components/CartItemCard';
 import CartBottomSection from '@/features/cart/components/CartBottomSection';
 import ProfileActionButtons from '@/features/profile/components/ProfileActionButtons';
+import FollowButton from '@/features/follow/components/FollowButton';
 import Avatar from '@/shared/components/ui/Avatar';
 import { useAppStore } from '@/shared/store';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -46,6 +47,7 @@ const mockMapLocation = {
 // Base tabs without Cart (Cart only shown in Business Mode)
 const BASE_TABS = [
   { key: 'products', label: 'Products', icon: 'cube-outline' },
+  { key: 'people', label: 'People', icon: 'people-outline' },
   { key: 'about', label: 'About Us', icon: 'person-outline' },
 ];
 
@@ -430,6 +432,92 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     Linking.openURL(`tel:${phone}`);
   };
 
+  // People tab - shows accepted business members
+  const [people, setPeople] = useState<any[]>([]);
+  const [peopleLoading, setPeopleLoading] = useState(false);
+  const [peopleFetched, setPeopleFetched] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'people' && !peopleFetched && businessId) {
+      setPeopleLoading(true);
+      apiGet<any[]>(`/businesses/${businessId}/people`)
+        .then(data => setPeople(data || []))
+        .catch(() => setPeople([]))
+        .finally(() => { setPeopleLoading(false); setPeopleFetched(true); });
+    }
+  }, [activeTab, peopleFetched, businessId]);
+
+  const PeopleTab = () => {
+    if (peopleLoading) {
+      return (
+        <View style={{ padding: 40, alignItems: 'center' }}>
+          <ActivityIndicator size="small" color={appTheme.colors.primary} />
+        </View>
+      );
+    }
+
+    if (people.length === 0) {
+      return (
+        <View style={{ padding: 40, alignItems: 'center' }}>
+          <Text style={{ color: appTheme.colors.textLight, fontSize: 14, fontFamily: theme.fonts.primary.regular }}>
+            No team members to display
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={{ paddingHorizontal: 12, paddingTop: 12 }}>
+        {people.map((person: any) => (
+          <TouchableOpacity
+            key={person.id}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 12,
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: appTheme.colors.borderColor,
+            }}
+            onPress={() => navigation.navigate('ViewUserProfile', { userId: person.id })}
+            activeOpacity={0.7}
+          >
+            <Avatar
+              userId={person.id}
+              userName={person.name || ''}
+              imageUri={person.avatar}
+              size={44}
+            />
+            <View style={{ marginLeft: 12, flex: 1 }}>
+              <Text style={{ fontSize: 15, fontFamily: theme.fonts.primary.semiBold, color: appTheme.colors.text }}>
+                {person.name}
+              </Text>
+              {person.jobTitle ? (
+                <Text style={{ fontSize: 13, fontFamily: theme.fonts.primary.regular, color: appTheme.colors.secondary, marginTop: 2 }}>
+                  {person.jobTitle}
+                </Text>
+              ) : null}
+            </View>
+            <View style={{
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 4,
+              backgroundColor: person.role === 'super_admin' ? appTheme.colors.primary + '20' : appTheme.colors.borderColor,
+            }}>
+              <Text style={{
+                fontSize: 11,
+                fontFamily: theme.fonts.primary.medium,
+                color: person.role === 'super_admin' ? appTheme.colors.primary : appTheme.colors.secondary,
+                textTransform: 'capitalize',
+              }}>
+                {person.role === 'super_admin' ? 'Owner' : person.role}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
   const AboutUsTab = () => {
     const address = business?.address || business?.locations?.[0]?.address || 'No address available';
     const website = aboutInfo.website || 'shop.com';
@@ -759,10 +847,15 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
             />
           </View>
 
-          {/* Business Name - 24px bold */}
-          <Text style={[styles.businessName, { color: appTheme.colors.text }]}>
-            {business?.name}
-          </Text>
+          {/* Business Name + Verified Badge */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[styles.businessName, { color: appTheme.colors.text }]}>
+              {business?.name}
+            </Text>
+            {business?.isVerified && (
+              <Icon name="checkmark-circle" size={22} color="#0075FF" />
+            )}
+          </View>
 
           {/* Industry/Type - 16px medium, secondary color */}
           {business?.industry ? (
@@ -782,9 +875,9 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
             </Text>
           )}
 
-          {/* Social Stats - Connections count */}
+          {/* Social Stats - Connections + Followers */}
           <View style={styles.socialStats}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.socialStatItem}
               onPress={() => {
                 // @ts-ignore
@@ -798,16 +891,29 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
                 Connections
               </Text>
             </TouchableOpacity>
+            <View style={styles.socialStatItem}>
+              <Text style={[styles.socialStatCount, { color: appTheme.colors.text }]}>
+                {business?.followersCount ?? 0}
+              </Text>
+              <Text style={[styles.socialStatLabel, { color: appTheme.colors.secondary }]}>
+                Followers
+              </Text>
+            </View>
           </View>
 
           {/* Profile Action Buttons - Based on ProfileViewType (OTHER_BUSINESS) */}
-          <ProfileActionButtons
-            viewType={viewType}
-            onPrimaryPress={handlePrimaryAction}
-            onSecondaryPress={handleSecondaryAction}
-            onMoreOptionsPress={handleMoreOptions}
-            style={styles.actionButtons}
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%' }}>
+            <View style={{ flex: 1 }}>
+              <ProfileActionButtons
+                viewType={viewType}
+                onPrimaryPress={handlePrimaryAction}
+                onSecondaryPress={handleSecondaryAction}
+                onMoreOptionsPress={handleMoreOptions}
+                style={styles.actionButtons}
+              />
+            </View>
+            <FollowButton businessId={businessId} />
+          </View>
         </View>
  
         {/* Tab Bar - matching BusinessProfileOwnScreen */}
@@ -847,6 +953,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
         <View style={styles.tabContentOuterContainer}>
           {activeTab === 'about' && <AboutUsTab />}
           {activeTab === 'products' && <ProductsTab />}
+          {activeTab === 'people' && <PeopleTab />}
           {activeTab === 'cart' && <CartTab />}
         </View>
       </ScrollView>

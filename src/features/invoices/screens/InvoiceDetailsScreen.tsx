@@ -31,6 +31,8 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import * as FileSystem from 'expo-file-system';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { checkPaywall, PaywallCheck, shouldShowNouProBranding } from '@/shared/utils/permissions';
+import { createInvoiceCheckout } from '@/features/payments/payments.service';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InvoiceDetails'>;
 
@@ -114,6 +116,9 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
   const [successMessage, setSuccessMessage] = useState('');
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   
+  // Pay Now state
+  const [isPayingNow, setIsPayingNow] = useState(false);
+
   // Paywall state
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallCheckResult, setPaywallCheckResult] = useState<PaywallCheck | null>(null);
@@ -216,6 +221,30 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
 
   const recordPayment = () => {
     setRecordingPayment(true);
+  };
+
+  // Pay invoice via Peach Payments (for invoice recipients)
+  const handlePayNow = async () => {
+    if (!businessId || !invoice) return;
+
+    setIsPayingNow(true);
+    try {
+      const { checkoutId, checkoutUrl } = await createInvoiceCheckout({
+        businessId,
+        invoiceId: invoice.id,
+      });
+
+      (navigation as NativeStackNavigationProp<RootStackParamList>).navigate('CheckoutScreen', {
+        checkoutUrl,
+        paymentType: 'INVOICE_PAYMENT',
+        checkoutId,
+      });
+    } catch (err) {
+      console.error('Failed to create invoice checkout:', err);
+      Alert.alert('Error', 'Failed to start payment. Please try again.');
+    } finally {
+      setIsPayingNow(false);
+    }
   };
 
   const sendDocument = async () => {
@@ -746,9 +775,9 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
             </TouchableOpacity>
           )
         ) : (
-          // Invoice: Show Record Payment and Download PDF
+          // Invoice: Show Record Payment, Pay Now, and Download PDF
           <>
-            {isAdmin && status !== 'paid' && (
+            {isAdmin && isInvoiceOwner && status !== 'paid' && (
               <TouchableOpacity
                 onPress={recordPayment}
                 style={[styles.actionButton, { backgroundColor: theme.colors.success }]}
@@ -756,7 +785,22 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
                 <Text style={styles.actionButtonText}>Record Payment</Text>
               </TouchableOpacity>
             )}
-            {isAdmin && status === 'draft' && (
+            {!isInvoiceOwner && (status === 'sent' || status === 'partially_paid' || status === 'overdue') && (
+              <TouchableOpacity
+                onPress={handlePayNow}
+                disabled={isPayingNow}
+                style={[styles.actionButton, { backgroundColor: theme.colors.primary, opacity: isPayingNow ? 0.6 : 1 }]}
+              >
+                {isPayingNow ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.actionButtonText}>
+                    Pay Now {fmtCurrency(grandTotal - (Number(invoice?.paidAmount) || 0))}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+            {isAdmin && isInvoiceOwner && status === 'draft' && (
               <TouchableOpacity
                 onPress={() => (navigation as any).navigate('CreateInvoice', { invoiceId, type: invoice?.type || 'invoice' })}
                 style={[styles.actionButton, { backgroundColor: theme.colors.surface }]}
@@ -764,7 +808,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
                 <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>Edit Draft</Text>
               </TouchableOpacity>
             )}
-            {isAdmin && status === 'draft' && (
+            {isAdmin && isInvoiceOwner && status === 'draft' && (
               <TouchableOpacity
                 onPress={sendDocument}
                 style={[styles.actionButton, { backgroundColor: '#EA5A5A' }]}

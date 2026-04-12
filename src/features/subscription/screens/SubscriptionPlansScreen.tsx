@@ -24,6 +24,9 @@ import AppButton from '@/shared/components/ui/AppButton';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { patch } from '@/shared/services/api';
+import { createSubscriptionCheckout } from '@/features/payments/payments.service';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/shared/types/navigation';
 import {
   SubscriptionPlan,
   BillingPeriod,
@@ -256,37 +259,44 @@ export default function SubscriptionPlansScreen() {
     if (selectedPlan === currentPlan || !activeBusiness?.id) {
       return;
     }
-    
+
     setIsUpdating(true);
 
     try {
-      // Call API to update subscription
-      await patch(`/companies/${activeBusiness.id}/subscription`, {
-        subscriptionTier: selectedPlan.toUpperCase(),
-        billingPeriod: billingPeriod,
-      });
-      
-      // Update the store with the new subscription data
-      useProfileStore.getState().updateUserBusiness(activeBusiness.id, {
-        plan: selectedPlan,
-      });
-      
-      // Show success message
-      Alert.alert(
-        'Success',
-        `Subscription updated to ${PLAN_INFO[selectedPlan].name}`,
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]
-      );
+      if (selectedPlan === 'free') {
+        // Downgrade to free - no payment needed
+        await patch(`/companies/${activeBusiness.id}/subscription`, {
+          subscriptionTier: 'FREE',
+          billingPeriod: billingPeriod,
+        });
+
+        useProfileStore.getState().updateUserBusiness(activeBusiness.id, {
+          plan: 'free',
+        });
+
+        Alert.alert('Success', 'Downgraded to Free plan', [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+      } else {
+        // Paid plan - create Peach Checkout
+        const { checkoutId, checkoutUrl } = await createSubscriptionCheckout({
+          businessId: activeBusiness.id,
+          plan: selectedPlan,
+          billingPeriod,
+        });
+
+        // Navigate to checkout WebView
+        (navigation as NativeStackNavigationProp<RootStackParamList>).navigate('CheckoutScreen', {
+          checkoutUrl,
+          paymentType: 'SUBSCRIPTION',
+          checkoutId,
+        });
+      }
     } catch (error) {
       console.error('Subscription update error:', error);
       Alert.alert(
         'Error',
-        error instanceof Error ? error.message : 'Failed to update subscription. Please try again.'
+        error instanceof Error ? error.message : 'Failed to process subscription. Please try again.'
       );
     } finally {
       setIsUpdating(false);

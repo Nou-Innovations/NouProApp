@@ -137,6 +137,7 @@ import { AllActivityScreen, BusinessExploreScreen } from '@/modes/business/scree
 
 // Screens - Subscription
 import { SubscriptionPlansScreen } from '@/features/subscription';
+import { CheckoutScreen, PaymentHistoryScreen } from '@/features/payments';
 
 // Screens - Feedback
 import { FeedbackCategoriesScreen, FeedbackListScreen, AddSuggestionScreen } from '@/features/feedback';
@@ -410,6 +411,10 @@ function AppNavigator() {
         
         {/* Subscription */}
         <RootStack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
+
+        {/* Payments */}
+        <RootStack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />
+        <RootStack.Screen name="CheckoutScreen" component={CheckoutScreen} options={{ presentation: 'modal' }} />
         
         {/* Feedback */}
         <RootStack.Screen name="FeedbackCategories" component={FeedbackCategoriesScreen} />

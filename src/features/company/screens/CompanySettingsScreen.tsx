@@ -23,6 +23,7 @@ import {
   Heart,
   Eye,
   LogOut,
+  CreditCard,
   LucideIcon,
 } from 'lucide-react-native';
 import { AppModal } from '@/shared/components/ui';
@@ -166,6 +167,11 @@ export default function CompanySettingsScreen() {
     navigation.navigate('SubscriptionPlans');
   };
 
+  const handlePaymentHistory = () => {
+    // @ts-ignore
+    navigation.navigate('PaymentHistory');
+  };
+
   const handleConfirmLeave = async () => {
     if (!activeBusiness?.id) return;
     setIsLeaving(true);
@@ -235,6 +241,11 @@ export default function CompanySettingsScreen() {
             icon={ShieldCheck}
             title="Security"
             onPress={handleSecurity}
+          />
+          <SettingsOption
+            icon={CreditCard}
+            title="Payment History"
+            onPress={handlePaymentHistory}
           />
 
           {/* Price Privacy Toggle */}

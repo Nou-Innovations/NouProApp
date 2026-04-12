@@ -91,6 +91,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         },
       ],
       'expo-asset',
+      'expo-font',
       'expo-secure-store',
       [
         'expo-local-authentication',

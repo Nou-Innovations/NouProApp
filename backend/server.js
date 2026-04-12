@@ -2242,19 +2242,45 @@ app.get('/api/companies/search', requireAuth, async (req, res) => {
 });
 
 // Get single business with capabilities
-app.get('/api/companies/:companyId', async (req, res) => {
+app.get('/api/companies/:companyId', optionalAuth, async (req, res) => {
   const business = await repos.businessRepo.getById(req.params.companyId);
   if (!business) {
     return res.status(404).json(errorResponse('Business not found'));
   }
-  
+
   const businessLocations = await repos.locationRepo.getByBusinessId(business.id);
   const capabilities = deriveCapabilities(business);
-  
-  res.json(successResponse({ 
-    ...business, 
+
+  // Follow data + people preview
+  const viewerUserId = req.user?.id;
+  const [followersCount, isFollowedByViewer, peoplePreview] = await Promise.all([
+    prisma.businessFollow.count({ where: { businessId: business.id } }),
+    viewerUserId
+      ? prisma.businessFollow.findUnique({
+          where: { userId_businessId: { userId: viewerUserId, businessId: business.id } },
+        }).then(f => !!f)
+      : Promise.resolve(false),
+    prisma.businessMember.findMany({
+      where: { businessId: business.id, status: 'accepted' },
+      include: { user: { select: { id: true, name: true, avatar: true, jobTitle: true } } },
+      orderBy: { createdAt: 'asc' },
+      take: 5,
+    }).then(members => members.map(m => ({
+      id: m.user.id,
+      name: m.user.name,
+      avatar: m.user.avatar,
+      jobTitle: m.user.jobTitle,
+      role: m.role,
+    }))),
+  ]);
+
+  res.json(successResponse({
+    ...business,
     capabilities,
     locations: businessLocations,
+    followersCount,
+    isFollowedByViewer,
+    peoplePreview,
   }));
 });
 
@@ -2722,6 +2748,155 @@ app.get('/api/business-connections/:businessId/pending', requireAuth, async (req
   } catch (err) {
     console.error('[BizConnectionsPending] Error:', err);
     res.status(500).json(errorResponse('Failed to list pending business connections'));
+  }
+});
+
+// ============================================================================
+// BUSINESS FOLLOW ROUTES
+// ============================================================================
+
+// Follow a business
+app.post('/api/businesses/:businessId/follow', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { businessId } = req.params;
+
+    const business = await repos.businessRepo.getById(businessId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found'));
+    }
+
+    // Check if already following
+    const existing = await prisma.businessFollow.findUnique({
+      where: { userId_businessId: { userId, businessId } },
+    });
+    if (existing) {
+      return res.status(409).json(errorResponse('Already following this business'));
+    }
+
+    const follow = await prisma.businessFollow.create({
+      data: { userId, businessId },
+    });
+
+    const followersCount = await prisma.businessFollow.count({ where: { businessId } });
+
+    res.status(201).json(successResponse({ follow, followersCount }));
+  } catch (err) {
+    console.error('[FollowBusiness] Error:', err);
+    res.status(500).json(errorResponse('Failed to follow business'));
+  }
+});
+
+// Unfollow a business
+app.delete('/api/businesses/:businessId/follow', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { businessId } = req.params;
+
+    const existing = await prisma.businessFollow.findUnique({
+      where: { userId_businessId: { userId, businessId } },
+    });
+    if (!existing) {
+      return res.status(404).json(errorResponse('Not following this business'));
+    }
+
+    await prisma.businessFollow.delete({
+      where: { userId_businessId: { userId, businessId } },
+    });
+
+    const followersCount = await prisma.businessFollow.count({ where: { businessId } });
+
+    res.json(successResponse({ followersCount }));
+  } catch (err) {
+    console.error('[UnfollowBusiness] Error:', err);
+    res.status(500).json(errorResponse('Failed to unfollow business'));
+  }
+});
+
+// Get followers for a business
+app.get('/api/businesses/:businessId/followers', async (req, res) => {
+  try {
+    const { businessId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = parseInt(req.query.offset) || 0;
+
+    const [followers, count] = await Promise.all([
+      prisma.businessFollow.findMany({
+        where: { businessId },
+        include: { user: { select: { id: true, name: true, avatar: true, jobTitle: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.businessFollow.count({ where: { businessId } }),
+    ]);
+
+    res.json(successResponse({
+      followers: followers.map(f => f.user),
+      followersCount: count,
+      hasMore: offset + limit < count,
+    }));
+  } catch (err) {
+    console.error('[GetFollowers] Error:', err);
+    res.status(500).json(errorResponse('Failed to get followers'));
+  }
+});
+
+// Check follow status
+app.get('/api/businesses/:businessId/follow-status', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { businessId } = req.params;
+
+    const [existing, count] = await Promise.all([
+      prisma.businessFollow.findUnique({
+        where: { userId_businessId: { userId, businessId } },
+      }),
+      prisma.businessFollow.count({ where: { businessId } }),
+    ]);
+
+    res.json(successResponse({
+      isFollowing: !!existing,
+      followersCount: count,
+    }));
+  } catch (err) {
+    console.error('[FollowStatus] Error:', err);
+    res.status(500).json(errorResponse('Failed to check follow status'));
+  }
+});
+
+// ============================================================================
+// BUSINESS PEOPLE ROUTE
+// ============================================================================
+
+// Get public team members for a business
+app.get('/api/businesses/:businessId/people', async (req, res) => {
+  try {
+    const { businessId } = req.params;
+
+    const members = await prisma.businessMember.findMany({
+      where: { businessId, status: 'accepted' },
+      include: {
+        user: {
+          select: { id: true, name: true, avatar: true, jobTitle: true, headline: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const people = members.map(m => ({
+      id: m.user.id,
+      name: m.user.name,
+      avatar: m.user.avatar,
+      jobTitle: m.user.jobTitle,
+      headline: m.user.headline,
+      role: m.role,
+    }));
+
+    res.json(successResponse(people));
+  } catch (err) {
+    console.error('[BusinessPeople] Error:', err);
+    res.status(500).json(errorResponse('Failed to get business people'));
   }
 });
 
@@ -10288,12 +10463,23 @@ app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
 });
 
 // Feed Routes (paginated, Prisma-backed)
-app.get('/api/feed', async (req, res) => {
+app.get('/api/feed', optionalAuth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit || '20', 10), 50);
     const cursor = req.query.cursor; // post id of the last item (optional)
     // SECURITY: Public endpoint — do not trust viewerBusinessId from query params
     const viewerBusinessId = null;
+    const userId = req.user?.id;
+
+    // Get IDs of businesses the user follows (for prioritization)
+    let followedBusinessIds = [];
+    if (userId) {
+      const follows = await prisma.businessFollow.findMany({
+        where: { userId },
+        select: { businessId: true },
+      });
+      followedBusinessIds = follows.map(f => f.businessId);
+    }
 
     const allPosts = await prisma.feedPost.findMany({
       take: limit + 1,
@@ -10315,11 +10501,15 @@ app.get('/api/feed', async (req, res) => {
 
     // Apply price privacy to embedded products in feed posts
     const privacyPage = await Promise.all(items.map(async (post) => {
-      if (!post.data?.products || post.data.products.length === 0) return post;
+      const isFromFollowed = followedBusinessIds.includes(post.businessId);
+
+      if (!post.data?.products || post.data.products.length === 0) {
+        return { ...post, isFromFollowed };
+      }
 
       // Determine the owner business ID for this post's products
       const ownerBizId = post.data.distributorId || post.data.businessId;
-      if (!ownerBizId) return post;
+      if (!ownerBizId) return { ...post, isFromFollowed };
 
       // Apply price privacy to each product in the post
       const privacyProducts = await applyPricePrivacyBatch(
@@ -10327,8 +10517,17 @@ app.get('/api/feed', async (req, res) => {
         viewerBusinessId || null
       );
 
-      return { ...post, data: { ...post.data, products: privacyProducts } };
+      return { ...post, data: { ...post.data, products: privacyProducts }, isFromFollowed };
     }));
+
+    // Sort: followed businesses' posts first, then by date
+    if (followedBusinessIds.length > 0) {
+      privacyPage.sort((a, b) => {
+        if (a.isFromFollowed && !b.isFromFollowed) return -1;
+        if (!a.isFromFollowed && b.isFromFollowed) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
 
     res.json({
       success: true,
@@ -11475,6 +11674,323 @@ async function sendPushToOfflineParticipants(chatId, senderName, messagePreview,
     console.error('[Push] Error in sendPushToOfflineParticipants:', err);
   }
 }
+
+// ============================================================================
+// PAYMENT ROUTES (Peach Payments)
+// ============================================================================
+
+const peachPayments = require('./src/services/peachPayments');
+
+// Subscription plan pricing (MUR) - must match frontend subscription.ts
+const PLAN_PRICES = {
+  MONTHLY: { PRO: 899, BUSINESS: 2699, ENTERPRISE: 4399 },
+  YEARLY: { PRO: 9588, BUSINESS: 28788, ENTERPRISE: 46788 },
+};
+
+// Create checkout session for subscription payment
+app.post('/api/payments/create-checkout', requireAuth, async (req, res) => {
+  try {
+    const { businessId, plan, billingPeriod } = req.body;
+    if (!businessId || !plan || !billingPeriod) {
+      return res.status(400).json(errorResponse('businessId, plan, and billingPeriod are required'));
+    }
+
+    // Validate plan and period
+    const planUpper = plan.toUpperCase();
+    const periodUpper = billingPeriod.toUpperCase();
+    if (!PLAN_PRICES[periodUpper] || !PLAN_PRICES[periodUpper][planUpper]) {
+      return res.status(400).json(errorResponse('Invalid plan or billing period'));
+    }
+
+    // Verify business admin
+    if (!(await requireBusinessAdmin(req, res, businessId))) return;
+
+    const amount = PLAN_PRICES[periodUpper][planUpper];
+    const orderId = `sub-${businessId}-${Date.now()}`;
+
+    // Create Peach checkout with card tokenization enabled
+    const { checkoutId } = await peachPayments.createCheckout({
+      amount,
+      currency: 'MUR',
+      orderId,
+      tokenizeCard: true,
+    });
+
+    // Create pending payment record
+    const payment = await prisma.payment.create({
+      data: {
+        businessId,
+        type: 'SUBSCRIPTION',
+        amount,
+        currency: 'MUR',
+        status: 'PENDING',
+        peachCheckoutId: checkoutId,
+        description: `${planUpper} plan - ${periodUpper.toLowerCase()}`,
+        metadata: { plan: planUpper, billingPeriod: periodUpper, orderId },
+      },
+    });
+
+    // Generate checkout page URL (served by our backend)
+    const checkoutUrl = `${req.protocol}://${req.get('host')}/api/payments/checkout-page/${checkoutId}`;
+
+    res.json(successResponse({ checkoutId, checkoutUrl, paymentId: payment.id }));
+  } catch (err) {
+    console.error('[CreateCheckout] Error:', err);
+    res.status(500).json(errorResponse('Failed to create checkout'));
+  }
+});
+
+// Serve the checkout HTML page for WebView rendering
+app.get('/api/payments/checkout-page/:checkoutId', (req, res) => {
+  const html = peachPayments.generateCheckoutHtml(req.params.checkoutId);
+  res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+});
+
+// Poll checkout result (backup to webhook)
+app.get('/api/payments/checkout-result/:checkoutId', requireAuth, async (req, res) => {
+  try {
+    const { checkoutId } = req.params;
+
+    const payment = await prisma.payment.findUnique({
+      where: { peachCheckoutId: checkoutId },
+    });
+    if (!payment) {
+      return res.status(404).json(errorResponse('Payment not found'));
+    }
+
+    // If already processed, return stored status
+    if (payment.status !== 'PENDING') {
+      return res.json(successResponse({ status: payment.status, paymentId: payment.id }));
+    }
+
+    // Query Peach for the result
+    const result = await peachPayments.getCheckoutResult(checkoutId);
+    const resultCode = result.result?.code;
+
+    if (peachPayments.isSuccessResult(resultCode)) {
+      // Update payment + subscription
+      await processSuccessfulPayment(payment, result);
+      return res.json(successResponse({ status: 'SUCCEEDED', paymentId: payment.id }));
+    } else if (peachPayments.isPendingResult(resultCode)) {
+      return res.json(successResponse({ status: 'PROCESSING', paymentId: payment.id }));
+    } else {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'FAILED', peachTransactionId: result.id },
+      });
+      return res.json(successResponse({ status: 'FAILED', paymentId: payment.id }));
+    }
+  } catch (err) {
+    console.error('[CheckoutResult] Error:', err);
+    res.status(500).json(errorResponse('Failed to get checkout result'));
+  }
+});
+
+// Peach Payments webhook handler
+app.post('/api/webhooks/peach', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    console.log('[PeachWebhook] Received:', event.type || 'unknown', event.id || '');
+
+    const checkoutId = event.payload?.checkoutId || event.checkoutId;
+    if (!checkoutId) {
+      return res.status(200).json({ received: true });
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { peachCheckoutId: checkoutId },
+    });
+    if (!payment) {
+      console.warn('[PeachWebhook] No payment found for checkoutId:', checkoutId);
+      return res.status(200).json({ received: true });
+    }
+
+    // Skip if already processed
+    if (payment.status === 'SUCCEEDED' || payment.status === 'FAILED') {
+      return res.status(200).json({ received: true });
+    }
+
+    const resultCode = event.payload?.result?.code || event.result?.code;
+
+    if (peachPayments.isSuccessResult(resultCode)) {
+      await processSuccessfulPayment(payment, event.payload || event);
+    } else {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'FAILED',
+          peachTransactionId: event.payload?.id || event.id,
+        },
+      });
+    }
+
+    res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('[PeachWebhook] Error:', err);
+    res.status(200).json({ received: true }); // Always 200 to avoid retries
+  }
+});
+
+// Helper: Process a successful payment (update subscription, store card token)
+async function processSuccessfulPayment(payment, peachResult) {
+  const registrationId = peachResult.registrationId;
+  const transactionId = peachResult.id;
+  const metadata = payment.metadata || {};
+
+  // Update payment record
+  await prisma.payment.update({
+    where: { id: payment.id },
+    data: {
+      status: 'SUCCEEDED',
+      peachTransactionId: transactionId,
+    },
+  });
+
+  // If this is a subscription payment, update the business
+  if (payment.type === 'SUBSCRIPTION' && metadata.plan) {
+    const periodDays = metadata.billingPeriod === 'YEARLY' ? 365 : 30;
+    const currentPeriodEnd = new Date();
+    currentPeriodEnd.setDate(currentPeriodEnd.getDate() + periodDays);
+
+    const updateData = {
+      subscriptionTier: metadata.plan,
+      billingPeriod: metadata.billingPeriod || 'MONTHLY',
+      currentPeriodEnd,
+    };
+
+    // Store card token for recurring billing if available
+    if (registrationId) {
+      updateData.peachCardRegistrationId = registrationId;
+    }
+
+    await prisma.business.update({
+      where: { id: payment.businessId },
+      data: updateData,
+    });
+
+    console.log(`[Payment] Subscription activated: ${payment.businessId} → ${metadata.plan} (${metadata.billingPeriod})`);
+  }
+
+  // If this is an invoice payment, update the invoice
+  if (payment.type === 'INVOICE_PAYMENT' && payment.invoiceId) {
+    await prisma.invoice.update({
+      where: { id: payment.invoiceId },
+      data: {
+        status: 'PAID',
+        paidAmount: payment.amount,
+      },
+    });
+    console.log(`[Payment] Invoice paid: ${payment.invoiceId}`);
+  }
+}
+
+// Get payment history for a business
+app.get('/api/businesses/:businessId/payments', requireAuth, async (req, res) => {
+  try {
+    const { businessId } = req.params;
+    if (!(await requireBusinessMembership(req, res, businessId))) return;
+
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = parseInt(req.query.offset) || 0;
+    const type = req.query.type; // optional filter: SUBSCRIPTION or INVOICE_PAYMENT
+
+    const where = { businessId };
+    if (type) where.type = type;
+
+    const [payments, count] = await Promise.all([
+      prisma.payment.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.payment.count({ where }),
+    ]);
+
+    res.json(successResponse({ payments, total: count, hasMore: offset + limit < count }));
+  } catch (err) {
+    console.error('[PaymentHistory] Error:', err);
+    res.status(500).json(errorResponse('Failed to get payment history'));
+  }
+});
+
+// Get subscription status for a business
+app.get('/api/businesses/:businessId/subscription-status', requireAuth, async (req, res) => {
+  try {
+    const { businessId } = req.params;
+    if (!(await requireBusinessMembership(req, res, businessId))) return;
+
+    const business = await repos.businessRepo.getById(businessId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found'));
+    }
+
+    const capabilities = deriveCapabilities(business);
+
+    res.json(successResponse({
+      plan: business.subscriptionTier,
+      billingPeriod: business.billingPeriod,
+      currentPeriodEnd: business.currentPeriodEnd,
+      hasStoredCard: !!business.peachCardRegistrationId,
+      capabilities,
+    }));
+  } catch (err) {
+    console.error('[SubscriptionStatus] Error:', err);
+    res.status(500).json(errorResponse('Failed to get subscription status'));
+  }
+});
+
+// Create checkout for paying a NouPro invoice
+app.post('/api/payments/invoice-checkout', requireAuth, async (req, res) => {
+  try {
+    const { invoiceId } = req.body;
+    if (!invoiceId) {
+      return res.status(400).json(errorResponse('invoiceId is required'));
+    }
+
+    const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId } });
+    if (!invoice) {
+      return res.status(404).json(errorResponse('Invoice not found'));
+    }
+    if (invoice.status === 'PAID') {
+      return res.status(400).json(errorResponse('Invoice is already paid'));
+    }
+
+    const amount = invoice.totalAmount || invoice.amount || 0;
+    if (amount <= 0) {
+      return res.status(400).json(errorResponse('Invoice has no payable amount'));
+    }
+
+    const orderId = `inv-${invoiceId}-${Date.now()}`;
+    const { checkoutId } = await peachPayments.createCheckout({
+      amount,
+      currency: invoice.currency || 'MUR',
+      orderId,
+    });
+
+    const payment = await prisma.payment.create({
+      data: {
+        businessId: invoice.businessId,
+        invoiceId: invoice.id,
+        type: 'INVOICE_PAYMENT',
+        amount,
+        currency: invoice.currency || 'MUR',
+        status: 'PENDING',
+        peachCheckoutId: checkoutId,
+        description: `Payment for invoice ${invoice.invoiceNumber || invoiceId}`,
+        metadata: { invoiceId, orderId },
+      },
+    });
+
+    const checkoutUrl = `${req.protocol}://${req.get('host')}/api/payments/checkout-page/${checkoutId}`;
+
+    res.json(successResponse({ checkoutId, checkoutUrl, paymentId: payment.id }));
+  } catch (err) {
+    console.error('[InvoiceCheckout] Error:', err);
+    res.status(500).json(errorResponse('Failed to create invoice checkout'));
+  }
+});
 
 // Start server (using HTTP server for Socket.IO support)
 server.listen(PORT, HOST, () => {
