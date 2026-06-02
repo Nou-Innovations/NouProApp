@@ -101,6 +101,37 @@ export const PROFILE_ACTION_CONFIGS: Record<ProfileViewType, ProfileActionConfig
 };
 
 /**
+ * The relationship action available on another account's profile.
+ * - 'connect' — mutual, request/accept (person↔person, business↔business)
+ * - 'follow'  — one-way, instant (person → business)
+ * - 'none'    — no relationship button (e.g. a business viewing a person)
+ */
+export type RelationshipAction = 'connect' | 'follow' | 'none';
+
+/**
+ * Decide whether another profile shows Follow, Connect, or no relationship button.
+ *
+ * Rule (see docs/PROFILES.md):
+ *   - A person (personal mode) → another person  = Connect
+ *   - A person (personal mode) → a business      = Follow
+ *   - A business (business mode) → another business = Connect
+ *   - A business (business mode) → a person      = none
+ *
+ * @param activeMode  the viewer's current mode ('personal' | 'business')
+ * @param targetType  the type of profile being viewed ('user' | 'business')
+ */
+export function getRelationshipAction(
+  activeMode: 'personal' | 'business',
+  targetType: 'user' | 'business',
+): RelationshipAction {
+  if (activeMode === 'business') {
+    return targetType === 'business' ? 'connect' : 'none';
+  }
+  // personal mode
+  return targetType === 'business' ? 'follow' : 'connect';
+}
+
+/**
  * Get profile action config for a given view type
  */
 export function getProfileActionConfig(viewType: ProfileViewType): ProfileActionConfig {

@@ -16,6 +16,8 @@ interface ProductCardOtherCompanyProps {
   product: any;
   isAdding: boolean;
   quantity: number;
+  /** When false, the add-to-cart affordance is hidden (e.g. personal mode). Defaults to true. */
+  canAddToCart?: boolean;
   onPress?: () => void;
   onStartAdding: () => void;
   onChangeQuantity: (qty: number) => void;
@@ -23,10 +25,11 @@ interface ProductCardOtherCompanyProps {
   onConfirmAdd: () => void;
 }
 
-const ProductCardOtherCompany: React.FC<ProductCardOtherCompanyProps> = ({ 
-  product, 
+const ProductCardOtherCompany: React.FC<ProductCardOtherCompanyProps> = ({
+  product,
   isAdding,
   quantity,
+  canAddToCart = true,
   onPress,
   onStartAdding,
   onChangeQuantity,
@@ -190,8 +193,8 @@ const ProductCardOtherCompany: React.FC<ProductCardOtherCompanyProps> = ({
         </View>
       </TouchableOpacity>
 
-      {/* Add/Remove Button - hidden when price is hidden */}
-      {!isAdding && !product.priceHidden && (
+      {/* Add/Remove Button - hidden when price is hidden or ordering not allowed */}
+      {canAddToCart && !isAdding && !product.priceHidden && (
         <TouchableOpacity
           style={[
             styles.addButton,
@@ -207,8 +210,8 @@ const ProductCardOtherCompany: React.FC<ProductCardOtherCompanyProps> = ({
         </TouchableOpacity>
       )}
 
-      {/* Expanded Quantity Section - only when price is visible */}
-      {isAdding && !product.priceHidden && (
+      {/* Expanded Quantity Section - only when price is visible and ordering allowed */}
+      {canAddToCart && isAdding && !product.priceHidden && (
         <View style={styles.quantitySection}>
           <View style={styles.quantityRow}>
             <View style={styles.quantityInputContainer}>

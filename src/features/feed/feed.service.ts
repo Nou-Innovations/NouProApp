@@ -57,9 +57,20 @@ export async function getFeed(params?: FeedParams): Promise<FeedResult> {
 
   // Use getFullResponse to get the complete response including nextCursor
   const response = await getFullResponse<FeedResponse>('/feed', queryParams);
-  
+
+  // Surface each company post's follow state. The backend tags every post with
+  // `isFromFollowed` (does the viewer follow this business); map it onto the
+  // company_presentation data so the feed can render Follow / Following.
+  const posts = response.data.map((post) => {
+    if (post.type === 'company_presentation') {
+      const isFollowing = (post as any).isFromFollowed ?? post.data.isConnected ?? false;
+      return { ...post, data: { ...post.data, isFollowing } };
+    }
+    return post;
+  });
+
   return {
-    posts: response.data,
+    posts,
     nextCursor: response.nextCursor,
   };
 }

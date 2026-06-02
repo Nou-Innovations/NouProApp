@@ -22,6 +22,19 @@ async function getByEmail(email) {
   });
 }
 
+/**
+ * Batch lookup of users by id. Returns lean records (id/name/avatar) for
+ * resolving chat participant display info without N+1 queries.
+ * @param {string[]} ids
+ */
+async function getByIds(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return [];
+  return prisma.user.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true, avatar: true },
+  });
+}
+
 async function getByPhone(phone) {
   return prisma.user.findFirst({
     where: { phone }
@@ -52,13 +65,14 @@ async function remove(id) {
   }
 }
 
-module.exports = { 
-  list, 
-  getById, 
-  getByEmail, 
+module.exports = {
+  list,
+  getById,
+  getByIds,
+  getByEmail,
   getByPhone,
-  create, 
-  update, 
-  delete: remove 
+  create,
+  update,
+  delete: remove
 };
 

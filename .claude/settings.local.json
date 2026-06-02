@@ -56,7 +56,20 @@
       "Bash(open -a Simulator)",
       "Bash(yes)",
       "Bash(node --check backend/src/repositories/prisma/orderRepo.prisma.js)",
-      "Bash(awk '/^model User /{f=1} f{print} /^}/{if\\(f\\)exit}' prisma/schema.prisma)"
+      "Bash(awk '/^model User /{f=1} f{print} /^}/{if\\(f\\)exit}' prisma/schema.prisma)",
+      "Bash(node --check server.js)",
+      "Bash(node --check src/repositories/prisma/userRepo.prisma.js)",
+      "Bash(node --check src/repositories/interfaces/userRepo.js)",
+      "Bash(ps -o command= -p 35748)",
+      "Bash(node server.js)",
+      "Bash(echo \"launched pid $!\")",
+      "Bash(lsof -nP -iTCP:3000 -sTCP:LISTEN)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(node --check backend/server.js)",
+      "Bash(echo \"tsc exit: $?\")",
+      "Bash(timeout 300 node_modules/.bin/tsc --noEmit)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(git diff *)"
     ]
   }
 }

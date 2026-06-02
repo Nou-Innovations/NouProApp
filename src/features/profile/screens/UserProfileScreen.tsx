@@ -13,7 +13,8 @@ import { userAvatarService } from '@/shared/services/userAvatarService';
 import Avatar from '@/shared/components/ui/Avatar';
 import { AppBottomSheet, type AppBottomSheetItem } from '@/shared/components/ui';
 import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
-import { ProfileViewType, getProfileAdditionalOptions } from '@/shared/types/profile';
+import { ProfileViewType, getProfileAdditionalOptions, getRelationshipAction } from '@/shared/types/profile';
+import { useProfileStore } from '@/shared/store/profileStore';
 import { get as apiGet, post as apiPost } from '@/shared/services/api';
 import theme from '@/shared/theme';
 
@@ -66,6 +67,13 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     profileId: userId,
     profileType: 'user',
   });
+
+  // Relationship button rule (see docs/PROFILES.md):
+  // personal mode → Connect (person↔person); business mode → no button (a business
+  // does not connect with a person).
+  const activeMode = useProfileStore((state) => state.activeMode);
+  const relationshipAction = getRelationshipAction(activeMode, 'user');
+  const showConnectButton = viewType === ProfileViewType.OTHER_USER && relationshipAction === 'connect';
 
   const fetchUserProfile = useCallback(async () => {
     try {
@@ -359,7 +367,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
         </TouchableOpacity>
       </View>
 
-      {/* Action Buttons - Message and Connect */}
+      {/* Action Buttons - Message + (Connect only in personal mode) */}
       <View style={styles.actionButtons}>
         <TouchableOpacity
           style={styles.messageButton}
@@ -367,25 +375,27 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
         >
           <Text style={styles.messageButtonText}>Message</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.connectButton,
-            user.connectionStatus?.status === 'accepted' && styles.connectedButton,
-          ]}
-          onPress={handleSecondaryAction}
-          disabled={connectLoading}
-        >
-          {connectLoading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={[
-              styles.connectButtonText,
-              user.connectionStatus?.status === 'accepted' && styles.connectedButtonText,
-            ]}>
-              {getConnectButtonLabel()}
-            </Text>
-          )}
-        </TouchableOpacity>
+        {showConnectButton && (
+          <TouchableOpacity
+            style={[
+              styles.connectButton,
+              user.connectionStatus?.status === 'accepted' && styles.connectedButton,
+            ]}
+            onPress={handleSecondaryAction}
+            disabled={connectLoading}
+          >
+            {connectLoading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={[
+                styles.connectButtonText,
+                user.connectionStatus?.status === 'accepted' && styles.connectedButtonText,
+              ]}>
+                {getConnectButtonLabel()}
+              </Text>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

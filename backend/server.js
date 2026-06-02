@@ -2327,12 +2327,27 @@ app.get('/api/companies/:companyId', optionalAuth, async (req, res) => {
     }))),
   ]);
 
+  // Business-to-business connection status (only when the viewer is acting as a business).
+  // Lets the frontend render Connect / Pending / Accept / Connected on the OTHER_BUSINESS screen.
+  let businessConnectionStatus = null;
+  const viewerBusinessId = req.query.viewerBusinessId;
+  if (viewerBusinessId && viewerUserId && viewerBusinessId !== business.id) {
+    const viewerMember = await findBusinessMember(viewerBusinessId, viewerUserId);
+    if (viewerMember) {
+      businessConnectionStatus = await repos.connectionRepo.getBusinessConnectionStatus(
+        viewerBusinessId,
+        business.id,
+      );
+    }
+  }
+
   res.json(successResponse({
     ...business,
     capabilities,
     locations: businessLocations,
     followersCount,
     isFollowedByViewer,
+    businessConnectionStatus,
     peoplePreview,
   }));
 });
@@ -4680,24 +4695,11 @@ app.get('/api/companies/:companyId/placed-orders', requireAuth, async (req, res)
 
 // Create order at Parent level (always allowed for paid plans)
 app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
-  // PERMISSION: Require business membership
-  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
-
   try {
-    const business = await repos.businessRepo.getById(req.params.companyId);
-    if (!business) {
-      return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
-    }
-
-    const capabilities = deriveCapabilities(business);
-    if (!capabilities.canCreateSellingOrders) {
-      return res.status(403).json(paywallResponse(
-        'Creating orders requires a paid subscription.',
-        'create_selling_order',
-        'pro'
-      ));
-    }
-
+    // Validate the body first: we need to know whether this is a B2B buyer
+    // order (placed BY a buyer company AT a supplier) or a seller-created
+    // order (B2C / manual entry by the selling company). The two cases have
+    // different authorization rules.
     const orderData = validateBody(createOrderSchema, req, res);
     if (!orderData) return;
 
@@ -4708,6 +4710,34 @@ app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
     } = orderData;
 
     const isB2B = !!buyerBusinessId;
+
+    // AUTHORIZATION — only business accounts can place orders:
+    //  - B2B buyer order: the authenticated user must be a member of the BUYER
+    //    business placing the order. They do NOT need to belong to the supplier,
+    //    which is what lets a company order from a different supplier.
+    //  - Seller-created order (no buyer business): the user must be a member of
+    //    the selling company (companyId), as before.
+    // A personal account belongs to neither, so it is rejected with 403.
+    if (isB2B) {
+      if (!(await requireBusinessMembership(req, res, buyerBusinessId))) return;
+    } else {
+      if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+    }
+
+    // The selling company must exist and have selling enabled (paid plan).
+    const business = await repos.businessRepo.getById(req.params.companyId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    }
+
+    const capabilities = deriveCapabilities(business);
+    if (!capabilities.canCreateSellingOrders) {
+      return res.status(403).json(paywallResponse(
+        'This supplier is not set up to receive orders (requires a paid subscription).',
+        'create_selling_order',
+        'pro'
+      ));
+    }
 
     const newOrder = {
       id: 'ORD-' + uuidv4().slice(0, 8).toUpperCase(),
@@ -7570,14 +7600,15 @@ app.post('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, c
       lastMessage: null
     });
 
-    // Notify all participants about the new chat via socket
+    // Notify all participants about the new chat via socket.
+    // Resolve the display per-recipient so a 1:1 chat shows the OTHER person.
     const chatParticipants = newChat.participants || participants || [];
     if (Array.isArray(chatParticipants)) {
-      chatParticipants.forEach(pid => {
-        if (typeof pid === 'string') {
-          io.to(`user:${pid}`).emit('chat_created', newChat);
-        }
-      });
+      for (const pid of chatParticipants) {
+        if (typeof pid !== 'string') continue;
+        const viewerChat = await serializeChatForViewer(newChat, pid);
+        io.to(`user:${pid}`).emit('chat_created', viewerChat);
+      }
     }
 
     res.status(201).json(successResponse(newChat));
@@ -7586,6 +7617,82 @@ app.post('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, c
     res.status(500).json(errorResponse('Failed to create chat'));
   }
 });
+
+/**
+ * Normalize a stored lastMessage into the canonical inbox-preview shape.
+ *
+ * Some stored rows (and seed data) use the legacy { text, sender } shape, while
+ * the runtime/socket path uses { content, senderName }. The frontend reads
+ * `content`/`senderName`, so we map legacy fields forward without dropping any.
+ */
+function normalizeLastMessage(lm) {
+  if (!lm || typeof lm !== 'object') return lm ?? null;
+  return {
+    ...lm,
+    content: lm.content != null ? lm.content : (lm.text != null ? lm.text : ''),
+    senderName: lm.senderName != null ? lm.senderName : (lm.sender != null ? lm.sender : ''),
+    type: lm.type || 'text',
+  };
+}
+
+const otherParticipantId = (chat, viewerUserId) => {
+  const parts = Array.isArray(chat.participants) ? chat.participants : [];
+  return parts
+    .map(p => (typeof p === 'string' ? p : (p && (p.userId || p.id))))
+    .find(pid => pid && pid !== viewerUserId);
+};
+
+const applyViewerDisplay = (chat, otherUser) => {
+  const base = { ...chat, lastMessage: normalizeLastMessage(chat.lastMessage) };
+  // Only 1:1 (direct) chats get a per-viewer name/avatar. Groups/client/supplier
+  // keep their stored name. Unknown "other" (e.g. company-to-company) → unchanged.
+  if (chat.type !== 'direct' || !otherUser) return base;
+  return {
+    ...base,
+    name: otherUser.name || chat.name || 'Unknown',
+    avatar: otherUser.avatar || chat.avatar || null,
+  };
+};
+
+/**
+ * Serialize a list of chats for one viewer: normalizes lastMessage for every
+ * chat and resolves the per-viewer display name/avatar for 1:1 (direct) chats.
+ * Uses a single batched user lookup (no N+1).
+ */
+async function serializeChatsForViewer(chats, viewerUserId) {
+  const otherIds = new Set();
+  for (const c of chats) {
+    if (c.type !== 'direct') continue;
+    const otherId = otherParticipantId(c, viewerUserId);
+    if (otherId) otherIds.add(otherId);
+  }
+
+  let userById = new Map();
+  if (otherIds.size > 0) {
+    const users = await repos.userRepo.getByIds([...otherIds]);
+    userById = new Map(users.map(u => [u.id, u]));
+  }
+
+  return chats.map(c =>
+    applyViewerDisplay(c, userById.get(otherParticipantId(c, viewerUserId)))
+  );
+}
+
+/**
+ * Serialize a single chat for one viewer — used by real-time socket emits so a
+ * newly created direct chat shows the correct name to each recipient.
+ */
+async function serializeChatForViewer(chat, viewerUserId) {
+  let otherUser = null;
+  if (chat.type === 'direct') {
+    const otherId = otherParticipantId(chat, viewerUserId);
+    if (otherId) {
+      const [u] = await repos.userRepo.getByIds([otherId]);
+      otherUser = u || null;
+    }
+  }
+  return applyViewerDisplay(chat, otherUser);
+}
 
 // List chats for a company (supports cursor-based pagination)
 app.get('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, async (req, res) => {
@@ -7633,6 +7740,9 @@ app.get('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, as
         unreadCount: participantCounts[c.id] ?? 0,
       }));
     }
+
+    // Normalize lastMessage + resolve per-viewer name/avatar for direct chats
+    companyChats = await serializeChatsForViewer(companyChats, requestingUserId);
 
     res.json({ success: true, data: companyChats, nextCursor: useSearch ? null : nextCursor });
   } catch (e) {
@@ -8204,6 +8314,9 @@ app.get('/api/users/:userId/chats', requireAuth, async (req, res) => {
       }));
     }
 
+    // Normalize lastMessage + resolve per-viewer name/avatar for direct chats
+    userChats = await serializeChatsForViewer(userChats, requestingUserId);
+
     res.json({ success: true, data: userChats, nextCursor: useSearch ? null : nextCursor });
   } catch (e) {
     console.error('Error fetching user chats:', e);
@@ -8244,10 +8357,13 @@ app.post('/api/users/:userId/chats', requireAuth, chatCreationLimiter, async (re
       lastMessage: null
     });
 
-    // Notify all participants about the new chat via socket
-    allParticipants.forEach(pid => {
-      io.to(`user:${pid}`).emit('chat_created', newChat);
-    });
+    // Notify all participants about the new chat via socket.
+    // Resolve the display per-recipient so a 1:1 chat shows the OTHER person.
+    for (const pid of allParticipants) {
+      if (typeof pid !== 'string') continue;
+      const viewerChat = await serializeChatForViewer(newChat, pid);
+      io.to(`user:${pid}`).emit('chat_created', viewerChat);
+    }
 
     res.status(201).json(successResponse(newChat));
   } catch (e) {

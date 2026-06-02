@@ -161,7 +161,6 @@ interface AppState {
   updateCartItemQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
   getCartItem: (productId: string) => CartItem | undefined;
-  placeOrder: (businessId: string, businessName: string) => void;
   reset: () => void;
 }
 
@@ -386,86 +385,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     return state.cartItems.find(item => item.productId === productId);
   },
   
-  placeOrder: (businessId, businessName) => {
-    const state = get();
-    if (state.cartItems.length === 0) return;
-    
-    // Calculate order details
-    const totalItems = state.cartItems.reduce((sum, item) => sum + item.quantity, 0);
-    const totalAmount = state.cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-    
-    // Create order message content
-    const orderSummary = state.cartItems.map(item => 
-      `${item.product.name} x${item.quantity} - Rs ${(item.product.price * item.quantity).toLocaleString()}`
-    ).join('\n');
-    
-    const orderMessage = {
-      id: `order-${Date.now()}`,
-      content: `🛒 **New Order**\n\n${orderSummary}\n\n**Total Items:** ${totalItems}\n**Total Amount:** Rs ${totalAmount.toLocaleString()}\n\nOrder placed on ${new Date().toLocaleString()}`,
-      senderId: 'current-user',
-      timestamp: new Date().toISOString(),
-      type: 'text' as const,
-      orderData: {
-        items: state.cartItems,
-        totalAmount,
-        totalItems,
-        orderId: `ORDER-${Date.now()}`,
-        status: 'pending'
-      }
-    };
-    
-    // Find or create channel for this business
-    let channelId = state.channels.find(channel => 
-      channel.partnerId === businessId && channel.partnerType === 'business'
-    )?.id;
-    
-    if (!channelId) {
-      // Create new channel
-      channelId = `channel-${businessId}`;
-      const newChannel = {
-        id: channelId,
-        name: businessName,
-        type: 'private' as const,
-        members: ['current-user', businessId],
-        avatar: null,
-        isGroup: false,
-        partnerId: businessId,
-        partnerType: 'business' as const,
-        unreadCount: 0,
-        lastMessage: orderMessage,
-        lastMessageTime: orderMessage.timestamp,
-      };
-      
-      set(state => ({
-        channels: [...state.channels, newChannel]
-      }));
-    } else {
-      // Update existing channel
-      set(state => ({
-        channels: state.channels.map(channel =>
-          channel.id === channelId
-            ? {
-                ...channel,
-                lastMessage: orderMessage,
-                lastMessageTime: orderMessage.timestamp,
-                unreadCount: channel.unreadCount + 1
-              }
-            : channel
-        )
-      }));
-    }
-    
-    // Add message to channel
-    set(state => ({
-      messages: {
-        ...state.messages,
-        [channelId]: [...(state.messages[channelId] || []), orderMessage],
-      },
-    }));
-    
-    // Clear cart after placing order
-    set({ cartItems: [] });
-  },
 }));
 
 // NOTE: The deprecated `useStore` alias has been removed.

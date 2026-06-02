@@ -5,6 +5,7 @@
 const UserRepository = {
   list: async () => {},
   getById: async (id) => {},
+  getByIds: async (ids) => {},
   getByEmail: async (email) => {},
   getByPhone: async (phone) => {},
   create: async (data) => {},

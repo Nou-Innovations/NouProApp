@@ -1,6 +1,6 @@
 /**
  * CompanyPresentationPost Component
- * Feed post presenting a company/distributor with logo, name, location, connect button, and brand cards
+ * Feed post presenting a company/distributor with logo, name, location, follow button, and brand cards
  */
 
 import React from 'react';
@@ -34,12 +34,13 @@ interface CompanyPresentationPostProps {
   companyName: string;
   companyLogo?: string;
   location: string;
-  isConnected?: boolean;
+  /** Whether the viewer (a person) follows this business */
+  isFollowing?: boolean;
   brands: BrandItem[];
   timestamp?: string;
   createdAt?: string;
   onCompanyPress?: () => void;
-  onConnectPress?: () => void;
+  onFollowPress?: () => void;
   onBrandPress?: (brandId: string) => void;
 }
 
@@ -48,12 +49,12 @@ export function CompanyPresentationPost({
   companyName,
   companyLogo,
   location,
-  isConnected = false,
+  isFollowing = false,
   brands = [],
   timestamp,
   createdAt,
   onCompanyPress,
-  onConnectPress,
+  onFollowPress,
   onBrandPress,
 }: CompanyPresentationPostProps) {
   const { theme: appTheme } = useTheme();
@@ -122,29 +123,29 @@ export function CompanyPresentationPost({
           </View>
         </TouchableOpacity>
 
-        {/* Connect Button - Vertically aligned, using secondary variant when connected */}
+        {/* Follow Button - Vertically aligned, using secondary variant when following */}
         <TouchableOpacity
           style={[
             styles.connectButton,
-            isConnected
+            isFollowing
               ? { backgroundColor: appTheme.colors.cardBackground, borderWidth: 0 }
               : { backgroundColor: appTheme.colors.primary },
           ]}
-          onPress={onConnectPress}
+          onPress={onFollowPress}
           activeOpacity={0.7}
         >
-          {isConnected ? (
+          {isFollowing ? (
             <>
               <Icon name="checkmark" size={16} color={appTheme.colors.text} />
               <Text style={[styles.connectButtonText, { color: appTheme.colors.text, marginLeft: 4 }]}>
-                Connected
+                Following
               </Text>
             </>
           ) : (
             <>
               <Icon name="add" size={16} color={appTheme.colors.textInverse} />
               <Text style={[styles.connectButtonText, { color: appTheme.colors.textInverse, marginLeft: 4 }]}>
-                Connect
+                Follow
               </Text>
             </>
           )}

@@ -18,6 +18,8 @@ import { useAppStore } from '@/shared/store';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useOrderStore } from '@/shared/store/orderStore';
 import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
+import { getRelationshipAction } from '@/shared/types/profile';
+import { sendBusinessConnectionRequest, acceptBusinessConnectionRequest } from '@/features/connections/connections.service';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import MapView, { Marker } from 'react-native-maps';
@@ -99,7 +101,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       setError(null);
       const viewerParam = activeBusinessId ? `?viewerBusinessId=${activeBusinessId}` : '';
       const [bizData, brandsData] = await Promise.all([
-        apiGet<any>(`/companies/${businessId}`),
+        apiGet<any>(`/companies/${businessId}${viewerParam}`),
         apiGet<any[]>(`/companies/${businessId}/brands${viewerParam}`).catch(() => []),
       ]);
       setBusiness(bizData);
@@ -164,8 +166,19 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     profileType: 'business',
   });
 
-  // Follow state - surfaced in the "more options" (⋮) menu rather than as a separate button
+  // Relationship button rule (see docs/PROFILES.md):
+  // personal mode → Follow (person → business); business mode → Connect (business ↔ business).
+  const relationshipAction = getRelationshipAction(activeMode, 'business');
+
+  // Follow state (used as the secondary button in personal mode)
   const { isFollowing, toggleFollow, loading: followLoading } = useFollowStatus(businessId);
+
+  // Business ↔ business connection state (used as the secondary button in business mode)
+  const [connectLoading, setConnectLoading] = useState(false);
+  const bizConn = business?.businessConnectionStatus as
+    | { id: string; status: string; direction: string }
+    | null
+    | undefined;
   
   // Legacy cart store - used by CartPopup, CartItemCard, CartBottomSection components
   const { cartItems, addToCart: legacyAddToCart, removeFromCart, clearCart: legacyClearCart } = useAppStore();
@@ -275,12 +288,76 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     });
   };
 
-  const handleSecondaryAction = () => {
-    // Connect with business
-    Alert.alert('Connect', `Connect with ${business.name}?`, [
+  // Connect button label reflecting the business ↔ business connection status
+  const getBizConnectLabel = () => {
+    if (!bizConn) return 'Connect';
+    if (bizConn.status === 'accepted') return 'Connected';
+    if (bizConn.status === 'pending' && bizConn.direction === 'sent') return 'Pending';
+    if (bizConn.status === 'pending' && bizConn.direction === 'received') return 'Accept';
+    return 'Connect';
+  };
+
+  // Business ↔ business connect flow (request / accept), mirroring the user connect flow
+  const handleBusinessConnect = () => {
+    if (!activeBusiness) {
+      Alert.alert('Business Mode required', 'Switch to a business to connect with another business.');
+      return;
+    }
+    if (bizConn?.status === 'accepted') {
+      Alert.alert('Already Connected', `${activeBusiness.name} is already connected with ${business.name}.`);
+      return;
+    }
+    if (bizConn?.status === 'pending' && bizConn.direction === 'sent') {
+      Alert.alert('Request Pending', 'Your connection request is already pending.');
+      return;
+    }
+    if (bizConn?.status === 'pending' && bizConn.direction === 'received') {
+      Alert.alert('Accept Request', `Accept connection request from ${business.name}?`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Accept',
+          onPress: async () => {
+            try {
+              setConnectLoading(true);
+              await acceptBusinessConnectionRequest(bizConn.id);
+              fetchBusinessData();
+            } catch {
+              Alert.alert('Error', 'Failed to accept connection request.');
+            } finally {
+              setConnectLoading(false);
+            }
+          },
+        },
+      ]);
+      return;
+    }
+
+    Alert.alert('Connect', `Send a connection request from ${activeBusiness.name} to ${business.name}?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Connect', onPress: () => {} },
+      {
+        text: 'Connect',
+        onPress: async () => {
+          try {
+            setConnectLoading(true);
+            await sendBusinessConnectionRequest(activeBusiness.id, business.id);
+            fetchBusinessData();
+          } catch (err: any) {
+            Alert.alert('Error', err?.response?.error || 'Failed to send connection request.');
+          } finally {
+            setConnectLoading(false);
+          }
+        },
+      },
     ]);
+  };
+
+  // Secondary button action depends on mode: Follow (personal) or Connect (business)
+  const handleSecondaryAction = () => {
+    if (relationshipAction === 'follow') {
+      toggleFollow();
+    } else if (relationshipAction === 'connect') {
+      handleBusinessConnect();
+    }
   };
 
   const handleShareProfile = async () => {
@@ -301,13 +378,8 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       { text: 'Block', onPress: () => {} },
     ];
 
-    // Follow / Unfollow lives here now (was a separate button in the action row)
-    if (!followLoading) {
-      options.unshift({
-        text: isFollowing ? 'Unfollow' : 'Follow',
-        onPress: () => { toggleFollow(); },
-      });
-    }
+    // Follow/Connect now live in the secondary action button (see docs/PROFILES.md),
+    // not in this menu.
 
     // Add "Request to Join" only in personal mode when not already a member
     if (activeMode === 'personal' && !isAlreadyMember) {
@@ -412,11 +484,12 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     } else {
       const addingState = addingStates[item.data.id] || { isAdding: false, quantity: 1 };
       return (
-        <ProductCardOtherCompany 
+        <ProductCardOtherCompany
           key={`product-${item.data.id}`}
           product={item.data}
           isAdding={addingState.isAdding}
           quantity={addingState.quantity}
+          canAddToCart={canOrder}
           onPress={() => navigation.navigate('ProductDetail', { productId: item.data.id })}
           onStartAdding={() => startAdding(item.data.id)}
           onChangeQuantity={(qty) => changeQuantity(item.data.id, qty)}
@@ -636,11 +709,12 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
               );
             } else {
               return (
-                <ProductCardOtherCompany 
+                <ProductCardOtherCompany
                   key={`product-${item.data.id}`}
                   product={item.data}
                   isAdding={addingStates[item.data.id]?.isAdding || false}
                   quantity={addingStates[item.data.id]?.quantity || 1}
+                  canAddToCart={canOrder}
                   onPress={() => navigation.navigate('ProductDetail', { productId: item.data.id })}
                   onStartAdding={() => startAdding(item.data.id)}
                   onChangeQuantity={(qty) => changeQuantity(item.data.id, qty)}
@@ -737,6 +811,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
             <CartItemCard
               key={item.productId}
               item={item}
+              businessId={business.id}
             />
           ))}
         </ScrollView>
@@ -912,13 +987,23 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
             </View>
           </View>
 
-          {/* Profile Action Buttons - Based on ProfileViewType (OTHER_BUSINESS) */}
-          {/* Message + Connect + ⋮ (Follow now lives inside the ⋮ menu) */}
+          {/* Profile Action Buttons - Message + (Follow in personal mode / Connect in business mode) + ⋮ */}
           <ProfileActionButtons
             viewType={viewType}
             onPrimaryPress={handlePrimaryAction}
             onSecondaryPress={handleSecondaryAction}
             onMoreOptionsPress={handleMoreOptions}
+            secondaryLabel={
+              relationshipAction === 'follow'
+                ? (isFollowing ? 'Following' : 'Follow')
+                : getBizConnectLabel()
+            }
+            secondaryVariant={
+              relationshipAction === 'follow'
+                ? (isFollowing ? 'outline' : 'primary')
+                : (bizConn?.status === 'accepted' ? 'outline' : 'primary')
+            }
+            secondaryLoading={relationshipAction === 'follow' ? followLoading : connectLoading}
             style={styles.actionButtons}
           />
         </View>
@@ -967,7 +1052,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
 
       {/* Cart Popup - Fixed across all tabs */}
       <CartPopup
-        isVisible={isCartPopupVisible && activeTab === 'products'}
+        isVisible={canOrder && isCartPopupVisible && activeTab === 'products'}
         onClose={handleCartPopupClose}
         onAddToCart={handleAddToCart}
         onGoToCart={handleGoToCart}
@@ -975,7 +1060,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
 
       {/* Cart Bottom Section - Only show on cart tab with items */}
       {activeTab === 'cart' && cartItems.length > 0 && (
-        <CartBottomSection onPlaceOrder={handlePlaceOrder} />
+        <CartBottomSection businessId={business.id} onPlaceOrder={handlePlaceOrder} />
       )}
     </View>
   );

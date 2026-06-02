@@ -44,7 +44,10 @@ export interface CompanyPresentationData {
   companyName: string;
   companyLogo: string;
   location: string;
+  /** @deprecated In personal mode a person follows a business — use isFollowing. */
   isConnected: boolean;
+  /** Whether the viewer (a person) currently follows this business. */
+  isFollowing?: boolean;
   brands: CompanyBrand[];
 }
 

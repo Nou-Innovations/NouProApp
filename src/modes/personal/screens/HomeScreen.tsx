@@ -32,7 +32,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { useNotifications } from '@/shared/context/NotificationContext';
 // ARCHITECTURE: Data comes from hook, not inline mock arrays
 import { useFeed } from '@/features/feed';
-import apiClient from '@/shared/services/api';
+import { followBusiness, unfollowBusiness } from '@/features/follow/follow.service';
 import { FeedPost } from '@/shared/types/feed';
 import { RootStackParamList } from '@/shared/types/navigation';
 import {
@@ -50,8 +50,8 @@ export default function HomeScreen() {
   const clearNewUserFlag = useProfileStore((state) => state.clearNewUserFlag);
   const { unreadCount } = useNotifications();
   
-  // Optimistic connection state overrides (companyId -> isConnected)
-  const [connectionOverrides, setConnectionOverrides] = useState<Record<string, boolean>>({});
+  // Optimistic follow state overrides (companyId -> isFollowing)
+  const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>({});
   
   // Clear new user flag after showing welcome message (after a delay)
   useEffect(() => {
@@ -94,30 +94,21 @@ export default function HomeScreen() {
     navigation.navigate('ViewBusinessProfile', { businessId, expandBrandId: brandId });
   };
 
-  const handleConnectPress = async (companyId: string, currentConnected: boolean) => {
+  // In personal mode a person follows a business (see docs/PROFILES.md).
+  const handleFollowPress = async (companyId: string, currentlyFollowing: boolean) => {
     // Optimistic toggle — immediately update UI
-    const newState = !currentConnected;
-    setConnectionOverrides((prev) => ({ ...prev, [companyId]: newState }));
+    const newState = !currentlyFollowing;
+    setFollowOverrides((prev) => ({ ...prev, [companyId]: newState }));
 
     try {
-      if (currentConnected) {
-        // Disconnect: find the connection and delete it
-        const res = await apiClient.get(`/companies/${companyId}/connections`);
-        const connections = res.data?.data || [];
-        if (connections.length > 0) {
-          const myBizId = useProfileStore.getState().activeBusiness?.id;
-          const conn = connections.find((c: any) => c.requesterBusinessId === myBizId);
-          if (conn) {
-            await apiClient.delete(`/companies/${companyId}/connections/${conn.id}`);
-          }
-        }
+      if (currentlyFollowing) {
+        await unfollowBusiness(companyId);
       } else {
-        // Connect to this business
-        await apiClient.post(`/companies/${companyId}/connections`, {});
+        await followBusiness(companyId);
       }
     } catch {
       // Revert optimistic update on failure
-      setConnectionOverrides((prev) => ({ ...prev, [companyId]: currentConnected }));
+      setFollowOverrides((prev) => ({ ...prev, [companyId]: currentlyFollowing }));
     }
   };
 
@@ -215,19 +206,19 @@ export default function HomeScreen() {
         );
 
       case 'company_presentation': {
-        const connected = connectionOverrides[item.data.companyId] ?? item.data.isConnected;
+        const following = followOverrides[item.data.companyId] ?? item.data.isFollowing ?? item.data.isConnected ?? false;
         return (
           <CompanyPresentationPost
             id={item.data.companyId}
             companyName={item.data.companyName}
             companyLogo={item.data.companyLogo}
             location={item.data.location}
-            isConnected={connected}
+            isFollowing={following}
             brands={item.data.brands}
             timestamp={item.timestamp}
             createdAt={item.createdAt}
             onCompanyPress={() => handleBusinessPress(item.data.companyId)}
-            onConnectPress={() => handleConnectPress(item.data.companyId, connected)}
+            onFollowPress={() => handleFollowPress(item.data.companyId, following)}
             // Clicking a brand card navigates to the company's business profile with that brand expanded
             onBrandPress={(brandId: string) => handleBrandPress(brandId, item.data.companyId)}
           />

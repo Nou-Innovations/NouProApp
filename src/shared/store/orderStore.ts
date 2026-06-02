@@ -321,6 +321,17 @@ export const useOrderStore = create<OrderStore>()(
         const cart = get().carts[toBusinessId];
         if (!cart || cart.items.length === 0) return null;
 
+        // Only business accounts can place orders. A user browsing in personal
+        // mode must switch to a business profile first. (lazy require avoids a
+        // circular import between orderStore <-> profileStore)
+        const profile = require('@/shared/store/profileStore').useProfileStore.getState();
+        if (profile.activeMode !== 'business' || !profile.activeBusinessId) {
+          set({
+            error: 'Only business accounts can place orders. Switch to your business profile to order.',
+          });
+          return null;
+        }
+
         set({ isLoading: true, error: null });
 
         try {

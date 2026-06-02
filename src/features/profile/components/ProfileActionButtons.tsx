@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -48,7 +49,24 @@ interface ProfileActionButtonsProps {
    * Handler for more options press (Report/Share/Block)
    */
   onMoreOptionsPress?: () => void;
-  
+
+  /**
+   * Override the secondary button label (e.g. "Follow" / "Connected" / "Pending").
+   * When omitted, the label from the view-type config is used.
+   */
+  secondaryLabel?: string;
+
+  /**
+   * Override the secondary button variant. Defaults to the config's variant.
+   */
+  secondaryVariant?: 'primary' | 'outline';
+
+  /**
+   * Show a spinner in the secondary button and disable it (e.g. while a
+   * follow/connect request is in flight).
+   */
+  secondaryLoading?: boolean;
+
   /**
    * Custom styles for the container
    */
@@ -68,12 +86,19 @@ export default function ProfileActionButtons({
   onPrimaryPress,
   onSecondaryPress,
   onMoreOptionsPress,
+  secondaryLabel,
+  secondaryVariant,
+  secondaryLoading = false,
   style,
 }: ProfileActionButtonsProps) {
   const { theme: appTheme } = useTheme();
   const config = getProfileActionConfig(viewType);
   const additionalOptions = getProfileAdditionalOptions(viewType);
   const showMoreButton = additionalOptions.length > 0;
+
+  // Allow callers to drive the secondary button (Follow/Connect states) dynamically.
+  const resolvedSecondaryLabel = secondaryLabel ?? config.secondaryButton.label;
+  const resolvedSecondaryVariant = secondaryVariant ?? config.secondaryButton.variant;
 
   const handleMoreOptions = () => {
     if (onMoreOptionsPress) {
@@ -139,21 +164,29 @@ export default function ProfileActionButtons({
       <TouchableOpacity
         style={[
           styles.button,
-          config.secondaryButton.variant === 'primary' && dynamicStyles.filledButton,
-          config.secondaryButton.variant === 'outline' && dynamicStyles.outlineButton,
+          resolvedSecondaryVariant === 'primary' && dynamicStyles.filledButton,
+          resolvedSecondaryVariant === 'outline' && dynamicStyles.outlineButton,
         ]}
         onPress={onSecondaryPress}
         activeOpacity={0.7}
+        disabled={secondaryLoading}
       >
-        <Text
-          style={[
-            styles.buttonText,
-            config.secondaryButton.variant === 'primary' && dynamicStyles.filledButtonText,
-            config.secondaryButton.variant === 'outline' && dynamicStyles.outlineButtonText,
-          ]}
-        >
-          {config.secondaryButton.label}
-        </Text>
+        {secondaryLoading ? (
+          <ActivityIndicator
+            size="small"
+            color={resolvedSecondaryVariant === 'primary' ? appTheme.colors.textInverse : appTheme.colors.primary}
+          />
+        ) : (
+          <Text
+            style={[
+              styles.buttonText,
+              resolvedSecondaryVariant === 'primary' && dynamicStyles.filledButtonText,
+              resolvedSecondaryVariant === 'outline' && dynamicStyles.outlineButtonText,
+            ]}
+          >
+            {resolvedSecondaryLabel}
+          </Text>
+        )}
       </TouchableOpacity>
 
       {/* More Options Button (only for OTHER_* profiles) */}

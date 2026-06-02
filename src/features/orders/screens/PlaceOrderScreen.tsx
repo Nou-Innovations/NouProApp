@@ -39,6 +39,7 @@ export default function PlaceOrderScreen({ route }: Props) {
   const placeOrder = useOrderStore((state) => state.placeOrder);
 
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
+  const activeMode = useProfileStore((state) => state.activeMode);
   const currentUser = useProfileStore((state) => state.currentUser);
 
   const [notes, setNotes] = useState('');
@@ -47,8 +48,11 @@ export default function PlaceOrderScreen({ route }: Props) {
   const total = cart?.total ?? 0;
 
   const handleConfirm = async () => {
-    if (!activeBusiness?.id) {
-      Alert.alert('No business selected', 'Please select a business before placing an order.');
+    if (activeMode !== 'business' || !activeBusiness?.id) {
+      Alert.alert(
+        'Business account required',
+        'Only business accounts can place orders. Switch to your business profile to continue.'
+      );
       return;
     }
     if (items.length === 0) {
