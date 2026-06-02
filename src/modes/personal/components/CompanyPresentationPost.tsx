@@ -34,13 +34,18 @@ interface CompanyPresentationPostProps {
   companyName: string;
   companyLogo?: string;
   location: string;
-  /** Whether the viewer (a person) follows this business */
-  isFollowing?: boolean;
+  /**
+   * Which relationship the viewer can form with this business (see docs/PROFILES.md):
+   * 'follow' in personal mode, 'connect' in business mode, 'none' to hide the button.
+   */
+  relationshipAction?: 'follow' | 'connect' | 'none';
+  /** Whether the relationship is already active (Following / Connected) */
+  isActive?: boolean;
   brands: BrandItem[];
   timestamp?: string;
   createdAt?: string;
   onCompanyPress?: () => void;
-  onFollowPress?: () => void;
+  onActionPress?: () => void;
   onBrandPress?: (brandId: string) => void;
 }
 
@@ -49,12 +54,13 @@ export function CompanyPresentationPost({
   companyName,
   companyLogo,
   location,
-  isFollowing = false,
+  relationshipAction = 'follow',
+  isActive = false,
   brands = [],
   timestamp,
   createdAt,
   onCompanyPress,
-  onFollowPress,
+  onActionPress,
   onBrandPress,
 }: CompanyPresentationPostProps) {
   const { theme: appTheme } = useTheme();
@@ -123,33 +129,35 @@ export function CompanyPresentationPost({
           </View>
         </TouchableOpacity>
 
-        {/* Follow Button - Vertically aligned, using secondary variant when following */}
-        <TouchableOpacity
-          style={[
-            styles.connectButton,
-            isFollowing
-              ? { backgroundColor: appTheme.colors.cardBackground, borderWidth: 0 }
-              : { backgroundColor: appTheme.colors.primary },
-          ]}
-          onPress={onFollowPress}
-          activeOpacity={0.7}
-        >
-          {isFollowing ? (
-            <>
-              <Icon name="checkmark" size={16} color={appTheme.colors.text} />
-              <Text style={[styles.connectButtonText, { color: appTheme.colors.text, marginLeft: 4 }]}>
-                Following
-              </Text>
-            </>
-          ) : (
-            <>
-              <Icon name="add" size={16} color={appTheme.colors.textInverse} />
-              <Text style={[styles.connectButtonText, { color: appTheme.colors.textInverse, marginLeft: 4 }]}>
-                Follow
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
+        {/* Relationship Button - Follow (personal) / Connect (business). Hidden when 'none'. */}
+        {relationshipAction !== 'none' && (
+          <TouchableOpacity
+            style={[
+              styles.connectButton,
+              isActive
+                ? { backgroundColor: appTheme.colors.cardBackground, borderWidth: 0 }
+                : { backgroundColor: appTheme.colors.primary },
+            ]}
+            onPress={onActionPress}
+            activeOpacity={0.7}
+          >
+            {isActive ? (
+              <>
+                <Icon name="checkmark" size={16} color={appTheme.colors.text} />
+                <Text style={[styles.connectButtonText, { color: appTheme.colors.text, marginLeft: 4 }]}>
+                  {relationshipAction === 'follow' ? 'Following' : 'Connected'}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Icon name="add" size={16} color={appTheme.colors.textInverse} />
+                <Text style={[styles.connectButtonText, { color: appTheme.colors.textInverse, marginLeft: 4 }]}>
+                  {relationshipAction === 'follow' ? 'Follow' : 'Connect'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Timestamp */}

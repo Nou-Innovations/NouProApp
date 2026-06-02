@@ -69,7 +69,8 @@
       "Bash(echo \"tsc exit: $?\")",
       "Bash(timeout 300 node_modules/.bin/tsc --noEmit)",
       "Bash(node_modules/.bin/tsc --noEmit)",
-      "Bash(git diff *)"
+      "Bash(git diff *)",
+      "Bash(git commit *)"
     ]
   }
 }

@@ -213,12 +213,13 @@ export default function HomeScreen() {
             companyName={item.data.companyName}
             companyLogo={item.data.companyLogo}
             location={item.data.location}
-            isFollowing={following}
+            relationshipAction="follow"
+            isActive={following}
             brands={item.data.brands}
             timestamp={item.timestamp}
             createdAt={item.createdAt}
             onCompanyPress={() => handleBusinessPress(item.data.companyId)}
-            onFollowPress={() => handleFollowPress(item.data.companyId, following)}
+            onActionPress={() => handleFollowPress(item.data.companyId, following)}
             // Clicking a brand card navigates to the company's business profile with that brand expanded
             onBrandPress={(brandId: string) => handleBrandPress(brandId, item.data.companyId)}
           />

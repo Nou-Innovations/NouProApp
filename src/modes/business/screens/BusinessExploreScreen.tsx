@@ -141,12 +141,13 @@ export default function BusinessExploreScreen() {
             companyName={item.data.companyName}
             companyLogo={item.data.companyLogo}
             location={item.data.location}
-            isConnected={connected}
+            relationshipAction="connect"
+            isActive={connected}
             brands={item.data.brands}
             timestamp={item.timestamp}
             createdAt={item.createdAt}
             onCompanyPress={() => handleBusinessPress(item.data.companyId)}
-            onConnectPress={() => handleConnectPress(item.data.companyId, connected)}
+            onActionPress={() => handleConnectPress(item.data.companyId, connected)}
             // Clicking a brand card navigates to the company's business profile with that brand expanded
             onBrandPress={(brandId: string) => handleBrandPress(brandId, item.data.companyId)}
           />

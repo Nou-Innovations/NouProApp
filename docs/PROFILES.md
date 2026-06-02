@@ -168,6 +168,16 @@ Screen: [`BusinessProfileScreen.tsx`](../src/features/profile/screens/BusinessPr
 - Backend: `GET /api/companies/:companyId` returns `businessConnectionStatus` when a valid
   `viewerBusinessId` is supplied (additive only — no schema change/migration).
 
+### Feed cards follow the same rule
+
+The same rule applies to company cards in the feed
+([`CompanyPresentationPost`](../src/modes/personal/components/CompanyPresentationPost.tsx)), which
+takes a `relationshipAction` prop:
+- Personal-mode Home feed ([`HomeScreen`](../src/modes/personal/screens/HomeScreen.tsx)) →
+  **Follow** (toggles `BusinessFollow`; initial state comes from the feed's `isFromFollowed`).
+- Business-mode Explore feed ([`BusinessExploreScreen`](../src/modes/business/screens/BusinessExploreScreen.tsx))
+  → **Connect** (business↔business).
+
 ---
 
 ## 8. Quick reference
