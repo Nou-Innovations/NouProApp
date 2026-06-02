@@ -23,6 +23,30 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
+// ============================================================================
+// ERROR MONITORING (Sentry) — enabled only when SENTRY_DSN is configured.
+// No-op (and zero overhead) when the DSN is absent, e.g. in local dev.
+// ============================================================================
+const Sentry = require('@sentry/node');
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    tracesSampleRate: 0.1,
+  });
+  console.log('[Sentry] Error monitoring enabled');
+
+  // Capture crashes that escape route-level try/catch blocks.
+  process.on('unhandledRejection', (reason) => {
+    Sentry.captureException(reason);
+    console.error('[unhandledRejection]', reason);
+  });
+  process.on('uncaughtException', (err) => {
+    Sentry.captureException(err);
+    console.error('[uncaughtException]', err);
+  });
+}
+
 if (process.env.JWT_SECRET === 'your-secret-here-generate-with-openssl-rand-base64-48') {
   console.error('\n[FATAL] JWT_SECRET is still the placeholder value from .env.example.');
   console.error('Generate a real secret: openssl rand -base64 48\n');
@@ -253,6 +277,18 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,                    // 15 attempts per window
   message: { success: false, error: 'Too many attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+});
+
+// Rate limiter for authenticated 2FA management endpoints (setup/verify-setup/disable).
+// Keyed by user id (applied AFTER requireAuth) — 10 attempts / 15 minutes / user.
+const twoFactorLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.user?.id ?? req.ip,
+  message: { success: false, error: 'Too many 2FA attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
   validate: { xForwardedForHeader: false },
@@ -1186,8 +1222,9 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       name: dbUser.name 
     });
     const refreshToken = generateToken({ 
-      sub: dbUser.id, 
-      type: 'refresh' 
+      sub: dbUser.id,
+      type: 'refresh',
+      tv: dbUser.tokenVersion ?? 0
     }, { expiresIn: '30d' });
     
     // Update lastLoginAt
@@ -1224,9 +1261,15 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   }
 });
 
-app.post('/api/auth/logout', requireAuth, (req, res) => {
-  // Note: Token invalidation requires a blacklist/Redis store (future improvement)
-  // For now, the client clears tokens locally and we log the event
+app.post('/api/auth/logout', requireAuth, async (req, res) => {
+  // Invalidate all refresh tokens for this user by bumping their token version.
+  // Existing access tokens remain valid until they expire (max 30 min), but no
+  // new access token can be minted from an old refresh token.
+  try {
+    await repos.userRepo.update(req.user.id, { tokenVersion: { increment: 1 } });
+  } catch (err) {
+    console.error('[Logout] Failed to bump token version:', err.message);
+  }
   if (process.env.NODE_ENV !== 'production') {
     console.log('[Logout] User logged out:', req.user.id);
   }
@@ -1301,9 +1344,9 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
       return res.status(404).json(errorResponse('User not found'));
     }
 
-    // Hash and store new password
+    // Hash and store new password, and invalidate all existing sessions
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    await repos.userRepo.update(dbUser.id, { passwordHash });
+    await repos.userRepo.update(dbUser.id, { passwordHash, tokenVersion: { increment: 1 } });
 
     console.log('[ResetPassword] Password reset for user:', dbUser.id);
 
@@ -1339,7 +1382,14 @@ app.post('/api/auth/refresh', authLimiter, async (req, res) => {
     if (!dbUser) {
       return res.status(401).json(errorResponse('User no longer exists'));
     }
-    
+
+    // Reject refresh tokens issued before the user's current token version
+    // (bumped on logout / password change). Missing claim is treated as 0 for
+    // backwards compatibility with tokens issued before this feature.
+    if ((result.user.claims.tv ?? 0) !== (dbUser.tokenVersion ?? 0)) {
+      return res.status(401).json(errorResponse('Session has been revoked. Please log in again.'));
+    }
+
     // Generate a new access token
     const newToken = generateToken({ 
       sub: dbUser.id, 
@@ -1354,7 +1404,8 @@ app.post('/api/auth/refresh', authLimiter, async (req, res) => {
     // Generate a new refresh token (rotation)
     const newRefreshToken = generateToken({
       sub: dbUser.id,
-      type: 'refresh'
+      type: 'refresh',
+      tv: dbUser.tokenVersion ?? 0
     }, { expiresIn: '30d' });
 
     res.json(successResponse({
@@ -1440,8 +1491,9 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       name: dbUser.name 
     });
     const refreshToken = generateToken({ 
-      sub: dbUser.id, 
-      type: 'refresh' 
+      sub: dbUser.id,
+      type: 'refresh',
+      tv: dbUser.tokenVersion ?? 0
     }, { expiresIn: '30d' });
     
     if (process.env.NODE_ENV !== 'production') {
@@ -1501,9 +1553,9 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
       return res.status(400).json(errorResponse('New password must be different from current password'));
     }
     
-    // Hash and store new password
+    // Hash and store new password, and invalidate all existing sessions
     const newPasswordHash = await bcrypt.hash(newPassword, 12);
-    await repos.userRepo.update(dbUser.id, { passwordHash: newPasswordHash });
+    await repos.userRepo.update(dbUser.id, { passwordHash: newPasswordHash, tokenVersion: { increment: 1 } });
     
     console.log('[ChangePassword] Password updated for user:', dbUser.id);
     
@@ -1669,7 +1721,7 @@ app.post('/api/auth/verify-email', authLimiter, async (req, res) => {
 // ============================================================================
 
 // Begin 2FA setup - generate TOTP secret
-app.post('/api/auth/2fa/setup', requireAuth, async (req, res) => {
+app.post('/api/auth/2fa/setup', requireAuth, twoFactorLimiter, async (req, res) => {
   try {
     const { authenticator } = require('otplib');
 
@@ -1704,7 +1756,7 @@ app.post('/api/auth/2fa/setup', requireAuth, async (req, res) => {
 });
 
 // Verify setup code and enable 2FA
-app.post('/api/auth/2fa/verify-setup', requireAuth, async (req, res) => {
+app.post('/api/auth/2fa/verify-setup', requireAuth, twoFactorLimiter, async (req, res) => {
   try {
     const { authenticator } = require('otplib');
     const crypto = require('crypto');
@@ -1755,7 +1807,7 @@ app.post('/api/auth/2fa/verify-setup', requireAuth, async (req, res) => {
 });
 
 // Disable 2FA (requires password)
-app.post('/api/auth/2fa/disable', requireAuth, async (req, res) => {
+app.post('/api/auth/2fa/disable', requireAuth, twoFactorLimiter, async (req, res) => {
   try {
     const { password } = req.body;
 
@@ -1859,6 +1911,7 @@ app.post('/api/auth/2fa/verify', authLimiter, async (req, res) => {
     const refreshToken = generateToken({
       sub: dbUser.id,
       type: 'refresh',
+      tv: dbUser.tokenVersion ?? 0,
     }, { expiresIn: '30d' });
 
     await repos.userRepo.update(dbUser.id, { lastLoginAt: new Date() }).catch(() => {});
@@ -4582,25 +4635,18 @@ app.get('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
   if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
 
   try {
-    let businessOrders = await repos.orderRepo.getByBusinessId(req.params.companyId);
+    // Filtering, sorting and pagination are pushed into SQL (see orderRepo).
+    const { status, scope, soldByScope, soldByLocationId, fulfillmentLocationId, search, limit, offset } = req.query;
 
-    // Optional filters
-    const { status, scope, soldByLocationId, fulfillmentLocationId, soldByScope, search } = req.query;
-
-    if (status) businessOrders = businessOrders.filter(o => o.status === status);
-    if (scope || soldByScope) businessOrders = businessOrders.filter(o => o.soldByScope === (scope || soldByScope));
-    if (soldByLocationId) businessOrders = businessOrders.filter(o => o.soldByLocationId === soldByLocationId);
-    if (fulfillmentLocationId) businessOrders = businessOrders.filter(o => o.fulfillmentLocationId === fulfillmentLocationId);
-
-    if (search) {
-      const searchLower = search.toLowerCase();
-      businessOrders = businessOrders.filter(o => 
-        (o.customerName || '').toLowerCase().includes(searchLower) ||
-        (o.id || '').toLowerCase().includes(searchLower)
-      );
-    }
-
-    businessOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const businessOrders = await repos.orderRepo.getByBusinessId(req.params.companyId, {
+      status,
+      soldByScope: scope || soldByScope,
+      soldByLocationId,
+      fulfillmentLocationId,
+      search,
+      limit: limit || 200,
+      offset,
+    });
 
     res.json(successResponse(businessOrders, 'Orders retrieved successfully'));
   } catch (err) {
@@ -4615,21 +4661,15 @@ app.get('/api/companies/:companyId/placed-orders', requireAuth, async (req, res)
   if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
 
   try {
-    // Use the repo method directly - no per-request PrismaClient
-    let placedOrders = await repos.orderRepo.getByBuyerBusinessId(req.params.companyId);
+    // Filtering, sorting and pagination are pushed into SQL (see orderRepo).
+    const { status, search, limit, offset } = req.query;
 
-    const { status, search } = req.query;
-    if (status) placedOrders = placedOrders.filter(o => o.status === status);
-    if (search) {
-      const s = search.toLowerCase();
-      placedOrders = placedOrders.filter(o =>
-        (o.customerName || '').toLowerCase().includes(s) ||
-        (o.id || '').toLowerCase().includes(s) ||
-        (o.buyerBusinessName || '').toLowerCase().includes(s)
-      );
-    }
-
-    placedOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const placedOrders = await repos.orderRepo.getByBuyerBusinessId(req.params.companyId, {
+      status,
+      search,
+      limit: limit || 200,
+      offset,
+    });
 
     res.json(successResponse(placedOrders, 'Placed orders retrieved successfully'));
   } catch (err) {
@@ -11990,6 +12030,21 @@ app.post('/api/payments/invoice-checkout', requireAuth, async (req, res) => {
     console.error('[InvoiceCheckout] Error:', err);
     res.status(500).json(errorResponse('Failed to create invoice checkout'));
   }
+});
+
+// ============================================================================
+// GLOBAL ERROR HANDLER — must be the LAST middleware. Reports unhandled
+// errors to Sentry (if configured) and returns a safe 500.
+// ============================================================================
+app.use((err, req, res, next) => {
+  // CORS rejections are expected/benign — don't spam Sentry with them.
+  const isCors = typeof err?.message === 'string' && err.message.startsWith('CORS_');
+  if (process.env.SENTRY_DSN && !isCors) {
+    Sentry.captureException(err);
+  }
+  console.error('[UnhandledError]', err);
+  if (res.headersSent) return next(err);
+  res.status(500).json(errorResponse('Internal server error', 'INTERNAL_ERROR'));
 });
 
 // Start server (using HTTP server for Socket.IO support)

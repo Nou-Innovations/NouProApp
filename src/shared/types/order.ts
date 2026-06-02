@@ -147,6 +147,8 @@ export interface Order {
   // B2B ordering fields
   buyerBusinessId?: string;
   buyerBusinessName?: string;
+  /** Seller's business name — populated on placed (outgoing) orders so the buyer can label them */
+  sellerBusinessName?: string;
   createdBy?: string;
   items: OrderItem[];
   totalAmount?: number;

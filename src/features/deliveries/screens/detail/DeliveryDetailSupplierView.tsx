@@ -29,6 +29,7 @@ import {
   Easing,
   FlatList,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
@@ -38,6 +39,7 @@ import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBo
 import AppButton from '@/shared/components/ui/AppButton';
 import AssignStaffModal from '@/shared/components/ui/AssignStaffModal';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import type { Delivery, DeliveryStatus, PaymentStatus, DeliveryItem, Staff } from '@/shared/types/delivery';
@@ -201,7 +203,18 @@ export function DeliveryDetailSupplierView({
     date.setMinutes(roundedMinutes);
     return date;
   });
-  // TODO: Add date picker component for full date+time scheduling
+  // Native date picker visibility for full date+time scheduling
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Apply a newly-picked calendar date while preserving the chosen time-of-day
+  const onDatePickerChange = (event: { type?: string }, selected?: Date) => {
+    // Android shows a dialog — close it on any result
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (event?.type === 'dismissed' || !selected) return;
+    const newDate = new Date(schedulingDate);
+    newDate.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+    setSchedulingDate(newDate);
+  };
 
   // Animation helpers
   const animateOverlayIn = (animation: Animated.Value) => {
@@ -407,6 +420,7 @@ export function DeliveryDetailSupplierView({
   // Scheduling modal handlers
   const openSchedulingModal = () => {
     setSchedulingDate(new Date(expectedDeliveryTime));
+    setShowDatePicker(false);
     setIsSchedulingModalVisible(true);
     animateOverlayIn(schedulingOverlayAnimation);
     animateContentIn(schedulingContentAnimation);
@@ -881,6 +895,35 @@ export function DeliveryDetailSupplierView({
               </TouchableOpacity>
             </View>
 
+            {/* Date Section */}
+            <View style={styles.schedulingTimeTitleSection}>
+              <Text style={styles.schedulingSectionTitle}>Date</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.schedulingDateRow}
+              onPress={() => setShowDatePicker((v) => !v)}
+            >
+              <Icon name="calendar-outline" size={20} color={theme.colors.primary} />
+              <Text style={styles.schedulingDateText}>
+                {schedulingDate.toLocaleDateString(undefined, {
+                  weekday: 'short',
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </Text>
+              <Icon name="chevron-forward" size={18} color="#9CA3AF" />
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={schedulingDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                minimumDate={new Date()}
+                onChange={onDatePickerChange}
+              />
+            )}
+
             {/* Time Section */}
             <View style={styles.schedulingTimeTitleSection}>
               <Text style={styles.schedulingSectionTitle}>Time</Text>
@@ -1113,6 +1156,25 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+  },
+  schedulingDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  schedulingDateText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
   },
   schedulingSectionTitle: {
     fontSize: 16,

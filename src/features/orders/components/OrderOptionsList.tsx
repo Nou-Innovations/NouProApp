@@ -33,7 +33,7 @@ export default function OrderOptionsList({
       type: 'payment' as const,
       title: 'Payment Details',
       description: `Status: ${paymentLabel}`,
-      icon: 'credit-card',
+      icon: 'card',
       isActive: order.paymentStatus === 'UNPAID',
     },
     {

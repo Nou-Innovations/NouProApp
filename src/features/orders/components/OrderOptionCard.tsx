@@ -15,7 +15,7 @@ type OrderOptionCardProps = {
   type: OrderOptionType;
   title: string;
   description: string;
-  icon: keyof typeof Icon.glyphMap;
+  icon: string;
   onPress: () => void;
   isActive?: boolean;
   badge?: number;
@@ -30,24 +30,26 @@ function OrderOptionCard({
   isActive = false,
   badge,
 }: OrderOptionCardProps) {
+  // Returns a concrete color value (the Icon component takes a `color` prop,
+  // not a NativeWind className).
   const getIconColor = () => {
     switch (type) {
       case 'assign':
-        return 'text-primary';
+        return '#0075FF'; // primary
       case 'payment':
-        return 'text-success';
+        return '#059669'; // green
       case 'delivery':
-        return 'text-secondary';
+        return '#5B21B6'; // purple
       case 'invoice':
-        return 'text-warning';
+        return '#F59E0B'; // amber
       case 'chat':
-        return 'text-info';
+        return '#0EA5E9'; // sky
       case 'notes':
-        return 'text-gray-600';
+        return '#4B5563'; // gray-600
       case 'history':
-        return 'text-gray-500';
+        return '#6B7280'; // gray-500
       default:
-        return 'text-gray-500';
+        return '#6B7280';
     }
   };
 
@@ -83,7 +85,7 @@ function OrderOptionCard({
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center flex-1">
           <View className={`w-10 h-10 rounded-full ${getBackgroundColor()} items-center justify-center mr-3`}>
-            <Icon name={icon} size={20} className={getIconColor()} />
+            <Icon name={icon} size={20} color={getIconColor()} />
           </View>
           <View className="flex-1">
             <Text className="text-base font-semibold text-gray-900">{title}</Text>
@@ -95,7 +97,7 @@ function OrderOptionCard({
             <Text className="text-xs text-white font-medium">{badge}</Text>
           </View>
         ) : (
-          <Icon name="chevron-right" size={20} className="text-gray-400" />
+          <Icon name="chevron-right" size={20} color="#9CA3AF" />
         )}
       </View>
     </TouchableOpacity>

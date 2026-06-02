@@ -16,11 +16,27 @@ async function getById(id) {
   });
 }
 
-async function getByBusinessId(businessId) {
-  return prisma.order.findMany({
-    where: { businessId },
-    orderBy: { createdAt: 'desc' }
-  });
+async function getByBusinessId(businessId, options = {}) {
+  const { status, soldByScope, soldByLocationId, fulfillmentLocationId, search, limit, offset } = options;
+  const where = { businessId };
+  if (status) where.status = status;
+  if (soldByScope) where.soldByScope = soldByScope;
+  if (soldByLocationId) where.soldByLocationId = soldByLocationId;
+  if (fulfillmentLocationId) where.fulfillmentLocationId = fulfillmentLocationId;
+  if (search) {
+    where.OR = [
+      { customerName: { contains: search, mode: 'insensitive' } },
+      { id: { contains: search } },
+    ];
+  }
+  const query = { where, orderBy: { createdAt: 'desc' } };
+  // Only cap/paginate when a limit is provided, so callers that need the full
+  // set (e.g. location-scoped access checks) keep their existing behavior.
+  if (limit) {
+    query.take = Math.min(Number(limit) || 200, 200);
+    query.skip = Number(offset) || 0;
+  }
+  return prisma.order.findMany(query);
 }
 
 async function getByLocationId(locationId) {
@@ -62,11 +78,35 @@ async function remove(id) {
   }
 }
 
-async function getByBuyerBusinessId(buyerBusinessId) {
-  return prisma.order.findMany({
-    where: { buyerBusinessId },
-    orderBy: { createdAt: 'desc' }
-  });
+async function getByBuyerBusinessId(buyerBusinessId, options = {}) {
+  const { status, search, limit, offset } = options;
+  const where = { buyerBusinessId };
+  if (status) where.status = status;
+  if (search) {
+    where.OR = [
+      { customerName: { contains: search, mode: 'insensitive' } },
+      { id: { contains: search } },
+      { buyerBusinessName: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+  const query = {
+    where,
+    orderBy: { createdAt: 'desc' },
+    // Include the seller business so the buyer's "Outgoing" list can label
+    // the order. The seller is order.business (via businessId).
+    include: { business: { select: { name: true } } },
+  };
+  if (limit) {
+    query.take = Math.min(Number(limit) || 200, 200);
+    query.skip = Number(offset) || 0;
+  }
+  const orders = await prisma.order.findMany(query);
+  // Surface the seller name as a flat field and drop the nested relation
+  // to keep the response shape consistent with other order endpoints.
+  return orders.map(({ business, ...order }) => ({
+    ...order,
+    sellerBusinessName: business?.name || null,
+  }));
 }
 
 /**

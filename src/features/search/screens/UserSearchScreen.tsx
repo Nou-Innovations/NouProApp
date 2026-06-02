@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,60 +7,29 @@ import {
   Image,
   FlatList,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { Icon } from '@/shared/utils/icons';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import theme from '@/shared/theme';
-
-// Mock data for users - should be the same data as in SearchResultsList
-const MOCK_USERS = [
-  {
-    id: 'usr-001',
-    name: 'Alice Johnson',
-    avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
-  },
-  {
-    id: 'usr-002',
-    name: 'Bob Smith',
-    avatar: 'https://randomuser.me/api/portraits/men/2.jpg',
-  },
-  {
-    id: 'usr-003',
-    name: 'Carol Williams',
-    avatar: 'https://randomuser.me/api/portraits/women/3.jpg',
-  },
-  {
-    id: 'usr-004',
-    name: 'David Brown',
-    avatar: 'https://randomuser.me/api/portraits/men/4.jpg',
-  },
-  {
-    id: 'usr-005',
-    name: 'Eva Miller',
-    avatar: 'https://randomuser.me/api/portraits/women/5.jpg',
-  },
-  {
-    id: 'usr-006',
-    name: 'Frank Davis',
-    avatar: 'https://randomuser.me/api/portraits/men/6.jpg',
-  },
-];
+import { searchUsers, UserSearchResult } from '../search.service';
 
 // Helper function to highlight matched text in bold
-const HighlightText = ({ text, highlight }) => {
+const HighlightText = ({ text, highlight }: { text: string; highlight: string }) => {
   if (!highlight || !highlight.trim()) {
     return <Text style={styles.itemName}>{text}</Text>;
   }
-  
+
   const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
-  
+
   return (
     <Text style={styles.itemName}>
-      {parts.map((part, i) => 
-        part.toLowerCase() === highlight.toLowerCase() ? 
-        <Text key={i} style={styles.highlightedText}>{part}</Text> : 
-        <Text key={i}>{part}</Text>
+      {parts.map((part, i) =>
+        part.toLowerCase() === highlight.toLowerCase() ? (
+          <Text key={i} style={styles.highlightedText}>{part}</Text>
+        ) : (
+          <Text key={i}>{part}</Text>
+        )
       )}
     </Text>
   );
@@ -73,21 +42,48 @@ type UserSearchScreenRouteParams = {
 };
 
 const UserSearchScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<UserSearchScreenRouteParams, 'UserSearch'>>();
   const searchQuery = route.params?.query || '';
-  
-  // Filter users based on search query
-  const filteredUsers = MOCK_USERS.filter((user) =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
-  const renderUserItem = ({ item }) => (
+  const [users, setUsers] = useState<UserSearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!searchQuery.trim()) {
+        setUsers([]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const results = await searchUsers(searchQuery);
+        if (!cancelled) setUsers(results);
+      } catch {
+        if (!cancelled) setUsers([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery]);
+
+  const renderUserItem = ({ item }: { item: UserSearchResult }) => (
     <TouchableOpacity
       style={styles.itemContainer}
       onPress={() => navigation.navigate('ViewUserProfile', { userId: item.id })}
     >
-      <Image source={{ uri: item.avatar }} style={styles.avatar} />
+      {item.avatar ? (
+        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+      ) : (
+        <View style={[styles.avatar, styles.avatarPlaceholder]}>
+          <Text style={styles.avatarInitial}>{item.name?.charAt(0)?.toUpperCase() || '?'}</Text>
+        </View>
+      )}
       <View style={styles.textContainer}>
         <HighlightText text={item.name} highlight={searchQuery} />
       </View>
@@ -100,21 +96,27 @@ const UserSearchScreen = () => {
         title={`Users: ${searchQuery}`}
         leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
       />
-      <FlatList
-        data={filteredUsers}
-        keyExtractor={(item) => item.id}
-        renderItem={renderUserItem}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        initialNumToRender={10}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No users found matching "{searchQuery}"</Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={users}
+          keyExtractor={(item) => item.id}
+          renderItem={renderUserItem}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={10}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No users found matching "{searchQuery}"</Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -126,6 +128,11 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   itemContainer: {
     flexDirection: 'row',
@@ -139,6 +146,16 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     marginRight: 16,
+  },
+  avatarPlaceholder: {
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
   },
   textContainer: {
     flex: 1,
@@ -162,4 +179,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default UserSearchScreen; 
+export default UserSearchScreen;

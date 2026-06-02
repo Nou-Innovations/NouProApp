@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,63 +7,32 @@ import {
   Image,
   FlatList,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { Icon } from '@/shared/utils/icons';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-
-// Mock data for companies - should be the same data as in SearchResultsList
-const MOCK_COMPANIES = [
-  {
-    id: 'biz-001',
-    name: 'Acme Corporation',
-    logo: 'https://ui-avatars.com/api/?name=Acme+Corp&background=0D8ABC&color=fff',
-  },
-  {
-    id: 'biz-002',
-    name: 'The Burning Distributor',
-    logo: 'https://placehold.co/80x80/orange/white?text=🔥',
-  },
-  {
-    id: 'biz-003',
-    name: 'Global Industries',
-    logo: 'https://ui-avatars.com/api/?name=Global+Industries&background=27AE60&color=fff',
-  },
-  {
-    id: 'biz-004',
-    name: 'Best Suppliers Ltd',
-    logo: 'https://ui-avatars.com/api/?name=Best+Suppliers&background=8E44AD&color=fff',
-  },
-  {
-    id: 'biz-005',
-    name: 'Tech Solutions',
-    logo: 'https://ui-avatars.com/api/?name=Tech+Solutions&background=E74C3C&color=fff',
-  },
-  {
-    id: 'biz-006',
-    name: 'Craft Wholesalers',
-    logo: 'https://ui-avatars.com/api/?name=Craft+Wholesalers&background=F39C12&color=fff',
-  },
-];
+import { searchCompanies, CompanySearchResult } from '@/features/search/search.service';
 
 // Helper function to highlight matched text in bold
-const HighlightText = ({ text, highlight }) => {
+const HighlightText = ({ text, highlight }: { text: string; highlight: string }) => {
   const { theme: appTheme } = useTheme();
-  
+
   if (!highlight || !highlight.trim()) {
     return <Text style={[styles.itemName, { color: appTheme.colors.text }]}>{text}</Text>;
   }
-  
+
   const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
-  
+
   return (
     <Text style={[styles.itemName, { color: appTheme.colors.text }]}>
-      {parts.map((part, i) => 
-        part.toLowerCase() === highlight.toLowerCase() ? 
-        <Text key={i} style={[styles.highlightedText, { color: appTheme.colors.text }]}>{part}</Text> : 
-        <Text key={i}>{part}</Text>
+      {parts.map((part, i) =>
+        part.toLowerCase() === highlight.toLowerCase() ? (
+          <Text key={i} style={[styles.highlightedText, { color: appTheme.colors.text }]}>{part}</Text>
+        ) : (
+          <Text key={i}>{part}</Text>
+        )
       )}
     </Text>
   );
@@ -76,28 +45,55 @@ type CompanySearchScreenRouteParams = {
 };
 
 const CompanySearchScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<CompanySearchScreenRouteParams, 'CompanySearch'>>();
   const searchQuery = route.params?.query || '';
   const { theme: appTheme } = useTheme();
-  
-  // Filter companies based on search query
-  const filteredCompanies = MOCK_COMPANIES.filter((company) =>
-    company.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
-  const renderCompanyItem = ({ item }) => (
+  const [companies, setCompanies] = useState<CompanySearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!searchQuery.trim()) {
+        setCompanies([]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const results = await searchCompanies(searchQuery);
+        if (!cancelled) setCompanies(results);
+      } catch {
+        if (!cancelled) setCompanies([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery]);
+
+  const renderCompanyItem = ({ item }: { item: CompanySearchResult }) => (
     <TouchableOpacity
       style={[
-        styles.itemContainer, 
-        { 
+        styles.itemContainer,
+        {
           borderBottomColor: appTheme.colors.borderColor,
-          backgroundColor: appTheme.colors.cardBackground 
-        }
+          backgroundColor: appTheme.colors.cardBackground,
+        },
       ]}
       onPress={() => navigation.navigate('ViewBusinessProfile', { businessId: item.id })}
     >
-      <Image source={{ uri: item.logo }} style={styles.avatar} />
+      {item.logoUrl ? (
+        <Image source={{ uri: item.logoUrl }} style={styles.avatar} />
+      ) : (
+        <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: appTheme.colors.primary }]}>
+          <Text style={styles.avatarInitial}>{item.name?.charAt(0)?.toUpperCase() || '?'}</Text>
+        </View>
+      )}
       <View style={styles.textContainer}>
         <HighlightText text={item.name} highlight={searchQuery} />
       </View>
@@ -110,19 +106,25 @@ const CompanySearchScreen = () => {
         title={`Companies: ${searchQuery}`}
         leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
       />
-      <FlatList
-        data={filteredCompanies}
-        keyExtractor={(item) => item.id}
-        renderItem={renderCompanyItem}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: appTheme.colors.textLight }]}>
-              No companies found matching "{searchQuery}"
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={appTheme.colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={companies}
+          keyExtractor={(item) => item.id}
+          renderItem={renderCompanyItem}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: appTheme.colors.textLight }]}>
+                No companies found matching "{searchQuery}"
+              </Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -133,6 +135,11 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   itemContainer: {
     flexDirection: 'row',
@@ -145,6 +152,15 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     marginRight: 16,
+  },
+  avatarPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
   },
   textContainer: {
     flex: 1,
@@ -165,4 +181,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CompanySearchScreen; 
+export default CompanySearchScreen;

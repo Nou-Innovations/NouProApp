@@ -109,6 +109,11 @@ export default function BusinessInboxScreen() {
     navigation.navigate('Notifications');
   }, [navigation]);
 
+  const navigateToOrders = useCallback(() => {
+    // @ts-ignore
+    navigation.navigate('Orders');
+  }, [navigation]);
+
   // Update the inbox unread count when component mounts or data changes
   useEffect(() => {
     setInboxUnreadCount(unreadChatsCount);
@@ -315,6 +320,7 @@ export default function BusinessInboxScreen() {
       transparent
       actions={[
         { icon: 'bell', onPress: navigateToNotifications, badge: unreadCount, accessibilityLabel: 'Notifications' },
+        { icon: 'cart', onPress: navigateToOrders, badge: undefined, accessibilityLabel: 'Orders' },
         { icon: 'globe', onPress: navigateToExplore, badge: undefined, accessibilityLabel: 'Explore' },
       ]}
     />

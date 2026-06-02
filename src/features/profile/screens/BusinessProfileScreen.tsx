@@ -12,7 +12,7 @@ import CartPopup from '@/features/cart/components/CartPopup';
 import CartItemCard from '@/features/cart/components/CartItemCard';
 import CartBottomSection from '@/features/cart/components/CartBottomSection';
 import ProfileActionButtons from '@/features/profile/components/ProfileActionButtons';
-import FollowButton from '@/features/follow/components/FollowButton';
+import { useFollowStatus } from '@/features/follow/hooks/useFollowStatus';
 import Avatar from '@/shared/components/ui/Avatar';
 import { useAppStore } from '@/shared/store';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -163,6 +163,9 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     profileId: businessId,
     profileType: 'business',
   });
+
+  // Follow state - surfaced in the "more options" (⋮) menu rather than as a separate button
+  const { isFollowing, toggleFollow, loading: followLoading } = useFollowStatus(businessId);
   
   // Legacy cart store - used by CartPopup, CartItemCard, CartBottomSection components
   const { cartItems, addToCart: legacyAddToCart, removeFromCart, clearCart: legacyClearCart } = useAppStore();
@@ -297,6 +300,14 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       { text: 'Report', onPress: () => {} },
       { text: 'Block', onPress: () => {} },
     ];
+
+    // Follow / Unfollow lives here now (was a separate button in the action row)
+    if (!followLoading) {
+      options.unshift({
+        text: isFollowing ? 'Unfollow' : 'Follow',
+        onPress: () => { toggleFollow(); },
+      });
+    }
 
     // Add "Request to Join" only in personal mode when not already a member
     if (activeMode === 'personal' && !isAlreadyMember) {
@@ -902,18 +913,14 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
           </View>
 
           {/* Profile Action Buttons - Based on ProfileViewType (OTHER_BUSINESS) */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%' }}>
-            <View style={{ flex: 1 }}>
-              <ProfileActionButtons
-                viewType={viewType}
-                onPrimaryPress={handlePrimaryAction}
-                onSecondaryPress={handleSecondaryAction}
-                onMoreOptionsPress={handleMoreOptions}
-                style={styles.actionButtons}
-              />
-            </View>
-            <FollowButton businessId={businessId} />
-          </View>
+          {/* Message + Connect + ⋮ (Follow now lives inside the ⋮ menu) */}
+          <ProfileActionButtons
+            viewType={viewType}
+            onPrimaryPress={handlePrimaryAction}
+            onSecondaryPress={handleSecondaryAction}
+            onMoreOptionsPress={handleMoreOptions}
+            style={styles.actionButtons}
+          />
         </View>
  
         {/* Tab Bar - matching BusinessProfileOwnScreen */}

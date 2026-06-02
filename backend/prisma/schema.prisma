@@ -18,6 +18,7 @@ model User {
   twoFactorSecret      String?
   twoFactorEnabled     Boolean          @default(false)
   twoFactorBackupCodes String?
+  tokenVersion         Int              @default(0)
   jobTitle             String?
   description          String?
   address              String?
@@ -305,6 +306,7 @@ model Stock {
 
   @@unique([locationId, productId])
   @@index([businessId])
+  @@index([productId])
 }
 
 model Order {
@@ -397,6 +399,7 @@ model Invoice {
   @@index([issuedByLocationId])
   @@index([status])
   @@index([createdAt])
+  @@index([orderId])
 }
 
 model Chat {
@@ -438,6 +441,7 @@ model Message {
 
   @@index([chatId])
   @@index([chatId, timestamp])
+  @@index([senderId])
 }
 
 model ChatParticipant {

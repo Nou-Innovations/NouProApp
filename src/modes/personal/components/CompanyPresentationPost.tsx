@@ -49,7 +49,7 @@ export function CompanyPresentationPost({
   companyLogo,
   location,
   isConnected = false,
-  brands,
+  brands = [],
   timestamp,
   createdAt,
   onCompanyPress,

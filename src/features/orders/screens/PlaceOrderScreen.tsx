@@ -1,0 +1,229 @@
+/**
+ * PlaceOrderScreen (checkout)
+ * Reviews the cart for one supplier, lets the buyer add notes, and places
+ * the order via orderStore.placeOrder() (which calls the backend and clears
+ * the cart on success).
+ */
+
+import React, { useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '@/shared/types/navigation';
+import { useTheme } from '@/shared/theme/ThemeProvider';
+import theme from '@/shared/theme';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { Text } from '@/shared/components/ui/Typography';
+import { formatCurrency } from '@/shared/utils/format';
+import { useCart, useOrderStore } from '@/shared/store/orderStore';
+import { useProfileStore } from '@/shared/store/profileStore';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'PlaceOrder'>;
+
+export default function PlaceOrderScreen({ route }: Props) {
+  const { businessId, businessName } = route.params;
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { theme: appTheme } = useTheme();
+
+  const cart = useCart(businessId);
+  const items = cart?.items || [];
+  const placeOrder = useOrderStore((state) => state.placeOrder);
+
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
+  const currentUser = useProfileStore((state) => state.currentUser);
+
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const total = cart?.total ?? 0;
+
+  const handleConfirm = async () => {
+    if (!activeBusiness?.id) {
+      Alert.alert('No business selected', 'Please select a business before placing an order.');
+      return;
+    }
+    if (items.length === 0) {
+      Alert.alert('Empty cart', 'There is nothing to order.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const order = await placeOrder(
+        activeBusiness.id,
+        activeBusiness.name || 'My business',
+        businessId,
+        businessName,
+        notes.trim() || undefined,
+        currentUser?.id
+      );
+
+      if (order) {
+        Alert.alert('Order placed', 'Your order has been sent to the supplier.', [
+          {
+            text: 'View orders',
+            onPress: () =>
+              navigation.navigate('Orders', { initialTab: 'outgoing' }),
+          },
+        ]);
+      } else {
+        const err = useOrderStore.getState().error;
+        Alert.alert('Could not place order', err || 'Please try again.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]}
+      edges={['top']}
+    >
+      <SecondaryHeader
+        title="Review order"
+        leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+      />
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Supplier */}
+        <Text style={[styles.sectionLabel, { color: appTheme.colors.textLight }]}>Supplier</Text>
+        <Text style={[styles.supplierName, { color: appTheme.colors.text }]}>{businessName}</Text>
+
+        {/* Items */}
+        <Text style={[styles.sectionLabel, { color: appTheme.colors.textLight, marginTop: 20 }]}>
+          Items
+        </Text>
+        <View style={[styles.card, { backgroundColor: appTheme.colors.cardBackground }]}>
+          {items.map((item) => (
+            <View key={item.productId} style={styles.itemRow}>
+              <View style={styles.itemInfo}>
+                <Text style={[styles.itemName, { color: appTheme.colors.text }]} numberOfLines={2}>
+                  {item.product.name}
+                </Text>
+                <Text style={[styles.itemMeta, { color: appTheme.colors.textLight }]}>
+                  {item.quantity} × {formatCurrency(item.product.price)}
+                </Text>
+              </View>
+              <Text style={[styles.itemTotal, { color: appTheme.colors.text }]}>
+                {formatCurrency(item.product.price * item.quantity)}
+              </Text>
+            </View>
+          ))}
+
+          <View style={[styles.totalRow, { borderTopColor: appTheme.colors.borderColor }]}>
+            <Text style={[styles.totalLabel, { color: appTheme.colors.text }]}>Total</Text>
+            <Text style={[styles.totalValue, { color: appTheme.colors.text }]}>
+              {formatCurrency(total)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Notes */}
+        <Text style={[styles.sectionLabel, { color: appTheme.colors.textLight, marginTop: 20 }]}>
+          Notes (optional)
+        </Text>
+        <TextInput
+          style={[
+            styles.notesInput,
+            {
+              color: appTheme.colors.text,
+              borderColor: appTheme.colors.borderColor,
+              backgroundColor: appTheme.colors.inputBackground,
+            },
+          ]}
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Add a note for the supplier…"
+          placeholderTextColor={appTheme.colors.textLight}
+          multiline
+        />
+      </ScrollView>
+
+      {/* Sticky confirm bar */}
+      <View
+        style={[
+          styles.actionBar,
+          { backgroundColor: appTheme.colors.background, borderTopColor: appTheme.colors.borderColor },
+        ]}
+      >
+        <TouchableOpacity
+          style={[styles.confirmButton, { backgroundColor: appTheme.colors.primary, opacity: submitting || items.length === 0 ? 0.6 : 1 }]}
+          onPress={handleConfirm}
+          disabled={submitting || items.length === 0}
+          activeOpacity={0.8}
+        >
+          {submitting ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.confirmButtonText}>Place order · {formatCurrency(total)}</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1 },
+  content: { padding: theme.spacing.md, paddingBottom: 120 },
+  sectionLabel: {
+    fontSize: 12,
+    fontFamily: theme.fonts.primary.medium,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  supplierName: { fontSize: 18, fontFamily: theme.fonts.primary.bold },
+  card: { borderRadius: 12, padding: theme.spacing.md },
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
+  itemInfo: { flex: 1, paddingRight: 12 },
+  itemName: { fontSize: 14, fontFamily: theme.fonts.primary.medium },
+  itemMeta: { fontSize: 12, marginTop: 2 },
+  itemTotal: { fontSize: 14, fontFamily: theme.fonts.primary.bold },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    paddingTop: 12,
+    marginTop: 4,
+  },
+  totalLabel: { fontSize: 16, fontFamily: theme.fonts.primary.bold },
+  totalValue: { fontSize: 18, fontFamily: theme.fonts.primary.bold },
+  notesInput: {
+    minHeight: 90,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.regular,
+    textAlignVertical: 'top',
+  },
+  actionBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: 12,
+    paddingBottom: 32,
+    borderTopWidth: 1,
+  },
+  confirmButton: {
+    height: 52,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmButtonText: { color: '#FFFFFF', fontSize: 16, fontFamily: theme.fonts.primary.bold },
+});

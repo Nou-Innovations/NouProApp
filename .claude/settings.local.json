@@ -46,7 +46,17 @@
       "Bash(git worktree:*)",
       "Bash(git branch:*)",
       "Bash(rm -f .git/index.lock)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(npm start *)",
+      "Bash(jobs -l)",
+      "Bash(sed \"s/async.*$//\")",
+      "Bash(sed \"s/, .*$//\")",
+      "Bash(npx eslint *)",
+      "Bash(xcrun simctl *)",
+      "Bash(open -a Simulator)",
+      "Bash(yes)",
+      "Bash(node --check backend/src/repositories/prisma/orderRepo.prisma.js)",
+      "Bash(awk '/^model User /{f=1} f{print} /^}/{if\\(f\\)exit}' prisma/schema.prisma)"
     ]
   }
 }

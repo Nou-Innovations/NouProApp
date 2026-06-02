@@ -23,27 +23,35 @@ interface OrderCardProps {
 const OrderCard: React.FC<OrderCardProps> = ({ order, type, onPress }) => {
   const { theme: appTheme } = useTheme();
 
-  // Get business name based on order type
-  const businessName = type === 'incoming' 
-    ? order.from_business_name 
-    : order.to_business_name;
+  // Counterparty name.
+  // - incoming (we are the seller): show the buyer (business or walk-in customer)
+  // - outgoing (we are the buyer): show the seller, surfaced by the placed-orders
+  //   endpoint as sellerBusinessName.
+  const businessName =
+    type === 'incoming'
+      ? order.buyerBusinessName || order.customerName || 'Customer'
+      : order.sellerBusinessName || 'Supplier order';
 
-  // Get item summary
-  const itemCount = order.items.length;
-  const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-  const itemSummary = itemCount === 1 
-    ? `${order.items[0].product_name} × ${order.items[0].quantity}`
-    : `${itemCount} items (${totalQuantity} units)`;
+  // Item summary (defensive against empty items)
+  const items = order.items || [];
+  const itemCount = items.length;
+  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  const itemSummary =
+    itemCount === 0
+      ? 'No items'
+      : itemCount === 1
+      ? `${items[0].productName || 'Item'} × ${items[0].quantity}`
+      : `${itemCount} items (${totalQuantity} units)`;
 
   // Format time
-  const timeAgo = formatRelativeTime(order.created_at);
+  const timeAgo = formatRelativeTime(order.createdAt);
 
   // Bottom row with status badge and total price
   const bottomRow = (
     <View style={styles.bottomRow}>
       <OrderStatusBadge status={order.status as OrderStatus} size="sm" />
       <Text style={[styles.totalPrice, { color: appTheme.colors.text }]}>
-        {formatCurrency(order.total_price)}
+        {formatCurrency(order.totalAmount ?? 0)}
       </Text>
     </View>
   );
@@ -53,11 +61,11 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, type, onPress }) => {
       avatar={{
         type: 'initials',
         userId: order.id,
-        userName: businessName || 'Unknown',
+        userName: businessName,
         borderRadius: 12,
       }}
-      title={businessName || 'Unknown'}
-      subtitle={order.id}
+      title={businessName}
+      subtitle={`#${order.id.slice(-6)}`}
       extraInfo={itemSummary}
       rightRow1={{ timestamp: timeAgo }}
       showChevron

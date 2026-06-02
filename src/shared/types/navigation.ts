@@ -157,6 +157,12 @@ export type RootStackParamList = {
     selectedProducts?: { id: string; name: string; price: number; brandName: string }[];
   };
   
+  // Orders & Cart screens (B2B ordering)
+  Orders: { initialTab?: 'incoming' | 'outgoing' } | undefined;
+  OrderDetails: { orderId: string };
+  Cart: { businessId: string; businessName?: string };
+  PlaceOrder: { businessId: string; businessName: string };
+
   // Invoice screens
   CreateInvoice: { type?: 'invoice' | 'estimate'; invoiceId?: string };
   InvoiceDetails: { invoiceId: string };

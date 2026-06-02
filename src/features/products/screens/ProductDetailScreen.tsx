@@ -460,7 +460,17 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       },
       quantity
     );
-    Alert.alert('Added to Cart', `${quantity} x ${dto.product.name} added to cart`);
+    Alert.alert('Added to Cart', `${quantity} x ${dto.product.name} added to cart`, [
+      { text: 'Continue shopping', style: 'cancel' },
+      {
+        text: 'View Cart',
+        onPress: () =>
+          (navigation as any).navigate('Cart', {
+            businessId: dto.seller.companyId,
+            businessName: dto.seller.companyName,
+          }),
+      },
+    ]);
     setIsOrdering(false);
     setQuantity(1);
   };

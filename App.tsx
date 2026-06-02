@@ -66,6 +66,12 @@ import CreateInvoiceScreen from '@/features/invoices/screens/CreateInvoiceScreen
 import InvoiceDetailsScreen from '@/features/invoices/screens/InvoiceDetailsScreen';
 import ReceivedPaymentsScreen from '@/features/invoices/screens/ReceivedPaymentsScreen';
 
+// Screens - Orders & Cart
+import OrdersScreen from '@/features/orders/screens/OrdersScreen';
+import OrderDetailsScreen from '@/features/orders/screens/OrderDetailsScreen';
+import CartScreen from '@/features/orders/screens/CartScreen';
+import PlaceOrderScreen from '@/features/orders/screens/PlaceOrderScreen';
+
 // Screens - Profile
 import BusinessProfileScreen from '@/features/profile/screens/BusinessProfileScreen';
 import UserProfileScreen from '@/features/profile/screens/UserProfileScreen';
@@ -345,6 +351,12 @@ function AppNavigator() {
         <RootStack.Screen name="CreateInvoice" component={CreateInvoiceScreen} />
         <RootStack.Screen name="InvoiceDetails" component={InvoiceDetailsScreen} />
         <RootStack.Screen name="ReceivedPayments" component={ReceivedPaymentsScreen} />
+
+        {/* Orders & Cart Screens */}
+        <RootStack.Screen name="Orders" component={OrdersScreen} />
+        <RootStack.Screen name="OrderDetails" component={OrderDetailsScreen} />
+        <RootStack.Screen name="Cart" component={CartScreen} />
+        <RootStack.Screen name="PlaceOrder" component={PlaceOrderScreen} />
         
         {/* Product Screens */}
         <RootStack.Screen name="CreateBrand" component={CreateBrandScreen} />
