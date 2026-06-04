@@ -23,7 +23,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -80,6 +80,10 @@ export default function HomeScreen() {
   // Navigation handlers
   const navigateToNotifications = useCallback(() => {
     navigation.navigate('Notifications');
+  }, [navigation]);
+
+  const openDrawer = useCallback(() => {
+    navigation.dispatch(DrawerActions.openDrawer());
   }, [navigation]);
 
   const handleBusinessPress = (businessId: string, expandBrandId?: string) => {
@@ -149,7 +153,16 @@ export default function HomeScreen() {
 
   const renderHeader = () => (
     <View style={[styles.header, { backgroundColor: appTheme.colors.background }]}>
-      <View style={{ width: 40 }} />
+      {/* Hamburger Menu Button - opens the sidebar drawer */}
+      <TouchableOpacity
+        style={styles.iconButton}
+        onPress={openDrawer}
+        activeOpacity={0.7}
+        accessibilityLabel="Open menu"
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Icon name="menu" size={26} color={appTheme.colors.text} />
+      </TouchableOpacity>
       <View style={styles.headerActions}>
         {/* Notifications Button */}
         <TouchableOpacity

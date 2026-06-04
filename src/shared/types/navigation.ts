@@ -256,6 +256,9 @@ export type RootStackParamList = {
   // Business Activity
   AllActivity: undefined;
 
+  // Reusable "Coming soon" placeholder for not-yet-built features
+  ComingSoon: { title: string };
+
   // Procurement screens
   ProcurementDashboard: undefined;
   Suppliers: undefined;

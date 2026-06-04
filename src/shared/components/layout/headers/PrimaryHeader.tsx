@@ -23,6 +23,7 @@ export interface PrimaryHeaderProps {
   title: string;
   subtitle?: string;
   onTitlePress?: () => void; // Makes title tappable with chevron
+  leftAction?: HeaderAction; // Optional leading icon button (e.g. hamburger menu)
   actions?: HeaderAction[];
   transparent?: boolean;
   style?: ViewStyle;
@@ -34,6 +35,7 @@ export default function PrimaryHeader({
   title,
   subtitle,
   onTitlePress,
+  leftAction,
   actions = [],
   transparent = false,
   style,
@@ -70,7 +72,23 @@ export default function PrimaryHeader({
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: bg }, style]}>
+    <View style={[styles.container, leftAction ? styles.containerWithLeft : null, { backgroundColor: bg }, style]}>
+      {leftAction ? (
+        <TouchableOpacity
+          onPress={leftAction.onPress}
+          style={styles.leftButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel={leftAction.accessibilityLabel}
+        >
+          <Icon
+            name={leftAction.icon}
+            size={26}
+            color={leftAction.iconColor ?? theme.colors.text}
+            strokeWidth={2}
+          />
+        </TouchableOpacity>
+      ) : null}
+
       {onTitlePress ? (
         <TouchableOpacity
           style={styles.left}
@@ -122,6 +140,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  containerWithLeft: {
+    paddingLeft: 8,
+  },
+  leftButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
   },
   left: {
     flex: 1,

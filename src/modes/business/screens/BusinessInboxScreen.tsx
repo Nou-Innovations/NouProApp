@@ -15,7 +15,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -313,11 +313,16 @@ export default function BusinessInboxScreen() {
     }
   };
 
+  const openDrawer = useCallback(() => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  }, [navigation]);
+
   // Render custom header using PrimaryHeader
   const renderHeader = () => (
     <PrimaryHeader
       title="Inbox"
       transparent
+      leftAction={{ icon: 'menu', onPress: openDrawer, accessibilityLabel: 'Open menu' }}
       actions={[
         { icon: 'bell', onPress: navigateToNotifications, badge: unreadCount, accessibilityLabel: 'Notifications' },
         { icon: 'cart', onPress: navigateToOrders, badge: undefined, accessibilityLabel: 'Orders' },

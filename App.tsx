@@ -12,6 +12,8 @@ import './tailwind.css';
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavigationContainer, Theme, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createDrawerNavigator, useDrawerProgress } from '@react-navigation/drawer';
+import Animated, { useAnimatedStyle, interpolate, Extrapolation, SharedValue } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +35,7 @@ import { useBusinessStore } from '@/shared/store/businessStore';
 // Navigation
 import { PersonalTabNavigator } from '@/navigation/PersonalTabNavigator';
 import { BusinessTabNavigator } from '@/navigation/BusinessTabNavigator';
+import SidebarContent from '@/navigation/SidebarContent';
 
 // Services
 import { userAvatarService } from '@/shared/services/userAvatarService';
@@ -111,6 +114,9 @@ import GoodsReceiptScreen from '@/features/procurement/screens/GoodsReceiptScree
 
 // Screens - Notifications
 import NotificationsScreen from '@/features/notifications/screens/NotificationsScreen';
+
+// Screens - Shared
+import ComingSoonScreen from '@/shared/screens/ComingSoonScreen';
 
 // Screens - Personal (from modes)
 import EditPersonalProfileScreen from '@/modes/personal/screens/EditPersonalProfileScreen';
@@ -214,8 +220,76 @@ function MainTabNavigator() {
   if (activeMode === 'business' && currentUserRole !== 'staff') {
     return <BusinessTabNavigator />;
   }
-  
+
   return <PersonalTabNavigator />;
+}
+
+/**
+ * AnimatedTabs - Threads-style scene wrapper.
+ * As the drawer opens, the screen slides aside (handled by drawerType: 'back')
+ * while this wrapper scales it down into a rounded, shadowed card that reveals
+ * the sidebar sitting behind it.
+ */
+function AnimatedTabs() {
+  const { theme: appTheme } = useTheme();
+  const progress = useDrawerProgress() as SharedValue<number>;
+
+  const cardStyle = useAnimatedStyle(() => {
+    const p = progress.value;
+    return {
+      transform: [{ scale: interpolate(p, [0, 1], [1, 0.92], Extrapolation.CLAMP) }],
+      borderRadius: interpolate(p, [0, 1], [0, 28], Extrapolation.CLAMP),
+    };
+  });
+
+  const clipStyle = useAnimatedStyle(() => ({
+    borderRadius: interpolate(progress.value, [0, 1], [0, 28], Extrapolation.CLAMP),
+  }));
+
+  return (
+    // Surface-colored backdrop sits behind the card so the gaps revealed as it scales match the sidebar.
+    <View style={{ flex: 1, backgroundColor: '#F6F7F9' }}>
+      <Animated.View
+        style={[
+          {
+            flex: 1,
+            backgroundColor: appTheme.colors.background,
+            transformOrigin: 'left center',
+          },
+          cardStyle,
+        ]}
+      >
+        <Animated.View style={[{ flex: 1, overflow: 'hidden' }, clipStyle]}>
+          <MainTabNavigator />
+        </Animated.View>
+      </Animated.View>
+    </View>
+  );
+}
+
+/**
+ * Main Drawer Navigator - wraps the tab navigator in a sidebar drawer.
+ * The drawer is opened by the hamburger icon on the home headers or by an
+ * edge-swipe gesture. Its content is rendered by SidebarContent.
+ */
+const MainDrawer = createDrawerNavigator();
+function MainDrawerNavigator() {
+  return (
+    <MainDrawer.Navigator
+      drawerContent={(props) => <SidebarContent {...props} />}
+      screenOptions={{
+        headerShown: false,
+        drawerType: 'back', // screen slides aside to reveal the sidebar behind it (Threads-style)
+        drawerPosition: 'left',
+        swipeEnabled: true,
+        swipeEdgeWidth: 60, // edge-swipe only — avoids conflicts with horizontal content
+        drawerStyle: { width: '80%', backgroundColor: '#F6F7F9' },
+        overlayColor: 'transparent', // don't darken the home screen as the drawer opens
+      }}
+    >
+      <MainDrawer.Screen name="Tabs" component={AnimatedTabs} />
+    </MainDrawer.Navigator>
+  );
 }
 
 /**
@@ -290,8 +364,8 @@ function AppNavigator() {
           gestureEnabled: true,
         }}
       >
-        {/* Main Tab Navigator */}
-        <RootStack.Screen name="MainTabs" component={MainTabNavigator} />
+        {/* Main Tab Navigator (wrapped in sidebar drawer) */}
+        <RootStack.Screen name="MainTabs" component={MainDrawerNavigator} />
         
         {/* Chat Screen */}
         <RootStack.Screen 
@@ -420,6 +494,9 @@ function AppNavigator() {
         
         {/* Business Activity */}
         <RootStack.Screen name="AllActivity" component={AllActivityScreen} />
+
+        {/* Coming soon placeholder (not-yet-built features) */}
+        <RootStack.Screen name="ComingSoon" component={ComingSoonScreen} />
         
         {/* Subscription */}
         <RootStack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
