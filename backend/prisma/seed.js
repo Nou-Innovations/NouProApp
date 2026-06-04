@@ -7,6 +7,10 @@
  * Run with: npm run prisma:seed
  */
 
+// Safety: refuse to wipe/seed a production database (defense-in-depth — also runs
+// when `prisma migrate reset` auto-invokes this file). See scripts/guard-not-prod.js.
+require('../scripts/guard-not-prod')();
+
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 

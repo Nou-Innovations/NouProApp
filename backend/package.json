@@ -9,9 +9,12 @@
     "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema ./prisma/schema.prisma",
     "prisma:migrate:deploy": "prisma migrate deploy --schema ./prisma/schema.prisma",
-    "prisma:seed": "node prisma/seed.js",
+    "prisma:seed": "node scripts/guard-not-prod.js && node prisma/seed.js",
     "prisma:studio": "prisma studio --schema ./prisma/schema.prisma",
-    "db:reset": "prisma migrate reset --force --schema ./prisma/schema.prisma && npm run prisma:seed"
+    "db:reset": "node scripts/guard-not-prod.js && prisma migrate reset --force --schema ./prisma/schema.prisma"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@prisma/client": "^6.19.1",

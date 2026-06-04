@@ -21,6 +21,8 @@ yarn-error.log*
 generated/prisma/
 prisma/generated/
 prisma/client/
+# Local rollback artifact from the 2026-06 migration re-baseline (P0-3)
+prisma/_prisma_migrations_backup.json
 
 ############################################
 # Build output

@@ -18,11 +18,26 @@ NouPro is a B2B professional platform (distributors, wholesalers, retailers) wit
 - `npm run dev` — nodemon dev server (port 3000)
 - `npm start` — production server
 - `npm run prisma:generate` — regenerate Prisma client after schema changes
-- `npm run prisma:migrate` — create + apply a new migration
+- `npm run prisma:migrate` — create + apply a new migration (adds an incremental migration on top of `0_init`)
 - `npm run prisma:migrate:deploy` — deploy migrations to production
-- `npm run prisma:seed` — seed the database
+- `npm run prisma:seed` — seed the database (guarded: refuses to run against production)
 - `npm run prisma:studio` — GUI for inspecting the database
-- `npm run db:reset` — full reset + reseed (dev only)
+- `npm run db:reset` — full reset + reseed (dev/throwaway only; guarded against production)
+
+### Database migrations (re-baselined 2026-06-04)
+The migration history was **squashed/re-baselined** on 2026-06-04 (fixing audit item P0-3). Previously
+the baseline migration was empty and only ~10 of 41 tables were ever created by migrations, so
+`db:reset` / fresh databases were broken. Now there is a single complete baseline
+`backend/prisma/migrations/0_init/migration.sql` (41 tables, 26 enums) that recreates the whole schema
+from scratch. The old 13 migrations are preserved in `backend/prisma/_archive_migrations_pre-rebaseline/`.
+- Production was reconciled: its `_prisma_migrations` table now records only `0_init` as applied; no
+  real tables/data were changed (verified by a zero-diff `prisma migrate diff`).
+- **Never run `db:reset`/`prisma:seed` against production** — `backend/scripts/guard-not-prod.js`
+  blocks it (matches the prod Supabase project ref). To test a fresh reset, point `DATABASE_URL`/
+  `DIRECT_URL` at a local or throwaway database.
+- Going forward, make schema changes with `npm run prisma:migrate` (creates normal incremental
+  migrations on top of `0_init`). `DIRECT_URL` must be a direct/session connection (port 5432, no
+  `pgbouncer=true`) for migrate commands.
 
 ## Architecture
 
