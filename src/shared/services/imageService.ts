@@ -106,21 +106,25 @@ const getProfilePictureFromStorage = async (userId: string): Promise<string | nu
   }
 };
 
-// Simulate image upload to backend/cloud storage
+// Upload an avatar/cover image to the backend (Supabase Storage) and return
+// the permanent public URL. Previously this was a stub that only copied the
+// image into the device's local filesystem and returned a file:// URI — so
+// avatars never actually reached the server and "vanished" on reinstall / other
+// devices. Now it performs the real upload via uploadImage().
 const uploadImageToBackend = async (imageUri: string, userId: string): Promise<string> => {
-  await simulateNetworkDelay();
-  
-  // Copy image to permanent storage first
-  const permanentUri = await copyImageToPermanentStorage(imageUri, userId);
-  
-  // Save to AsyncStorage for persistence
-  await saveProfilePictureToStorage(userId, permanentUri);
-  
-  // In real app, you would upload to AWS S3, Cloudinary, Firebase Storage, etc.
-  // and return the actual cloud URL
-  
-  // Return the permanent local URI so the image persists across app reloads
-  return permanentUri;
+  // Real upload — returns an absolute, persistent URL (e.g. Supabase public URL).
+  const remoteUrl = await uploadImage(imageUri);
+
+  // Best-effort local cache for faster reloads / offline display. Failures here
+  // must not break the upload, so they're swallowed.
+  try {
+    const permanentUri = await copyImageToPermanentStorage(imageUri, userId);
+    await saveProfilePictureToStorage(userId, permanentUri);
+  } catch (cacheError) {
+    console.warn('Local avatar cache failed (non-fatal):', cacheError);
+  }
+
+  return remoteUrl;
 };
 
 /**

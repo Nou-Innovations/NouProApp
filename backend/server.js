@@ -136,7 +136,7 @@ const repos = getRepos();
 const { prisma } = require('./src/db/prisma');
 
 // Services
-const { orderStatus: orderStatusService, eventMessages, pushService } = require('./src/services');
+const { orderStatus: orderStatusService, eventMessages, pushService, storageService } = require('./src/services');
 
 // Authentication middleware
 const { requireAuth, optionalAuth, generateToken, verifyToken } = require('./src/middleware/auth');
@@ -294,17 +294,34 @@ const twoFactorLimiter = rateLimit({
   validate: { xForwardedForHeader: false },
 });
 
-// File upload setup with security hardening
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    // Sanitize filename and add unique prefix
-    const sanitized = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + '-' + sanitized);
-  }
-});
+// File upload setup with security hardening.
+//
+// Storage engine is chosen by configuration:
+//   - Supabase Storage configured  → memoryStorage (buffer is streamed to the
+//     bucket in the upload handler so files persist across deploys).
+//   - Not configured (local dev)   → diskStorage → ./uploads (same as before).
+// Render's filesystem is ephemeral, so disk storage MUST NOT be relied on in prod.
+const useSupabaseStorage = storageService.isConfigured();
+if (!useSupabaseStorage) {
+  console.warn(
+    '[Storage] SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — file uploads fall back to ' +
+    'LOCAL DISK (./uploads). This is fine for local dev but EPHEMERAL on Render: uploaded ' +
+    'images will be wiped on every redeploy. Set the Supabase Storage env vars in production.'
+  );
+}
+
+const storage = useSupabaseStorage
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+      },
+      filename: function (req, file, cb) {
+        // Sanitize filename and add unique prefix
+        const sanitized = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+        cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + '-' + sanitized);
+      }
+    });
 
 // Allowed MIME types for uploads
 const ALLOWED_MIME_TYPES = [
@@ -686,6 +703,17 @@ function withProductVisibility(product) {
     isListed,
     isPublic: isListed,
   };
+}
+
+// SECURITY (P0-4): Remove internal/sensitive business fields before returning to
+// anonymous callers or non-members. Keeps all public-facing profile fields.
+function stripSensitiveBusinessFields(business) {
+  if (!business) return business;
+  const {
+    subscriptionTier, settings, billingPeriod, currentPeriodEnd,
+    peachCustomerId, peachCardRegistrationId, ...safe
+  } = business;
+  return safe;
 }
 
 // Helper: Apply price privacy to a single product
@@ -2247,10 +2275,11 @@ app.post('/api/companies', requireAuth, async (req, res) => {
 });
 
 // Get all businesses (for search/discovery)
-app.get('/api/businesses', async (req, res) => {
+app.get('/api/businesses', requireAuth, async (req, res) => {
   const businesses = await repos.businessRepo.list();
+  // SECURITY (P0-4): strip internal/sensitive fields before returning
   const businessesWithCaps = businesses.map(b => ({
-    ...b,
+    ...stripSensitiveBusinessFields(b),
     capabilities: deriveCapabilities(b),
   }));
   res.json(successResponse(businessesWithCaps));
@@ -2341,8 +2370,14 @@ app.get('/api/companies/:companyId', optionalAuth, async (req, res) => {
     }
   }
 
+  // SECURITY (P0-4): only ACCEPTED members of this business may see internal/sensitive fields
+  // (subscriptionTier, settings, billing + payment IDs). Strip them for everyone else.
+  // isBusinessMember enforces status === 'accepted' (pending invites are not members).
+  const isMember = viewerUserId ? await isBusinessMember(business.id, viewerUserId) : false;
+  const baseBusiness = isMember ? business : stripSensitiveBusinessFields(business);
+
   res.json(successResponse({
-    ...business,
+    ...baseBusiness,
     capabilities,
     locations: businessLocations,
     followersCount,
@@ -2486,8 +2521,8 @@ app.patch('/api/companies/:companyId/subscription', requireAuth, async (req, res
 // Legacy company routes (for backwards compatibility)
 app.get('/api/companies', async (req, res) => {
   const businesses = await repos.businessRepo.list();
-  // SECURITY: Strip internal/sensitive fields from public listing
-  const publicBusinesses = businesses.map(({ subscriptionTier, settings, ...b }) => b);
+  // SECURITY (P0-4): Strip internal/sensitive fields (incl. billing + payment IDs) from public listing
+  const publicBusinesses = businesses.map(stripSensitiveBusinessFields);
   res.json(successResponse(publicBusinesses));
 });
 
@@ -2790,7 +2825,8 @@ app.get('/api/business-connections/:businessId', requireAuth, async (req, res) =
         : conn.requesterBusiness;
       return {
         connectionId: conn.id,
-        business: otherBiz,
+        // SECURITY (P0-4): strip the other company's internal/sensitive fields
+        business: stripSensitiveBusinessFields(otherBiz),
         connectedAt: conn.updatedAt,
       };
     });
@@ -2809,7 +2845,8 @@ app.get('/api/business-connections/:businessId/pending', requireAuth, async (req
     const pending = await repos.connectionRepo.listPendingBusinessRequests(req.params.businessId);
     const result = pending.map(conn => ({
       connectionId: conn.id,
-      requesterBusiness: conn.requesterBusiness,
+      // SECURITY (P0-4): strip the requesting company's internal/sensitive fields
+      requesterBusiness: stripSensitiveBusinessFields(conn.requesterBusiness),
       requestedAt: conn.createdAt,
     }));
     res.json(successResponse(result));
@@ -2882,7 +2919,7 @@ app.delete('/api/businesses/:businessId/follow', requireAuth, async (req, res) =
 });
 
 // Get followers for a business
-app.get('/api/businesses/:businessId/followers', async (req, res) => {
+app.get('/api/businesses/:businessId/followers', requireAuth, async (req, res) => {
   try {
     const { businessId } = req.params;
     const limit = Math.min(parseInt(req.query.limit) || 20, 100);
@@ -2938,7 +2975,7 @@ app.get('/api/businesses/:businessId/follow-status', requireAuth, async (req, re
 // ============================================================================
 
 // Get public team members for a business
-app.get('/api/businesses/:businessId/people', async (req, res) => {
+app.get('/api/businesses/:businessId/people', requireAuth, async (req, res) => {
   try {
     const { businessId } = req.params;
 
@@ -2973,16 +3010,20 @@ app.get('/api/businesses/:businessId/people', async (req, res) => {
 // ============================================================================
 
 // Get locations for a business
-app.get('/api/companies/:companyId/locations', async (req, res) => {
+app.get('/api/companies/:companyId/locations', requireAuth, async (req, res) => {
   const business = await repos.businessRepo.getById(req.params.companyId);
   const businessLocations = await repos.locationRepo.getByBusinessId(req.params.companyId);
 
+  // SECURITY (P0-4): publicDisabledReason is an internal hint (e.g. "Enterprise plan required")
+  // that can reveal the owner's subscription tier. Only expose it to accepted members.
+  const isMember = req.user?.id ? await isBusinessMember(req.params.companyId, req.user.id) : false;
+
   const enrichedLocations = businessLocations.map(location => {
     const publicEffective = business ? isLocationPublicEffective(business, location) : false;
-    const publicDisabledReason = business ? getPublicDisabledReason(business, location) : null;
+    const publicDisabledReason = isMember && business ? getPublicDisabledReason(business, location) : null;
     return { ...location, publicEffective, publicDisabledReason };
   });
-  
+
   res.json(successResponse(enrichedLocations));
 });
 
@@ -3328,15 +3369,32 @@ app.get('/api/companies/:companyId/products', requireAuth, async (req, res) => {
       const totalStock = stocks.reduce((sum, s) => sum + (s.qtyOnHand || 0), 0);
       return { ...product, stockQuantity: totalStock, locationStocks: stocks };
     });
-    
-    res.json(successResponse(enrichedProducts));
+
+    // SECURITY (P0-4): enforce price privacy. A caller who belongs to companyId sees their own
+    // prices/costs; anyone else is an outside viewer (prices hidden unless connected).
+    // viewerBusinessId is derived from membership, never trusted from query params.
+    let viewerBusinessId = null;
+    if (req.user?.id) {
+      const ownerMember = await findBusinessMember(companyId, req.user.id);
+      if (ownerMember && ownerMember.status === 'accepted') {
+        viewerBusinessId = companyId;
+      } else if (req.query.viewerBusinessId) {
+        const viewerMember = await findBusinessMember(req.query.viewerBusinessId, req.user.id);
+        if (viewerMember && viewerMember.status === 'accepted') {
+          viewerBusinessId = req.query.viewerBusinessId;
+        }
+      }
+    }
+    const privacyProducts = await applyPricePrivacyBatch(enrichedProducts, viewerBusinessId);
+
+    res.json(successResponse(privacyProducts));
   } catch (e) {
     console.error('Error fetching products:', e);
     res.status(500).json(errorResponse('Failed to load products'));
   }
 });
 
-app.get('/api/companies/:companyId/products/:productId', async (req, res) => {
+app.get('/api/companies/:companyId/products/:productId', requireAuth, async (req, res) => {
   try {
     const { companyId, productId } = req.params;
 
@@ -3351,7 +3409,24 @@ app.get('/api/companies/:companyId/products/:productId', async (req, res) => {
       return res.status(404).json(errorResponse('Product not found'));
     }
 
-    res.json(successResponse(product));
+    // SECURITY (P0-4): enforce price privacy. The URL companyId is the product's owner
+    // business; a caller who belongs to it sees their own prices, anyone else is treated
+    // as an outside viewer (prices hidden unless connected). viewerBusinessId is derived
+    // from membership, never trusted from query params.
+    let viewerBusinessId = null;
+    if (req.user?.id) {
+      const ownerMember = await findBusinessMember(companyId, req.user.id);
+      if (ownerMember && ownerMember.status === 'accepted') {
+        viewerBusinessId = companyId;
+      } else if (req.query.viewerBusinessId) {
+        const viewerMember = await findBusinessMember(req.query.viewerBusinessId, req.user.id);
+        if (viewerMember && viewerMember.status === 'accepted') {
+          viewerBusinessId = req.query.viewerBusinessId;
+        }
+      }
+    }
+    const result = await applyPricePrivacy(product, viewerBusinessId);
+    res.json(successResponse(result));
   } catch (e) {
     console.error('Error fetching product:', e);
     res.status(500).json(errorResponse('Failed to load product'));
@@ -10601,17 +10676,27 @@ app.get('/api/companies/:companyId/users/:userId/activities', requireAuth, async
 });
 
 // File Upload Route
-app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
+app.post('/api/upload', requireAuth, upload.single('file'), async (req, res) => {
   try {
-    if (req.file) {
-      // Use request host for dynamic URL (works with LAN IP)
-      const protocol = req.protocol;
-      const host = req.get('host');
-      const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
-      res.json(successResponse({ url: fileUrl }));
-    } else {
-      res.status(400).json(errorResponse('No file uploaded'));
+    if (!req.file) {
+      return res.status(400).json(errorResponse('No file uploaded'));
     }
+
+    if (useSupabaseStorage) {
+      // Persist to Supabase Storage → returns a permanent public CDN URL that
+      // survives deploys (req.file.buffer comes from multer.memoryStorage).
+      const url = await storageService.uploadBuffer({
+        buffer: req.file.buffer,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+      });
+      return res.json(successResponse({ url }));
+    }
+
+    // Local-dev fallback (disk storage): host-derived URL (works with LAN IP).
+    // NOTE: ephemeral on Render — for local development only.
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    return res.json(successResponse({ url: fileUrl }));
   } catch (err) {
     console.error('[Upload] Error:', err);
     res.status(500).json(errorResponse('File upload failed'));
