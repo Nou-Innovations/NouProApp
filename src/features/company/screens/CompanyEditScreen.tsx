@@ -417,13 +417,20 @@ export default function CompanyEditScreen() {
       let logoUrl = profileImage;
       let bannerUrl = coverImage;
 
-      // Upload logo if it's a new local file (not already a remote URL)
-      if (profileImage && !profileImage.startsWith('http')) {
-        logoUrl = await uploadImage(profileImage);
-      }
-      // Upload banner if it's a new local file
-      if (coverImage && !coverImage.startsWith('http')) {
-        bannerUrl = await uploadImage(coverImage);
+      // Upload images first. Label any failure clearly so we can tell an upload
+      // problem apart from a save/validation problem.
+      try {
+        // Upload logo if it's a new local file (not already a remote URL)
+        if (profileImage && !profileImage.startsWith('http')) {
+          logoUrl = await uploadImage(profileImage);
+        }
+        // Upload banner if it's a new local file
+        if (coverImage && !coverImage.startsWith('http')) {
+          bannerUrl = await uploadImage(coverImage);
+        }
+      } catch (uploadErr) {
+        const m = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+        throw new Error(`Image upload failed — ${m}`);
       }
 
       // Auto-prefix website with https:// if user typed a bare URL (backend requires http/https prefix)
@@ -478,10 +485,13 @@ export default function CompanyEditScreen() {
         setHasChanges(false);
         setShowSuccessDialog(true);
       } else {
-        Alert.alert('Error', 'Failed to save changes. Please try again.');
+        const storeErr = useBusinessStore.getState().error;
+        Alert.alert('Error', `Failed to save changes.\n\n${storeErr || 'Please try again.'}`);
       }
     } catch (err) {
-      Alert.alert('Error', 'Failed to save changes. Please try again.');
+      const detail = err instanceof Error ? err.message : String(err);
+      console.error('[CompanyEdit] Save failed:', err);
+      Alert.alert('Error', `Failed to save changes.\n\n${detail}`);
     } finally {
       setIsSaving(false);
     }

@@ -141,6 +141,19 @@ const { orderStatus: orderStatusService, eventMessages, pushService, storageServ
 // Authentication middleware
 const { requireAuth, optionalAuth, generateToken, verifyToken } = require('./src/middleware/auth');
 
+// ---------------------------------------------------------------------------
+// Extracted helper modules (Phase 1 modularization).
+// Previously defined inline below; moved out to shrink server.js. Identifiers
+// are kept IDENTICAL so every existing call site keeps working unchanged.
+// `repos` (line above) and `prisma` are already constructed, so the
+// repos/prisma-dependent factories can be invoked here.
+// ---------------------------------------------------------------------------
+const { successResponse, errorResponse, paywallResponse, sendError } = require('./src/utils/response');
+const { deriveCapabilities, isLocationPublicEffective, getPublicDisabledReason, hasCapability } = require('./src/domain/capabilities');
+const { applyPricePrivacy, applyPricePrivacyBatch } = require('./src/domain/pricePrivacy')(repos, prisma);
+const { normalizeLastMessage, otherParticipantId, applyViewerDisplay, serializeChatsForViewer, serializeChatForViewer } = require('./src/domain/chatSerializers')(repos);
+const requireAutomationAuth = require('./src/middleware/automationAuth')(errorResponse);
+
 // Password hashing
 const bcrypt = require('bcryptjs');
 
@@ -361,132 +374,8 @@ const SUBSCRIPTION_TIERS = {
 
 // LOCATION_MODES already imported from constants at line 117
 
-// Derive capabilities from subscription tier (centralized logic)
-// RULE: Only ENTERPRISE can have independent locations with public pages
-// RULE: Expired subscriptions are treated as FREE (with 3-day grace period)
-function deriveCapabilities(business) {
-  let tier = business.subscriptionTier || SUBSCRIPTION_TIERS.FREE;
-
-  // SECURITY: Enforce subscription expiration
-  if (tier !== SUBSCRIPTION_TIERS.FREE && business.currentPeriodEnd) {
-    const expiryDate = new Date(business.currentPeriodEnd);
-    const gracePeriodMs = 3 * 24 * 60 * 60 * 1000; // 3 days grace
-    if (Date.now() > expiryDate.getTime() + gracePeriodMs) {
-      tier = SUBSCRIPTION_TIERS.FREE; // Expired + grace period passed → treat as FREE
-    }
-  }
-
-  const isEnterprise = tier === SUBSCRIPTION_TIERS.ENTERPRISE;
-  const isBusiness = tier === SUBSCRIPTION_TIERS.BUSINESS;
-  const isPaidTier = tier !== SUBSCRIPTION_TIERS.FREE;
-  
-  return {
-    // Enterprise-only capabilities
-    canChooseLocationMode: isEnterprise,
-    canHaveIndependentLocations: isEnterprise,
-    canEnablePublicLocationPages: isEnterprise,
-    canUseAdvancedPermissions: isEnterprise,
-    canUseAPI: isEnterprise,
-    
-    // Business & Enterprise capabilities
-    canUseBusinessSpecificPricing: isBusiness || isEnterprise,
-    
-    // Order capabilities (granular)
-    canReceiveOrders: true, // All tiers can receive B2B order requests
-    canRequestOrders: true, // All tiers can create purchase order requests
-    canCreateSellingOrders: isPaidTier, // Only paid tiers can create selling orders
-    
-    // Invoice capabilities (granular)
-    canCreateInvoiceDraft: true, // All tiers can create drafts
-    canSendInvoice: isPaidTier, // Only paid tiers can send invoices
-    canExportInvoicePDF: isPaidTier, // Only paid tiers can export PDFs
-    canCreateInvoices: isPaidTier, // Full invoice capability (legacy, use granular instead)
-    
-    // Delivery capabilities
-    canCreateDeliveries: isPaidTier,
-    canAssignTransport: isPaidTier,
-    
-    // Staff capabilities
-    canInviteStaff: isPaidTier,
-    canHaveStaff: isPaidTier,
-    
-    // Other paid tier capabilities
-    canPublishBusinessPage: isPaidTier,
-    
-    // Analytics
-    analyticsType: tier === SUBSCRIPTION_TIERS.FREE ? 'none' :
-                   tier === SUBSCRIPTION_TIERS.PRO ? 'none' :
-                   tier === SUBSCRIPTION_TIERS.BUSINESS ? 'basic_7day' : 'full',
-    
-    // Branding
-    showNouProBranding: tier === SUBSCRIPTION_TIERS.FREE,
-    canRemoveBranding: isPaidTier,
-    
-    // Tier-based limits
-    maxLocations: tier === SUBSCRIPTION_TIERS.FREE ? 1 : 
-                  tier === SUBSCRIPTION_TIERS.PRO ? 1 : 
-                  tier === SUBSCRIPTION_TIERS.BUSINESS ? 7 : 999,
-    maxStaff: tier === SUBSCRIPTION_TIERS.FREE ? 1 : 
-              tier === SUBSCRIPTION_TIERS.PRO ? 3 : 
-              tier === SUBSCRIPTION_TIERS.BUSINESS ? 9 : 999,
-    maxListedProducts: tier === SUBSCRIPTION_TIERS.FREE ? 10 :
-                      tier === SUBSCRIPTION_TIERS.PRO ? 50 :
-                      tier === SUBSCRIPTION_TIERS.BUSINESS ? 150 : 999999,
-
-    // Price privacy (Business+ only)
-    canEnablePricePrivacy: isBusiness || isEnterprise,
-
-    // Procurement (PRO+)
-    canViewSuppliers: isPaidTier,
-    canManageSuppliers: isPaidTier,
-    canCreatePurchaseRequests: isPaidTier,
-    canCreatePurchaseOrders: isPaidTier,
-
-    // Procurement (BUSINESS+)
-    canApprovePurchaseRequests: isBusiness || isEnterprise,
-    canReceiveGoods: isBusiness || isEnterprise,
-    canUseSupplierPricing: isBusiness || isEnterprise,
-    canUse3WayMatching: isBusiness || isEnterprise,
-
-    // Procurement (ENTERPRISE)
-    canUseBudgetControls: isEnterprise,
-
-    // Procurement limits
-    maxSuppliers: tier === SUBSCRIPTION_TIERS.FREE ? 0 :
-                  tier === SUBSCRIPTION_TIERS.PRO ? 5 :
-                  tier === SUBSCRIPTION_TIERS.BUSINESS ? 20 : 999,
-  };
-}
-
-// ============================================================================
-// EFFECTIVE PUBLIC STATUS (computed, not stored)
-// ============================================================================
-// On downgrade, location.isPublic stays true but effective public becomes false.
-// This allows instant re-enable on upgrade and preserves audit trail.
-
-function isLocationPublicEffective(business, location) {
-  const caps = deriveCapabilities(business);
-  return (
-    location.operatingMode === LOCATION_MODES.INDEPENDENT &&
-    location.isPublic === true &&
-    caps.canEnablePublicLocationPages === true
-  );
-}
-
-// Get public disabled reason for UI display
-function getPublicDisabledReason(business, location) {
-  if (location.operatingMode !== LOCATION_MODES.INDEPENDENT) {
-    return 'Only independent locations can have public pages';
-  }
-  if (!location.isPublic) {
-    return null; // Not marked public, so no "disabled" reason
-  }
-  const caps = deriveCapabilities(business);
-  if (!caps.canEnablePublicLocationPages) {
-    return 'Enterprise plan required';
-  }
-  return null;
-}
+// deriveCapabilities(), isLocationPublicEffective(), getPublicDisabledReason()
+// → moved to src/domain/capabilities.js (imported at top of file).
 
 // ============================================================================
 // NAMING CONVENTION
@@ -559,11 +448,7 @@ async function isLocationMember(locationId, userId) {
   return false;
 }
 
-// Check business capability
-function hasCapability(business, capabilityName) {
-  const caps = deriveCapabilities(business);
-  return caps[capabilityName] === true;
-}
+// hasCapability() → moved to src/domain/capabilities.js (imported at top of file).
 
 // Check location operating mode
 function checkLocationMode(location, requiredMode) {
@@ -667,11 +552,7 @@ function nextId(prefix) {
   return `${prefix}-${Date.now()}-${rand}`;
 }
 
-// Error wrapper for try/catch handlers
-function sendError(res, err) {
-  const status = err.status || 500;
-  res.status(status).json({ success: false, message: err.message || 'Server error' });
-}
+// sendError() → moved to src/utils/response.js (imported at top of file).
 
 // Convert member data to staff DTO shape
 function toStaffDto({ user, role, status, scope, locationId, locationName, joinedAt }) {
@@ -716,102 +597,8 @@ function stripSensitiveBusinessFields(business) {
   return safe;
 }
 
-// Helper: Apply price privacy to a single product
-// Returns product with prices hidden if the owner business has pricePrivacyEnabled
-// and the viewer is not connected.
-async function applyPricePrivacy(product, viewerBusinessId) {
-  if (!product) return product;
-  const ownerBizId = product.businessId || product.companyId || product.ownerBusinessId;
-
-  // Own products always show price
-  if (viewerBusinessId && ownerBizId === viewerBusinessId) return product;
-
-  // Check if owner has price privacy enabled
-  let settings = null;
-  try {
-    const biz = await repos.businessRepo.getById(ownerBizId);
-    settings = biz?.settings || null;
-  } catch { /* ignore */ }
-
-  if (!settings?.pricePrivacyEnabled) return product;
-
-  // Privacy enabled — check connection
-  if (viewerBusinessId) {
-    try {
-      const conn = await prisma.businessConnection.findFirst({
-        where: {
-          status: 'accepted',
-          OR: [
-            { requesterBusinessId: viewerBusinessId, targetBusinessId: ownerBizId },
-            { requesterBusinessId: ownerBizId, targetBusinessId: viewerBusinessId },
-          ],
-        },
-      });
-      if (conn) return product;
-    } catch { /* ignore */ }
-  }
-
-  // Not connected or no viewer — hide prices
-  return { ...product, price: null, salePrice: null, costPrice: null, pricePerCarton: null, priceHidden: true };
-}
-
-// Helper: Apply price privacy to an array of products (with caching for efficiency)
-async function applyPricePrivacyBatch(products, viewerBusinessId) {
-  const businessSettingsCache = new Map();
-  const connectionCache = new Map();
-
-  const getSettings = async (bizId) => {
-    if (!bizId) return null;
-    if (businessSettingsCache.has(bizId)) return businessSettingsCache.get(bizId);
-    try {
-      const biz = await repos.businessRepo.getById(bizId);
-      const s = biz?.settings || null;
-      businessSettingsCache.set(bizId, s);
-      return s;
-    } catch {
-      businessSettingsCache.set(bizId, null);
-      return null;
-    }
-  };
-
-  const checkConnection = async (bizA, bizB) => {
-    if (!bizA || !bizB || bizA === bizB) return true;
-    const key = [bizA, bizB].sort().join(':');
-    if (connectionCache.has(key)) return connectionCache.get(key);
-    try {
-      const conn = await prisma.businessConnection.findFirst({
-        where: {
-          status: 'accepted',
-          OR: [
-            { requesterBusinessId: bizA, targetBusinessId: bizB },
-            { requesterBusinessId: bizB, targetBusinessId: bizA },
-          ],
-        },
-      });
-      const result = !!conn;
-      connectionCache.set(key, result);
-      return result;
-    } catch {
-      connectionCache.set(key, false);
-      return false;
-    }
-  };
-
-  return Promise.all(products.map(async (p) => {
-    const ownerBizId = p.businessId || p.companyId || p.ownerBusinessId;
-    if (viewerBusinessId && ownerBizId === viewerBusinessId) return p;
-
-    const settings = await getSettings(ownerBizId);
-    if (!settings?.pricePrivacyEnabled) return p;
-
-    if (viewerBusinessId) {
-      const connected = await checkConnection(viewerBusinessId, ownerBizId);
-      if (connected) return p;
-    }
-
-    return { ...p, price: null, salePrice: null, costPrice: null, pricePerCarton: null, priceHidden: true };
-  }));
-}
+// applyPricePrivacy(), applyPricePrivacyBatch()
+// → moved to src/domain/pricePrivacy.js (imported at top of file).
 
 // ============================================================================
 // MEMBERSHIP ENFORCEMENT MIDDLEWARE
@@ -927,25 +714,8 @@ const VALID_MESSAGE_TYPES = new Set([
 
 const MAX_MESSAGE_LENGTH = 10000; // 10k characters
 
-// Helper functions
-const successResponse = (data, message = 'Success') => ({
-  success: true,
-  data,
-  message
-});
-
-const errorResponse = (message, code = 'ERROR') => ({
-  success: false,
-  error: { code, message },
-  message,
-});
-
-// Standardized paywall/plan-gated error response
-const paywallResponse = (message, triggerId, requiredPlan = 'pro') => ({
-  success: false,
-  error: { code: 'PAYWALL', triggerId, requiredPlan, message },
-  message,
-});
+// successResponse(), errorResponse(), paywallResponse()
+// → moved to src/utils/response.js (imported at top of file).
 
 // ============================================================================
 // ZOD VALIDATION SCHEMAS
@@ -7693,81 +7463,9 @@ app.post('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, c
   }
 });
 
-/**
- * Normalize a stored lastMessage into the canonical inbox-preview shape.
- *
- * Some stored rows (and seed data) use the legacy { text, sender } shape, while
- * the runtime/socket path uses { content, senderName }. The frontend reads
- * `content`/`senderName`, so we map legacy fields forward without dropping any.
- */
-function normalizeLastMessage(lm) {
-  if (!lm || typeof lm !== 'object') return lm ?? null;
-  return {
-    ...lm,
-    content: lm.content != null ? lm.content : (lm.text != null ? lm.text : ''),
-    senderName: lm.senderName != null ? lm.senderName : (lm.sender != null ? lm.sender : ''),
-    type: lm.type || 'text',
-  };
-}
-
-const otherParticipantId = (chat, viewerUserId) => {
-  const parts = Array.isArray(chat.participants) ? chat.participants : [];
-  return parts
-    .map(p => (typeof p === 'string' ? p : (p && (p.userId || p.id))))
-    .find(pid => pid && pid !== viewerUserId);
-};
-
-const applyViewerDisplay = (chat, otherUser) => {
-  const base = { ...chat, lastMessage: normalizeLastMessage(chat.lastMessage) };
-  // Only 1:1 (direct) chats get a per-viewer name/avatar. Groups/client/supplier
-  // keep their stored name. Unknown "other" (e.g. company-to-company) → unchanged.
-  if (chat.type !== 'direct' || !otherUser) return base;
-  return {
-    ...base,
-    name: otherUser.name || chat.name || 'Unknown',
-    avatar: otherUser.avatar || chat.avatar || null,
-  };
-};
-
-/**
- * Serialize a list of chats for one viewer: normalizes lastMessage for every
- * chat and resolves the per-viewer display name/avatar for 1:1 (direct) chats.
- * Uses a single batched user lookup (no N+1).
- */
-async function serializeChatsForViewer(chats, viewerUserId) {
-  const otherIds = new Set();
-  for (const c of chats) {
-    if (c.type !== 'direct') continue;
-    const otherId = otherParticipantId(c, viewerUserId);
-    if (otherId) otherIds.add(otherId);
-  }
-
-  let userById = new Map();
-  if (otherIds.size > 0) {
-    const users = await repos.userRepo.getByIds([...otherIds]);
-    userById = new Map(users.map(u => [u.id, u]));
-  }
-
-  return chats.map(c =>
-    applyViewerDisplay(c, userById.get(otherParticipantId(c, viewerUserId)))
-  );
-}
-
-/**
- * Serialize a single chat for one viewer — used by real-time socket emits so a
- * newly created direct chat shows the correct name to each recipient.
- */
-async function serializeChatForViewer(chat, viewerUserId) {
-  let otherUser = null;
-  if (chat.type === 'direct') {
-    const otherId = otherParticipantId(chat, viewerUserId);
-    if (otherId) {
-      const [u] = await repos.userRepo.getByIds([otherId]);
-      otherUser = u || null;
-    }
-  }
-  return applyViewerDisplay(chat, otherUser);
-}
+// normalizeLastMessage(), otherParticipantId(), applyViewerDisplay(),
+// serializeChatsForViewer(), serializeChatForViewer()
+// → moved to src/domain/chatSerializers.js (imported at top of file).
 
 // List chats for a company (supports cursor-based pagination)
 app.get('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, async (req, res) => {
@@ -8222,7 +7920,7 @@ app.post('/api/companies/:companyId/chats/:chatId/messages/:messageId/forward', 
 
     // Push notifications to offline participants
     if (typeof sendPushToOfflineParticipants === 'function') {
-      sendPushToOfflineParticipants(targetChat, savedMessage, userId).catch(() => {});
+      sendPushToOfflineParticipants(targetChatId, senderName, savedMessage.text || savedMessage.content || 'New message', userId).catch(() => {});
     }
 
     res.json(successResponse(savedMessage));
@@ -8871,7 +8569,7 @@ app.post('/api/users/:userId/chats/:chatId/messages/:messageId/forward', require
     }
 
     if (typeof sendPushToOfflineParticipants === 'function') {
-      sendPushToOfflineParticipants(targetChat, savedMessage, userId).catch(() => {});
+      sendPushToOfflineParticipants(targetChatId, senderName, savedMessage.text || savedMessage.content || 'New message', userId).catch(() => {});
     }
 
     res.json(successResponse(savedMessage));
@@ -10698,8 +10396,11 @@ app.post('/api/upload', requireAuth, upload.single('file'), async (req, res) => 
     const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
     return res.json(successResponse({ url: fileUrl }));
   } catch (err) {
+    // Surface the underlying storage error so misconfig (wrong key, wrong bucket,
+    // RLS denial, etc.) is diagnosable from the client instead of a generic message.
     console.error('[Upload] Error:', err);
-    res.status(500).json(errorResponse('File upload failed'));
+    const detail = (err && (err.message || err.error)) || 'Unknown storage error';
+    res.status(500).json(errorResponse(`File upload failed: ${detail}`));
   }
 });
 
@@ -11736,24 +11437,8 @@ app.post('/api/public/locations/:locationId/orders', async (req, res) => {
 // These endpoints can be called by cron services (e.g., Render cron jobs)
 // They require an API key for security
 
-const AUTOMATION_API_KEY = process.env.AUTOMATION_API_KEY;
-if (!AUTOMATION_API_KEY) {
-  console.warn('[SECURITY] AUTOMATION_API_KEY not set -- automation endpoints will reject all requests');
-}
-
-function requireAutomationAuth(req, res) {
-  // SECURITY: Fail closed if no API key is configured
-  if (!AUTOMATION_API_KEY) {
-    res.status(503).json(errorResponse('Automation endpoints are not configured', 'NOT_CONFIGURED'));
-    return false;
-  }
-  const apiKey = req.headers['x-automation-key'] || req.query.key;
-  if (apiKey !== AUTOMATION_API_KEY) {
-    res.status(401).json(errorResponse('Unauthorized', 'UNAUTHORIZED'));
-    return false;
-  }
-  return true;
-}
+// requireAutomationAuth() + AUTOMATION_API_KEY
+// → moved to src/middleware/automationAuth.js (imported at top of file).
 
 // Run order automation (auto-cancel stale orders, report stuck pending)
 // Can be called via: curl -H "x-automation-key: your-key" http://localhost:3000/api/automation/orders

@@ -165,28 +165,47 @@ export async function uploadImage(localUri: string): Promise<string> {
 
 export const imageService = {
   /**
-   * Request camera and media library permissions
+   * Request CAMERA permission only — used when taking a new photo.
+   * Do NOT require photo-library access here; the camera doesn't need it.
    */
-  async requestPermissions(): Promise<boolean> {
+  async requestCameraPermission(): Promise<boolean> {
     try {
-      // Request camera permissions
       const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-      
-      // Request media library permissions
-      const mediaLibraryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (cameraPermission.status !== 'granted' || mediaLibraryPermission.status !== 'granted') {
+      if (cameraPermission.status !== 'granted') {
         Alert.alert(
-          'Permissions Required',
-          'Camera and photo library access are required to change your profile picture.',
+          'Camera Access Needed',
+          'Please allow camera access in Settings to take a photo. You can also pick an existing photo from your gallery instead.',
           [{ text: 'OK' }]
         );
         return false;
       }
-      
       return true;
     } catch (error) {
-      console.error('Permission request error:', error);
+      console.error('Camera permission request error:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Request PHOTO LIBRARY permission only — used when choosing from the gallery.
+   * Critically, this must NOT require camera access: picking an existing photo
+   * never uses the camera, so demanding camera permission here wrongly blocks
+   * users who only granted photo access.
+   */
+  async requestMediaLibraryPermission(): Promise<boolean> {
+    try {
+      const mediaLibraryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (mediaLibraryPermission.status !== 'granted') {
+        Alert.alert(
+          'Photo Access Needed',
+          'Please allow photo library access in Settings to choose a picture.',
+          [{ text: 'OK' }]
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Media library permission request error:', error);
       return false;
     }
   },
@@ -196,7 +215,7 @@ export const imageService = {
    */
   async openCamera(): Promise<ImageUploadResponse> {
     try {
-      const hasPermission = await this.requestPermissions();
+      const hasPermission = await this.requestCameraPermission();
       if (!hasPermission) {
         return { success: false, error: 'PERMISSION_DENIED' };
       }
@@ -227,7 +246,7 @@ export const imageService = {
    */
   async openGallery(): Promise<ImageUploadResponse> {
     try {
-      const hasPermission = await this.requestPermissions();
+      const hasPermission = await this.requestMediaLibraryPermission();
       if (!hasPermission) {
         return { success: false, error: 'PERMISSION_DENIED' };
       }
