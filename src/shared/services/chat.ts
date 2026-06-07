@@ -283,6 +283,16 @@ class ChatService {
       }
     });
 
+    // Handle dedicated unread-count updates (badge stays live without a REST refetch)
+    this.socket.on('unread_update', (payload: { chatId: string; unreadCount: number }) => {
+      if (payload?.chatId == null || payload.unreadCount == null) return;
+      const store = this.inboxStore.getState();
+      store.updateChat(payload.chatId, { unreadCount: payload.unreadCount });
+      if (__DEV__) {
+        console.log('[ChatService] Unread update:', payload.chatId, payload.unreadCount);
+      }
+    });
+
     // Handle new chat created by another participant
     this.socket.on('chat_created', (chat: any) => {
       const store = this.inboxStore.getState();

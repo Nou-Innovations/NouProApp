@@ -138,12 +138,16 @@ export default function TeamManagementScreen() {
         setLocations(result.locations || []);
       } catch (error) {
         console.error('Error fetching locations:', error);
-        // Fallback mock locations for demo
-        setLocations([
-          { id: 'loc-001', name: 'Downtown' },
-          { id: 'loc-002', name: 'Westside' },
-          { id: 'loc-003', name: 'Northgate' },
-        ]);
+        if (__DEV__) {
+          // Demo-only fallback so the dev UI isn't empty on API error; never shown in production
+          setLocations([
+            { id: 'loc-001', name: 'Downtown' },
+            { id: 'loc-002', name: 'Westside' },
+            { id: 'loc-003', name: 'Northgate' },
+          ]);
+        } else {
+          setLocations([]);
+        }
       }
     };
     

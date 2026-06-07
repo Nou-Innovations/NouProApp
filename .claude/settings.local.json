@@ -70,7 +70,12 @@
       "Bash(timeout 300 node_modules/.bin/tsc --noEmit)",
       "Bash(node_modules/.bin/tsc --noEmit)",
       "Bash(git diff *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(tee /tmp/tsc_output.txt)",
+      "Bash(awk -F\"'\" \"/^  '[^']*': / { if \\(keys[\\\\$2]\\) print \\\\$2 \\\\\" \\(line \\\\\" NR \\\\\", previously line \\\\\" keys[\\\\$2] \\\\\"\\)\\\\\"; keys[\\\\$2] = NR }\" /Users/arnaudlabonne/Nou/NouPro/NouProApp/src/shared/utils/icons.tsx)",
+      "Bash(sed 's/.prisma.js$//')",
+      "Bash(cat > *)",
+      "Bash(git rev-list *)"
     ]
   }
 }

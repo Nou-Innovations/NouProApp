@@ -22,9 +22,6 @@ const STORAGE_KEYS = {
   PROFILE_PICTURES: 'profile_pictures',
 };
 
-// Mock image storage - In real app, this would be your backend/cloud storage
-const mockImageStorage: { [key: string]: string } = {};
-
 // Simulate network delay
 const simulateNetworkDelay = (ms: number = 1500): Promise<void> => {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -319,10 +316,7 @@ export const imageService = {
   async deleteProfilePicture(userId: string): Promise<boolean> {
     try {
       await simulateNetworkDelay(500);
-      
-      // Remove from mock storage
-      delete mockImageStorage[userId];
-      
+
       // In real app, you would also delete from cloud storage
       console.log(`Profile picture deleted for user ${userId}`);
       

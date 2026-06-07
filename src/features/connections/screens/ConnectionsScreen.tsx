@@ -23,7 +23,7 @@ import theme from '@/shared/theme';
 import Avatar from '@/shared/components/ui/Avatar';
 import { EmptyState } from '@/shared/components/ui';
 import { RootStackParamList } from '@/shared/types/navigation';
-import { connectionsAPI } from '@/shared/services/api';
+import { get } from '@/shared/services/api';
 import { useProfileStore } from '@/shared/store/profileStore';
 
 type ConnectionsScreenRouteProp = RouteProp<RootStackParamList, 'Connections'>;
@@ -77,14 +77,14 @@ export default function ConnectionsScreen() {
     setLoading(true);
     setError(null);
     try {
-      const [userRes, bizRes] = await Promise.all([
-        connectionsAPI.getUserConnections(),
+      const [userList, bizList] = await Promise.all([
+        get<Array<{ connectionId: string; user: any; connectedAt: string }>>('/connections'),
         activeBusiness?.id
-          ? connectionsAPI.getBusinessConnections(activeBusiness.id)
-          : Promise.resolve({ data: [] } as any),
+          ? get<any[]>(`/companies/${activeBusiness.id}/connections`)
+          : Promise.resolve([] as any[]),
       ]);
 
-      const userConns: UserConnection[] = (userRes.data || []).map((c: any) => ({
+      const userConns: UserConnection[] = (userList || []).map((c: any) => ({
         id: c.user?.id || c.connectionId,
         name: `${c.user?.firstName || ''} ${c.user?.lastName || ''}`.trim(),
         job_title: c.user?.jobTitle || undefined,
@@ -93,7 +93,7 @@ export default function ConnectionsScreen() {
         type: 'user' as const,
       }));
 
-      const bizConns: CompanyConnection[] = (bizRes.data || []).map((c: any) => {
+      const bizConns: CompanyConnection[] = (bizList || []).map((c: any) => {
         // Determine the "other" business in the connection
         const otherBiz = c.requesterBusinessId === activeBusiness?.id
           ? c.targetBusiness

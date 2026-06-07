@@ -461,86 +461,10 @@ export const authAPI = {
   },
 };
 
-export const productsAPI = {
-  getProducts: async (locationId: string) => {
-    const response = await apiClient.get(`/products?locationId=${locationId}`);
-    return response.data;
-  },
-
-  getProduct: async (productId: string) => {
-    const response = await apiClient.get(`/products/${productId}`);
-    return response.data;
-  },
-
-  createProduct: async (productData: any) => {
-    const response = await apiClient.post('/products', productData);
-    return response.data;
-  },
-
-  updateProduct: async (productId: string, updates: any) => {
-    const response = await apiClient.patch(`/products/${productId}`, updates);
-    return response.data;
-  },
-
-  deleteProduct: async (productId: string) => {
-    await apiClient.delete(`/products/${productId}`);
-  },
-
-  updateStock: async (productId: string, variantId: string, quantity: number) => {
-    const response = await apiClient.patch(`/products/${productId}/stock`, {
-      variantId,
-      quantity,
-    });
-    return response.data;
-  },
-};
-
+// productsAPI removed -- unused dead code (use the generic get/post/patch/del helpers)
+// invoicesAPI removed -- unused dead code (use the generic get/post/patch/del helpers)
 // ordersAPI removed -- use src/shared/services/orders.ts instead (single source of truth)
-
-export const invoicesAPI = {
-  getInvoices: async (locationId: string) => {
-    const response = await apiClient.get(`/invoices?locationId=${locationId}`);
-    return response.data;
-  },
-
-  getInvoice: async (invoiceId: string) => {
-    const response = await apiClient.get(`/invoices/${invoiceId}`);
-    return response.data;
-  },
-
-  createInvoice: async (invoiceData: any) => {
-    const response = await apiClient.post('/invoices', invoiceData);
-    return response.data;
-  },
-
-  updateInvoiceStatus: async (invoiceId: string, status: string) => {
-    const response = await apiClient.patch(`/invoices/${invoiceId}/status`, { status });
-    return response.data;
-  },
-
-  generatePDF: async (invoiceId: string) => {
-    const response = await apiClient.get(`/invoices/${invoiceId}/pdf`, {
-      responseType: 'blob',
-    });
-    return response.data;
-  },
-};
-
-// ============================================================================
-// Connections API
-// ============================================================================
-
-export const connectionsAPI = {
-  getUserConnections: async (): Promise<ApiResponse<Array<{ connectionId: string; user: any; connectedAt: string }>>> => {
-    const response = await apiClient.get('/connections');
-    return response.data;
-  },
-
-  getBusinessConnections: async (companyId: string): Promise<ApiResponse<Array<{ connectionId: string; company: any; connectedAt: string }>>> => {
-    const response = await apiClient.get(`/companies/${companyId}/connections`);
-    return response.data;
-  },
-};
+// connectionsAPI removed -- callers use the unwrapped get<T>() helper directly
 
 // ============================================================================
 // Export
