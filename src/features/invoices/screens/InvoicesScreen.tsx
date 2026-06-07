@@ -9,7 +9,7 @@ import {
   FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { EmptyState, Skeleton, SkeletonRow, SkeletonColumn , AppBottomSheet } from '@/shared/components/ui';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
@@ -36,6 +36,7 @@ import {
 
 export default function InvoicesScreen() {
   const navigation = useNavigation();
+  const route = useRoute<any>();
   const [search, setSearch] = useState('');
   const statuses = ['all', 'draft', 'sent', 'paid', 'overdue'];
   const [filter, setFilter] = useState('all');
@@ -73,11 +74,16 @@ export default function InvoicesScreen() {
     locationId: selectedLocationId 
   });
 
-  // Refetch on screen focus
+  // Refetch on screen focus; honor a one-shot `initialTab` (e.g. sidebar → Estimates)
   useFocusEffect(
     useCallback(() => {
+      const initialTab = route.params?.initialTab as 'invoices' | 'estimates' | undefined;
+      if (initialTab) {
+        setActiveTab(initialTab);
+        navigation.setParams({ initialTab: undefined } as any);
+      }
       refetch();
-    }, [refetch])
+    }, [refetch, route.params?.initialTab, navigation])
   );
 
   // Get filtered documents using hook's filter method

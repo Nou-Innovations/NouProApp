@@ -21,6 +21,7 @@ import { useProducts } from '../hooks/useProducts';
 import { getPublicProducts } from '../products.service';
 import { useProfileStore } from '@/shared/store/profileStore';
 import type { UIProduct } from '@/shared/types/product';
+import { getCategoryLabel } from '@/shared/constants/categories';
 
 type FilterKey = 'myProducts' | 'myBrands' | 'allProducts' | 'allBrands';
 
@@ -54,11 +55,14 @@ export default function ProductsSearchScreen({ navigation, route }: { navigation
   const { theme: appTheme } = useTheme();
 
   const filter: FilterKey = route.params?.filter || 'allProducts';
+  const categoryParam: string | undefined = route.params?.category;
   const initialQuery: string = route.params?.query || '';
   const [query, setQuery] = useState(initialQuery);
 
-  const isMine = filter === 'myProducts' || filter === 'myBrands';
-  const isBrandView = filter === 'myBrands' || filter === 'allBrands';
+  // A category drill-down forces the business's own products + a category filter.
+  const isMine = filter === 'myProducts' || filter === 'myBrands' || !!categoryParam;
+  const isBrandView = (filter === 'myBrands' || filter === 'allBrands') && !categoryParam;
+  const screenTitle = categoryParam ? getCategoryLabel(categoryParam) : FILTER_TITLES[filter];
 
   // "My" products come from the active business.
   const { products: myProducts, loading: myLoading } = useProducts({ autoFetch: isMine });
@@ -84,14 +88,20 @@ export default function ProductsSearchScreen({ navigation, route }: { navigation
 
   const q = query.trim().toLowerCase();
 
+  const categoryMatches = (p: UIProduct, cat: string) => {
+    const c = (p.category || '').trim().toLowerCase();
+    return c === cat.trim().toLowerCase() || c === getCategoryLabel(cat).trim().toLowerCase();
+  };
+
   const filteredProducts = useMemo(() => {
     if (isBrandView) return [];
     return sourceProducts.filter((p) =>
-      !q ||
-      p.name.toLowerCase().includes(q) ||
-      (p.brand || '').toLowerCase().includes(q),
+      (!categoryParam || categoryMatches(p, categoryParam)) &&
+      (!q ||
+        p.name.toLowerCase().includes(q) ||
+        (p.brand || '').toLowerCase().includes(q)),
     );
-  }, [isBrandView, sourceProducts, q]);
+  }, [isBrandView, sourceProducts, q, categoryParam]);
 
   const filteredBrands = useMemo(() => {
     if (!isBrandView) return [];
@@ -147,7 +157,7 @@ export default function ProductsSearchScreen({ navigation, route }: { navigation
         <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Icon name="chevron-back" size={24} color={appTheme.colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: appTheme.colors.text }]}>{FILTER_TITLES[filter]}</Text>
+        <Text style={[styles.headerTitle, { color: appTheme.colors.text }]}>{screenTitle}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -156,7 +166,7 @@ export default function ProductsSearchScreen({ navigation, route }: { navigation
         <Icon name="search-outline" size={18} color={appTheme.colors.iconMuted} />
         <TextInput
           style={[styles.searchInput, { color: appTheme.colors.text }]}
-          placeholder={`Search ${FILTER_TITLES[filter].toLowerCase()}`}
+          placeholder={`Search ${screenTitle.toLowerCase()}`}
           placeholderTextColor={appTheme.colors.textMuted}
           value={query}
           onChangeText={setQuery}

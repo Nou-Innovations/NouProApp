@@ -9,13 +9,18 @@ import AppTextField from '@/shared/components/ui/AppTextField';
 import ImagePlaceholder from '@/shared/components/ui/ImagePlaceholder';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { createBrand } from '../brands.service';
+import { createBrand, updateBrand } from '../brands.service';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateBrand'>;
 
-const CreateBrandScreen: React.FC<Props> = ({ navigation }) => {
-  const [brandName, setBrandName] = useState('');
-  const [brandImage, setBrandImage] = useState<string | null>(null);
+const CreateBrandScreen: React.FC<Props> = ({ navigation, route }) => {
+  const editingBrand = route.params?.brand;
+  const isEdit = !!editingBrand;
+  // "Manage" mode = opened from the Brands screen (return there on save) rather
+  // than the create-product flow (which jumps on to CreateProduct).
+  const manageMode = route.params?.manage || isEdit;
+  const [brandName, setBrandName] = useState(editingBrand?.name ?? '');
+  const [brandImage, setBrandImage] = useState<string | null>(editingBrand?.logoUrl ?? null);
   const [isSaving, setIsSaving] = useState(false);
   const { theme: appTheme } = useTheme();
   const { activeBusiness } = useProfileStore();
@@ -33,13 +38,24 @@ const CreateBrandScreen: React.FC<Props> = ({ navigation }) => {
 
     setIsSaving(true);
     try {
-      await createBrand(companyId, {
-        name: brandName.trim(),
-        logoUrl: brandImage || undefined,
-      });
-      navigation.navigate('CreateProduct', { selectedBrand: brandName.trim() });
+      if (isEdit && editingBrand) {
+        await updateBrand(companyId, editingBrand.id, {
+          name: brandName.trim(),
+          logoUrl: brandImage || undefined,
+        });
+      } else {
+        await createBrand(companyId, {
+          name: brandName.trim(),
+          logoUrl: brandImage || undefined,
+        });
+      }
+      if (manageMode) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('CreateProduct', { selectedBrand: brandName.trim() });
+      }
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to create brand');
+      Alert.alert('Error', err?.message || 'Failed to save brand');
     } finally {
       setIsSaving(false);
     }
@@ -52,7 +68,7 @@ const CreateBrandScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <SecondaryHeader
-        title="Create New Brand"
+        title={isEdit ? 'Edit Brand' : 'Create New Brand'}
         leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
       />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContentContainer}>
@@ -75,7 +91,7 @@ const CreateBrandScreen: React.FC<Props> = ({ navigation }) => {
         />
         
         <AppButton 
-          title={isSaving ? 'Saving...' : 'Save Brand'}
+          title={isSaving ? 'Saving...' : isEdit ? 'Save Changes' : 'Save Brand'}
           onPress={handleSave} 
           style={styles.saveButton}
           disabled={!isFormValid || isSaving}

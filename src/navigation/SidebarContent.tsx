@@ -157,18 +157,18 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
             items: [
               { label: 'All deliveries', icon: 'truck-outline', onPress: () => go('Deliveries') },
               { label: 'Orders', icon: 'cart-outline', onPress: () => go('Orders') },
-              { label: 'Transfers', icon: 'swap-horizontal-outline', onPress: () => comingSoon('Transfers') },
+              { label: 'Transfers', icon: 'swap-horizontal-outline', onPress: () => go('Transfers') },
             ],
           },
           {
             title: 'Products',
             items: [
               { label: 'Products', icon: 'cube-outline', onPress: () => go('Products') },
-              { label: 'Categories', icon: 'grid-outline', onPress: () => comingSoon('Categories') },
-              { label: 'Brands', icon: 'bookmark-outline', onPress: () => comingSoon('Brands') },
-              { label: 'Stock', icon: 'archive-outline', onPress: () => comingSoon('Stock') },
+              { label: 'Categories', icon: 'grid-outline', onPress: () => go('Categories') },
+              { label: 'Brands', icon: 'bookmark-outline', onPress: () => go('Brands') },
+              { label: 'Stock', icon: 'archive-outline', onPress: () => go('Stock') },
               { label: 'Price lists', icon: 'cash-outline', onPress: () => comingSoon('Price lists') },
-              { label: 'Visibility', icon: 'eye-outline', onPress: () => comingSoon('Visibility') },
+              { label: 'Visibility', icon: 'eye-outline', onPress: () => go('ProductVisibility') },
               { label: 'Collections', icon: 'folder-outline', onPress: () => comingSoon('Collections') },
               { label: 'Recipes', icon: 'restaurant-outline', onPress: () => comingSoon('Recipes') },
               { label: 'Discounts', icon: 'pricetag-outline', onPress: () => comingSoon('Discounts') },
@@ -178,7 +178,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
             title: 'Accounting',
             items: [
               { label: 'Invoices', icon: 'receipt-text-outline', onPress: () => go('Invoices') },
-              { label: 'Estimates', icon: 'document-text-outline', onPress: () => comingSoon('Estimates') },
+              { label: 'Estimates', icon: 'document-text-outline', onPress: () => go('Invoices', { initialTab: 'estimates' }) },
               { label: 'Scan invoice', icon: 'scan-outline', onPress: () => comingSoon('Scan invoice') },
             ],
           },

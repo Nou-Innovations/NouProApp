@@ -104,7 +104,7 @@ export type BusinessTabParamList = {
   BusinessInbox: undefined; // Business inbox with activity timeline and chats
   Deliveries: undefined;
   Products: undefined;
-  Invoices: undefined;
+  Invoices: { initialTab?: 'invoices' | 'estimates' } | undefined;
   BusinessProfile: undefined;
 };
 
@@ -148,10 +148,18 @@ export type RootStackParamList = {
   // Product screens
   CreateProduct: { selectedBrand?: string; selectedBrandId?: string; product?: import('./product').UIProduct };
   ProductDetail: { productId: string };
-  ProductsSearch: { query?: string; filter?: 'myProducts' | 'myBrands' | 'allProducts' | 'allBrands' };
+  ProductsSearch: { query?: string; filter?: 'myProducts' | 'myBrands' | 'allProducts' | 'allBrands'; category?: string };
+  Categories: undefined;
+  Stock: undefined;
+  ProductVisibility: undefined;
 
   // Brand screens
-  CreateBrand: { selectedProducts?: { id: string; name: string; price: number; brandName: string }[] };
+  Brands: undefined;
+  CreateBrand: {
+    selectedProducts?: { id: string; name: string; price: number; brandName: string }[];
+    brand?: { id: string; name: string; logoUrl?: string | null; description?: string | null };
+    manage?: boolean;
+  };
   BrandSelection: { selectedBrand?: string };
   SelectProductsForBrand: { 
     brandName: string;
@@ -175,7 +183,8 @@ export type RootStackParamList = {
   };
   
   // Delivery screens
-  DeliveryDetail: { 
+  Transfers: undefined;
+  DeliveryDetail: {
     deliveryId: string;
     /** Optional override for view type detection */
     viewAs?: 'client' | 'supplier' | 'self' | 'staff';

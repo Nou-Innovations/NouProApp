@@ -27,6 +27,7 @@ import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore
 import { useBusinessStore } from '@/shared/store/businessStore';
 import Avatar from '@/shared/components/ui/Avatar';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import * as Sentry from '@sentry/react-native';
 import { DemoModeBadge } from '@/shared/components/ui/DemoModeBadge';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -349,6 +350,24 @@ export default function PersonalSettingsScreen() {
         <View style={styles.settingLeft}>
           <Icon name="document-text-outline" size={24} color={appTheme.colors.iconColor} />
           <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Privacy Policy</Text>
+        </View>
+        <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+      </TouchableOpacity>
+
+      {/* TEMPORARY: Sentry wiring test — REMOVE once error reporting is confirmed. */}
+      <TouchableOpacity
+        style={[styles.settingRow, { borderBottomColor: appTheme.colors.borderColor }]}
+        onPress={() => {
+          Sentry.captureException(new Error('NouPro Sentry test error ' + new Date().toISOString()));
+          Alert.alert(
+            'Test error sent',
+            'Check your Sentry dashboard (nou-innovations) under Issues in ~1 minute — a "NouPro Sentry test error" should appear.'
+          );
+        }}
+      >
+        <View style={styles.settingLeft}>
+          <Icon name="bug-outline" size={24} color={appTheme.colors.iconColor} />
+          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Send test error to Sentry (temporary)</Text>
         </View>
         <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
       </TouchableOpacity>

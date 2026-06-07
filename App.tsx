@@ -119,6 +119,13 @@ import NotificationsScreen from '@/features/notifications/screens/NotificationsS
 // Screens - Shared
 import ComingSoonScreen from '@/shared/screens/ComingSoonScreen';
 
+// Screens - Quick-win features (formerly "Coming soon")
+import BrandsScreen from '@/features/brands/screens/BrandsScreen';
+import StockScreen from '@/features/products/screens/StockScreen';
+import CategoriesScreen from '@/features/products/screens/CategoriesScreen';
+import ProductVisibilityScreen from '@/features/products/screens/ProductVisibilityScreen';
+import TransfersScreen from '@/features/deliveries/screens/TransfersScreen';
+
 // Screens - Personal (from modes)
 import EditPersonalProfileScreen from '@/modes/personal/screens/EditPersonalProfileScreen';
 import AddWorkExperienceScreen from '@/modes/personal/screens/AddWorkExperienceScreen';
@@ -511,6 +518,13 @@ function AppNavigator() {
 
         {/* Coming soon placeholder (not-yet-built features) */}
         <RootStack.Screen name="ComingSoon" component={ComingSoonScreen} />
+
+        {/* Quick-win feature screens (formerly "Coming soon") */}
+        <RootStack.Screen name="Brands" component={BrandsScreen} />
+        <RootStack.Screen name="Stock" component={StockScreen} />
+        <RootStack.Screen name="Categories" component={CategoriesScreen} />
+        <RootStack.Screen name="ProductVisibility" component={ProductVisibilityScreen} />
+        <RootStack.Screen name="Transfers" component={TransfersScreen} />
         
         {/* Subscription */}
         <RootStack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
