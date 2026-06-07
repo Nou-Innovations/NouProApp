@@ -235,7 +235,7 @@ export default function AllActivityScreen() {
           ]}
           style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           maxToRenderPerBatch={10}
           windowSize={5}
           initialNumToRender={10}

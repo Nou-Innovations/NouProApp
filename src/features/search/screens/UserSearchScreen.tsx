@@ -105,7 +105,7 @@ const UserSearchScreen = () => {
           data={users}
           keyExtractor={(item) => item.id}
           renderItem={renderUserItem}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           maxToRenderPerBatch={10}
           windowSize={5}
           initialNumToRender={10}

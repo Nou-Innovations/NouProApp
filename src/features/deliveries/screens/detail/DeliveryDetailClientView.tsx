@@ -226,7 +226,7 @@ export function DeliveryDetailClientView({
         {/* Notes - Can add */}
         <NotesSection
           notes={notes}
-          canAddNotes={true}
+          canAddNotes
           onAddNote={handleSendNote}
         />
 

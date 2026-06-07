@@ -35,7 +35,17 @@ function deriveCapabilities(business) {
     canUseAPI: isEnterprise,
 
     // Business & Enterprise capabilities
+    // NOTE: canUseBusinessSpecificPricing is RESERVED for an unbuilt feature.
+    // There is currently no business/customer-specific pricing write endpoint
+    // (only the unused LocationProduct.priceOverride), so this gates nothing and
+    // there is no active entitlement leak. If business-specific pricing is built,
+    // gate its write endpoint with hasCapability(business, 'canUseBusinessSpecificPricing').
     canUseBusinessSpecificPricing: isBusiness || isEnterprise,
+
+    // Feed publishing (Business+). Mirrors the frontend publish_on_feed /
+    // publish_products_on_feed plan features.
+    canPublishOnFeed: isBusiness || isEnterprise,
+    canPublishProductsOnFeed: isBusiness || isEnterprise,
 
     // Order capabilities (granular)
     canReceiveOrders: true, // All tiers can receive B2B order requests

@@ -426,7 +426,7 @@ export default function NewChatModalList({
           </View>
         ) : item.subtitle}
         onPress={() => toggleContact(item.id)}
-        showCheckmark={true}
+        showCheckmark
         selected={isSelected}
         showDivider={!isLast}
       />
@@ -493,7 +493,7 @@ export default function NewChatModalList({
               title="New group"
               subtitle="Create a group conversation"
               onPress={() => handleActionPress('new-group')}
-              showDivider={true}
+              showDivider
             />
             <ListItemCard
               avatar={{

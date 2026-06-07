@@ -290,7 +290,7 @@ export default function LocationsScreen() {
         <FlatList
           data={[1]} // Single item to render sections
           keyExtractor={() => 'sections'}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           maxToRenderPerBatch={10}
           windowSize={5}
           initialNumToRender={10}
@@ -305,7 +305,7 @@ export default function LocationsScreen() {
                     onEdit={() => handleEditLocation(primaryLocation)}
                     onDelete={() => handleDeleteLocation(primaryLocation)}
                     showDivider={false}
-                    isPrimaryLocation={true}
+                    isPrimaryLocation
                   />
                 </View>
               ) : (
@@ -325,7 +325,7 @@ export default function LocationsScreen() {
                           onEdit={() => handleEditLocation(primaryLocation)}
                           onDelete={() => handleDeleteLocation(primaryLocation)}
                           showDivider={false}
-                          isPrimaryLocation={true}
+                          isPrimaryLocation
                         />
                       </View>
                     </View>

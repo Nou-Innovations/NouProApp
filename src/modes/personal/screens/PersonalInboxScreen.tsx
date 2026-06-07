@@ -141,7 +141,7 @@ export default function PersonalInboxScreen() {
       isGroup: isGroupChat,
       avatar: chat.avatar,
       partnerId: chat.id,
-      partnerType: partnerType,
+      partnerType,
       unreadCount: chat.unreadCount || 0,
     });
   };
@@ -223,7 +223,7 @@ export default function PersonalInboxScreen() {
         onScrollBeginDrag={handleScroll}
         onRefresh={refresh}
         refreshing={refreshing}
-        removeClippedSubviews={true}
+        removeClippedSubviews
         maxToRenderPerBatch={10}
         windowSize={5}
         initialNumToRender={10}

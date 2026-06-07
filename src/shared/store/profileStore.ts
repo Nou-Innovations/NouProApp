@@ -11,6 +11,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { User } from '@/shared/types/user';
+import { Business, BusinessStaff, StaffRole, StaffRoleType, UserBusiness } from '@/shared/types/business';
+import { ProfileMode } from '@/shared/types/roles';
+import { SubscriptionPlan, PLAN_FEATURES } from '@/shared/types/subscription';
+import { chatService } from '@/shared/services/chat';
 // Graceful fallback: use SecureStore when native module is available, otherwise AsyncStorage
 let SecureStoreAvailable = false;
 let SecureStore: typeof import('expo-secure-store') | null = null;
@@ -42,11 +47,6 @@ const secureDelete = async (key: string): Promise<void> => {
   }
   return AsyncStorage.removeItem(key);
 };
-import { User } from '@/shared/types/user';
-import { Business, BusinessStaff, StaffRole, StaffRoleType, UserBusiness } from '@/shared/types/business';
-import { ProfileMode } from '@/shared/types/roles';
-import { SubscriptionPlan, PLAN_FEATURES } from '@/shared/types/subscription';
-import { chatService } from '@/shared/services/chat';
 
 /**
  * Profile Store State

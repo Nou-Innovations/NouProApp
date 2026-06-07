@@ -15,7 +15,7 @@ export interface OrderTransitions {
   currentStatus: string;
   currentMeta: { label: string; color: string };
   isFinal: boolean;
-  transitions: Array<{ status: string; label: string; color: string }>;
+  transitions: { status: string; label: string; color: string }[];
 }
 
 /** Shape of a single status history entry */

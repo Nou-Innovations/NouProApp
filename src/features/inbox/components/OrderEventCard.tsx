@@ -471,7 +471,7 @@ export function OrderEventCard({
           isExpanded={expandedRow === 'payment'}
           onToggle={() => handleToggle('payment')}
           colors={colors}
-          isLast={true}
+          isLast
           expandedContent={
             <View style={styles.expandedContent}>
               {getPaymentTimeline().map((payment, index) => (

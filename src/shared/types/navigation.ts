@@ -76,7 +76,7 @@ export interface PendingAuthData {
   user: Record<string, unknown>;
   token: string;
   refreshToken: string;
-  businesses?: Array<Record<string, unknown>>;
+  businesses?: Record<string, unknown>[];
 }
 
 // ========== Personal Mode Tab Navigator ==========

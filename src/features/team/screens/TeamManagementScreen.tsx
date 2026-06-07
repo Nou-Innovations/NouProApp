@@ -13,7 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { AppSearchBar, StaffCard, StaffMember, StaffRole as StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard, EmptyState } from '@/shared/components/ui';
+import { AppSearchBar, StaffCard, StaffMember, StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard, EmptyState } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import LocationDropdown from '@/shared/components/ui/LocationDropdown';
 import theme from '@/shared/theme';
@@ -28,15 +28,13 @@ import {
   resendInvite,
   updateTeamMemberRole,
   type AccessibleLocation,
-} from '@/features/team/team.service';
-import {
+
   getJoinRequests,
   getPendingInvites,
   acceptJoinRequestWithRole,
   rejectJoinRequestById,
   type JoinRequest,
-  type PendingInvite,
-} from '@/features/team/team.service';
+  type PendingInvite} from '@/features/team/team.service';
 
 // User type for team management (matches backend /staff response)
 interface User {
@@ -453,7 +451,7 @@ export default function TeamManagementScreen() {
       <LocationDropdown
         selectedLocationId={selectedLocationId}
         onLocationSelect={setSelectedLocationId}
-        showAllLocationsOption={true}
+        showAllLocationsOption
         style={styles.locationDropdown}
       />
 
@@ -518,7 +516,7 @@ export default function TeamManagementScreen() {
         <FlatList
           data={[1]} // Single item to render all sections
           keyExtractor={() => 'sections'}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           maxToRenderPerBatch={10}
           windowSize={5}
           initialNumToRender={10}

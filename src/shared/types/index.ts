@@ -39,8 +39,29 @@ export * from './feed';
 // Inbox/Chat types
 export * from './inbox';
 
-// Delivery types (UI-specific, extends order.ts)
-export * from './delivery';
+// Delivery types (UI-specific, extends order.ts).
+// DeliveryStatus / PaymentStatus and their *_COLORS / *_LABELS are the single source of
+// truth in ./order — only delivery-specific names are re-exported here, to avoid
+// duplicate/ambiguous barrel exports (eslint import/export, tsc TS2308).
+export type {
+  ItemStatus,
+  DeliveryType,
+  DeliveryDirection,
+  DeliveryItem,
+  Delivery,
+  Staff,
+  DeliveryStaffRole,
+  DeliveryStaffAssignment,
+  TransportMode,
+  DeliveriesResponse,
+  DeliveryResponse,
+  DeliveryFilters,
+  DeliveryViewType,
+  DeliveryFilterTab,
+  CreateDeliveryData,
+  UpdateDeliveryData,
+} from './delivery';
+export { DELIVERY_FILTER_TAB_STATUSES } from './delivery';
 
 // Transport/Vehicle types
 export * from './transport';

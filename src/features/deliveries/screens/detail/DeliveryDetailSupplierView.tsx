@@ -559,11 +559,11 @@ export function DeliveryDetailSupplierView({
           expectedDeliveryTime={expectedDeliveryTime}
           transportDisplay={selectedTransport?.name}
           staffDisplay={getStaffDisplayText()}
-          canEditSchedule={true}
-          canEditTransport={true}
-          canEditAssignedStaff={true}
-          canEditStatus={true}
-          canEditPayment={true}
+          canEditSchedule
+          canEditTransport
+          canEditAssignedStaff
+          canEditStatus
+          canEditPayment
           onOpenScheduleModal={openSchedulingModal}
           onOpenTransportModal={handleShowTransportModal}
           onOpenStaffModal={() => {
@@ -584,10 +584,10 @@ export function DeliveryDetailSupplierView({
         <ProductListSection
           items={deliveryItems}
           currentWarehouseName={currentLocation?.name || 'Warehouse A'}
-          showWarehouseSelector={true}
-          showStockWarnings={true}
-          canToggleLoaded={true}
-          showItemStatusMenu={true}
+          showWarehouseSelector
+          showStockWarnings
+          canToggleLoaded
+          showItemStatusMenu
           onItemLoadedToggle={handleItemLoadedToggle}
           onItemStatusChange={handleItemStatusChange}
         />
@@ -595,7 +595,7 @@ export function DeliveryDetailSupplierView({
         {/* Notes */}
         <NotesSection
           notes={notes}
-          canAddNotes={true}
+          canAddNotes
           onAddNote={handleSendNote}
         />
 
@@ -663,7 +663,7 @@ export function DeliveryDetailSupplierView({
       {/* Transport Modal */}
       <Modal
         visible={showTransportModal}
-        transparent={true}
+        transparent
         animationType="none"
         onRequestClose={handleHideTransportModal}
       >
@@ -728,7 +728,7 @@ export function DeliveryDetailSupplierView({
       {/* Order Status Modal */}
       <Modal
         visible={showOrderStatusModal}
-        transparent={true}
+        transparent
         animationType="none"
         onRequestClose={handleHideOrderStatusModal}
       >
@@ -795,7 +795,7 @@ export function DeliveryDetailSupplierView({
       {/* Payment Status Modal */}
       <Modal
         visible={showPaymentStatusModal}
-        transparent={true}
+        transparent
         animationType="none"
         onRequestClose={handleHidePaymentStatusModal}
       >
@@ -862,7 +862,7 @@ export function DeliveryDetailSupplierView({
       {/* Scheduling Modal */}
       <Modal
         visible={isSchedulingModalVisible}
-        transparent={true}
+        transparent
         animationType="none"
         onRequestClose={closeSchedulingModal}
       >

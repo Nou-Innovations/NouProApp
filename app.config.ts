@@ -19,6 +19,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: 'NouPro',
     slug: 'noupro',
+    scheme: 'noupro',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
@@ -57,6 +58,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         'android.permission.ACCESS_FINE_LOCATION',
         'android.permission.RECORD_AUDIO',
         'android.permission.CAMERA',
+        'android.permission.POST_NOTIFICATIONS',
       ],
     },
     web: {
@@ -107,15 +109,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           defaultChannel: 'default',
         },
       ],
+      '@sentry/react-native',
     ],
     extra: {
       eas: {
         projectId: '862199f7-e9f9-4a46-9b37-a90773d8a72f',
       },
       // Pass environment variables to runtime
-      appEnv: appEnv,
-      isDemo: isDemo,
-      isProd: isProd,
+      appEnv,
+      isDemo,
+      isProd,
     },
     updates: {
       fallbackToCacheTimeout: 0,

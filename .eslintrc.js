@@ -23,9 +23,9 @@ module.exports = {
     'prettier/prettier': 'off',
     // Pure import-ordering churn (~1800 hits) — not part of this project's lint scope.
     'import/order': 'off',
-    // Pre-existing debt, downgraded to keep the baseline green (CI gates on errors only):
-    'import/no-duplicates': 'warn', // duplicate import lines — safe to merge later via --fix
-    'import/export': 'warn', // ambiguous re-exports in shared barrels (see tsc TS2308 burndown)
+    // import/no-duplicates and import/export keep universe's default 'error' — the
+    // pre-existing violations were resolved in this pass (duplicate imports merged,
+    // ambiguous barrel re-exports fixed), so they now guard against regressions.
   },
   overrides: [
     {

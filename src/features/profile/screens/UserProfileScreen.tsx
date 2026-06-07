@@ -38,13 +38,13 @@ interface UserProfileData {
   address?: string;
   connectionsCount?: number;
   connectionStatus?: { id: string; status: string; direction: string } | null;
-  experiences?: Array<{
+  experiences?: {
     business_id: string;
     business_name: string;
     business_logo?: string;
     role: string;
     started_at?: string;
-  }>;
+  }[];
   createdAt?: string;
 }
 

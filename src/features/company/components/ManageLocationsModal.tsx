@@ -129,7 +129,7 @@ const ManageLocationsModal: React.FC<ManageLocationsModalProps> = ({
               onChangeText={setLocationAddress}
           placeholder="Enter address"
               placeholderTextColor={appTheme.colors.textLight}
-              multiline={true}
+              multiline
               numberOfLines={3}
               textAlignVertical="top"
         />
@@ -213,7 +213,7 @@ const ManageLocationsModal: React.FC<ManageLocationsModalProps> = ({
   return (
     <Modal
       visible={isVisible}
-      transparent={true}
+      transparent
       animationType="slide"
       onRequestClose={onClose}
     >

@@ -195,7 +195,7 @@ export default function PersonalDeliveryDetailScreen() {
   }
 
   const status = delivery.deliveryStatus as DeliveryStatus;
-  const items = (delivery.items || []) as Array<{ name: string; quantityOrdered?: number; quantity?: number }>;
+  const items = (delivery.items || []) as { name: string; quantityOrdered?: number; quantity?: number }[];
 
   return (
     <SafeAreaView

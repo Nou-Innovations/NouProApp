@@ -7,6 +7,8 @@
  * Order status type
  * Re-exported from constants for convenience
  */
+import type { OrderStatus as OrderStatusType } from '@/shared/constants/orderStatus';
+
 export type { OrderStatus } from '@/shared/constants/orderStatus';
 export { 
   ORDER_STATUS_META,
@@ -122,8 +124,6 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   PARTIALLY_REFUNDED: 'Partially refunded',
   DISPUTED: 'Disputed',
 };
-
-import type { OrderStatus as OrderStatusType } from '@/shared/constants/orderStatus';
 
 /**
  * Order - Business orders (B2C and B2B)

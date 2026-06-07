@@ -78,7 +78,7 @@ export default function ConnectionsScreen() {
     setError(null);
     try {
       const [userList, bizList] = await Promise.all([
-        get<Array<{ connectionId: string; user: any; connectedAt: string }>>('/connections'),
+        get<{ connectionId: string; user: any; connectedAt: string }[]>('/connections'),
         activeBusiness?.id
           ? get<any[]>(`/companies/${activeBusiness.id}/connections`)
           : Promise.resolve([] as any[]),
@@ -375,7 +375,7 @@ export default function ConnectionsScreen() {
           showsVerticalScrollIndicator={false}
           onRefresh={fetchConnections}
           refreshing={loading}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           maxToRenderPerBatch={10}
           windowSize={5}
           initialNumToRender={10}

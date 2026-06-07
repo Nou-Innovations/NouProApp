@@ -267,7 +267,7 @@ export default function SubscriptionPlansScreen() {
         // Downgrade to free - no payment needed
         await patch(`/companies/${activeBusiness.id}/subscription`, {
           subscriptionTier: 'FREE',
-          billingPeriod: billingPeriod,
+          billingPeriod,
         });
 
         useProfileStore.getState().updateUserBusiness(activeBusiness.id, {

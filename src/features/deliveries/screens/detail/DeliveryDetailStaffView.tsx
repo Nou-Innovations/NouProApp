@@ -307,7 +307,7 @@ export function DeliveryDetailStaffView({ delivery }: DeliveryDetailStaffViewPro
         {/* Notes - Can report issues */}
         <NotesSection
           notes={notes}
-          canAddNotes={true}
+          canAddNotes
           onAddNote={handleReportIssue}
           mode="reportIssue"
           placeholder="Report an issue..."
@@ -324,7 +324,7 @@ export function DeliveryDetailStaffView({ delivery }: DeliveryDetailStaffViewPro
       {/* Staff-limited Status Modal */}
       <Modal
         visible={showStatusModal}
-        transparent={true}
+        transparent
         animationType="none"
         onRequestClose={handleHideStatusModal}
       >

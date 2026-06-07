@@ -1201,7 +1201,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
         {isColorPickerVisible && (
           <Modal
             visible={isColorPickerVisible}
-            transparent={true}
+            transparent
             animationType="fade"
             onRequestClose={() => setIsColorPickerVisible(false)}
           >
@@ -1234,7 +1234,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
         <Modal
           visible={showPreview}
           animationType="slide"
-          transparent={true}
+          transparent
           onRequestClose={() => setShowPreview(false)}
         >
           <View style={[styles.previewOverlay]}>

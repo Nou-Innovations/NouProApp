@@ -236,7 +236,7 @@ export default function EditPersonalProfileScreen() {
     try {
       const uploadResult = await imageService.uploadProfilePicture({
         userId: currentUser?.id || '1',
-        imageUri: imageUri,
+        imageUri,
         imageType: 'profile',
       });
 

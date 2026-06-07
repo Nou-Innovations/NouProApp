@@ -22,8 +22,7 @@
  * - POST /api/users/:userId/chats/:chatId/read
  */
 
-import { get, getFullResponse, post, del } from '@/shared/services/api';
-import apiClient from '@/shared/services/api';
+import apiClient, { get, getFullResponse, post, del } from '@/shared/services/api';
 import { 
   Chat, 
   Message, 

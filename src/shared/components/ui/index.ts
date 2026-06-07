@@ -33,7 +33,7 @@ export { default as ColorPicker } from './ColorPicker';
 export { default as ImageUploadField } from './ImageUploadField';
 export { default as PhoneNumberField } from './PhoneNumberField';
 export { default as StaffCard } from './StaffCard';
-export type { StaffMember, StaffRole } from './StaffCard';
+export type { StaffMember, StaffCardRole } from './StaffCard';
 export { default as IconButton } from './IconButton';
 export { default as ImagePlaceholder } from './ImagePlaceholder';
 export { default as Pill } from './Pill';

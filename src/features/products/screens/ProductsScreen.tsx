@@ -21,9 +21,8 @@ import ProductCreateModal from '@/features/products/components/ProductCreateModa
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import AppButton from '@/shared/components/ui/AppButton';
 import IconButton from '@/shared/components/ui/IconButton';
-import { AppModal, AppBottomSheet, ListItemCard } from '@/shared/components/ui';
+import { AppModal, AppBottomSheet, ListItemCard , EmptyState, Skeleton, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
-import { EmptyState, Skeleton, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { useBusinessStore } from '@/shared/store/businessStore';
@@ -466,7 +465,7 @@ const ProductsScreen: React.FC = () => {
         }}
         contentContainerStyle={{ flexGrow: 1 }}
         style={{ flex: 1 }}
-        removeClippedSubviews={true}
+        removeClippedSubviews
         maxToRenderPerBatch={10}
         windowSize={5}
         initialNumToRender={10}

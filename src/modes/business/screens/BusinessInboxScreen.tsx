@@ -251,7 +251,7 @@ export default function BusinessInboxScreen() {
       isGroup: isGroupChat,
       avatar: chat.avatar,
       partnerId: chat.participants?.[0] || chat.id,
-      partnerType: partnerType,
+      partnerType,
       unreadCount: chat.unreadCount || 0,
     });
   };
@@ -466,7 +466,7 @@ export default function BusinessInboxScreen() {
                 ListEmptyComponent={loadingChats ? renderChatSkeleton : renderEmptyState}
                 onScrollBeginDrag={handleScroll}
                 showsVerticalScrollIndicator={false}
-                removeClippedSubviews={true}
+                removeClippedSubviews
                 maxToRenderPerBatch={10}
                 windowSize={5}
                 initialNumToRender={10}

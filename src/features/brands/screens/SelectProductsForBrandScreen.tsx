@@ -160,7 +160,7 @@ const SelectProductsForBrandScreen: React.FC<Props> = ({ navigation, route }) =>
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={renderEmptyState}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           maxToRenderPerBatch={10}
           windowSize={5}
           initialNumToRender={10}

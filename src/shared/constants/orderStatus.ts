@@ -272,10 +272,10 @@ export function isValidTransition(fromStatus: OrderStatus, toStatus: OrderStatus
  * Get valid transitions with their metadata
  * Useful for rendering status change options in UI
  */
-export function getTransitionsWithMeta(currentStatus: OrderStatus): Array<{
+export function getTransitionsWithMeta(currentStatus: OrderStatus): {
   status: OrderStatus;
   meta: OrderStatusMeta;
-}> {
+}[] {
   return getValidTransitions(currentStatus).map(status => ({
     status,
     meta: ORDER_STATUS_META[status],

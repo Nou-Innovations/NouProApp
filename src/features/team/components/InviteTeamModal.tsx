@@ -60,7 +60,7 @@ const InviteTeamModal: React.FC<InviteTeamModalProps> = ({
     <Modal
       visible={isVisible}
       animationType="slide"
-      transparent={true}
+      transparent
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>

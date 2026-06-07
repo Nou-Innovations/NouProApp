@@ -586,7 +586,7 @@ export default function BusinessProfileOwnScreen() {
   // Profile Switcher Modal
   const renderProfileSwitcherModal = () => (
     <Modal
-      transparent={true}
+      transparent
       visible={isProfileSwitcherVisible}
       onRequestClose={closeProfileSwitcher}
       animationType="none"
@@ -802,7 +802,7 @@ export default function BusinessProfileOwnScreen() {
   // Add Business Options Modal
   const renderAddBusinessOptionsModal = () => (
     <Modal
-      transparent={true}
+      transparent
       visible={isAddBusinessOptionsVisible}
       onRequestClose={closeAddBusinessOptions}
       animationType="none"

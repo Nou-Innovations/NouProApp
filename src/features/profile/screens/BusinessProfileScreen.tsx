@@ -447,7 +447,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       ...prev,
       [productId]: { 
         ...prev[productId],
-        quantity: quantity 
+        quantity 
       }
     }));
   };

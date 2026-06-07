@@ -31,11 +31,10 @@ import {
   canCreateDeliveries,
   checkPaywall,
   PaywallCheck,
-} from '@/shared/utils/permissions';
+ canCreateProcurementOrders } from '@/shared/utils/permissions';
 import { useDeliveries } from '../hooks/useDeliveries';
 import { Delivery, DeliveryFilterTab, DeliveryViewType } from '@/shared/types/delivery';
 import { useProcurementStore, selectPendingProcurementCount } from '@/features/procurement/store/procurement.store';
-import { canCreateProcurementOrders } from '@/shared/utils/permissions';
 
 // Grouped filter tabs for the delivery filter bar
 const DELIVERY_FILTER_TABS: DeliveryFilterTab[] = [
@@ -323,7 +322,7 @@ export default function DeliveryScreen() {
         }}
         contentContainerStyle={filteredDeliveries.length === 0 ? { flex: 1 } : { flexGrow: 1 }}
         style={{ flex: 1 }}
-        removeClippedSubviews={true}
+        removeClippedSubviews
         maxToRenderPerBatch={10}
         windowSize={5}
         initialNumToRender={10}

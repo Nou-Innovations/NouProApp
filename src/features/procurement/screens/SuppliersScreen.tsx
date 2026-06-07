@@ -67,7 +67,7 @@ export default function SuppliersScreen() {
       <FlatList<Supplier>
         data={loading ? [] : suppliers}
         keyExtractor={(item) => item.id}
-        removeClippedSubviews={true}
+        removeClippedSubviews
         maxToRenderPerBatch={10}
         windowSize={5}
         initialNumToRender={10}

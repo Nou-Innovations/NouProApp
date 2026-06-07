@@ -155,7 +155,7 @@ const AppSearchBar = forwardRef<AppSearchBarRef, AppSearchBarProps>(({
           value={value}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          blurOnSubmit={true}
+          blurOnSubmit
           {...rest}
         />
         {value ? (

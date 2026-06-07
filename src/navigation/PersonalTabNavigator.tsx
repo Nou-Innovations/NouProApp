@@ -87,7 +87,7 @@ export function PersonalTabNavigator() {
             <Text style={{
               fontSize: theme.fontSize.xs,
               fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color: color,
+              color,
             }}>
               Home
             </Text>
@@ -116,7 +116,7 @@ export function PersonalTabNavigator() {
             <Text style={{
               fontSize: theme.fontSize.xs,
               fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color: color,
+              color,
             }}>
               Inbox
             </Text>
@@ -145,7 +145,7 @@ export function PersonalTabNavigator() {
             <Text style={{
               fontSize: theme.fontSize.xs,
               fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color: color,
+              color,
             }}>
               Activities
             </Text>
@@ -165,7 +165,7 @@ export function PersonalTabNavigator() {
             <Text style={{
               fontSize: theme.fontSize.xs,
               fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color: color,
+              color,
             }}>
               Profile
             </Text>

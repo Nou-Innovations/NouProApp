@@ -11,12 +11,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
-import { EmptyState, Skeleton, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
+import { EmptyState, Skeleton, SkeletonRow, SkeletonColumn , AppBottomSheet } from '@/shared/components/ui';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/shared/components/ui/FilterBar';
 import InvoiceCard from '@/features/invoices/components/InvoiceCard';
 import LocationDropdown from '@/shared/components/ui/LocationDropdown';
-import { AppBottomSheet } from '@/shared/components/ui';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
 import InvoiceActionsModal from '@/features/invoices/components/InvoiceActionsModal';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
@@ -263,7 +262,7 @@ export default function InvoicesScreen() {
         }}
         contentContainerStyle={{ flexGrow: 1 }}
         style={{ flex: 1 }}
-        removeClippedSubviews={true}
+        removeClippedSubviews
         maxToRenderPerBatch={10}
         windowSize={5}
         initialNumToRender={10}

@@ -67,7 +67,7 @@ const EditBusinessModal: React.FC<EditBusinessModalProps> = ({
   return (
     <Modal
       visible={isVisible}
-      transparent={true}
+      transparent
       animationType="slide"
       onRequestClose={onClose}
     >
@@ -124,7 +124,7 @@ const EditBusinessModal: React.FC<EditBusinessModalProps> = ({
                 onChangeText={setDescription}
                 placeholder="Enter description"
                 placeholderTextColor={appTheme.colors.textLight}
-                multiline={true}
+                multiline
                 numberOfLines={5}
               />
             </View>

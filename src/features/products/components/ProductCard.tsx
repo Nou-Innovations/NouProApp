@@ -11,16 +11,16 @@ import {
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { UIProduct, UIProductStatus } from '@/shared/types/product';
-
-// Re-export for backward compatibility
-type Product = UIProduct;
-type ProductStatus = UIProductStatus;
 import Pill from '@/shared/components/ui/Pill';
 import theme from '@/shared/theme';
 import { Text, BodyBold, Caption, Label } from '@/shared/components/ui/Typography';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
+
+// Re-export for backward compatibility
+type Product = UIProduct;
+type ProductStatus = UIProductStatus;
 
 // Helper function to format numbers
 const formatNumber = (value: number | undefined | null, type: 'currency' | 'stock'): string => {

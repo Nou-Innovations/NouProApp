@@ -356,7 +356,7 @@ export default function HomeScreen() {
           onEndReached={hasMore ? loadMore : undefined}
           onEndReachedThreshold={0.5}
           showsVerticalScrollIndicator={false}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           maxToRenderPerBatch={10}
           windowSize={5}
           initialNumToRender={10}

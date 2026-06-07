@@ -868,7 +868,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
       {recordingPayment && (
         <Modal
           visible={recordingPayment}
-          transparent={true}
+          transparent
           animationType="slide"
           onRequestClose={() => setRecordingPayment(false)}
         >

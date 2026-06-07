@@ -500,7 +500,7 @@ export default function TransportsScreen() {
         <FlatList
           data={[1]} // Single item to render sections
           keyExtractor={() => 'sections'}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           maxToRenderPerBatch={10}
           windowSize={5}
           initialNumToRender={10}

@@ -105,14 +105,14 @@ export interface PublicUserProfile {
     end_date?: string; // null/undefined = Present
   };
   // Array for multiple company affiliations (experiences)
-  experiences?: Array<{
+  experiences?: {
     business_id: string;
     business_name: string;
     business_logo?: string;
     role: string;
     start_date?: string;
     end_date?: string;
-  }>;
+  }[];
 }
 
 /**

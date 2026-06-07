@@ -227,7 +227,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       avatar={{
         type: 'icon',
         icon: getIconName(notification.type),
-        iconColor: iconColor,
+        iconColor,
         backgroundColor: iconColor + '26',
         borderRadius: 10,
       }}
@@ -625,7 +625,7 @@ export default function NotificationsScreen() {
           contentContainerStyle={styles.listContent}
           style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           maxToRenderPerBatch={10}
           windowSize={5}
           initialNumToRender={10}
@@ -635,7 +635,7 @@ export default function NotificationsScreen() {
       {/* Role Selection Bottom Sheet */}
       <Modal
         visible={showRoleModal}
-        transparent={true}
+        transparent
         animationType="slide"
         onRequestClose={() => setShowRoleModal(false)}
       >

@@ -115,7 +115,7 @@ export default function PurchaseRequestsScreen() {
       <FlatList<PurchaseRequest>
         data={loading ? [] : purchaseRequests}
         keyExtractor={(item) => item.id}
-        removeClippedSubviews={true}
+        removeClippedSubviews
         maxToRenderPerBatch={10}
         windowSize={5}
         initialNumToRender={10}

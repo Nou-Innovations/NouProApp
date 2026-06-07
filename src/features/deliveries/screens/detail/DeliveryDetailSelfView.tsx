@@ -406,11 +406,11 @@ export function DeliveryDetailSelfView({ delivery }: DeliveryDetailSelfViewProps
           expectedDeliveryTime={expectedDeliveryTime}
           transportDisplay={selectedTransport?.name}
           staffDisplay={getStaffDisplayText()}
-          canEditSchedule={true}
-          canEditTransport={true}
-          canEditAssignedStaff={true}
-          canEditStatus={true}
-          canEditPayment={true}
+          canEditSchedule
+          canEditTransport
+          canEditAssignedStaff
+          canEditStatus
+          canEditPayment
           onOpenScheduleModal={async () => {
             Alert.alert(
               'Reschedule Transfer',
@@ -463,10 +463,10 @@ export function DeliveryDetailSelfView({ delivery }: DeliveryDetailSelfViewProps
         <ProductListSection
           items={deliveryItems}
           currentWarehouseName={currentLocation?.name || 'Warehouse A'}
-          showWarehouseSelector={true}
-          showStockWarnings={true}
-          canToggleLoaded={true}
-          showItemStatusMenu={true}
+          showWarehouseSelector
+          showStockWarnings
+          canToggleLoaded
+          showItemStatusMenu
           onItemLoadedToggle={handleItemLoadedToggle}
           onItemStatusChange={handleItemStatusChange}
         />
@@ -474,7 +474,7 @@ export function DeliveryDetailSelfView({ delivery }: DeliveryDetailSelfViewProps
         {/* Notes */}
         <NotesSection
           notes={notes}
-          canAddNotes={true}
+          canAddNotes
           onAddNote={handleSendNote}
         />
 
@@ -542,7 +542,7 @@ export function DeliveryDetailSelfView({ delivery }: DeliveryDetailSelfViewProps
       {/* Transport Modal */}
       <Modal
         visible={showTransportModal}
-        transparent={true}
+        transparent
         animationType="none"
         onRequestClose={handleHideTransportModal}
       >
@@ -607,7 +607,7 @@ export function DeliveryDetailSelfView({ delivery }: DeliveryDetailSelfViewProps
       {/* Order Status Modal */}
       <Modal
         visible={showOrderStatusModal}
-        transparent={true}
+        transparent
         animationType="none"
         onRequestClose={handleHideOrderStatusModal}
       >
@@ -674,7 +674,7 @@ export function DeliveryDetailSelfView({ delivery }: DeliveryDetailSelfViewProps
       {/* Payment Status Modal */}
       <Modal
         visible={showPaymentStatusModal}
-        transparent={true}
+        transparent
         animationType="none"
         onRequestClose={handleHidePaymentStatusModal}
       >

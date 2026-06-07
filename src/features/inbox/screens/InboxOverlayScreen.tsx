@@ -155,7 +155,7 @@ export default function InboxOverlayScreen() {
       isGroup: isGroupChat,
       avatar: chat.avatar,
       partnerId,
-      partnerType: partnerType,
+      partnerType,
       unreadCount: chat.unreadCount || 0,
     });
   };

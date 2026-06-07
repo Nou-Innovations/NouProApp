@@ -24,6 +24,9 @@ import { AppBottomSheet, AppModal, ListItemCard } from '@/shared/components/ui';
 import ImageUploadField from '@/shared/components/ui/ImageUploadField';
 import { imageService, uploadImage } from '@/shared/services/imageService';
 import { BUSINESS_CATEGORIES, getCategoryLabel, getCategoryById } from '@/shared/constants/categories';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
+import Avatar from '@/shared/components/ui/Avatar';
+import theme from '@/shared/theme';
 
 // DropdownItem type (kept for selection items)
 interface DropdownItem {
@@ -32,9 +35,6 @@ interface DropdownItem {
   description?: string;
   icon?: string;
 }
-import { SecondaryHeader } from '@/shared/components/layout/headers';
-import Avatar from '@/shared/components/ui/Avatar';
-import theme from '@/shared/theme';
 
 interface TimeSlot {
   open: string;
@@ -977,7 +977,7 @@ export default function CompanyEditScreen() {
                   mode="time"
                   display="spinner"
                   onChange={handleTimeChange}
-                  is24Hour={true}
+                  is24Hour
                   minuteInterval={15}
                   style={styles.iosTimePicker}
                 />
@@ -1009,7 +1009,7 @@ export default function CompanyEditScreen() {
         mode="time"
         display="default"
         onChange={handleTimeChange}
-        is24Hour={true}
+        is24Hour
       />
     );
   };

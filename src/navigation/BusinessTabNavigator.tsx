@@ -94,7 +94,7 @@ export function BusinessTabNavigator() {
             <Text style={{
               fontSize: theme.fontSize.xs,
               fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color: color,
+              color,
             }}>
               Inbox
             </Text>
@@ -114,7 +114,7 @@ export function BusinessTabNavigator() {
             <Text style={{
               fontSize: theme.fontSize.xs,
               fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color: color,
+              color,
             }}>
               Deliveries
             </Text>
@@ -143,7 +143,7 @@ export function BusinessTabNavigator() {
             <Text style={{
               fontSize: theme.fontSize.xs,
               fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color: color,
+              color,
             }}>
               Products
             </Text>
@@ -163,7 +163,7 @@ export function BusinessTabNavigator() {
             <Text style={{
               fontSize: theme.fontSize.xs,
               fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color: color,
+              color,
             }}>
               Invoices
             </Text>
@@ -192,7 +192,7 @@ export function BusinessTabNavigator() {
             <Text style={{
               fontSize: theme.fontSize.xs,
               fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color: color,
+              color,
             }}>
               Profile
             </Text>

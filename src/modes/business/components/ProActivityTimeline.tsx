@@ -141,7 +141,7 @@ export function ProActivityTimeline({
               title="View all activities"
               onPress={onSeeAll}
               variant="outline"
-              disabled={true}
+              disabled
             />
           </View>
         )}

@@ -31,13 +31,22 @@ import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import { RootStackParamList } from '@/shared/types/navigation';
-import type { Staff } from '@/shared/types/delivery';
+import type { Staff , DeliveryStaffRole } from '@/shared/types/delivery';
 import { getProducts } from '@/features/products/products.service';
 import { getTeamMembers } from '@/features/team/team.service';
 import { searchContacts } from '@/features/inbox/inbox.service';
 import { getTransports } from '@/features/transports/transports.service';
 import type { Transport, VehicleType, VehicleStatus } from '@/shared/types/transport';
 import { getVehicleIcon, getVehicleStatusLabel, VEHICLE_STATUS_COLORS } from '@/shared/types/transport';
+import { formatCurrency } from '@/shared/utils/format';
+import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, TimeSelector, ListItemCard } from '@/shared/components/ui';
+import AppButton from '@/shared/components/ui/AppButton';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { canUseAdvancedPermissions , checkPaywall, PaywallCheck } from '@/shared/utils/permissions';
+import { createDelivery } from '@/features/deliveries/deliveries.service';
+import { useDeliveriesStore } from '@/features/deliveries/deliveries.store';
+import AssignStaffModal from '@/shared/components/ui/AssignStaffModal';
+import PaywallModal from '@/shared/components/ui/PaywallModal';
 
 // Business vehicle interface for this screen's transport picker
 interface BusinessVehicle {
@@ -52,17 +61,6 @@ interface BusinessVehicle {
 const getVehicleStatusColor = (status: VehicleStatus): string => {
   return VEHICLE_STATUS_COLORS[status] || '#9CA3AF';
 };
-import { formatCurrency } from '@/shared/utils/format';
-import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, TimeSelector, ListItemCard } from '@/shared/components/ui';
-import AppButton from '@/shared/components/ui/AppButton';
-import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { canUseAdvancedPermissions } from '@/shared/utils/permissions';
-import { createDelivery } from '@/features/deliveries/deliveries.service';
-import { useDeliveriesStore } from '@/features/deliveries/deliveries.store';
-import AssignStaffModal from '@/shared/components/ui/AssignStaffModal';
-import PaywallModal from '@/shared/components/ui/PaywallModal';
-import { checkPaywall, PaywallCheck } from '@/shared/utils/permissions';
-import type { DeliveryStaffRole } from '@/shared/types/delivery';
 
 interface SelectedStaffMember {
   id: string;

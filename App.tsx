@@ -7,7 +7,7 @@
  * - Dual-mode navigation (Personal/Business)
  */
 
-import 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import './tailwind.css';
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavigationContainer, Theme, NavigationContainerRef } from '@react-navigation/native';
@@ -21,7 +21,6 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
 import { View, StyleSheet } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // Theme & Context
 import theme from '@/shared/theme';
@@ -40,6 +39,7 @@ import SidebarContent from '@/navigation/SidebarContent';
 // Services
 import { userAvatarService } from '@/shared/services/userAvatarService';
 import * as SecureStore from 'expo-secure-store';
+import * as Sentry from '@sentry/react-native';
 import { authAPI } from '@/shared/services/api';
 
 // Screens - Auth
@@ -810,15 +810,31 @@ const AppWithTheme = () => {
 };
 
 /**
+ * Sentry crash/error reporting — enabled only when EXPO_PUBLIC_SENTRY_DSN is set.
+ * No-op (zero overhead) in local dev or any build without a DSN.
+ */
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    environment: process.env.EXPO_PUBLIC_APP_ENV || 'dev',
+    tracesSampleRate: 0.1,
+  });
+}
+
+/**
  * Root App Component
  */
-export default function App() {
+function App() {
   return (
     <ThemeProvider>
       <AppWithTheme />
     </ThemeProvider>
   );
 }
+
+// Wrap with Sentry (error boundary + perf) only when monitoring is enabled.
+export default SENTRY_DSN ? Sentry.wrap(App) : App;
 
 const styles = StyleSheet.create({
   container: {

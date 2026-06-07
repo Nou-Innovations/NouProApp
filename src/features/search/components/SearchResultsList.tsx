@@ -136,8 +136,8 @@ const SearchResultsList: React.FC<SearchResultsListProps> = ({
                   isGroup: item.isGroup,
                   partnerId: item.partnerId,
                   partnerType: item.partnerType,
-                  highlightMessage: messageMatch ? true : false,
-                  searchQuery: searchQuery,
+                  highlightMessage: !!messageMatch,
+                  searchQuery,
                   scrollToMessage: messageMatch,
                   unreadCount: item.unreadCount || 0,
                 })}

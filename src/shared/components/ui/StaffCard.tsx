@@ -7,14 +7,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppBottomSheet, { AppBottomSheetItem } from './AppBottomSheet';
 import ListItemCard from './ListItemCard';
 
-export type StaffRole = 'superAdmin' | 'admin' | 'staff';
+// Renamed from StaffRole to avoid colliding with the domain StaffRole in
+// @/shared/types/business (different values). This is the StaffCard UI-local role.
+export type StaffCardRole = 'superAdmin' | 'admin' | 'staff';
 
 export interface StaffMember {
   id: string;
   name: string;
   username?: string;
   email: string;
-  role: StaffRole;
+  role: StaffCardRole;
   avatar?: string;
 }
 
@@ -23,13 +25,13 @@ interface StaffCardProps {
   isCurrentUser?: boolean;
   canManageRole?: boolean;
   canRemove?: boolean;
-  onRoleChange?: (staff: StaffMember, newRole: StaffRole) => void;
+  onRoleChange?: (staff: StaffMember, newRole: StaffCardRole) => void;
   onRemove?: (staff: StaffMember) => void;
   onReport?: (staff: StaffMember) => void;
   showDivider?: boolean;
 }
 
-const getRoleLabel = (role: StaffRole): string => {
+const getRoleLabel = (role: StaffCardRole): string => {
   switch (role) {
     case 'superAdmin':
       return 'Super Admin';
@@ -43,7 +45,7 @@ const getRoleLabel = (role: StaffRole): string => {
 };
 
 // All role options
-const ALL_ROLES: { id: StaffRole; title: string }[] = [
+const ALL_ROLES: { id: StaffCardRole; title: string }[] = [
   { id: 'staff', title: 'Staff' },
   { id: 'admin', title: 'Admin' },
   { id: 'superAdmin', title: 'Super Admin' },
@@ -51,7 +53,7 @@ const ALL_ROLES: { id: StaffRole; title: string }[] = [
 
 /** Role Badge/Button component */
 const RoleBadge: React.FC<{
-  role: StaffRole;
+  role: StaffCardRole;
   editable: boolean;
   onPress?: () => void;
 }> = ({ role, editable, onPress }) => {
@@ -115,7 +117,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({
     optionItems.push({ id: 'remove', title: 'Remove from Staff', variant: 'destructive' });
   }
 
-  const handleRoleSelect = (role: StaffRole) => {
+  const handleRoleSelect = (role: StaffCardRole) => {
     if (onRoleChange && role !== staff.role) {
       onRoleChange(staff, role);
     }

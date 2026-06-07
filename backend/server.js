@@ -11363,6 +11363,26 @@ app.get('/api/products', async (req, res) => {
       catalog = catalog.filter(p =>
         p.isListed === true || p.is_listed === true || p.isDisplayable === true || p.isPublic === true
       );
+
+      // ENTITLEMENT (P2 #10): publishing products on the public feed is a
+      // Business+ capability (canPublishProductsOnFeed). Hide products owned by
+      // businesses without it so FREE/PRO catalogs don't leak into the public
+      // Explore feed or the cross-business product search.
+      const ownerIds = [...new Set(
+        catalog.map(p => p.companyId || p.businessId || p.ownerBusinessId).filter(Boolean)
+      )];
+      if (ownerIds.length > 0) {
+        const owners = await prisma.business.findMany({
+          where: { id: { in: ownerIds } },
+          select: { id: true, subscriptionTier: true, currentPeriodEnd: true },
+        });
+        const allowedOwnerIds = new Set(
+          owners.filter(b => deriveCapabilities(b).canPublishProductsOnFeed).map(b => b.id)
+        );
+        catalog = catalog.filter(p =>
+          allowedOwnerIds.has(p.companyId || p.businessId || p.ownerBusinessId)
+        );
+      }
     }
 
     // Optional filters for product-details suggestions carousels

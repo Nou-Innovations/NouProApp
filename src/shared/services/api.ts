@@ -287,7 +287,7 @@ interface AuthResponseData {
   user: Record<string, unknown>;
   token: string;
   refreshToken: string;
-  businesses: Array<Record<string, unknown>>;
+  businesses: Record<string, unknown>[];
 }
 
 export function unwrapAuthResponse(response: { data?: AuthResponseData } & Partial<AuthResponseData>): AuthResponseData {

@@ -162,7 +162,7 @@ export default function RoleRequestsScreen() {
           <FlatList
             data={requests}
             keyExtractor={(item) => item.id}
-            removeClippedSubviews={true}
+            removeClippedSubviews
             maxToRenderPerBatch={10}
             windowSize={5}
             initialNumToRender={10}

@@ -1699,12 +1699,12 @@ export default function ChatScreen() {
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[styles.listContent, { backgroundColor: appTheme.colors.surface }, messages.length === 0 && { flex: 1 }]}
-          inverted={true}
+          inverted
           onScrollToIndexFailed={onScrollToIndexFailed}
           style={{ backgroundColor: appTheme.colors.surface }}
           onEndReached={loadMoreMessages}
           onEndReachedThreshold={0.3}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           maxToRenderPerBatch={10}
           windowSize={7}
           initialNumToRender={15}
