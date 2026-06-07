@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
+const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
@@ -238,6 +239,13 @@ const io = new SocketIOServer(server, {
 });
 
 // Middleware
+// Security headers (HSTS, X-Content-Type-Options, X-Frame-Options, etc.).
+// crossOriginResourcePolicy is relaxed to 'cross-origin' so statically served
+// images under /uploads remain embeddable from other origins (e.g. the app /
+// expo web), which the default 'same-origin' policy would block.
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, Postman, curl, etc.)

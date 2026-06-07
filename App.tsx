@@ -354,9 +354,21 @@ function AppNavigator() {
       card: appTheme.colors.background,
     },
   };
-  
+
+  // Deep-linking: resolves noupro:// links (and the production https base) to
+  // the relevant in-app screens. Matches the "scheme" declared in app.json.
+  const linking = {
+    prefixes: ['noupro://', 'https://nouproapp.onrender.com'],
+    config: {
+      screens: {
+        OrderDetails: 'orders/:orderId',
+        InvoiceDetails: 'invoices/:invoiceId',
+      },
+    },
+  };
+
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer theme={navTheme} linking={linking}>
       <RootStack.Navigator
         initialRouteName="MainTabs"
         screenOptions={{ 

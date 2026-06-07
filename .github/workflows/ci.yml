@@ -6,6 +6,18 @@ on:
   pull_request:
 
 jobs:
+  frontend-lint:
+    name: Frontend lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
   backend-tests:
     name: Backend smoke tests
     runs-on: ubuntu-latest
@@ -28,8 +40,6 @@ jobs:
       - run: npx prisma generate --schema ./prisma/schema.prisma
       - run: npm test
 
-# Frontend gates (lint + `tsc --noEmit`) are intentionally NOT run here yet:
-#   - `npm run lint` is broken at the repo level (the ESLint toolchain — expo config
-#     + eslint-plugin-import — needs repair; pre-existing, out of scope for this pass).
-#   - `tsc --noEmit` still reports ~176 known type errors being burned down.
-# Add a frontend job here once the lint toolchain is fixed and the tsc backlog is cleared.
+# `npm run lint` gates on errors only (currently 0). There is a backlog of warnings
+# (unused vars, explicit any, duplicate imports) being burned down — not enforced yet.
+# A `tsc --noEmit` gate is also intentionally omitted until the ~172-error backlog clears.

@@ -2,6 +2,7 @@
   "expo": {
     "name": "NouPro",
     "slug": "noupro",
+    "scheme": "noupro",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -41,11 +42,12 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icon.png"
     },
     "plugins": [
       "expo-dev-client",
@@ -73,6 +75,12 @@
           "image": "./assets/launch/splash-logo.png",
           "imageResizeMode": "contain",
           "backgroundColor": "#000000"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#000000"
         }
       ],
       "expo-asset"
