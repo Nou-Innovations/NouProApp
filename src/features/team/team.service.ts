@@ -107,10 +107,12 @@ export async function updateTeamMemberRole(
   role: TeamMemberRole,
   locationId?: string
 ): Promise<void> {
-  if (locationId) {
+  // super_admin is business-level only (the location endpoint rejects it), and members
+  // with no location are managed at the business level. Anything else updates the
+  // specific location assignment (which also aligns the business-level role).
+  if (locationId && role !== 'super_admin') {
     await patch(`/companies/${companyId}/locations/${locationId}/staff/${userId}`, { role });
   } else {
-    // Fallback to business-level update
     await patch(`/companies/${companyId}/users/${userId}`, { role });
   }
 }
