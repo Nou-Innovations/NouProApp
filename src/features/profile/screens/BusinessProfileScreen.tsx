@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
-  View, Text, Image, TouchableOpacity, Dimensions, StyleSheet, Linking, StatusBar, ScrollView, Alert, Share, ActivityIndicator,
+  View, Text, Image, TouchableOpacity, Dimensions, StyleSheet, Linking, StatusBar, ScrollView, Alert, Share, ActivityIndicator, Modal, TextInput,
 } from 'react-native';
 import { Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn } from '@/shared/components/ui/Skeleton';
 import { get as apiGet } from '@/shared/services/api';
@@ -20,6 +20,7 @@ import { useOrderStore } from '@/shared/store/orderStore';
 import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
 import { getRelationshipAction } from '@/shared/types/profile';
 import { sendBusinessConnectionRequest, acceptBusinessConnectionRequest } from '@/features/connections/connections.service';
+import { createPublicOrder } from '@/shared/services/orders';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import MapView, { Marker } from 'react-native-maps';
@@ -86,6 +87,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
   const activeBusinessId = useProfileStore((state) => state.activeBusinessId);
   const activeMode = useProfileStore((state) => state.activeMode);
   const userBusinesses = useProfileStore((state) => state.userBusinesses);
+  const currentUser = useProfileStore((state) => state.currentUser);
 
   // Check if the current user is already a member of this business (not shown in personal mode if member)
   const isAlreadyMember = useMemo(
@@ -166,6 +168,20 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     profileType: 'business',
   });
 
+  // Public storefront ordering: a personal-mode viewer can order from a business
+  // whose location is an INDEPENDENT, public, Enterprise-enabled storefront
+  // (mirrors the backend isLocationPublicEffective check). Business-mode viewers
+  // keep using the existing B2B cart/placeOrder flow.
+  const publicOrderLocation = useMemo(() => {
+    if (canOrder) return null;
+    if (!business?.capabilities?.canEnablePublicLocationPages) return null;
+    return (business?.locations || []).find(
+      (l: any) => l.operatingMode === 'INDEPENDENT' && l.isPublic === true,
+    ) || null;
+  }, [business, canOrder]);
+  const canOrderPublic = !!publicOrderLocation && !isOwnProfile;
+  const effectiveCanOrder = canOrder || canOrderPublic;
+
   // Relationship button rule (see docs/PROFILES.md):
   // personal mode → Follow (person → business); business mode → Connect (business ↔ business).
   const relationshipAction = getRelationshipAction(activeMode, 'business');
@@ -192,11 +208,11 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
   
   // Determine which tabs to show based on mode
   const TABS = useMemo(() => {
-    if (isBusinessMode) {
+    if (isBusinessMode || canOrderPublic) {
       return [...BASE_TABS, CART_TAB];
     }
     return BASE_TABS;
-  }, [isBusinessMode]);
+  }, [isBusinessMode, canOrderPublic]);
 
   // Auto-hide cart popup when cart becomes empty
   useEffect(() => {
@@ -489,7 +505,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
           product={item.data}
           isAdding={addingState.isAdding}
           quantity={addingState.quantity}
-          canAddToCart={canOrder}
+          canAddToCart={effectiveCanOrder}
           onPress={() => navigation.navigate('ProductDetail', { productId: item.data.id })}
           onStartAdding={() => startAdding(item.data.id)}
           onChangeQuantity={(qty) => changeQuantity(item.data.id, qty)}
@@ -714,7 +730,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
                   product={item.data}
                   isAdding={addingStates[item.data.id]?.isAdding || false}
                   quantity={addingStates[item.data.id]?.quantity || 1}
-                  canAddToCart={canOrder}
+                  canAddToCart={effectiveCanOrder}
                   onPress={() => navigation.navigate('ProductDetail', { productId: item.data.id })}
                   onStartAdding={() => startAdding(item.data.id)}
                   onChangeQuantity={(qty) => changeQuantity(item.data.id, qty)}
@@ -736,7 +752,60 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
 
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
+  // Personal-mode public storefront checkout (guest contact details).
+  const [showPublicCheckout, setShowPublicCheckout] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [guestAddress, setGuestAddress] = useState('');
+  const [guestNotes, setGuestNotes] = useState('');
+
+  const openPublicCheckout = () => {
+    setGuestName(currentUser?.name || '');
+    setGuestPhone((currentUser as any)?.phone || '');
+    setGuestAddress('');
+    setGuestNotes('');
+    setShowPublicCheckout(true);
+  };
+
+  const submitPublicOrder = async () => {
+    if (!publicOrderLocation) return;
+    if (!guestName.trim() || !guestPhone.trim()) {
+      Alert.alert('Missing info', 'Please enter your name and phone number.');
+      return;
+    }
+    const cart = getCart(business.id);
+    const items = (cart?.items || []).map((i: any) => ({ productId: i.productId, quantity: i.quantity }));
+    if (items.length === 0) {
+      Alert.alert('Empty cart', 'Add at least one product before placing an order.');
+      return;
+    }
+    setIsPlacingOrder(true);
+    try {
+      const order = await createPublicOrder(publicOrderLocation.id, {
+        customerName: guestName.trim(),
+        customerPhone: guestPhone.trim(),
+        customerAddress: guestAddress.trim() || undefined,
+        items,
+        notes: guestNotes.trim() || undefined,
+      });
+      legacyClearCart();
+      clearOrderCart(business.id);
+      setShowPublicCheckout(false);
+      Alert.alert('Order placed!', `Your order #${order.id} has been sent to ${business.name}.`);
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.response?.error || err?.message || 'Failed to place order. Please try again.';
+      Alert.alert('Error', msg);
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
+
   const handlePlaceOrder = async () => {
+    // Personal-mode customer ordering from a business's public storefront.
+    if (!isBusinessMode && canOrderPublic) {
+      openPublicCheckout();
+      return;
+    }
     if (!isBusinessMode || !activeBusiness) {
       Alert.alert('Error', 'You must be in Business Mode to place orders.');
       return;
@@ -1052,7 +1121,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
 
       {/* Cart Popup - Fixed across all tabs */}
       <CartPopup
-        isVisible={canOrder && isCartPopupVisible && activeTab === 'products'}
+        isVisible={effectiveCanOrder && isCartPopupVisible && activeTab === 'products'}
         onClose={handleCartPopupClose}
         onAddToCart={handleAddToCart}
         onGoToCart={handleGoToCart}
@@ -1062,6 +1131,71 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       {activeTab === 'cart' && cartItems.length > 0 && (
         <CartBottomSection businessId={business.id} onPlaceOrder={handlePlaceOrder} />
       )}
+
+      {/* Public storefront checkout (personal-mode customer) */}
+      <Modal
+        visible={showPublicCheckout}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPublicCheckout(false)}
+      >
+        <View style={styles.checkoutOverlay}>
+          <View style={[styles.checkoutSheet, { backgroundColor: appTheme.colors.background, paddingBottom: insets.bottom + 16 }]}>
+            <View style={styles.checkoutHeader}>
+              <Text style={[styles.checkoutTitle, { color: appTheme.colors.text }]}>Your details</Text>
+              <TouchableOpacity onPress={() => setShowPublicCheckout(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Icon name="close" size={24} color={appTheme.colors.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.checkoutSubtitle, { color: appTheme.colors.secondary }]}>
+              We'll share these with {business?.name} so they can fulfil your order.
+            </Text>
+
+            <TextInput
+              style={[styles.checkoutInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor }]}
+              placeholder="Full name"
+              placeholderTextColor={appTheme.colors.textMuted}
+              value={guestName}
+              onChangeText={setGuestName}
+            />
+            <TextInput
+              style={[styles.checkoutInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor }]}
+              placeholder="Phone number"
+              placeholderTextColor={appTheme.colors.textMuted}
+              keyboardType="phone-pad"
+              value={guestPhone}
+              onChangeText={setGuestPhone}
+            />
+            <TextInput
+              style={[styles.checkoutInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor }]}
+              placeholder="Delivery address (optional)"
+              placeholderTextColor={appTheme.colors.textMuted}
+              value={guestAddress}
+              onChangeText={setGuestAddress}
+            />
+            <TextInput
+              style={[styles.checkoutInput, styles.checkoutNotes, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor }]}
+              placeholder="Notes (optional)"
+              placeholderTextColor={appTheme.colors.textMuted}
+              value={guestNotes}
+              onChangeText={setGuestNotes}
+              multiline
+            />
+
+            <TouchableOpacity
+              style={[styles.checkoutSubmit, { backgroundColor: appTheme.colors.primary }, isPlacingOrder && { opacity: 0.6 }]}
+              onPress={submitPublicOrder}
+              disabled={isPlacingOrder}
+            >
+              {isPlacingOrder ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.checkoutSubmitText}>Place order</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1272,6 +1406,58 @@ const styles = StyleSheet.create({
   emptyListText: {
     color: '#9ca3af',
     marginTop: 40,
+  },
+  // Public storefront checkout modal
+  checkoutOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  checkoutSheet: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  checkoutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  checkoutTitle: {
+    fontSize: 18,
+    fontFamily: theme.fonts.primary.bold,
+  },
+  checkoutSubtitle: {
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.regular,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  checkoutInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontFamily: theme.fonts.primary.regular,
+    marginBottom: 12,
+  },
+  checkoutNotes: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  checkoutSubmit: {
+    height: 48,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  checkoutSubmitText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.semiBold,
   },
 
 }); 

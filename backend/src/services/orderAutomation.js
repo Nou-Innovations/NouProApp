@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 /**
  * Order Automation Service
  * 
@@ -13,8 +14,8 @@
  * single source of truth.
  */
 
-// Conditionally load Prisma only if using database mode
-const dataSource = process.env.DATA_SOURCE || 'memory';
+// Prisma is the only data source (the legacy "memory" mode was never implemented).
+const dataSource = process.env.DATA_SOURCE || 'prisma';
 let prisma = null;
 if (dataSource === 'prisma') {
   prisma = require('../db/prisma').prisma;
@@ -61,7 +62,7 @@ const DEFAULT_SETTINGS = {
 async function getStaleNewOrders(hoursThreshold = DEFAULT_SETTINGS.autoCancelNewAfterHours) {
   // Automation only runs in prisma mode (production)
   if (!prisma) {
-    console.log('[OrderAutomation] Skipping getStaleNewOrders - running in memory mode');
+    logger.debug('[OrderAutomation] Skipping getStaleNewOrders - running in memory mode');
     return [];
   }
   
@@ -94,7 +95,7 @@ async function getStaleNewOrders(hoursThreshold = DEFAULT_SETTINGS.autoCancelNew
 async function getStuckPendingOrders(hoursThreshold = DEFAULT_SETTINGS.pendingReminderAfterHours) {
   // Automation only runs in prisma mode (production)
   if (!prisma) {
-    console.log('[OrderAutomation] Skipping getStuckPendingOrders - running in memory mode');
+    logger.debug('[OrderAutomation] Skipping getStuckPendingOrders - running in memory mode');
     return [];
   }
   
@@ -208,7 +209,7 @@ function getActiveStatuses() {
 async function getInactiveOrdersByStatus(hoursThreshold = 24) {
   // Automation only runs in prisma mode (production)
   if (!prisma) {
-    console.log('[OrderAutomation] Skipping getInactiveOrdersByStatus - running in memory mode');
+    logger.debug('[OrderAutomation] Skipping getInactiveOrdersByStatus - running in memory mode');
     return { total: 0, byStatus: {}, orders: [] };
   }
   
@@ -257,7 +258,7 @@ async function getInactiveOrdersByStatus(hoursThreshold = 24) {
  * @returns {Promise<Object>} Combined results
  */
 async function runAutomation({ dryRun = false } = {}) {
-  console.log(`[OrderAutomation] Starting automation run (dryRun: ${dryRun})`);
+  logger.debug(`[OrderAutomation] Starting automation run (dryRun: ${dryRun})`);
   const startTime = Date.now();
   
   const results = {
@@ -272,26 +273,26 @@ async function runAutomation({ dryRun = false } = {}) {
   try {
     // Task 1: Auto-cancel stale NEW orders
     results.autoCancelNewOrders = await autoCancelStaleOrders({ dryRun });
-    console.log(`[OrderAutomation] Auto-cancel: ${results.autoCancelNewOrders.canceled}/${results.autoCancelNewOrders.total} orders`);
+    logger.debug(`[OrderAutomation] Auto-cancel: ${results.autoCancelNewOrders.canceled}/${results.autoCancelNewOrders.total} orders`);
     
     // Task 2: Report stuck PENDING orders (for notifications)
     results.stuckPendingOrders = await getStuckPendingReport();
-    console.log(`[OrderAutomation] Stuck pending: ${results.stuckPendingOrders.total} orders`);
+    logger.debug(`[OrderAutomation] Stuck pending: ${results.stuckPendingOrders.total} orders`);
     
     // Task 3: Report all inactive orders by status (for dashboard/monitoring)
     results.inactiveOrders = await getInactiveOrdersByStatus(24);
-    console.log(`[OrderAutomation] Inactive orders (24h): ${results.inactiveOrders.total}`);
+    logger.debug(`[OrderAutomation] Inactive orders (24h): ${results.inactiveOrders.total}`);
     
     // TODO: Task 4: Send notifications for stuck pending orders
     // This would integrate with your notification system
     
   } catch (error) {
-    console.error('[OrderAutomation] Error during automation:', error);
+    logger.error('[OrderAutomation] Error during automation:', error);
     results.error = error.message;
   }
   
   results.duration = Date.now() - startTime;
-  console.log(`[OrderAutomation] Completed in ${results.duration}ms`);
+  logger.debug(`[OrderAutomation] Completed in ${results.duration}ms`);
   
   return results;
 }

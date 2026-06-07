@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const { Expo } = require('expo-server-sdk');
 
 const expo = new Expo();
@@ -53,11 +54,11 @@ async function sendToUsers({ userIds, title, body, category, data }, repos) {
       try {
         await expo.sendPushNotificationsAsync(chunk);
       } catch (err) {
-        console.error('[PushService] Error sending chunk:', err);
+        logger.error('[PushService] Error sending chunk:', err);
       }
     }
   } catch (err) {
-    console.error('[PushService] Error in sendToUsers:', err);
+    logger.error('[PushService] Error in sendToUsers:', err);
   }
 }
 

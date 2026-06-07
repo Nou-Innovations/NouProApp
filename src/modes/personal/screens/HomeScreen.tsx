@@ -278,7 +278,7 @@ export default function HomeScreen() {
       title="Welcome to your workspace"
       subtitle="This is where updates, activity, and recommendations will appear as you start using NouPro."
       ctaLabel="Explore NouPro"
-      onCtaPress={() => navigation.navigate('Explore' as never)}
+      onCtaPress={() => navigation.navigate('ExploreOverlay' as never)}
       testID="empty-home-feed"
     />
   );

@@ -321,7 +321,7 @@ export default function ConnectionsScreen() {
     let emptyMessage = 'Build your professional network by connecting with others.';
     let emptyIcon = 'person-add-outline';
     let ctaLabel: string | undefined = 'Find people';
-    let ctaAction: (() => void) | undefined = () => navigation.navigate('Explore' as never);
+    let ctaAction: (() => void) | undefined = () => navigation.navigate('ExploreOverlay' as never);
     
     if (searchQuery) {
       emptyTitle = 'No results found';

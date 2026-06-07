@@ -148,7 +148,8 @@ export type RootStackParamList = {
   // Product screens
   CreateProduct: { selectedBrand?: string; selectedBrandId?: string; product?: import('./product').UIProduct };
   ProductDetail: { productId: string };
-  
+  ProductsSearch: { query?: string; filter?: 'myProducts' | 'myBrands' | 'allProducts' | 'allBrands' };
+
   // Brand screens
   CreateBrand: { selectedProducts?: { id: string; name: string; price: number; brandName: string }[] };
   BrandSelection: { selectedBrand?: string };

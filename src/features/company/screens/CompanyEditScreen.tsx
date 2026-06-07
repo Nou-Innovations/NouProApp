@@ -561,7 +561,7 @@ export default function CompanyEditScreen() {
       <View style={styles.upgradeSection}>
         <AppButton
           title="Upgrade plan"
-          onPress={() => Alert.alert('Upgrade Plan', 'Upgrade to premium features!')}
+          onPress={() => navigation.navigate('SubscriptionPlans' as never)}
           variant="alert"
           style={styles.upgradeButton}
         />

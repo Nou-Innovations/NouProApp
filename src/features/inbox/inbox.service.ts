@@ -353,7 +353,7 @@ export async function removeUserChatParticipant(ownUserId: string, chatId: strin
  * Edit a message (business mode)
  */
 export async function editMessageApi(companyId: string, chatId: string, messageId: string, content: string): Promise<Message> {
-  const response = await apiClient.patch(`/api/companies/${companyId}/chats/${chatId}/messages/${messageId}`, { content });
+  const response = await apiClient.patch(`/companies/${companyId}/chats/${chatId}/messages/${messageId}`, { content });
   return response.data.data;
 }
 
@@ -361,7 +361,7 @@ export async function editMessageApi(companyId: string, chatId: string, messageI
  * Edit a message (personal mode)
  */
 export async function editUserMessageApi(userId: string, chatId: string, messageId: string, content: string): Promise<Message> {
-  const response = await apiClient.patch(`/api/users/${userId}/chats/${chatId}/messages/${messageId}`, { content });
+  const response = await apiClient.patch(`/users/${userId}/chats/${chatId}/messages/${messageId}`, { content });
   return response.data.data;
 }
 

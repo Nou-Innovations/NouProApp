@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 /**
  * Authentication Middleware
  * 
@@ -8,7 +9,7 @@
  *   
  *   // Require authentication (returns 401 if no valid token)
  *   app.post('/api/orders', requireAuth, (req, res) => {
- *     console.log(req.user.id); // User ID from token
+ *     logger.debug(req.user.id); // User ID from token
  *   });
  *   
  *   // Optional authentication (continues even without token)
@@ -33,7 +34,7 @@ function verifyToken(authHeader) {
 
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    console.error('[Auth] JWT_SECRET is not configured');
+    logger.error('[Auth] JWT_SECRET is not configured');
     return { error: 'JWT_SECRET_MISSING' };
   }
 

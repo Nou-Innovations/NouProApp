@@ -150,7 +150,7 @@ const createApiClient = (): AxiosInstance => {
               const resp = await client.post('/auth/refresh', { refreshToken });
               const tokenData = resp.data?.data || resp.data;
               if (tokenData?.token) {
-                useProfileStore.getState().setTokens(tokenData.token);
+                useProfileStore.getState().setTokens(tokenData.token, tokenData.refreshToken);
                 return tokenData.token as string;
               }
               return null;
@@ -348,7 +348,7 @@ export const authAPI = {
     // Backend wraps in successResponse(), so token is at response.data.data.token
     const tokenData = response.data?.data || response.data;
     if (tokenData?.token) {
-      useProfileStore.getState().setTokens(tokenData.token);
+      useProfileStore.getState().setTokens(tokenData.token, tokenData.refreshToken);
     }
     return response.data;
   },

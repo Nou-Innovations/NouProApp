@@ -68,7 +68,7 @@ The app has two modes that determine which tab navigator and screens appear:
 
 ### Backend Structure
 - **`backend/server.js`** — Monolithic Express server (~11,600 lines). All API routes and business logic in one file.
-- **`backend/src/repositories/`** — Data access layer. Interfaces in `interfaces/` (10 files), Prisma implementations in `prisma/` (19 repositories including procurement).
+- **`backend/src/repositories/`** — Data access layer. Prisma implementations in `prisma/` (24 repositories including procurement). (The old JSDoc `interfaces/` layer was unused and has been removed.)
 - **`backend/src/services/`** — Business logic services: `orderAutomation`, `orderStatus`, `purchaseOrderStatus`, `pushService`, `eventMessages`.
 - **`backend/src/middleware/auth.js`** — JWT verification middleware.
 - **`backend/prisma/schema.prisma`** — 33 models.
@@ -98,7 +98,7 @@ Set via `EXPO_PUBLIC_APP_ENV` (dev/demo/prod). Frontend reads `EXPO_PUBLIC_API_U
 - `production` — store distribution, channel `production`
 
 ### Backend Patterns
-- Repository pattern for data access (swap Prisma for memory with `DATA_SOURCE=memory`)
+- Repository pattern for data access (Prisma is the only data source; `getDataSource()` always returns `'prisma'`)
 - Rate limiting: auth 15/15min, messages 30/min, chat creation 10/min
 - Order & Delivery status state machines with audit trails
 - Purchase Order status state machine (procurement module)

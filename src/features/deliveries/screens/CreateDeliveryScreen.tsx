@@ -1039,7 +1039,7 @@ export default function CreateDeliveryScreen() {
         onClose={() => setShowPaywall(false)}
         onUpgrade={() => {
           setShowPaywall(false);
-          navigation.navigate('Subscription' as never);
+          navigation.navigate('SubscriptionPlans' as never);
         }}
         requiredPlan={paywallCheckResult?.requiredPlan || 'pro'}
         modalType={paywallCheckResult?.modalType}

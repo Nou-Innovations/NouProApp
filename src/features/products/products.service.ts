@@ -61,6 +61,16 @@ export async function getProducts(params: GetProductsParams): Promise<UIProduct[
 }
 
 /**
+ * Get the public product catalog (listed products across all businesses).
+ * Used by the cross-business product search ("All products"/"All brands").
+ */
+export async function getPublicProducts(viewerBusinessId?: string): Promise<UIProduct[]> {
+  const params: Record<string, string> = { scope: 'public' };
+  if (viewerBusinessId) params.viewerBusinessId = viewerBusinessId;
+  return get<UIProduct[]>('/products', params);
+}
+
+/**
  * Get a single product by ID
  */
 export async function getProduct(companyId: string, productId: string): Promise<UIProduct> {

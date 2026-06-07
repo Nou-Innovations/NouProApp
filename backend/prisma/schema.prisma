@@ -231,6 +231,7 @@ model Transport {
   business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
+  @@index([assignedStaffId])
 }
 
 model Product {
@@ -346,6 +347,8 @@ model Order {
   @@index([soldByLocationId])
   @@index([fulfillmentLocationId])
   @@index([buyerBusinessId])
+  @@index([customerId])
+  @@index([createdBy])
 }
 
 model OrderStatusHistory {
@@ -546,6 +549,8 @@ model Delivery {
   @@index([businessId, createdAt])
   @@index([locationId])
   @@index([orderId])
+  @@index([assignedStaffId])
+  @@index([clientId])
 }
 
 model DeliveryStaff {
@@ -718,6 +723,11 @@ enum InvoiceStatus {
   REFUNDED
 }
 
+// NOTE: PAYMENT_PENDING, PENDING_CONFIRMATION, DUE_TODAY, PARTIALLY_REFUNDED and
+// DISPUTED are currently unused by any backend logic. They are intentionally kept
+// rather than dropped — removing a value from a Postgres enum requires recreating
+// the type (destructive, risky on the shared production DB). Revisit if a clean
+// migration window opens.
 enum PaymentStatus {
   UNPAID
   PARTIALLY_PAID
@@ -834,6 +844,9 @@ model Task {
   @@index([businessId, status])
   @@index([businessId, assignedToUserId])
   @@index([assignedToUserId])
+  @@index([linkedOrderId])
+  @@index([linkedDeliveryId])
+  @@index([linkedInvoiceId])
 }
 
 // ── Procurement Models ──

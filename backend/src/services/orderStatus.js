@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 /**
  * Order Status Service
  * 
@@ -277,7 +278,7 @@ async function adjustStockForOrder(repos, order, direction) {
           },
         });
       } catch (err) {
-        console.error('[orderStatus] Failed to create low-stock alert:', err.message);
+        logger.error('[orderStatus] Failed to create low-stock alert:', err.message);
       }
     }
   }

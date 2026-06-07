@@ -12,14 +12,17 @@ const { z } = require('zod');
 // Load environment variables (create a .env file in backend/ if needed)
 require('dotenv').config();
 
+// Leveled logger — silences debug/info in production, always keeps warn/error.
+const logger = require('./src/utils/logger');
+
 // ============================================================================
 // ENVIRONMENT VALIDATION — fail fast on missing critical vars
 // ============================================================================
 const REQUIRED_ENV = ['JWT_SECRET', 'DATABASE_URL', 'DIRECT_URL'];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length > 0) {
-  console.error(`\n[FATAL] Missing required environment variables: ${missing.join(', ')}`);
-  console.error('Create a .env file in backend/ — see .env.example for reference.\n');
+  logger.error(`\n[FATAL] Missing required environment variables: ${missing.join(', ')}`);
+  logger.error('Create a .env file in backend/ — see .env.example for reference.\n');
   process.exit(1);
 }
 
@@ -34,22 +37,22 @@ if (process.env.SENTRY_DSN) {
     environment: process.env.NODE_ENV || 'development',
     tracesSampleRate: 0.1,
   });
-  console.log('[Sentry] Error monitoring enabled');
+  logger.debug('[Sentry] Error monitoring enabled');
 
   // Capture crashes that escape route-level try/catch blocks.
   process.on('unhandledRejection', (reason) => {
     Sentry.captureException(reason);
-    console.error('[unhandledRejection]', reason);
+    logger.error('[unhandledRejection]', reason);
   });
   process.on('uncaughtException', (err) => {
     Sentry.captureException(err);
-    console.error('[uncaughtException]', err);
+    logger.error('[uncaughtException]', err);
   });
 }
 
 if (process.env.JWT_SECRET === 'your-secret-here-generate-with-openssl-rand-base64-48') {
-  console.error('\n[FATAL] JWT_SECRET is still the placeholder value from .env.example.');
-  console.error('Generate a real secret: openssl rand -base64 48\n');
+  logger.error('\n[FATAL] JWT_SECRET is still the placeholder value from .env.example.');
+  logger.error('Generate a real secret: openssl rand -base64 48\n');
   process.exit(1);
 }
 
@@ -64,7 +67,7 @@ function getEmailTransporter() {
   if (emailTransporter) return emailTransporter;
 
   if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-    console.warn('[Email] Email not configured. Set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD in .env');
+    logger.warn('[Email] Email not configured. Set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD in .env');
     return null;
   }
 
@@ -87,9 +90,15 @@ async function sendPasswordResetEmail(toEmail, resetToken) {
   const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
 
   if (!transporter) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[Email] Would send password reset email to:', toEmail);
-      console.log('[Email] Reset link:', resetLink);
+    if (process.env.NODE_ENV === 'production') {
+      // Fail loudly: in production a missing transporter means real users who
+      // request a reset never receive an email. Surface it to logs + Sentry
+      // instead of silently returning "success".
+      logger.error('[Email] Password reset email NOT sent — email transporter is not configured. Set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD.');
+      Sentry.captureMessage('Password reset email could not be sent: email transporter not configured', 'error');
+    } else {
+      logger.debug('[Email] Would send password reset email to:', toEmail);
+      logger.debug('[Email] Reset link:', resetLink);
     }
     return;
   }
@@ -157,7 +166,7 @@ const requireAutomationAuth = require('./src/middleware/automationAuth')(errorRe
 // Password hashing
 const bcrypt = require('bcryptjs');
 
-console.log(`📦 Data source: ${getDataSource()}`);
+logger.debug(`📦 Data source: ${getDataSource()}`);
 
 // Import pure enum constants (no entity data)
 const {
@@ -238,7 +247,7 @@ app.use(cors({
     
     // If no allowlist configured, block all cross-origin requests in production
     if (corsAllowlist.length === 0) {
-      console.warn('[CORS] No CORS_ORIGIN configured - blocking cross-origin request from:', origin);
+      logger.warn('[CORS] No CORS_ORIGIN configured - blocking cross-origin request from:', origin);
       return callback(new Error('CORS_NOT_CONFIGURED'), false);
     }
     
@@ -248,7 +257,7 @@ app.use(cors({
     }
     
     // Log and block unknown origins
-    console.warn('[CORS] Blocked request from unknown origin:', origin);
+    logger.warn('[CORS] Blocked request from unknown origin:', origin);
     return callback(new Error('CORS_BLOCKED'), false);
   },
   credentials: true,
@@ -316,7 +325,7 @@ const twoFactorLimiter = rateLimit({
 // Render's filesystem is ephemeral, so disk storage MUST NOT be relied on in prod.
 const useSupabaseStorage = storageService.isConfigured();
 if (!useSupabaseStorage) {
-  console.warn(
+  logger.warn(
     '[Storage] SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — file uploads fall back to ' +
     'LOCAL DISK (./uploads). This is fine for local dev but EPHEMERAL on Render: uploaded ' +
     'images will be wiped on every redeploy. Set the Supabase Storage env vars in production.'
@@ -423,7 +432,7 @@ async function requireCompanyMember(req, res, next) {
     }
     next();
   } catch (err) {
-    console.error('Membership check failed:', err);
+    logger.error('Membership check failed:', err);
     return res.status(500).json(errorResponse('Internal server error'));
   }
 }
@@ -818,7 +827,7 @@ io.use((socket, next) => {
   // Verify JWT token
   const result = verifyToken(`Bearer ${token}`);
   if (result.error) {
-    console.warn(`[Socket] Auth failed for userId=${userId}: ${result.error}`);
+    logger.warn(`[Socket] Auth failed for userId=${userId}: ${result.error}`);
     return next(new Error('Invalid token'));
   }
   if (result.user.id !== userId) {
@@ -832,7 +841,7 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
-  console.log(`[Socket] User connected: ${socket.userId}`);
+  logger.debug(`[Socket] User connected: ${socket.userId}`);
 
   // Auto-join user-level room so we can send events (chat_created, etc.) to a user
   // regardless of which chat rooms they're currently in
@@ -866,20 +875,20 @@ io.on('connection', (socket) => {
       }
 
       if (!isParticipant && !isCompanyMember) {
-        console.warn(`[Socket] ${socket.userId} denied join to chat:${chatId} (not a member)`);
+        logger.warn(`[Socket] ${socket.userId} denied join to chat:${chatId} (not a member)`);
         return;
       }
 
       socket.join(`chat:${chatId}`);
-      console.log(`[Socket] ${socket.userId} joined chat:${chatId}`);
+      logger.debug(`[Socket] ${socket.userId} joined chat:${chatId}`);
     } catch (err) {
-      console.error(`[Socket] Error in join_chat:`, err);
+      logger.error(`[Socket] Error in join_chat:`, err);
     }
   });
 
   socket.on('leave_chat', (chatId) => {
     socket.leave(`chat:${chatId}`);
-    console.log(`[Socket] ${socket.userId} left chat:${chatId}`);
+    logger.debug(`[Socket] ${socket.userId} left chat:${chatId}`);
   });
 
   // Typing indicators
@@ -901,7 +910,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log(`[Socket] User disconnected: ${socket.userId}`);
+    logger.debug(`[Socket] User disconnected: ${socket.userId}`);
   });
 });
 
@@ -944,14 +953,14 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
     // Debug logging
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[Login] Received:', { email, passwordLength: password?.length });
+      logger.debug('[Login] Received:', { email, passwordLength: password?.length });
     }
 
     // Look up user from database
     const dbUser = await repos.userRepo.getByEmail(email);
     if (!dbUser) {
       if (process.env.NODE_ENV !== 'production') {
-        console.log('[Login] User not found:', email);
+        logger.debug('[Login] User not found:', email);
       }
       return res.status(401).json(errorResponse('Invalid credentials'));
     }
@@ -959,7 +968,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     // Verify password
     if (!dbUser.passwordHash) {
       if (process.env.NODE_ENV !== 'production') {
-        console.log('[Login] No password hash set for:', email);
+        logger.debug('[Login] No password hash set for:', email);
       }
       return res.status(401).json(errorResponse('Invalid credentials'));
     }
@@ -971,7 +980,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       const current = failedLoginAttempts.get(key) || { count: 0, lastAttempt: 0 };
       failedLoginAttempts.set(key, { count: current.count + 1, lastAttempt: Date.now() });
       if (process.env.NODE_ENV !== 'production') {
-        console.log('[Login] Invalid password for:', email);
+        logger.debug('[Login] Invalid password for:', email);
       }
       return res.status(401).json(errorResponse('Invalid credentials'));
     }
@@ -1027,7 +1036,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     
     // Update lastLoginAt
     await repos.userRepo.update(dbUser.id, { lastLoginAt: new Date() }).catch(err => {
-      console.warn('[Login] Failed to update lastLoginAt:', err.message);
+      logger.warn('[Login] Failed to update lastLoginAt:', err.message);
     });
     
     // Build user response (exclude sensitive fields, match register shape)
@@ -1044,7 +1053,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     };
     
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[Login] Generated JWT for user:', dbUser.id);
+      logger.debug('[Login] Generated JWT for user:', dbUser.id);
     }
     
     res.json(successResponse({
@@ -1054,7 +1063,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       businesses: userBusinesses
     }));
   } catch (err) {
-    console.error('[Login] Error:', err);
+    logger.error('[Login] Error:', err);
     res.status(500).json(errorResponse('Login failed. Please try again.'));
   }
 });
@@ -1066,10 +1075,10 @@ app.post('/api/auth/logout', requireAuth, async (req, res) => {
   try {
     await repos.userRepo.update(req.user.id, { tokenVersion: { increment: 1 } });
   } catch (err) {
-    console.error('[Logout] Failed to bump token version:', err.message);
+    logger.error('[Logout] Failed to bump token version:', err.message);
   }
   if (process.env.NODE_ENV !== 'production') {
-    console.log('[Logout] User logged out:', req.user.id);
+    logger.debug('[Logout] User logged out:', req.user.id);
   }
   res.json(successResponse(null, 'Logged out successfully'));
 });
@@ -1081,6 +1090,16 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
 
     if (!email) {
       return res.status(400).json(errorResponse('Email is required'));
+    }
+
+    // If email delivery isn't configured at all, fail loudly rather than
+    // telling the user a reset link "has been sent". This check is
+    // account-independent (it fires for every request regardless of whether
+    // the account exists), so it leaks no information about account existence.
+    if (process.env.NODE_ENV === 'production' && !getEmailTransporter()) {
+      logger.error('[ForgotPassword] Email transporter not configured — cannot send reset emails.');
+      Sentry.captureMessage('forgot-password requested but email transporter is not configured', 'error');
+      return res.status(503).json(errorResponse('Email service is temporarily unavailable. Please try again later.', 'EMAIL_UNAVAILABLE'));
     }
 
     // Look up user
@@ -1098,11 +1117,19 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
       email: dbUser.email
     }, { expiresIn: '15m' });
 
-    await sendPasswordResetEmail(email, resetToken);
+    // A transient send failure (transporter exists but SMTP errored) is logged
+    // to Sentry, but we still return the uniform success message so the response
+    // doesn't reveal whether the account exists.
+    try {
+      await sendPasswordResetEmail(email, resetToken);
+    } catch (sendErr) {
+      logger.error('[ForgotPassword] Failed to send reset email:', sendErr);
+      Sentry.captureException(sendErr);
+    }
 
     res.json(successResponse(null, 'If an account with that email exists, a reset link has been sent.'));
   } catch (err) {
-    console.error('[ForgotPassword] Error:', err);
+    logger.error('[ForgotPassword] Error:', err);
     res.status(500).json(errorResponse('Failed to process password reset request'));
   }
 });
@@ -1146,11 +1173,11 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
     const passwordHash = await bcrypt.hash(newPassword, 12);
     await repos.userRepo.update(dbUser.id, { passwordHash, tokenVersion: { increment: 1 } });
 
-    console.log('[ResetPassword] Password reset for user:', dbUser.id);
+    logger.debug('[ResetPassword] Password reset for user:', dbUser.id);
 
     res.json(successResponse(null, 'Password has been reset successfully. You can now log in with your new password.'));
   } catch (err) {
-    console.error('[ResetPassword] Error:', err);
+    logger.error('[ResetPassword] Error:', err);
     res.status(500).json(errorResponse('Failed to reset password'));
   }
 });
@@ -1196,7 +1223,7 @@ app.post('/api/auth/refresh', authLimiter, async (req, res) => {
     });
     
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[Refresh] Generated new token for user:', dbUser.id);
+      logger.debug('[Refresh] Generated new token for user:', dbUser.id);
     }
     
     // Generate a new refresh token (rotation)
@@ -1211,7 +1238,7 @@ app.post('/api/auth/refresh', authLimiter, async (req, res) => {
       refreshToken: newRefreshToken,
     }));
   } catch (err) {
-    console.error('[Refresh] Error:', err);
+    logger.error('[Refresh] Error:', err);
     res.status(500).json(errorResponse('Token refresh failed'));
   }
 });
@@ -1295,7 +1322,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     }, { expiresIn: '30d' });
     
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[Register] Created user:', dbUser.id, dbUser.email);
+      logger.debug('[Register] Created user:', dbUser.id, dbUser.email);
     }
     
     res.status(201).json(successResponse({
@@ -1305,7 +1332,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       businesses: [] // New user has no businesses yet
     }, 'Account created successfully'));
   } catch (err) {
-    console.error('[Register] Error:', err);
+    logger.error('[Register] Error:', err);
     res.status(500).json(errorResponse('Failed to create account. Please try again.'));
   }
 });
@@ -1355,11 +1382,11 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     const newPasswordHash = await bcrypt.hash(newPassword, 12);
     await repos.userRepo.update(dbUser.id, { passwordHash: newPasswordHash, tokenVersion: { increment: 1 } });
     
-    console.log('[ChangePassword] Password updated for user:', dbUser.id);
+    logger.debug('[ChangePassword] Password updated for user:', dbUser.id);
     
     res.json(successResponse({ message: 'Password changed successfully' }, 'Password changed successfully'));
   } catch (err) {
-    console.error('[ChangePassword] Error:', err);
+    logger.error('[ChangePassword] Error:', err);
     res.status(500).json(errorResponse('Failed to change password. Please try again.'));
   }
 });
@@ -1378,7 +1405,7 @@ function getTwilioClient() {
   const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
   if (!sid || !token || !serviceSid) {
-    console.warn('[Twilio] Not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID in .env');
+    logger.warn('[Twilio] Not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID in .env');
     return null;
   }
 
@@ -1407,10 +1434,10 @@ app.post('/api/auth/send-phone-otp', authLimiter, async (req, res) => {
       .verifications
       .create({ to: fullNumber, channel: 'sms' });
 
-    console.log('[OTP] Phone verification sent to:', fullNumber);
+    logger.debug('[OTP] Phone verification sent to:', fullNumber);
     res.json(successResponse({ message: 'Verification code sent' }));
   } catch (err) {
-    console.error('[OTP] Send phone OTP error:', err.message);
+    logger.error('[OTP] Send phone OTP error:', err.message);
     if (err.code === 60200) {
       return res.status(400).json(errorResponse('Invalid phone number'));
     }
@@ -1440,13 +1467,13 @@ app.post('/api/auth/verify-phone', authLimiter, async (req, res) => {
       .create({ to: fullNumber, code });
 
     if (check.status === 'approved') {
-      console.log('[OTP] Phone verified:', fullNumber);
+      logger.debug('[OTP] Phone verified:', fullNumber);
       res.json(successResponse(null, 'Phone number verified successfully'));
     } else {
       res.status(400).json(errorResponse('Incorrect verification code'));
     }
   } catch (err) {
-    console.error('[OTP] Verify phone error:', err.message);
+    logger.error('[OTP] Verify phone error:', err.message);
     if (err.code === 60200) {
       return res.status(400).json(errorResponse('Invalid verification code'));
     }
@@ -1474,10 +1501,10 @@ app.post('/api/auth/send-email-otp', authLimiter, async (req, res) => {
       .verifications
       .create({ to: email, channel: 'email' });
 
-    console.log('[OTP] Email verification sent to:', email);
+    logger.debug('[OTP] Email verification sent to:', email);
     res.json(successResponse({ message: 'Verification code sent to email' }));
   } catch (err) {
-    console.error('[OTP] Send email OTP error:', err.message);
+    logger.error('[OTP] Send email OTP error:', err.message);
     res.status(500).json(errorResponse('Failed to send verification code'));
   }
 });
@@ -1503,13 +1530,13 @@ app.post('/api/auth/verify-email', authLimiter, async (req, res) => {
       .create({ to: email, code });
 
     if (check.status === 'approved') {
-      console.log('[OTP] Email verified:', email);
+      logger.debug('[OTP] Email verified:', email);
       res.json(successResponse(null, 'Email verified successfully'));
     } else {
       res.status(400).json(errorResponse('Incorrect verification code'));
     }
   } catch (err) {
-    console.error('[OTP] Verify email error:', err.message);
+    logger.error('[OTP] Verify email error:', err.message);
     res.status(500).json(errorResponse('Verification failed'));
   }
 });
@@ -1548,7 +1575,7 @@ app.post('/api/auth/2fa/setup', requireAuth, twoFactorLimiter, async (req, res) 
 
     res.json(successResponse({ secret: formattedSecret, otpauthUrl }));
   } catch (err) {
-    console.error('[2FA Setup] Error:', err);
+    logger.error('[2FA Setup] Error:', err);
     res.status(500).json(errorResponse('Failed to set up two-factor authentication'));
   }
 });
@@ -1592,14 +1619,14 @@ app.post('/api/auth/2fa/verify-setup', requireAuth, twoFactorLimiter, async (req
       twoFactorBackupCodes: JSON.stringify(hashedBackupCodes),
     });
 
-    console.log('[2FA] Enabled for user:', req.user.id);
+    logger.debug('[2FA] Enabled for user:', req.user.id);
 
     res.json(successResponse({
       backupCodes,
       message: 'Two-factor authentication enabled successfully',
     }));
   } catch (err) {
-    console.error('[2FA Verify Setup] Error:', err);
+    logger.error('[2FA Verify Setup] Error:', err);
     res.status(500).json(errorResponse('Failed to verify two-factor code'));
   }
 });
@@ -1627,11 +1654,11 @@ app.post('/api/auth/2fa/disable', requireAuth, twoFactorLimiter, async (req, res
       twoFactorBackupCodes: null,
     });
 
-    console.log('[2FA] Disabled for user:', req.user.id);
+    logger.debug('[2FA] Disabled for user:', req.user.id);
 
     res.json(successResponse(null, 'Two-factor authentication disabled'));
   } catch (err) {
-    console.error('[2FA Disable] Error:', err);
+    logger.error('[2FA Disable] Error:', err);
     res.status(500).json(errorResponse('Failed to disable two-factor authentication'));
   }
 });
@@ -1724,7 +1751,7 @@ app.post('/api/auth/2fa/verify', authLimiter, async (req, res) => {
       profilePicture: dbUser.avatar,
     };
 
-    console.log('[2FA Verify] Login completed for user:', dbUser.id);
+    logger.debug('[2FA Verify] Login completed for user:', dbUser.id);
 
     res.json(successResponse({
       user: userResponse,
@@ -1733,7 +1760,7 @@ app.post('/api/auth/2fa/verify', authLimiter, async (req, res) => {
       businesses: userBusinesses,
     }));
   } catch (err) {
-    console.error('[2FA Verify] Error:', err);
+    logger.error('[2FA Verify] Error:', err);
     res.status(500).json(errorResponse('Failed to verify two-factor code'));
   }
 });
@@ -1779,11 +1806,11 @@ app.patch('/api/auth/me', requireAuth, async (req, res) => {
     // Strip sensitive fields from response
     const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = updatedUser;
 
-    console.log('[UpdateProfile] Updated user:', req.user.id, Object.keys(updateData));
+    logger.debug('[UpdateProfile] Updated user:', req.user.id, Object.keys(updateData));
 
     res.json(successResponse(safeUser, 'Profile updated successfully'));
   } catch (err) {
-    console.error('[UpdateProfile] Error:', err);
+    logger.error('[UpdateProfile] Error:', err);
     res.status(500).json(errorResponse('Failed to update profile'));
   }
 });
@@ -1824,7 +1851,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
       businesses: userBusinesses,
     }));
   } catch (err) {
-    console.error('[GetMe] Error:', err);
+    logger.error('[GetMe] Error:', err);
     res.status(500).json(errorResponse('Failed to get user profile'));
   }
 });
@@ -1914,7 +1941,7 @@ app.get('/api/users/:userId', requireAuth, async (req, res) => {
       experiences,
     }));
   } catch (err) {
-    console.error('[GetUser] Error:', err);
+    logger.error('[GetUser] Error:', err);
     res.status(500).json(errorResponse('Failed to get user profile'));
   }
 });
@@ -2039,7 +2066,7 @@ app.post('/api/companies', requireAuth, async (req, res) => {
       },
     }, 'Business created successfully'));
   } catch (err) {
-    console.error('[Create Business] Error:', err);
+    logger.error('[Create Business] Error:', err);
     res.status(500).json(errorResponse('Failed to create business. Please try again.'));
   }
 });
@@ -2367,7 +2394,7 @@ app.post('/api/connections/request', requireAuth, async (req, res) => {
     const connection = await repos.connectionRepo.sendRequest(req.user.id, receiverId);
     res.status(201).json(successResponse(connection, 'Connection request sent'));
   } catch (err) {
-    console.error('[ConnectionRequest] Error:', err);
+    logger.error('[ConnectionRequest] Error:', err);
     res.status(500).json(errorResponse('Failed to send connection request'));
   }
 });
@@ -2389,7 +2416,7 @@ app.patch('/api/connections/:id/accept', requireAuth, async (req, res) => {
     const updated = await repos.connectionRepo.acceptRequest(req.params.id);
     res.json(successResponse(updated, 'Connection accepted'));
   } catch (err) {
-    console.error('[ConnectionAccept] Error:', err);
+    logger.error('[ConnectionAccept] Error:', err);
     res.status(500).json(errorResponse('Failed to accept connection'));
   }
 });
@@ -2411,7 +2438,7 @@ app.patch('/api/connections/:id/reject', requireAuth, async (req, res) => {
     const updated = await repos.connectionRepo.rejectRequest(req.params.id);
     res.json(successResponse(updated, 'Connection rejected'));
   } catch (err) {
-    console.error('[ConnectionReject] Error:', err);
+    logger.error('[ConnectionReject] Error:', err);
     res.status(500).json(errorResponse('Failed to reject connection'));
   }
 });
@@ -2431,7 +2458,7 @@ app.delete('/api/connections/:id', requireAuth, async (req, res) => {
     await repos.connectionRepo.removeConnection(req.params.id);
     res.json(successResponse(null, 'Connection removed'));
   } catch (err) {
-    console.error('[ConnectionRemove] Error:', err);
+    logger.error('[ConnectionRemove] Error:', err);
     res.status(500).json(errorResponse('Failed to remove connection'));
   }
 });
@@ -2452,7 +2479,7 @@ app.get('/api/connections', requireAuth, async (req, res) => {
     });
     res.json(successResponse(result));
   } catch (err) {
-    console.error('[ConnectionsList] Error:', err);
+    logger.error('[ConnectionsList] Error:', err);
     res.status(500).json(errorResponse('Failed to list connections'));
   }
 });
@@ -2471,7 +2498,7 @@ app.get('/api/connections/pending', requireAuth, async (req, res) => {
     });
     res.json(successResponse(result));
   } catch (err) {
-    console.error('[ConnectionsPending] Error:', err);
+    logger.error('[ConnectionsPending] Error:', err);
     res.status(500).json(errorResponse('Failed to list pending connections'));
   }
 });
@@ -2515,7 +2542,7 @@ app.post('/api/business-connections/request', requireAuth, async (req, res) => {
     const connection = await repos.connectionRepo.sendBusinessRequest(requesterBusinessId, targetBusinessId);
     res.status(201).json(successResponse(connection, 'Business connection request sent'));
   } catch (err) {
-    console.error('[BizConnectionRequest] Error:', err);
+    logger.error('[BizConnectionRequest] Error:', err);
     res.status(500).json(errorResponse('Failed to send business connection request'));
   }
 });
@@ -2536,7 +2563,7 @@ app.patch('/api/business-connections/:id/accept', requireAuth, async (req, res) 
     const updated = await repos.connectionRepo.acceptBusinessRequest(req.params.id);
     res.json(successResponse(updated, 'Business connection accepted'));
   } catch (err) {
-    console.error('[BizConnectionAccept] Error:', err);
+    logger.error('[BizConnectionAccept] Error:', err);
     res.status(500).json(errorResponse('Failed to accept business connection'));
   }
 });
@@ -2556,7 +2583,7 @@ app.patch('/api/business-connections/:id/reject', requireAuth, async (req, res) 
     const updated = await repos.connectionRepo.rejectBusinessRequest(req.params.id);
     res.json(successResponse(updated, 'Business connection rejected'));
   } catch (err) {
-    console.error('[BizConnectionReject] Error:', err);
+    logger.error('[BizConnectionReject] Error:', err);
     res.status(500).json(errorResponse('Failed to reject business connection'));
   }
 });
@@ -2578,7 +2605,7 @@ app.delete('/api/business-connections/:id', requireAuth, async (req, res) => {
     await repos.connectionRepo.removeBusinessConnection(req.params.id);
     res.json(successResponse(null, 'Business connection removed'));
   } catch (err) {
-    console.error('[BizConnectionRemove] Error:', err);
+    logger.error('[BizConnectionRemove] Error:', err);
     res.status(500).json(errorResponse('Failed to remove business connection'));
   }
 });
@@ -2602,7 +2629,7 @@ app.get('/api/business-connections/:businessId', requireAuth, async (req, res) =
     });
     res.json(successResponse(result));
   } catch (err) {
-    console.error('[BizConnectionsList] Error:', err);
+    logger.error('[BizConnectionsList] Error:', err);
     res.status(500).json(errorResponse('Failed to list business connections'));
   }
 });
@@ -2621,7 +2648,7 @@ app.get('/api/business-connections/:businessId/pending', requireAuth, async (req
     }));
     res.json(successResponse(result));
   } catch (err) {
-    console.error('[BizConnectionsPending] Error:', err);
+    logger.error('[BizConnectionsPending] Error:', err);
     res.status(500).json(errorResponse('Failed to list pending business connections'));
   }
 });
@@ -2657,7 +2684,7 @@ app.post('/api/businesses/:businessId/follow', requireAuth, async (req, res) => 
 
     res.status(201).json(successResponse({ follow, followersCount }));
   } catch (err) {
-    console.error('[FollowBusiness] Error:', err);
+    logger.error('[FollowBusiness] Error:', err);
     res.status(500).json(errorResponse('Failed to follow business'));
   }
 });
@@ -2683,7 +2710,7 @@ app.delete('/api/businesses/:businessId/follow', requireAuth, async (req, res) =
 
     res.json(successResponse({ followersCount }));
   } catch (err) {
-    console.error('[UnfollowBusiness] Error:', err);
+    logger.error('[UnfollowBusiness] Error:', err);
     res.status(500).json(errorResponse('Failed to unfollow business'));
   }
 });
@@ -2712,7 +2739,7 @@ app.get('/api/businesses/:businessId/followers', requireAuth, async (req, res) =
       hasMore: offset + limit < count,
     }));
   } catch (err) {
-    console.error('[GetFollowers] Error:', err);
+    logger.error('[GetFollowers] Error:', err);
     res.status(500).json(errorResponse('Failed to get followers'));
   }
 });
@@ -2735,7 +2762,7 @@ app.get('/api/businesses/:businessId/follow-status', requireAuth, async (req, re
       followersCount: count,
     }));
   } catch (err) {
-    console.error('[FollowStatus] Error:', err);
+    logger.error('[FollowStatus] Error:', err);
     res.status(500).json(errorResponse('Failed to check follow status'));
   }
 });
@@ -2770,7 +2797,7 @@ app.get('/api/businesses/:businessId/people', requireAuth, async (req, res) => {
 
     res.json(successResponse(people));
   } catch (err) {
-    console.error('[BusinessPeople] Error:', err);
+    logger.error('[BusinessPeople] Error:', err);
     res.status(500).json(errorResponse('Failed to get business people'));
   }
 });
@@ -3159,7 +3186,7 @@ app.get('/api/companies/:companyId/products', requireAuth, async (req, res) => {
 
     res.json(successResponse(privacyProducts));
   } catch (e) {
-    console.error('Error fetching products:', e);
+    logger.error('Error fetching products:', e);
     res.status(500).json(errorResponse('Failed to load products'));
   }
 });
@@ -3198,7 +3225,7 @@ app.get('/api/companies/:companyId/products/:productId', requireAuth, async (req
     const result = await applyPricePrivacy(product, viewerBusinessId);
     res.json(successResponse(result));
   } catch (e) {
-    console.error('Error fetching product:', e);
+    logger.error('Error fetching product:', e);
     res.status(500).json(errorResponse('Failed to load product'));
   }
 });
@@ -3246,7 +3273,7 @@ app.post('/api/companies/:companyId/products', requireAuth, async (req, res) => 
 
     res.status(201).json(successResponse(newProduct));
   } catch (e) {
-    console.error('Error creating product:', e);
+    logger.error('Error creating product:', e);
     res.status(500).json(errorResponse('Failed to create product'));
   }
 });
@@ -3310,7 +3337,7 @@ app.patch('/api/companies/:companyId/products/:productId', requireAuth, async (r
 
     res.json(successResponse(updatedProduct));
   } catch (e) {
-    console.error('Error updating product:', e);
+    logger.error('Error updating product:', e);
     res.status(500).json(errorResponse('Failed to update product'));
   }
 });
@@ -3335,7 +3362,7 @@ app.delete('/api/companies/:companyId/products/:productId', requireAuth, async (
     await repos.productRepo.delete(productId);
     res.json(successResponse(null, 'Product deleted successfully'));
   } catch (e) {
-    console.error('Error deleting product:', e);
+    logger.error('Error deleting product:', e);
     res.status(500).json(errorResponse('Failed to delete product'));
   }
 });
@@ -3388,7 +3415,7 @@ app.get('/api/companies/:companyId/products/with-supplier-pricing', requireAuth,
 
     res.json(successResponse(Array.from(productMap.values())));
   } catch (e) {
-    console.error('Error fetching products with supplier pricing:', e);
+    logger.error('Error fetching products with supplier pricing:', e);
     res.status(500).json(errorResponse('Failed to fetch products with supplier pricing'));
   }
 });
@@ -3424,7 +3451,7 @@ app.get('/api/companies/:companyId/products/:productId/suppliers', requireAuth, 
 
     res.json(successResponse(result));
   } catch (e) {
-    console.error('Error fetching suppliers for product:', e);
+    logger.error('Error fetching suppliers for product:', e);
     res.status(500).json(errorResponse('Failed to fetch suppliers for product'));
   }
 });
@@ -3455,7 +3482,7 @@ app.get('/api/companies/:companyId/brands', requireAuth, async (req, res) => {
 
     res.json(successResponse(brandsWithPrivacy));
   } catch (e) {
-    console.error('Error fetching brands:', e);
+    logger.error('Error fetching brands:', e);
     res.status(500).json(errorResponse('Failed to fetch brands'));
   }
 });
@@ -3486,7 +3513,7 @@ app.post('/api/companies/:companyId/brands', requireAuth, async (req, res) => {
     if (e.code === 'P2002') {
       return res.status(409).json(errorResponse('A brand with this name already exists'));
     }
-    console.error('Error creating brand:', e);
+    logger.error('Error creating brand:', e);
     res.status(500).json(errorResponse('Failed to create brand'));
   }
 });
@@ -3520,7 +3547,7 @@ app.patch('/api/companies/:companyId/brands/:brandId', requireAuth, async (req, 
     if (e.code === 'P2002') {
       return res.status(409).json(errorResponse('A brand with this name already exists'));
     }
-    console.error('Error updating brand:', e);
+    logger.error('Error updating brand:', e);
     res.status(500).json(errorResponse('Failed to update brand'));
   }
 });
@@ -3541,7 +3568,7 @@ app.delete('/api/companies/:companyId/brands/:brandId', requireAuth, async (req,
     await repos.brandRepo.delete(brandId);
     res.json(successResponse(null, 'Brand deleted successfully'));
   } catch (e) {
-    console.error('Error deleting brand:', e);
+    logger.error('Error deleting brand:', e);
     res.status(500).json(errorResponse('Failed to delete brand'));
   }
 });
@@ -3586,7 +3613,7 @@ app.get('/api/companies/:companyId/transports', requireAuth, async (req, res) =>
 
     res.json(successResponse(transports.map(mapTransportToResponse)));
   } catch (e) {
-    console.error('Error fetching transports:', e);
+    logger.error('Error fetching transports:', e);
     res.status(500).json(errorResponse('Failed to fetch transports'));
   }
 });
@@ -3632,7 +3659,7 @@ app.post('/api/companies/:companyId/transports', requireAuth, async (req, res) =
 
     res.status(201).json(successResponse(mapTransportToResponse(created)));
   } catch (e) {
-    console.error('Error creating transport:', e);
+    logger.error('Error creating transport:', e);
     res.status(500).json(errorResponse('Failed to create transport'));
   }
 });
@@ -3689,7 +3716,7 @@ app.patch('/api/companies/:companyId/transports/:transportId', requireAuth, asyn
 
     res.json(successResponse(mapTransportToResponse(updated)));
   } catch (e) {
-    console.error('Error updating transport:', e);
+    logger.error('Error updating transport:', e);
     res.status(500).json(errorResponse('Failed to update transport'));
   }
 });
@@ -3714,7 +3741,7 @@ app.delete('/api/companies/:companyId/transports/:transportId', requireAuth, asy
     await repos.transportRepo.delete(transportId);
     res.json(successResponse(null, 'Transport deleted successfully'));
   } catch (e) {
-    console.error('Error deleting transport:', e);
+    logger.error('Error deleting transport:', e);
     res.status(500).json(errorResponse('Failed to delete transport'));
   }
 });
@@ -3731,7 +3758,7 @@ app.get('/api/users/:userId/experiences', requireAuth, async (req, res) => {
     const experiences = await repos.workExperienceRepo.getByUserId(req.params.userId);
     res.json(successResponse(experiences));
   } catch (e) {
-    console.error('Error fetching experiences:', e);
+    logger.error('Error fetching experiences:', e);
     res.status(500).json(errorResponse('Failed to fetch work experiences'));
   }
 });
@@ -3767,7 +3794,7 @@ app.post('/api/users/me/experiences', requireAuth, async (req, res) => {
 
     res.status(201).json(successResponse(created));
   } catch (e) {
-    console.error('Error creating work experience:', e);
+    logger.error('Error creating work experience:', e);
     res.status(500).json(errorResponse('Failed to create work experience'));
   }
 });
@@ -3797,7 +3824,7 @@ app.patch('/api/users/me/experiences/:id', requireAuth, async (req, res) => {
     const updated = await repos.workExperienceRepo.update(req.params.id, patch);
     res.json(successResponse(updated));
   } catch (e) {
-    console.error('Error updating work experience:', e);
+    logger.error('Error updating work experience:', e);
     res.status(500).json(errorResponse('Failed to update work experience'));
   }
 });
@@ -3813,7 +3840,7 @@ app.delete('/api/users/me/experiences/:id', requireAuth, async (req, res) => {
     await repos.workExperienceRepo.delete(req.params.id);
     res.json(successResponse(null, 'Work experience deleted'));
   } catch (e) {
-    console.error('Error deleting work experience:', e);
+    logger.error('Error deleting work experience:', e);
     res.status(500).json(errorResponse('Failed to delete work experience'));
   }
 });
@@ -3826,7 +3853,7 @@ app.get('/api/users/:userId/education', requireAuth, async (req, res) => {
     const education = await repos.educationRepo.getByUserId(req.params.userId);
     res.json(successResponse(education));
   } catch (e) {
-    console.error('Error fetching education:', e);
+    logger.error('Error fetching education:', e);
     res.status(500).json(errorResponse('Failed to fetch education'));
   }
 });
@@ -3853,7 +3880,7 @@ app.post('/api/users/me/education', requireAuth, async (req, res) => {
 
     res.status(201).json(successResponse(created));
   } catch (e) {
-    console.error('Error creating education:', e);
+    logger.error('Error creating education:', e);
     res.status(500).json(errorResponse('Failed to create education'));
   }
 });
@@ -3880,7 +3907,7 @@ app.patch('/api/users/me/education/:id', requireAuth, async (req, res) => {
     const updated = await repos.educationRepo.update(req.params.id, patch);
     res.json(successResponse(updated));
   } catch (e) {
-    console.error('Error updating education:', e);
+    logger.error('Error updating education:', e);
     res.status(500).json(errorResponse('Failed to update education'));
   }
 });
@@ -3896,7 +3923,7 @@ app.delete('/api/users/me/education/:id', requireAuth, async (req, res) => {
     await repos.educationRepo.delete(req.params.id);
     res.json(successResponse(null, 'Education deleted'));
   } catch (e) {
-    console.error('Error deleting education:', e);
+    logger.error('Error deleting education:', e);
     res.status(500).json(errorResponse('Failed to delete education'));
   }
 });
@@ -3909,7 +3936,7 @@ app.get('/api/users/:userId/certifications', requireAuth, async (req, res) => {
     const certifications = await repos.certificationRepo.getByUserId(req.params.userId);
     res.json(successResponse(certifications));
   } catch (e) {
-    console.error('Error fetching certifications:', e);
+    logger.error('Error fetching certifications:', e);
     res.status(500).json(errorResponse('Failed to fetch certifications'));
   }
 });
@@ -3938,7 +3965,7 @@ app.post('/api/users/me/certifications', requireAuth, async (req, res) => {
 
     res.status(201).json(successResponse(created));
   } catch (e) {
-    console.error('Error creating certification:', e);
+    logger.error('Error creating certification:', e);
     res.status(500).json(errorResponse('Failed to create certification'));
   }
 });
@@ -3964,7 +3991,7 @@ app.patch('/api/users/me/certifications/:id', requireAuth, async (req, res) => {
     const updated = await repos.certificationRepo.update(req.params.id, patch);
     res.json(successResponse(updated));
   } catch (e) {
-    console.error('Error updating certification:', e);
+    logger.error('Error updating certification:', e);
     res.status(500).json(errorResponse('Failed to update certification'));
   }
 });
@@ -3980,7 +4007,7 @@ app.delete('/api/users/me/certifications/:id', requireAuth, async (req, res) => 
     await repos.certificationRepo.delete(req.params.id);
     res.json(successResponse(null, 'Certification deleted'));
   } catch (e) {
-    console.error('Error deleting certification:', e);
+    logger.error('Error deleting certification:', e);
     res.status(500).json(errorResponse('Failed to delete certification'));
   }
 });
@@ -3994,7 +4021,7 @@ app.get('/api/skills/search', requireAuth, async (req, res) => {
     const skills = await repos.skillRepo.search(query, 20);
     res.json(successResponse(skills));
   } catch (e) {
-    console.error('Error searching skills:', e);
+    logger.error('Error searching skills:', e);
     res.status(500).json(errorResponse('Failed to search skills'));
   }
 });
@@ -4005,7 +4032,7 @@ app.get('/api/users/:userId/skills', requireAuth, async (req, res) => {
     const userSkills = await repos.skillRepo.getUserSkills(req.params.userId);
     res.json(successResponse(userSkills));
   } catch (e) {
-    console.error('Error fetching user skills:', e);
+    logger.error('Error fetching user skills:', e);
     res.status(500).json(errorResponse('Failed to fetch skills'));
   }
 });
@@ -4049,7 +4076,7 @@ app.post('/api/users/me/skills', requireAuth, async (req, res) => {
     if (e.code === 'P2002') {
       return res.status(409).json(errorResponse('You already have this skill'));
     }
-    console.error('Error adding skill:', e);
+    logger.error('Error adding skill:', e);
     res.status(500).json(errorResponse('Failed to add skill'));
   }
 });
@@ -4060,7 +4087,7 @@ app.delete('/api/users/me/skills/:skillId', requireAuth, async (req, res) => {
     await repos.skillRepo.removeUserSkill(req.user.id, req.params.skillId);
     res.json(successResponse(null, 'Skill removed'));
   } catch (e) {
-    console.error('Error removing skill:', e);
+    logger.error('Error removing skill:', e);
     res.status(500).json(errorResponse('Failed to remove skill'));
   }
 });
@@ -4076,7 +4103,7 @@ app.patch('/api/users/me/skills/reorder', requireAuth, async (req, res) => {
     await repos.skillRepo.reorderUserSkills(req.user.id, skillIds);
     res.json(successResponse(null, 'Skills reordered'));
   } catch (e) {
-    console.error('Error reordering skills:', e);
+    logger.error('Error reordering skills:', e);
     res.status(500).json(errorResponse('Failed to reorder skills'));
   }
 });
@@ -4108,7 +4135,7 @@ app.get('/api/profile/:slug', optionalAuth, async (req, res) => {
     const { passwordHash, twoFactorSecret, twoFactorBackupCodes, twoFactorEnabled, ...safeProfile } = profile;
     res.json(successResponse(safeProfile));
   } catch (e) {
-    console.error('Error fetching public profile:', e);
+    logger.error('Error fetching public profile:', e);
     res.status(500).json(errorResponse('Failed to fetch profile'));
   }
 });
@@ -4162,7 +4189,7 @@ app.get('/api/users/me/profile-completeness', requireAuth, async (req, res) => {
 
     res.json(successResponse({ percentage, completed, missing }));
   } catch (e) {
-    console.error('Error calculating profile completeness:', e);
+    logger.error('Error calculating profile completeness:', e);
     res.status(500).json(errorResponse('Failed to calculate profile completeness'));
   }
 });
@@ -4210,7 +4237,7 @@ app.get('/api/companies/:companyId/tasks', requireAuth, async (req, res) => {
 
     res.json(successResponse(enrichedTasks));
   } catch (e) {
-    console.error('Error fetching tasks:', e);
+    logger.error('Error fetching tasks:', e);
     res.status(500).json(errorResponse('Failed to fetch tasks'));
   }
 });
@@ -4240,7 +4267,7 @@ app.get('/api/companies/:companyId/tasks/:taskId', requireAuth, async (req, res)
       createdByUserName: usersMap[task.createdByUserId]?.name || null,
     }));
   } catch (e) {
-    console.error('Error fetching task:', e);
+    logger.error('Error fetching task:', e);
     res.status(500).json(errorResponse('Failed to fetch task'));
   }
 });
@@ -4275,7 +4302,7 @@ app.post('/api/companies/:companyId/tasks', requireAuth, async (req, res) => {
 
     res.status(201).json(successResponse(created));
   } catch (e) {
-    console.error('Error creating task:', e);
+    logger.error('Error creating task:', e);
     res.status(500).json(errorResponse('Failed to create task'));
   }
 });
@@ -4307,7 +4334,7 @@ app.patch('/api/companies/:companyId/tasks/:taskId', requireAuth, async (req, re
     const updated = await repos.taskRepo.update(req.params.taskId, patch);
     res.json(successResponse(updated));
   } catch (e) {
-    console.error('Error updating task:', e);
+    logger.error('Error updating task:', e);
     res.status(500).json(errorResponse('Failed to update task'));
   }
 });
@@ -4341,7 +4368,7 @@ app.patch('/api/companies/:companyId/tasks/:taskId/status', requireAuth, async (
     const updated = await repos.taskRepo.update(req.params.taskId, patch);
     res.json(successResponse(updated));
   } catch (e) {
-    console.error('Error changing task status:', e);
+    logger.error('Error changing task status:', e);
     res.status(500).json(errorResponse('Failed to change task status'));
   }
 });
@@ -4358,7 +4385,7 @@ app.delete('/api/companies/:companyId/tasks/:taskId', requireAuth, async (req, r
     await repos.taskRepo.delete(req.params.taskId);
     res.json(successResponse(null, 'Task deleted'));
   } catch (e) {
-    console.error('Error deleting task:', e);
+    logger.error('Error deleting task:', e);
     res.status(500).json(errorResponse('Failed to delete task'));
   }
 });
@@ -4369,7 +4396,7 @@ app.get('/api/users/me/tasks', requireAuth, async (req, res) => {
     const tasks = await repos.taskRepo.getByAssignedUserId(req.user.id);
     res.json(successResponse(tasks));
   } catch (e) {
-    console.error('Error fetching personal tasks:', e);
+    logger.error('Error fetching personal tasks:', e);
     res.status(500).json(errorResponse('Failed to fetch tasks'));
   }
 });
@@ -4404,7 +4431,7 @@ app.post('/api/companies/:companyId/connections', requireAuth, async (req, res) 
     if (e.code === 'P2002') {
       return res.status(409).json(errorResponse('Connection request already exists'));
     }
-    console.error('Error creating connection:', e);
+    logger.error('Error creating connection:', e);
     res.status(500).json(errorResponse('Failed to create connection'));
   }
 });
@@ -4432,7 +4459,7 @@ app.get('/api/companies/:companyId/connections', requireAuth, async (req, res) =
     });
     res.json(successResponse(connections));
   } catch (e) {
-    console.error('Error fetching connections:', e);
+    logger.error('Error fetching connections:', e);
     res.status(500).json(errorResponse('Failed to fetch connections'));
   }
 });
@@ -4460,7 +4487,7 @@ app.patch('/api/companies/:companyId/connections/:connectionId', requireAuth, as
     });
     res.json(successResponse(updated));
   } catch (e) {
-    console.error('Error updating connection:', e);
+    logger.error('Error updating connection:', e);
     res.status(500).json(errorResponse('Failed to update connection'));
   }
 });
@@ -4480,7 +4507,7 @@ app.delete('/api/companies/:companyId/connections/:connectionId', requireAuth, a
     await prisma.businessConnection.delete({ where: { id: req.params.connectionId } });
     res.json(successResponse(null, 'Connection removed'));
   } catch (e) {
-    console.error('Error deleting connection:', e);
+    logger.error('Error deleting connection:', e);
     res.status(500).json(errorResponse('Failed to delete connection'));
   }
 });
@@ -4510,7 +4537,7 @@ app.get('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
 
     res.json(successResponse(businessOrders, 'Orders retrieved successfully'));
   } catch (err) {
-    console.error('Error fetching business orders:', err);
+    logger.error('Error fetching business orders:', err);
     res.status(500).json(errorResponse('Failed to retrieve orders', 'FETCH_ERROR'));
   }
 });
@@ -4533,7 +4560,7 @@ app.get('/api/companies/:companyId/placed-orders', requireAuth, async (req, res)
 
     res.json(successResponse(placedOrders, 'Placed orders retrieved successfully'));
   } catch (err) {
-    console.error('Error fetching placed orders:', err);
+    logger.error('Error fetching placed orders:', err);
     res.status(500).json(errorResponse('Failed to retrieve placed orders', 'FETCH_ERROR'));
   }
 });
@@ -4627,13 +4654,13 @@ app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
         }
       });
     } catch (msgErr) {
-      console.error('Failed to create order event message:', msgErr);
+      logger.error('Failed to create order event message:', msgErr);
       // Don't fail the order creation if message creation fails
     }
 
     res.status(201).json(successResponse(created, 'Order created successfully'));
   } catch (err) {
-    console.error('Error creating business order:', err);
+    logger.error('Error creating business order:', err);
     res.status(500).json(errorResponse('Failed to create order', 'CREATE_ERROR'));
   }
 });
@@ -4683,7 +4710,7 @@ app.post('/api/companies/:companyId/orders/:orderId/assign', requireAuth, async 
           await repos.deliveryRepo.update(linkedDelivery.id, { deliveryStatus: 'ASSIGNED' });
         }
       } catch (syncErr) {
-        console.warn('Failed to sync order assign to delivery:', syncErr.message);
+        logger.warn('Failed to sync order assign to delivery:', syncErr.message);
       } finally {
         _orderDeliverySyncInProgress.delete(req.params.orderId);
       }
@@ -4691,7 +4718,7 @@ app.post('/api/companies/:companyId/orders/:orderId/assign', requireAuth, async 
 
     res.json(successResponse(updated, 'Order assigned successfully'));
   } catch (err) {
-    console.error('Error assigning order:', err);
+    logger.error('Error assigning order:', err);
     res.status(500).json(errorResponse('Failed to assign order', 'ASSIGN_ERROR'));
   }
 });
@@ -4709,7 +4736,7 @@ app.get('/api/companies/:companyId/orders/:orderId', requireAuth, async (req, re
 
     res.json(successResponse(order, 'Order retrieved successfully'));
   } catch (err) {
-    console.error('Error fetching order:', err);
+    logger.error('Error fetching order:', err);
     res.status(500).json(errorResponse('Failed to retrieve order', 'FETCH_ERROR'));
   }
 });
@@ -4765,7 +4792,7 @@ app.patch('/api/companies/:companyId/orders/:orderId', requireAuth, async (req, 
             await repos.deliveryRepo.update(linkedDelivery.id, { paymentStatus: updateData.paymentStatus });
           }
         } catch (syncErr) {
-          console.warn('Failed to sync order paymentStatus to delivery:', syncErr.message);
+          logger.warn('Failed to sync order paymentStatus to delivery:', syncErr.message);
         } finally {
           _orderDeliverySyncInProgress.delete(req.params.orderId);
         }
@@ -4774,7 +4801,7 @@ app.patch('/api/companies/:companyId/orders/:orderId', requireAuth, async (req, 
 
     res.json(successResponse(updated, 'Order updated successfully'));
   } catch (err) {
-    console.error('Error updating order:', err);
+    logger.error('Error updating order:', err);
     res.status(500).json(errorResponse('Failed to update order', 'UPDATE_ERROR'));
   }
 });
@@ -4823,7 +4850,7 @@ app.patch('/api/companies/:companyId/orders/:orderId/status', requireAuth, async
           await repos.deliveryRepo.update(linkedDelivery.id, { deliveryStatus });
         }
       } catch (syncErr) {
-        console.warn('Failed to sync order status to delivery:', syncErr.message);
+        logger.warn('Failed to sync order status to delivery:', syncErr.message);
       } finally {
         _orderDeliverySyncInProgress.delete(req.params.orderId);
       }
@@ -4845,7 +4872,7 @@ app.patch('/api/companies/:companyId/orders/:orderId/status', requireAuth, async
         }
       });
     } catch (msgErr) {
-      console.error('Failed to create status update message:', msgErr);
+      logger.error('Failed to create status update message:', msgErr);
       // Don't fail the status update if message creation fails
     }
 
@@ -4857,12 +4884,12 @@ app.patch('/api/companies/:companyId/orders/:orderId/status', requireAuth, async
         body: `Order status changed to ${status}`,
         category: 'orders',
         data: { type: 'order_status', orderId: updated.id, status },
-      }, repos).catch((err) => console.error('[Push] Order status push error:', err));
+      }, repos).catch((err) => logger.error('[Push] Order status push error:', err));
     }
 
     res.json(successResponse(updated, 'Order status updated successfully'));
   } catch (err) {
-    console.error('Error changing order status:', err);
+    logger.error('Error changing order status:', err);
     
     // Return specific error codes
     if (err.code === 'INVALID_STATUS_TRANSITION') {
@@ -4941,7 +4968,7 @@ app.patch('/api/companies/:companyId/orders/:orderId/delivery-status', requireAu
           await repos.deliveryRepo.update(linkedDelivery.id, { deliveryStatus });
         }
       } catch (syncErr) {
-        console.warn('Failed to sync delivery status to delivery record:', syncErr.message);
+        logger.warn('Failed to sync delivery status to delivery record:', syncErr.message);
       } finally {
         _orderDeliverySyncInProgress.delete(req.params.orderId);
       }
@@ -4949,7 +4976,7 @@ app.patch('/api/companies/:companyId/orders/:orderId/delivery-status', requireAu
 
     res.json(successResponse(updated, 'Delivery status updated successfully'));
   } catch (err) {
-    console.error('Error updating delivery status:', err);
+    logger.error('Error updating delivery status:', err);
     res.status(500).json(errorResponse('Failed to update delivery status', 'UPDATE_ERROR'));
   }
 });
@@ -4968,7 +4995,7 @@ app.get('/api/companies/:companyId/orders/:orderId/history', requireAuth, async 
     const history = await orderStatusService.getOrderStatusHistory(req.params.orderId);
     res.json(successResponse(history, 'Order status history retrieved successfully'));
   } catch (err) {
-    console.error('Error fetching order status history:', err);
+    logger.error('Error fetching order status history:', err);
     res.status(500).json(errorResponse('Failed to retrieve status history', 'FETCH_ERROR'));
   }
 });
@@ -4998,7 +5025,7 @@ app.get('/api/companies/:companyId/orders/:orderId/transitions', requireAuth, as
       validTransitions: transitionsWithMeta,
     }, 'Valid transitions retrieved successfully'));
   } catch (err) {
-    console.error('Error fetching valid transitions:', err);
+    logger.error('Error fetching valid transitions:', err);
     res.status(500).json(errorResponse('Failed to retrieve valid transitions', 'FETCH_ERROR'));
   }
 });
@@ -5018,6 +5045,7 @@ app.get('/api/order-status-meta', (req, res) => {
 // ============================================================================
 
 // Get orders for a location (for location staff view)
+// [location-mode] Not yet called by the app -- kept for the planned DEPENDENT/INDEPENDENT-location feature (AUDIT.md P3).
 app.get('/api/locations/:locationId/orders', requireAuth, async (req, res) => {
   // PERMISSION: Require location membership
   if (!(await requireLocationMembership(req, res, req.params.locationId))) return;
@@ -5050,13 +5078,14 @@ app.get('/api/locations/:locationId/orders', requireAuth, async (req, res) => {
 
     res.json(successResponse(locationOrders, 'Location orders retrieved successfully'));
   } catch (err) {
-    console.error('Error fetching location orders:', err);
+    logger.error('Error fetching location orders:', err);
     res.status(500).json(errorResponse('Failed to retrieve orders', 'FETCH_ERROR'));
   }
 });
 
 // Create order at Location level (INDEPENDENT locations only) - INTERNAL USE
 // For customer-facing orders, use /api/public/locations/:locationId/orders
+// [location-mode] Not yet called by the app -- kept for the planned DEPENDENT/INDEPENDENT-location feature (AUDIT.md P3).
 app.post('/api/locations/:locationId/orders', requireAuth, async (req, res) => {
   // PERMISSION: Require location membership (internal staff creating order)
   if (!(await requireLocationMembership(req, res, req.params.locationId))) return;
@@ -5145,13 +5174,13 @@ app.post('/api/locations/:locationId/orders', requireAuth, async (req, res) => {
         }
       });
     } catch (msgErr) {
-      console.error('Failed to create order event message:', msgErr);
+      logger.error('Failed to create order event message:', msgErr);
       // Don't fail the order creation if message creation fails
     }
 
     res.status(201).json(successResponse(created, 'Order created successfully'));
   } catch (err) {
-    console.error('Error creating location order:', err);
+    logger.error('Error creating location order:', err);
     res.status(500).json(errorResponse('Failed to create order', 'CREATE_ERROR'));
   }
 });
@@ -5251,7 +5280,7 @@ app.patch('/api/locations/:locationId/orders/:orderId', requireAuth, async (req,
             await repos.deliveryRepo.update(linkedDelivery.id, { deliveryStatus });
           }
         } catch (syncErr) {
-          console.warn('Failed to sync location order status to delivery:', syncErr.message);
+          logger.warn('Failed to sync location order status to delivery:', syncErr.message);
         } finally {
           _orderDeliverySyncInProgress.delete(req.params.orderId);
         }
@@ -5262,7 +5291,7 @@ app.patch('/api/locations/:locationId/orders/:orderId', requireAuth, async (req,
 
     res.json(successResponse(updated, 'Order updated successfully'));
   } catch (err) {
-    console.error('Error updating location order:', err);
+    logger.error('Error updating location order:', err);
     res.status(500).json(errorResponse('Failed to update order', 'UPDATE_ERROR'));
   }
 });
@@ -5285,7 +5314,7 @@ app.get('/api/locations/:locationId/orders/:orderId', requireAuth, async (req, r
 
     res.json(successResponse(order, 'Order retrieved successfully'));
   } catch (err) {
-    console.error('Error fetching location order:', err);
+    logger.error('Error fetching location order:', err);
     res.status(500).json(errorResponse('Failed to retrieve order', 'FETCH_ERROR'));
   }
 });
@@ -5295,6 +5324,7 @@ app.get('/api/locations/:locationId/orders/:orderId', requireAuth, async (req, r
 // ============================================================================
 
 // Get stock for a location
+// [location-mode] Not yet called by the app -- kept for the planned DEPENDENT/INDEPENDENT-location feature (AUDIT.md P3).
 app.get('/api/locations/:locationId/stock', requireAuth, async (req, res) => {
   try {
     // PERMISSION: Require location membership
@@ -5316,7 +5346,7 @@ app.get('/api/locations/:locationId/stock', requireAuth, async (req, res) => {
 
     res.json(successResponse(enriched));
   } catch (e) {
-    console.error('Error fetching location stock:', e);
+    logger.error('Error fetching location stock:', e);
     res.status(500).json(errorResponse('Failed to load stock'));
   }
 });
@@ -5347,12 +5377,13 @@ app.patch('/api/locations/:locationId/stock/:productId', requireAuth, async (req
 
     res.json(successResponse(updated));
   } catch (e) {
-    console.error('Error updating stock:', e);
+    logger.error('Error updating stock:', e);
     res.status(500).json(errorResponse('Failed to update stock'));
   }
 });
 
 // Get stock for a business (all locations)
+// [location-mode] Not yet called by the app -- kept for the planned DEPENDENT/INDEPENDENT-location feature (AUDIT.md P3).
 app.get('/api/companies/:companyId/stock', requireAuth, async (req, res) => {
   if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
   try {
@@ -5380,7 +5411,7 @@ app.get('/api/companies/:companyId/stock', requireAuth, async (req, res) => {
 
     res.json(successResponse(enriched));
   } catch (e) {
-    console.error('Error fetching business stock:', e);
+    logger.error('Error fetching business stock:', e);
     res.status(500).json(errorResponse('Failed to load business stock'));
   }
 });
@@ -5418,7 +5449,7 @@ app.get('/api/companies/:companyId/suppliers', requireAuth, async (req, res) => 
     const suppliers = await repos.procurementRepo.getSuppliers(req.params.companyId);
     res.json(successResponse(suppliers));
   } catch (e) {
-    console.error('Error fetching suppliers:', e);
+    logger.error('Error fetching suppliers:', e);
     res.status(500).json(errorResponse('Failed to load suppliers'));
   }
 });
@@ -5468,7 +5499,7 @@ app.post('/api/companies/:companyId/suppliers', requireAuth, procurementLimiter,
 
     res.status(201).json(successResponse(supplier, 'Supplier created'));
   } catch (e) {
-    console.error('Error creating supplier:', e);
+    logger.error('Error creating supplier:', e);
     if (e.code === 'P2002') {
       return res.status(409).json(errorResponse('This business is already linked as a supplier', 'DUPLICATE'));
     }
@@ -5487,7 +5518,7 @@ app.get('/api/companies/:companyId/suppliers/:supplierId', requireAuth, async (r
     }
     res.json(successResponse(supplier));
   } catch (e) {
-    console.error('Error fetching supplier:', e);
+    logger.error('Error fetching supplier:', e);
     res.status(500).json(errorResponse('Failed to load supplier'));
   }
 });
@@ -5514,7 +5545,7 @@ app.patch('/api/companies/:companyId/suppliers/:supplierId', requireAuth, procur
     const updated = await repos.procurementRepo.updateSupplier(req.params.supplierId, patch);
     res.json(successResponse(updated, 'Supplier updated'));
   } catch (e) {
-    console.error('Error updating supplier:', e);
+    logger.error('Error updating supplier:', e);
     res.status(500).json(errorResponse('Failed to update supplier'));
   }
 });
@@ -5539,7 +5570,7 @@ app.delete('/api/companies/:companyId/suppliers/:supplierId', requireAuth, procu
     await repos.procurementRepo.deleteSupplier(req.params.supplierId);
     res.json(successResponse(null, 'Supplier deleted'));
   } catch (e) {
-    console.error('Error deleting supplier:', e);
+    logger.error('Error deleting supplier:', e);
     res.status(500).json(errorResponse('Failed to delete supplier'));
   }
 });
@@ -5559,7 +5590,7 @@ app.get('/api/companies/:companyId/suppliers/:supplierId/products', requireAuth,
     const products = await repos.procurementRepo.getSupplierProducts(req.params.supplierId);
     res.json(successResponse(products));
   } catch (e) {
-    console.error('Error fetching supplier products:', e);
+    logger.error('Error fetching supplier products:', e);
     res.status(500).json(errorResponse('Failed to load supplier products'));
   }
 });
@@ -5594,7 +5625,7 @@ app.post('/api/companies/:companyId/suppliers/:supplierId/products', requireAuth
 
     res.status(201).json(successResponse(result, 'Supplier product saved'));
   } catch (e) {
-    console.error('Error saving supplier product:', e);
+    logger.error('Error saving supplier product:', e);
     res.status(500).json(errorResponse('Failed to save supplier product'));
   }
 });
@@ -5622,7 +5653,7 @@ app.patch('/api/companies/:companyId/suppliers/:supplierId/products/:spId', requ
     const updated = await repos.procurementRepo.updateSupplierProduct(req.params.spId, patch);
     res.json(successResponse(updated, 'Supplier product updated'));
   } catch (e) {
-    console.error('Error updating supplier product:', e);
+    logger.error('Error updating supplier product:', e);
     res.status(500).json(errorResponse('Failed to update supplier product'));
   }
 });
@@ -5635,7 +5666,7 @@ app.delete('/api/companies/:companyId/suppliers/:supplierId/products/:spId', req
     await repos.procurementRepo.deleteSupplierProduct(req.params.spId);
     res.json(successResponse(null, 'Supplier product removed'));
   } catch (e) {
-    console.error('Error deleting supplier product:', e);
+    logger.error('Error deleting supplier product:', e);
     res.status(500).json(errorResponse('Failed to delete supplier product'));
   }
 });
@@ -5663,7 +5694,7 @@ app.get('/api/companies/:companyId/purchase-requests', requireAuth, async (req, 
     const requests = await repos.procurementRepo.getPurchaseRequests(req.params.companyId, filters);
     res.json(successResponse(requests));
   } catch (e) {
-    console.error('Error fetching purchase requests:', e);
+    logger.error('Error fetching purchase requests:', e);
     res.status(500).json(errorResponse('Failed to load purchase requests'));
   }
 });
@@ -5717,7 +5748,7 @@ app.post('/api/companies/:companyId/purchase-requests', requireAuth, procurement
 
     res.status(201).json(successResponse(pr, 'Purchase request created'));
   } catch (e) {
-    console.error('Error creating purchase request:', e);
+    logger.error('Error creating purchase request:', e);
     res.status(500).json(errorResponse('Failed to create purchase request'));
   }
 });
@@ -5733,7 +5764,7 @@ app.get('/api/companies/:companyId/purchase-requests/:prId', requireAuth, async 
     }
     res.json(successResponse(pr));
   } catch (e) {
-    console.error('Error fetching purchase request:', e);
+    logger.error('Error fetching purchase request:', e);
     res.status(500).json(errorResponse('Failed to load purchase request'));
   }
 });
@@ -5762,7 +5793,7 @@ app.patch('/api/companies/:companyId/purchase-requests/:prId', requireAuth, proc
     const updated = await repos.procurementRepo.updatePurchaseRequest(req.params.prId, patch);
     res.json(successResponse(updated, 'Purchase request updated'));
   } catch (e) {
-    console.error('Error updating purchase request:', e);
+    logger.error('Error updating purchase request:', e);
     res.status(500).json(errorResponse('Failed to update purchase request'));
   }
 });
@@ -5798,7 +5829,7 @@ app.post('/api/companies/:companyId/purchase-requests/:prId/submit', requireAuth
 
     res.json(successResponse(updated, 'Purchase request submitted'));
   } catch (e) {
-    console.error('Error submitting purchase request:', e);
+    logger.error('Error submitting purchase request:', e);
     res.status(500).json(errorResponse('Failed to submit purchase request'));
   }
 });
@@ -5845,7 +5876,7 @@ app.post('/api/companies/:companyId/purchase-requests/:prId/approve', requireAut
 
     res.json(successResponse(updated, 'Purchase request approved'));
   } catch (e) {
-    console.error('Error approving purchase request:', e);
+    logger.error('Error approving purchase request:', e);
     res.status(500).json(errorResponse('Failed to approve purchase request'));
   }
 });
@@ -5896,7 +5927,7 @@ app.post('/api/companies/:companyId/purchase-requests/:prId/reject', requireAuth
 
     res.json(successResponse(updated, 'Purchase request rejected'));
   } catch (e) {
-    console.error('Error rejecting purchase request:', e);
+    logger.error('Error rejecting purchase request:', e);
     res.status(500).json(errorResponse('Failed to reject purchase request'));
   }
 });
@@ -5940,7 +5971,7 @@ app.post('/api/companies/:companyId/purchase-requests/:prId/convert', requireAut
 
     res.status(201).json(successResponse(po, 'Purchase request converted to purchase order'));
   } catch (e) {
-    console.error('Error converting purchase request:', e);
+    logger.error('Error converting purchase request:', e);
     res.status(500).json(errorResponse('Failed to convert purchase request'));
   }
 });
@@ -5968,7 +5999,7 @@ app.get('/api/companies/:companyId/purchase-orders', requireAuth, async (req, re
     const orders = await repos.procurementRepo.getPurchaseOrders(req.params.companyId, filters);
     res.json(successResponse(orders));
   } catch (e) {
-    console.error('Error fetching purchase orders:', e);
+    logger.error('Error fetching purchase orders:', e);
     res.status(500).json(errorResponse('Failed to load purchase orders'));
   }
 });
@@ -6013,7 +6044,7 @@ app.post('/api/companies/:companyId/purchase-orders', requireAuth, procurementLi
 
     res.status(201).json(successResponse(po, 'Purchase order created'));
   } catch (e) {
-    console.error('Error creating purchase order:', e);
+    logger.error('Error creating purchase order:', e);
     res.status(500).json(errorResponse('Failed to create purchase order'));
   }
 });
@@ -6029,7 +6060,7 @@ app.get('/api/companies/:companyId/purchase-orders/:poId', requireAuth, async (r
     }
     res.json(successResponse(po));
   } catch (e) {
-    console.error('Error fetching purchase order:', e);
+    logger.error('Error fetching purchase order:', e);
     res.status(500).json(errorResponse('Failed to load purchase order'));
   }
 });
@@ -6058,7 +6089,7 @@ app.patch('/api/companies/:companyId/purchase-orders/:poId', requireAuth, procur
     const updated = await repos.procurementRepo.updatePurchaseOrder(req.params.poId, patch);
     res.json(successResponse(updated, 'Purchase order updated'));
   } catch (e) {
-    console.error('Error updating purchase order:', e);
+    logger.error('Error updating purchase order:', e);
     res.status(500).json(errorResponse('Failed to update purchase order'));
   }
 });
@@ -6141,7 +6172,7 @@ app.patch('/api/companies/:companyId/purchase-orders/:poId/status', requireAuth,
           });
         }
       } catch (deliveryErr) {
-        console.error('Auto-delivery creation failed (non-blocking):', deliveryErr);
+        logger.error('Auto-delivery creation failed (non-blocking):', deliveryErr);
       }
     }
 
@@ -6153,7 +6184,7 @@ app.patch('/api/companies/:companyId/purchase-orders/:poId/status', requireAuth,
     if (e.code === 'PO_NOT_FOUND') {
       return res.status(404).json(errorResponse(e.message, e.code));
     }
-    console.error('Error changing PO status:', e);
+    logger.error('Error changing PO status:', e);
     res.status(500).json(errorResponse('Failed to change purchase order status'));
   }
 });
@@ -6171,7 +6202,7 @@ app.get('/api/companies/:companyId/purchase-orders/:poId/history', requireAuth, 
     const history = await repos.procurementRepo.getPOStatusHistory(req.params.poId);
     res.json(successResponse(history));
   } catch (e) {
-    console.error('Error fetching PO history:', e);
+    logger.error('Error fetching PO history:', e);
     res.status(500).json(errorResponse('Failed to load purchase order history'));
   }
 });
@@ -6269,7 +6300,7 @@ app.post('/api/companies/:companyId/purchase-orders/:poId/receive', requireAuth,
     if (e.code === 'INVALID_STATUS_TRANSITION') {
       return res.status(400).json(errorResponse(e.message, e.code));
     }
-    console.error('Error creating goods receipt:', e);
+    logger.error('Error creating goods receipt:', e);
     res.status(500).json(errorResponse('Failed to record goods receipt'));
   }
 });
@@ -6290,7 +6321,7 @@ app.get('/api/companies/:companyId/goods-receipts', requireAuth, async (req, res
     const receipts = await repos.procurementRepo.getGoodsReceipts(req.params.companyId);
     res.json(successResponse(receipts));
   } catch (e) {
-    console.error('Error fetching goods receipts:', e);
+    logger.error('Error fetching goods receipts:', e);
     res.status(500).json(errorResponse('Failed to load goods receipts'));
   }
 });
@@ -6306,7 +6337,7 @@ app.get('/api/companies/:companyId/goods-receipts/:grnId', requireAuth, async (r
     }
     res.json(successResponse(grn));
   } catch (e) {
-    console.error('Error fetching goods receipt:', e);
+    logger.error('Error fetching goods receipt:', e);
     res.status(500).json(errorResponse('Failed to load goods receipt'));
   }
 });
@@ -6330,7 +6361,7 @@ app.patch('/api/companies/:companyId/goods-receipts/:grnId', requireAuth, procur
     const updated = await repos.procurementRepo.updateGoodsReceipt(req.params.grnId, patch);
     res.json(successResponse(updated, 'Goods receipt updated'));
   } catch (e) {
-    console.error('Error updating goods receipt:', e);
+    logger.error('Error updating goods receipt:', e);
     res.status(500).json(errorResponse('Failed to update goods receipt'));
   }
 });
@@ -6365,7 +6396,7 @@ app.get('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =>
 
     res.json(successResponse(items));
   } catch (e) {
-    console.error('Error fetching deliveries:', e);
+    logger.error('Error fetching deliveries:', e);
     res.status(500).json(errorResponse('Failed to load deliveries'));
   }
 });
@@ -6495,7 +6526,7 @@ app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =
               assignedBy: req.user?.id || null,
             });
           } catch (staffErr) {
-            console.warn('Failed to assign staff during delivery creation:', staffErr.message);
+            logger.warn('Failed to assign staff during delivery creation:', staffErr.message);
           }
         }
       }
@@ -6506,7 +6537,7 @@ app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =
 
     res.status(201).json(successResponse(created));
   } catch (e) {
-    console.error('Error creating delivery:', e);
+    logger.error('Error creating delivery:', e);
     res.status(500).json(errorResponse('Failed to create delivery'));
   }
 });
@@ -6526,7 +6557,7 @@ app.get('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, async (
 
     res.json(successResponse(delivery));
   } catch (e) {
-    console.error('Error fetching delivery:', e);
+    logger.error('Error fetching delivery:', e);
     res.status(500).json(errorResponse('Failed to load delivery'));
   }
 });
@@ -6585,7 +6616,7 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, async
               note: 'Auto-completed: delivery marked as delivered',
             });
           } catch (statusErr) {
-            console.warn('Failed to auto-complete order on DELIVERED:', statusErr.message);
+            logger.warn('Failed to auto-complete order on DELIVERED:', statusErr.message);
           }
         }
 
@@ -6594,7 +6625,7 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, async
           await repos.orderRepo.update(delivery.orderId, { paymentStatus: updateData.paymentStatus });
         }
       } catch (syncErr) {
-        console.warn('Failed to sync delivery changes to order:', syncErr.message);
+        logger.warn('Failed to sync delivery changes to order:', syncErr.message);
       } finally {
         _orderDeliverySyncInProgress.delete(delivery.orderId);
       }
@@ -6608,12 +6639,12 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, async
         body: `Delivery status changed to ${updateData.deliveryStatus.replace(/_/g, ' ')}`,
         category: 'deliveries',
         data: { type: 'delivery_status', deliveryId: delivery.id, status: updateData.deliveryStatus },
-      }, repos).catch((err) => console.error('[Push] Delivery status push error:', err));
+      }, repos).catch((err) => logger.error('[Push] Delivery status push error:', err));
     }
 
     res.json(successResponse(updated));
   } catch (e) {
-    console.error('Error updating delivery:', e);
+    logger.error('Error updating delivery:', e);
     res.status(500).json(errorResponse('Failed to update delivery'));
   }
 });
@@ -6634,7 +6665,7 @@ app.delete('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, asyn
     await repos.deliveryRepo.delete(deliveryId);
     res.json(successResponse({ deleted: true }));
   } catch (e) {
-    console.error('Error deleting delivery:', e);
+    logger.error('Error deleting delivery:', e);
     res.status(500).json(errorResponse('Failed to delete delivery'));
   }
 });
@@ -6695,7 +6726,7 @@ app.post('/api/companies/:companyId/orders/:orderId/create-delivery', requireAut
       try {
         await repos.orderRepo.update(orderId, { deliveryStatus: 'NOT_ASSIGNED' });
       } catch (syncErr) {
-        console.warn('Failed to sync order deliveryStatus:', syncErr.message);
+        logger.warn('Failed to sync order deliveryStatus:', syncErr.message);
       } finally {
         _orderDeliverySyncInProgress.delete(orderId);
       }
@@ -6703,7 +6734,7 @@ app.post('/api/companies/:companyId/orders/:orderId/create-delivery', requireAut
 
     res.status(201).json(successResponse(delivery));
   } catch (e) {
-    console.error('Error creating delivery from order:', e);
+    logger.error('Error creating delivery from order:', e);
     res.status(500).json(errorResponse('Failed to create delivery from order'));
   }
 });
@@ -6755,7 +6786,7 @@ app.get('/api/companies/:companyId/invoices', requireAuth, async (req, res) => {
 
     res.json(successResponse(businessInvoices, 'Invoices retrieved successfully'));
   } catch (err) {
-    console.error('Error fetching business invoices:', err);
+    logger.error('Error fetching business invoices:', err);
     res.status(500).json(errorResponse('Failed to retrieve invoices', 'FETCH_ERROR'));
   }
 });
@@ -6771,7 +6802,7 @@ app.get('/api/companies/:companyId/invoices/:invoiceId', requireAuth, async (req
     }
     res.json(successResponse(invoice));
   } catch (err) {
-    console.error('Error fetching invoice:', err);
+    logger.error('Error fetching invoice:', err);
     res.status(500).json(errorResponse('Failed to retrieve invoice', 'FETCH_ERROR'));
   }
 });
@@ -6899,7 +6930,7 @@ app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => 
         // P2002 = Unique constraint violation (Prisma error code)
         const isUniqueViolation = createErr.code === 'P2002' || (createErr.message && createErr.message.includes('Unique constraint'));
         if (isUniqueViolation && attempt < MAX_RETRIES) {
-          console.warn(`[Invoice] Duplicate invoice number "${invoiceNumber}" on attempt ${attempt}, retrying...`);
+          logger.warn(`[Invoice] Duplicate invoice number "${invoiceNumber}" on attempt ${attempt}, retrying...`);
           continue;
         }
         throw createErr; // Re-throw if not a unique violation or out of retries
@@ -6931,18 +6962,19 @@ app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => 
           }
         });
       } catch (msgErr) {
-        console.error('Failed to create invoice event message:', msgErr);
+        logger.error('Failed to create invoice event message:', msgErr);
       }
     }
 
     res.status(201).json(successResponse(created, 'Invoice created successfully'));
   } catch (err) {
-    console.error('Error creating business invoice:', err);
+    logger.error('Error creating business invoice:', err);
     res.status(500).json(errorResponse('Failed to create invoice', 'CREATE_ERROR'));
   }
 });
 
 // Get invoices for a location
+// [location-mode] Not yet called by the app -- kept for the planned DEPENDENT/INDEPENDENT-location feature (AUDIT.md P3).
 app.get('/api/locations/:locationId/invoices', requireAuth, async (req, res) => {
   // PERMISSION: Require location membership
   if (!(await requireLocationMembership(req, res, req.params.locationId))) return;
@@ -6974,12 +7006,13 @@ app.get('/api/locations/:locationId/invoices', requireAuth, async (req, res) => 
 
     res.json(successResponse(locationInvoices, 'Location invoices retrieved successfully'));
   } catch (err) {
-    console.error('Error fetching location invoices:', err);
+    logger.error('Error fetching location invoices:', err);
     res.status(500).json(errorResponse('Failed to retrieve invoices', 'FETCH_ERROR'));
   }
 });
 
 // Create invoice at Location level (INDEPENDENT only) - INTERNAL USE
+// [location-mode] Not yet called by the app -- kept for the planned DEPENDENT/INDEPENDENT-location feature (AUDIT.md P3).
 app.post('/api/locations/:locationId/invoices', requireAuth, async (req, res) => {
   // PERMISSION: Require location membership
   if (!(await requireLocationMembership(req, res, req.params.locationId))) return;
@@ -7119,7 +7152,7 @@ app.post('/api/locations/:locationId/invoices', requireAuth, async (req, res) =>
       } catch (createErr) {
         const isUniqueViolation = createErr.code === 'P2002' || (createErr.message && createErr.message.includes('Unique constraint'));
         if (isUniqueViolation && attempt < MAX_RETRIES) {
-          console.warn(`[Invoice] Duplicate location invoice number "${invoiceNumber}" on attempt ${attempt}, retrying...`);
+          logger.warn(`[Invoice] Duplicate location invoice number "${invoiceNumber}" on attempt ${attempt}, retrying...`);
           continue;
         }
         throw createErr;
@@ -7150,13 +7183,13 @@ app.post('/api/locations/:locationId/invoices', requireAuth, async (req, res) =>
           }
         });
       } catch (msgErr) {
-        console.error('Failed to create invoice event message:', msgErr);
+        logger.error('Failed to create invoice event message:', msgErr);
       }
     }
 
     res.status(201).json(successResponse(created, 'Invoice created successfully'));
   } catch (err) {
-    console.error('Error creating location invoice:', err);
+    logger.error('Error creating location invoice:', err);
     res.status(500).json(errorResponse('Failed to create invoice', 'CREATE_ERROR'));
   }
 });
@@ -7286,7 +7319,7 @@ app.patch('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
           }
         });
       } catch (msgErr) {
-        console.error('Failed to create estimate_confirmed event:', msgErr);
+        logger.error('Failed to create estimate_confirmed event:', msgErr);
       }
     }
 
@@ -7311,13 +7344,13 @@ app.patch('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
           }
         });
       } catch (msgErr) {
-        console.error('Failed to create invoice sent event message:', msgErr);
+        logger.error('Failed to create invoice sent event message:', msgErr);
       }
     }
 
     res.json(successResponse(updated, 'Invoice updated successfully'));
   } catch (err) {
-    console.error('Error updating invoice:', err);
+    logger.error('Error updating invoice:', err);
     res.status(500).json(errorResponse('Failed to update invoice', 'UPDATE_ERROR'));
   }
 });
@@ -7349,12 +7382,13 @@ app.delete('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
 
     res.json(successResponse(null, 'Invoice deleted successfully'));
   } catch (err) {
-    console.error('Error deleting invoice:', err);
+    logger.error('Error deleting invoice:', err);
     res.status(500).json(errorResponse('Failed to delete invoice', 'DELETE_ERROR'));
   }
 });
 
 // Accept estimate (convert to invoice) - admin/super_admin only
+// [location-mode] Not yet called by the app -- kept for the planned DEPENDENT/INDEPENDENT-location feature (AUDIT.md P3).
 app.post('/api/invoices/:invoiceId/accept', requireAuth, async (req, res) => {
   try {
     const invoice = await repos.invoiceRepo.getById(req.params.invoiceId);
@@ -7394,11 +7428,11 @@ app.post('/api/invoices/:invoiceId/accept', requireAuth, async (req, res) => {
         }
       });
     } catch (msgErr) {
-      console.error('Failed to create estimate_confirmed event:', msgErr);
+      logger.error('Failed to create estimate_confirmed event:', msgErr);
     }
     res.json(successResponse(updated, 'Estimate accepted and converted to invoice'));
   } catch (err) {
-    console.error('Error accepting estimate:', err);
+    logger.error('Error accepting estimate:', err);
     res.status(500).json(errorResponse('Failed to accept estimate', 'ACCEPT_ERROR'));
   }
 });
@@ -7458,7 +7492,7 @@ app.post('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, c
 
     res.status(201).json(successResponse(newChat));
   } catch (e) {
-    console.error('Error creating chat:', e);
+    logger.error('Error creating chat:', e);
     res.status(500).json(errorResponse('Failed to create chat'));
   }
 });
@@ -7519,7 +7553,7 @@ app.get('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, as
 
     res.json({ success: true, data: companyChats, nextCursor: useSearch ? null : nextCursor });
   } catch (e) {
-    console.error('Error fetching chats:', e);
+    logger.error('Error fetching chats:', e);
     res.status(500).json(errorResponse('Failed to load chats'));
   }
 });
@@ -7554,7 +7588,7 @@ app.get('/api/companies/:companyId/chats/:chatId/messages', requireAuth, require
       message: 'Success'
     });
   } catch (e) {
-    console.error('Error fetching messages:', e);
+    logger.error('Error fetching messages:', e);
     res.status(500).json(errorResponse('Failed to load messages'));
   }
 });
@@ -7591,7 +7625,7 @@ app.post('/api/companies/:companyId/chats/:chatId/read', requireAuth, requireCom
 
     res.json(successResponse(chat));
   } catch (e) {
-    console.error('Error marking chat as read:', e);
+    logger.error('Error marking chat as read:', e);
     res.status(500).json(errorResponse('Failed to mark chat as read'));
   }
 });
@@ -7709,7 +7743,7 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, requir
         });
       }
     } else {
-      console.warn(`[Chat] No participants found for chat ${chatId}, skipping chat_update emit`);
+      logger.warn(`[Chat] No participants found for chat ${chatId}, skipping chat_update emit`);
     }
 
     // Send push notifications to other participants
@@ -7723,12 +7757,12 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, requir
         body: created.content || 'Sent a message',
         category: 'messages',
         data: { type: 'chat_message', chatId },
-      }, repos).catch((err) => console.error('[Push] Chat message push error:', err));
+      }, repos).catch((err) => logger.error('[Push] Chat message push error:', err));
     }
 
     res.json(successResponse(created));
   } catch (e) {
-    console.error('Error sending message:', e);
+    logger.error('Error sending message:', e);
     res.status(500).json(errorResponse('Failed to send message'));
   }
 });
@@ -7778,7 +7812,7 @@ app.delete('/api/companies/:companyId/chats/:chatId/messages/:messageId', requir
 
     res.json(successResponse(deletedMessage));
   } catch (e) {
-    console.error('Error deleting message:', e);
+    logger.error('Error deleting message:', e);
     res.status(500).json(errorResponse('Failed to delete message'));
   }
 });
@@ -7833,7 +7867,7 @@ app.patch('/api/companies/:companyId/chats/:chatId/messages/:messageId', require
 
     res.json(successResponse(edited));
   } catch (e) {
-    console.error('Error editing message:', e);
+    logger.error('Error editing message:', e);
     res.status(500).json(errorResponse('Failed to edit message'));
   }
 });
@@ -7925,7 +7959,7 @@ app.post('/api/companies/:companyId/chats/:chatId/messages/:messageId/forward', 
 
     res.json(successResponse(savedMessage));
   } catch (e) {
-    console.error('Error forwarding message:', e);
+    logger.error('Error forwarding message:', e);
     res.status(500).json(errorResponse('Failed to forward message'));
   }
 });
@@ -7971,7 +8005,7 @@ app.post('/api/companies/:companyId/chats/:chatId/leave', requireAuth, requireCo
 
     res.json(successResponse({ message: 'Left group successfully' }));
   } catch (e) {
-    console.error('Error leaving chat:', e);
+    logger.error('Error leaving chat:', e);
     res.status(500).json(errorResponse('Failed to leave group'));
   }
 });
@@ -8029,7 +8063,7 @@ app.post('/api/companies/:companyId/chats/:chatId/remove-participant', requireAu
 
     res.json(successResponse({ message: 'Participant removed successfully' }));
   } catch (e) {
-    console.error('Error removing participant:', e);
+    logger.error('Error removing participant:', e);
     res.status(500).json(errorResponse('Failed to remove participant'));
   }
 });
@@ -8092,7 +8126,7 @@ app.get('/api/users/:userId/chats', requireAuth, async (req, res) => {
 
     res.json({ success: true, data: userChats, nextCursor: useSearch ? null : nextCursor });
   } catch (e) {
-    console.error('Error fetching user chats:', e);
+    logger.error('Error fetching user chats:', e);
     res.status(500).json(errorResponse('Failed to load chats'));
   }
 });
@@ -8140,7 +8174,7 @@ app.post('/api/users/:userId/chats', requireAuth, chatCreationLimiter, async (re
 
     res.status(201).json(successResponse(newChat));
   } catch (e) {
-    console.error('Error creating user chat:', e);
+    logger.error('Error creating user chat:', e);
     res.status(500).json(errorResponse('Failed to create chat'));
   }
 });
@@ -8180,7 +8214,7 @@ app.get('/api/users/:userId/chats/:chatId/messages', requireAuth, async (req, re
       message: 'Messages retrieved'
     });
   } catch (e) {
-    console.error('Error fetching user chat messages:', e);
+    logger.error('Error fetching user chat messages:', e);
     res.status(500).json(errorResponse('Failed to load messages'));
   }
 });
@@ -8220,7 +8254,7 @@ app.post('/api/users/:userId/chats/:chatId/read', requireAuth, async (req, res) 
 
     res.json(successResponse(chat));
   } catch (e) {
-    console.error('Error marking user chat as read:', e);
+    logger.error('Error marking user chat as read:', e);
     res.status(500).json(errorResponse('Failed to mark chat as read'));
   }
 });
@@ -8357,12 +8391,12 @@ app.post('/api/users/:userId/chats/:chatId/messages', requireAuth, messageLimite
         });
       }
     } else {
-      console.warn(`[Chat] No participants found for chat ${chatId}, skipping chat_update emit`);
+      logger.warn(`[Chat] No participants found for chat ${chatId}, skipping chat_update emit`);
     }
 
     res.json(successResponse(created));
   } catch (e) {
-    console.error('Error sending user message:', e);
+    logger.error('Error sending user message:', e);
     res.status(500).json(errorResponse('Failed to send message'));
   }
 });
@@ -8422,7 +8456,7 @@ app.delete('/api/users/:userId/chats/:chatId/messages/:messageId', requireAuth, 
 
     res.json(successResponse(deletedMessage));
   } catch (e) {
-    console.error('Error deleting user message:', e);
+    logger.error('Error deleting user message:', e);
     res.status(500).json(errorResponse('Failed to delete message'));
   }
 });
@@ -8482,7 +8516,7 @@ app.patch('/api/users/:userId/chats/:chatId/messages/:messageId', requireAuth, a
 
     res.json(successResponse(edited));
   } catch (e) {
-    console.error('Error editing user message:', e);
+    logger.error('Error editing user message:', e);
     res.status(500).json(errorResponse('Failed to edit message'));
   }
 });
@@ -8574,7 +8608,7 @@ app.post('/api/users/:userId/chats/:chatId/messages/:messageId/forward', require
 
     res.json(successResponse(savedMessage));
   } catch (e) {
-    console.error('Error forwarding user message:', e);
+    logger.error('Error forwarding user message:', e);
     res.status(500).json(errorResponse('Failed to forward message'));
   }
 });
@@ -8616,7 +8650,7 @@ app.post('/api/users/:userId/chats/:chatId/leave', requireAuth, async (req, res)
 
     res.json(successResponse({ message: 'Left group successfully' }));
   } catch (e) {
-    console.error('Error leaving user chat:', e);
+    logger.error('Error leaving user chat:', e);
     res.status(500).json(errorResponse('Failed to leave group'));
   }
 });
@@ -8666,7 +8700,7 @@ app.post('/api/users/:userId/chats/:chatId/remove-participant', requireAuth, asy
 
     res.json(successResponse({ message: 'Participant removed successfully' }));
   } catch (e) {
-    console.error('Error removing participant from user chat:', e);
+    logger.error('Error removing participant from user chat:', e);
     res.status(500).json(errorResponse('Failed to remove participant'));
   }
 });
@@ -8852,7 +8886,7 @@ app.get('/api/users/:userId/contacts', requireAuth, async (req, res) => {
 
     res.json(successResponse(allResults));
   } catch (error) {
-    console.error('[Contacts] Error:', error);
+    logger.error('[Contacts] Error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch contacts' });
   }
 });
@@ -8873,7 +8907,7 @@ app.get('/api/companies/:companyId/users', requireAuth, async (req, res) => {
     
     res.json(successResponse(companyUsers));
   } catch (error) {
-    console.error('[CompanyUsers] Error:', error);
+    logger.error('[CompanyUsers] Error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch company users' });
   }
 });
@@ -9328,6 +9362,61 @@ app.patch('/api/companies/:companyId/locations/:locationId/staff/:userId', requi
     }
 
     return res.json(successResponse({ businessMember: updatedBm, locationMember: lm }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Update role/status at the business level (no specific location).
+// PATCH /api/companies/:companyId/users/:userId
+// Body: { role?, status? }
+// This is the fallback used by the team screen when no locationId is supplied,
+// so business-level role edits work. Mirrors the location-scoped staff PATCH
+// above, minus the per-location assignment logic.
+app.patch('/api/companies/:companyId/users/:userId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, userId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
+    const { role, status } = req.body || {};
+
+    if (role !== undefined) ensureRole(role);
+    if (status !== undefined) ensureStatus(status);
+
+    const bm = await findBusinessMember(companyId, userId);
+    if (!bm) return res.status(404).json(errorResponse('User is not a member of this business'));
+
+    // Only a super_admin may grant or change a super_admin role, so an admin
+    // can't elevate themselves or lock out the owner.
+    if (bm.role === 'super_admin' || role === 'super_admin') {
+      const requester = await findBusinessMember(companyId, req.user?.id);
+      if (!requester || requester.role !== 'super_admin') {
+        return res.status(403).json(errorResponse('Only a super_admin can change a super_admin role.', 'FORBIDDEN'));
+      }
+    }
+
+    const bmPatch = {};
+    if (role !== undefined) bmPatch.role = role;
+    if (status !== undefined) bmPatch.status = status;
+
+    let updatedBm = bm;
+    if (Object.keys(bmPatch).length > 0) {
+      updatedBm = await repos.memberRepo.updateBusinessMember(bm.id, bmPatch);
+    }
+
+    // Keep this user's existing location assignments aligned with the new
+    // business-level role/status (best-effort; never block the main update).
+    if (Object.keys(bmPatch).length > 0) {
+      try {
+        const lms = await repos.memberRepo.listLocationMembersByBusinessAndUser(companyId, userId);
+        for (const lm of lms || []) {
+          await repos.memberRepo.updateLocationMember(lm.id, bmPatch);
+        }
+      } catch (e) {
+        logger.warn('[role-update] failed to align location memberships:', e?.message);
+      }
+    }
+
+    return res.json(successResponse({ businessMember: updatedBm }));
   } catch (err) {
     return sendError(res, err);
   }
@@ -10040,7 +10129,7 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/assign', requireAuth
         });
       }
     } catch (staffErr) {
-      console.warn('Failed to create DeliveryStaff record:', staffErr.message);
+      logger.warn('Failed to create DeliveryStaff record:', staffErr.message);
     }
 
     // Sync delivery assignment status to linked order (with loop guard)
@@ -10049,7 +10138,7 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/assign', requireAuth
       try {
         await repos.orderRepo.update(delivery.orderId, { deliveryStatus: patch.deliveryStatus });
       } catch (syncErr) {
-        console.warn('Failed to sync delivery assign to order:', syncErr.message);
+        logger.warn('Failed to sync delivery assign to order:', syncErr.message);
       } finally {
         _orderDeliverySyncInProgress.delete(delivery.orderId);
       }
@@ -10095,7 +10184,7 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/unassign', requireAu
         await repos.deliveryStaffRepo.unassign(deliveryId, staff.userId);
       }
     } catch (staffErr) {
-      console.warn('Failed to remove DeliveryStaff records:', staffErr.message);
+      logger.warn('Failed to remove DeliveryStaff records:', staffErr.message);
     }
 
     // Sync delivery unassignment status to linked order (with loop guard)
@@ -10104,7 +10193,7 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/unassign', requireAu
       try {
         await repos.orderRepo.update(delivery.orderId, { deliveryStatus: patch.deliveryStatus });
       } catch (syncErr) {
-        console.warn('Failed to sync delivery unassign to order:', syncErr.message);
+        logger.warn('Failed to sync delivery unassign to order:', syncErr.message);
       } finally {
         _orderDeliverySyncInProgress.delete(delivery.orderId);
       }
@@ -10184,7 +10273,7 @@ app.post('/api/companies/:companyId/deliveries/:deliveryId/staff', requireAuth, 
     if (backwardPatch.deliveryStatus && delivery.orderId && !_orderDeliverySyncInProgress.has(delivery.orderId)) {
       _orderDeliverySyncInProgress.add(delivery.orderId);
       try { await repos.orderRepo.update(delivery.orderId, { deliveryStatus: backwardPatch.deliveryStatus }); }
-      catch (syncErr) { console.warn('Failed to sync:', syncErr.message); }
+      catch (syncErr) { logger.warn('Failed to sync:', syncErr.message); }
       finally { _orderDeliverySyncInProgress.delete(delivery.orderId); }
     }
 
@@ -10227,7 +10316,7 @@ app.delete('/api/companies/:companyId/deliveries/:deliveryId/staff/:userId', req
     if (backwardPatch.deliveryStatus && delivery.orderId && !_orderDeliverySyncInProgress.has(delivery.orderId)) {
       _orderDeliverySyncInProgress.add(delivery.orderId);
       try { await repos.orderRepo.update(delivery.orderId, { deliveryStatus: backwardPatch.deliveryStatus }); }
-      catch (syncErr) { console.warn('Failed to sync:', syncErr.message); }
+      catch (syncErr) { logger.warn('Failed to sync:', syncErr.message); }
       finally { _orderDeliverySyncInProgress.delete(delivery.orderId); }
     }
 
@@ -10398,7 +10487,7 @@ app.post('/api/upload', requireAuth, upload.single('file'), async (req, res) => 
   } catch (err) {
     // Surface the underlying storage error so misconfig (wrong key, wrong bucket,
     // RLS denial, etc.) is diagnosable from the client instead of a generic message.
-    console.error('[Upload] Error:', err);
+    logger.error('[Upload] Error:', err);
     const detail = (err && (err.message || err.error)) || 'Unknown storage error';
     res.status(500).json(errorResponse(`File upload failed: ${detail}`));
   }
@@ -10478,7 +10567,7 @@ app.get('/api/feed', optionalAuth, async (req, res) => {
       message: 'Success'
     });
   } catch (err) {
-    console.error('[Feed] Error:', err);
+    logger.error('[Feed] Error:', err);
     res.json({ success: true, data: [], nextCursor: null, message: 'Success' });
   }
 });
@@ -10648,7 +10737,7 @@ app.get('/api/companies/:companyId/activity-feed', requireAuth, async (req, res)
     
     return res.json(successResponse({ activities }));
   } catch (err) {
-    console.error('Error fetching activity feed:', err);
+    logger.error('Error fetching activity feed:', err);
     return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch activity feed'));
   }
 });
@@ -10949,7 +11038,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
           });
         }
       } catch (err) {
-        console.error('Error fetching received invites for personal notifications:', err);
+        logger.error('Error fetching received invites for personal notifications:', err);
       }
 
       // 2. User's own join/role requests resolved — join_request_accepted / status_change
@@ -11001,7 +11090,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
           }
         }
       } catch (err) {
-        console.error('Error fetching user role requests for personal notifications:', err);
+        logger.error('Error fetching user role requests for personal notifications:', err);
       }
 
       // 3. Deliveries assigned to this user — delivery_assigned
@@ -11030,7 +11119,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
           });
         }
       } catch (err) {
-        console.error('Error fetching delivery assignments for personal notifications:', err);
+        logger.error('Error fetching delivery assignments for personal notifications:', err);
       }
 
       // 4. Pending personal connection requests received — company_request
@@ -11056,7 +11145,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
           });
         }
       } catch (err) {
-        console.error('Error fetching connection requests for personal notifications:', err);
+        logger.error('Error fetching connection requests for personal notifications:', err);
       }
 
       // 5. Recently accepted personal connections — connection_accepted
@@ -11084,7 +11173,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
           });
         }
       } catch (err) {
-        console.error('Error fetching accepted connections for personal notifications:', err);
+        logger.error('Error fetching accepted connections for personal notifications:', err);
       }
     } // end personal mode
 
@@ -11148,7 +11237,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
 
     return res.json(successResponse({ notifications }));
   } catch (err) {
-    console.error('Error fetching notifications:', err);
+    logger.error('Error fetching notifications:', err);
     return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch notifications'));
   }
 });
@@ -11178,7 +11267,7 @@ app.post('/api/users/:userId/notifications/:notificationId/read', requireAuth, a
       readAt: record.readAt
     }));
   } catch (err) {
-    console.error('Error marking notification as read:', err);
+    logger.error('Error marking notification as read:', err);
     return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to mark notification as read'));
   }
 });
@@ -11195,7 +11284,7 @@ app.post('/api/push-tokens/register', requireAuth, async (req, res) => {
     const record = await repos.pushTokenRepo.upsert(req.user.id, token, platform, deviceId || null);
     return res.json(successResponse(record, 'Push token registered'));
   } catch (err) {
-    console.error('[PushToken] Register error:', err);
+    logger.error('[PushToken] Register error:', err);
     return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to register push token'));
   }
 });
@@ -11210,7 +11299,7 @@ app.delete('/api/push-tokens/unregister', requireAuth, async (req, res) => {
     await repos.pushTokenRepo.deactivate(req.user.id, token);
     return res.json(successResponse(null, 'Push token unregistered'));
   } catch (err) {
-    console.error('[PushToken] Unregister error:', err);
+    logger.error('[PushToken] Unregister error:', err);
     return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to unregister push token'));
   }
 });
@@ -11225,7 +11314,7 @@ app.get('/api/notification-preferences', requireAuth, async (req, res) => {
     }
     return res.json(successResponse(prefs));
   } catch (err) {
-    console.error('[NotifPrefs] Get error:', err);
+    logger.error('[NotifPrefs] Get error:', err);
     return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to get notification preferences'));
   }
 });
@@ -11246,7 +11335,7 @@ app.patch('/api/notification-preferences', requireAuth, async (req, res) => {
     const prefs = await repos.notificationPreferenceRepo.upsert(req.user.id, updates);
     return res.json(successResponse(prefs, 'Preferences updated'));
   } catch (err) {
-    console.error('[NotifPrefs] Update error:', err);
+    logger.error('[NotifPrefs] Update error:', err);
     return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to update notification preferences'));
   }
 });
@@ -11317,7 +11406,7 @@ app.get('/api/products/:productId', async (req, res) => {
     const result = await applyPricePrivacy(foundProduct, viewerBusinessId || null);
     return res.json(successResponse(result));
   } catch (e) {
-    console.error('Error fetching product:', e);
+    logger.error('Error fetching product:', e);
     res.status(500).json(errorResponse('Failed to load product'));
   }
 });
@@ -11402,7 +11491,9 @@ app.get('/api/public/locations/:locationId/products', async (req, res) => {
   }
 });
 
-// Create order from public storefront - STUB (not yet implemented)
+// Create an order from a business's public storefront (no auth — a guest /
+// personal-mode customer ordering from a publicly visible location).
+// Body: { customerName, customerPhone, customerAddress?, items: [{ productId, quantity }], notes? }
 app.post('/api/public/locations/:locationId/orders', async (req, res) => {
   try {
     const location = await prisma.location.findUnique({ where: { id: req.params.locationId } });
@@ -11422,10 +11513,92 @@ app.post('/api/public/locations/:locationId/orders', async (req, res) => {
       return res.status(404).json(errorResponse('This location does not accept public orders'));
     }
 
-    return res.status(501).json(errorResponse(
-      'Public order creation is not yet implemented. Use internal endpoints for now.',
-      'NOT_IMPLEMENTED'
-    ));
+    const { customerName, customerPhone, customerAddress, items: rawItems, notes } = req.body || {};
+
+    // Guest-contact validation (no account, so we need a way to reach them).
+    if (!customerName || !String(customerName).trim()) {
+      return res.status(400).json(errorResponse('customerName is required'));
+    }
+    if (!customerPhone || !String(customerPhone).trim()) {
+      return res.status(400).json(errorResponse('customerPhone is required'));
+    }
+    if (!Array.isArray(rawItems) || rawItems.length === 0) {
+      return res.status(400).json(errorResponse('At least one order item is required'));
+    }
+
+    // SECURITY: never trust client-supplied prices. Load each product, confirm
+    // it belongs to this location's business and is publicly listed, then
+    // compute unit prices and totals from the database.
+    const orderItems = [];
+    let totalAmount = 0;
+    for (const item of rawItems) {
+      const productId = item?.productId;
+      const quantity = Number(item?.quantity);
+      if (!productId || !Number.isFinite(quantity) || quantity <= 0) {
+        return res.status(400).json(errorResponse('Each item needs a valid productId and a quantity greater than 0'));
+      }
+      const product = await prisma.product.findUnique({ where: { id: productId } });
+      if (!product || product.businessId !== location.businessId || !product.isListed) {
+        return res.status(400).json(errorResponse(`Product not available: ${productId}`, 'INVALID_PRODUCT'));
+      }
+      const unitPrice = product.price || 0;
+      const subtotal = unitPrice * quantity;
+      totalAmount += subtotal;
+      orderItems.push({
+        productId: product.id,
+        productName: product.name,
+        quantity,
+        unitPrice,
+        subtotal,
+      });
+    }
+
+    const newOrder = {
+      id: 'ORD-' + uuidv4().slice(0, 8).toUpperCase(),
+      businessId: location.businessId,
+      soldByScope: ORDER_SCOPE_FROM_STORE.LOCATION,
+      soldByLocationId: location.id,
+      fulfillmentLocationId: location.id,
+      customerId: null,
+      customerName: String(customerName).trim(),
+      customerAddress: customerAddress ? String(customerAddress).trim() : null,
+      customerPhone: String(customerPhone).trim(),
+      buyerBusinessId: null,
+      buyerBusinessName: null,
+      createdBy: null,
+      items: orderItems,
+      totalAmount,
+      // Public orders always start NEW so the seller explicitly accepts them.
+      status: ORDER_STATUS_FROM_STORE.NEW,
+      paymentStatus: 'UNPAID',
+      notes: notes ? String(notes) : null,
+    };
+
+    const created = await repos.orderRepo.create(newOrder);
+
+    // Notify the seller (non-blocking).
+    try {
+      await eventMessages.createEventMessage({
+        type: 'order_event',
+        fromBusinessId: created.businessId,
+        toBusinessId: null,
+        entityId: created.id,
+        actorId: null,
+        actorName: created.customerName || 'Customer',
+        metadata: {
+          status: created.status,
+          orderNumber: created.id,
+          customerName: created.customerName,
+          totalAmount: created.totalAmount,
+          locationId: location.id,
+          source: 'public_storefront',
+        },
+      });
+    } catch (msgErr) {
+      logger.error('Failed to create public order event message:', msgErr);
+    }
+
+    res.status(201).json(successResponse(created, 'Order placed successfully'));
   } catch (err) {
     return sendError(res, err);
   }
@@ -11451,7 +11624,7 @@ app.post('/api/automation/orders', async (req, res) => {
     const results = await orderAutomation.runAutomation({ dryRun });
     res.json(successResponse(results, 'Automation completed'));
   } catch (err) {
-    console.error('Error running order automation:', err);
+    logger.error('Error running order automation:', err);
     res.status(500).json(errorResponse('Automation failed', 'AUTOMATION_ERROR'));
   }
 });
@@ -11465,7 +11638,7 @@ app.get('/api/automation/orders/preview', async (req, res) => {
     const results = await orderAutomation.runAutomation({ dryRun: true });
     res.json(successResponse(results, 'Automation preview'));
   } catch (err) {
-    console.error('Error previewing order automation:', err);
+    logger.error('Error previewing order automation:', err);
     res.status(500).json(errorResponse('Automation preview failed', 'AUTOMATION_ERROR'));
   }
 });
@@ -11515,7 +11688,7 @@ app.post('/api/users/:userId/device-tokens', requireAuth, async (req, res) => {
 
     res.json(successResponse(deviceToken));
   } catch (e) {
-    console.error('Error registering device token:', e);
+    logger.error('Error registering device token:', e);
     res.status(500).json(errorResponse('Failed to register device token'));
   }
 });
@@ -11535,7 +11708,7 @@ app.delete('/api/users/:userId/device-tokens/:token', requireAuth, async (req, r
 
     res.json(successResponse({ deleted: true }));
   } catch (e) {
-    console.error('Error unregistering device token:', e);
+    logger.error('Error unregistering device token:', e);
     res.status(500).json(errorResponse('Failed to unregister device token'));
   }
 });
@@ -11593,11 +11766,11 @@ async function sendPushToOfflineParticipants(chatId, senderName, messagePreview,
       try {
         await expo.sendPushNotificationsAsync(chunk);
       } catch (err) {
-        console.error('[Push] Error sending chunk:', err);
+        logger.error('[Push] Error sending chunk:', err);
       }
     }
   } catch (err) {
-    console.error('[Push] Error in sendPushToOfflineParticipants:', err);
+    logger.error('[Push] Error in sendPushToOfflineParticipants:', err);
   }
 }
 
@@ -11661,7 +11834,7 @@ app.post('/api/payments/create-checkout', requireAuth, async (req, res) => {
 
     res.json(successResponse({ checkoutId, checkoutUrl, paymentId: payment.id }));
   } catch (err) {
-    console.error('[CreateCheckout] Error:', err);
+    logger.error('[CreateCheckout] Error:', err);
     res.status(500).json(errorResponse('Failed to create checkout'));
   }
 });
@@ -11708,7 +11881,7 @@ app.get('/api/payments/checkout-result/:checkoutId', requireAuth, async (req, re
       return res.json(successResponse({ status: 'FAILED', paymentId: payment.id }));
     }
   } catch (err) {
-    console.error('[CheckoutResult] Error:', err);
+    logger.error('[CheckoutResult] Error:', err);
     res.status(500).json(errorResponse('Failed to get checkout result'));
   }
 });
@@ -11717,7 +11890,7 @@ app.get('/api/payments/checkout-result/:checkoutId', requireAuth, async (req, re
 app.post('/api/webhooks/peach', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
     const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    console.log('[PeachWebhook] Received:', event.type || 'unknown', event.id || '');
+    logger.debug('[PeachWebhook] Received:', event.type || 'unknown', event.id || '');
 
     const checkoutId = event.payload?.checkoutId || event.checkoutId;
     if (!checkoutId) {
@@ -11728,7 +11901,7 @@ app.post('/api/webhooks/peach', express.raw({ type: 'application/json' }), async
       where: { peachCheckoutId: checkoutId },
     });
     if (!payment) {
-      console.warn('[PeachWebhook] No payment found for checkoutId:', checkoutId);
+      logger.warn('[PeachWebhook] No payment found for checkoutId:', checkoutId);
       return res.status(200).json({ received: true });
     }
 
@@ -11753,7 +11926,7 @@ app.post('/api/webhooks/peach', express.raw({ type: 'application/json' }), async
 
     res.status(200).json({ received: true });
   } catch (err) {
-    console.error('[PeachWebhook] Error:', err);
+    logger.error('[PeachWebhook] Error:', err);
     res.status(200).json({ received: true }); // Always 200 to avoid retries
   }
 });
@@ -11795,7 +11968,7 @@ async function processSuccessfulPayment(payment, peachResult) {
       data: updateData,
     });
 
-    console.log(`[Payment] Subscription activated: ${payment.businessId} → ${metadata.plan} (${metadata.billingPeriod})`);
+    logger.debug(`[Payment] Subscription activated: ${payment.businessId} → ${metadata.plan} (${metadata.billingPeriod})`);
   }
 
   // If this is an invoice payment, update the invoice
@@ -11807,7 +11980,7 @@ async function processSuccessfulPayment(payment, peachResult) {
         paidAmount: payment.amount,
       },
     });
-    console.log(`[Payment] Invoice paid: ${payment.invoiceId}`);
+    logger.debug(`[Payment] Invoice paid: ${payment.invoiceId}`);
   }
 }
 
@@ -11836,7 +12009,7 @@ app.get('/api/businesses/:businessId/payments', requireAuth, async (req, res) =>
 
     res.json(successResponse({ payments, total: count, hasMore: offset + limit < count }));
   } catch (err) {
-    console.error('[PaymentHistory] Error:', err);
+    logger.error('[PaymentHistory] Error:', err);
     res.status(500).json(errorResponse('Failed to get payment history'));
   }
 });
@@ -11862,7 +12035,7 @@ app.get('/api/businesses/:businessId/subscription-status', requireAuth, async (r
       capabilities,
     }));
   } catch (err) {
-    console.error('[SubscriptionStatus] Error:', err);
+    logger.error('[SubscriptionStatus] Error:', err);
     res.status(500).json(errorResponse('Failed to get subscription status'));
   }
 });
@@ -11913,7 +12086,7 @@ app.post('/api/payments/invoice-checkout', requireAuth, async (req, res) => {
 
     res.json(successResponse({ checkoutId, checkoutUrl, paymentId: payment.id }));
   } catch (err) {
-    console.error('[InvoiceCheckout] Error:', err);
+    logger.error('[InvoiceCheckout] Error:', err);
     res.status(500).json(errorResponse('Failed to create invoice checkout'));
   }
 });
@@ -11928,7 +12101,7 @@ app.use((err, req, res, next) => {
   if (process.env.SENTRY_DSN && !isCors) {
     Sentry.captureException(err);
   }
-  console.error('[UnhandledError]', err);
+  logger.error('[UnhandledError]', err);
   if (res.headersSent) return next(err);
   res.status(500).json(errorResponse('Internal server error', 'INTERNAL_ERROR'));
 });
@@ -11936,82 +12109,82 @@ app.use((err, req, res, next) => {
 // Start server (using HTTP server for Socket.IO support)
 server.listen(PORT, HOST, () => {
   const lanIP = getNetworkIP();
-  console.log('');
-  console.log('🚀 NouPro Backend Server Started (Locations + Modes MVP)');
-  console.log('=========================================================');
-  console.log(`📍 Local:   http://localhost:${PORT}`);
-  console.log(`📍 Network: http://${lanIP}:${PORT}`);
-  console.log('');
-  console.log(`🏥 Health:  http://localhost:${PORT}/api/health`);
-  console.log(`📊 Data source: PRISMA (PostgreSQL)`);
-  console.log(`🔌 Socket.IO: Enabled (real-time messaging)`);
-  console.log('');
-  console.log('📱 For physical device testing, use:');
-  console.log(`   EXPO_PUBLIC_API_URL=http://${lanIP}:${PORT}/api`);
-  console.log('');
-  console.log('🏢 Subscription Tiers:');
-  console.log('   FREE     - 1 location, DEPENDENT only, no orders/invoices');
-  console.log('   PRO      - 3 locations, DEPENDENT only, orders/invoices enabled');
-  console.log('   BUSINESS - Unlimited, INDEPENDENT allowed, full features');
-  console.log('');
-  console.log('📍 Location Modes:');
-  console.log('   DEPENDENT   - Fulfills parent orders only');
-  console.log('   INDEPENDENT - Own orders, invoices, public page (BUSINESS tier only)');
-  console.log('');
-  console.log('Available endpoints:');
-  console.log('');
-  console.log('  Auth:');
-  console.log('    POST /api/auth/login');
-  console.log('');
-  console.log('  Business (with capabilities):');
-  console.log('    GET  /api/businesses');
-  console.log('    GET  /api/companies/:companyId');
-  console.log('    PATCH /api/companies/:companyId');
-  console.log('');
-  console.log('  Locations (with mode enforcement):');
-  console.log('    GET  /api/companies/:companyId/locations');
-  console.log('    POST /api/companies/:companyId/locations');
-  console.log('    GET  /api/locations/:locationId');
-  console.log('    PATCH /api/locations/:locationId');
-  console.log('');
-  console.log('  Orders (scope: PARENT vs LOCATION):');
-  console.log('    GET  /api/companies/:companyId/orders');
-  console.log('    POST /api/companies/:companyId/orders (Parent)');
-  console.log('    POST /api/companies/:companyId/orders/:orderId/assign');
-  console.log('    GET  /api/locations/:locationId/orders');
-  console.log('    POST /api/locations/:locationId/orders (Independent only)');
-  console.log('');
-  console.log('  Invoices (scope: PARENT vs LOCATION):');
-  console.log('    GET  /api/companies/:companyId/invoices');
-  console.log('    POST /api/companies/:companyId/invoices (Parent)');
-  console.log('    GET  /api/locations/:locationId/invoices');
-  console.log('    POST /api/locations/:locationId/invoices (Independent only)');
-  console.log('');
-  console.log('  Stock:');
-  console.log('    GET  /api/companies/:companyId/stock');
-  console.log('    GET  /api/locations/:locationId/stock');
-  console.log('    PATCH /api/locations/:locationId/stock/:productId');
-  console.log('');
-  console.log('  Membership:');
-  console.log('    GET  /api/companies/:companyId/members');
-  console.log('    GET  /api/locations/:locationId/members');
-  console.log('    GET  /api/users/:userId/businesses');
-  console.log('    GET  /api/users/:userId/locations');
-  console.log('');
-  console.log('  Legacy (backwards compatible):');
-  console.log('    GET  /api/companies');
-  console.log('    GET  /api/companies/:companyId/products');
-  console.log('    GET  /api/companies/:companyId/deliveries');
-  console.log('    GET  /api/companies/:companyId/invoices');
-  console.log('    GET  /api/companies/:companyId/chats');
-  console.log('');
-  console.log('  Public Storefront (no auth required):');
-  console.log('    GET  /api/public/locations/:locationId');
-  console.log('    GET  /api/public/locations/:locationId/products');
-  console.log('    POST /api/public/locations/:locationId/orders (STUB)');
-  console.log('');
-  console.log('  Other:');
-  console.log('    GET  /api/feed');
-  console.log('    POST /api/upload');
-  console.log('    GET  /api/health');
+  logger.debug('');
+  logger.debug('🚀 NouPro Backend Server Started (Locations + Modes MVP)');
+  logger.debug('=========================================================');
+  logger.debug(`📍 Local:   http://localhost:${PORT}`);
+  logger.debug(`📍 Network: http://${lanIP}:${PORT}`);
+  logger.debug('');
+  logger.debug(`🏥 Health:  http://localhost:${PORT}/api/health`);
+  logger.debug(`📊 Data source: PRISMA (PostgreSQL)`);
+  logger.debug(`🔌 Socket.IO: Enabled (real-time messaging)`);
+  logger.debug('');
+  logger.debug('📱 For physical device testing, use:');
+  logger.debug(`   EXPO_PUBLIC_API_URL=http://${lanIP}:${PORT}/api`);
+  logger.debug('');
+  logger.debug('🏢 Subscription Tiers:');
+  logger.debug('   FREE     - 1 location, DEPENDENT only, no orders/invoices');
+  logger.debug('   PRO      - 3 locations, DEPENDENT only, orders/invoices enabled');
+  logger.debug('   BUSINESS - Unlimited, INDEPENDENT allowed, full features');
+  logger.debug('');
+  logger.debug('📍 Location Modes:');
+  logger.debug('   DEPENDENT   - Fulfills parent orders only');
+  logger.debug('   INDEPENDENT - Own orders, invoices, public page (BUSINESS tier only)');
+  logger.debug('');
+  logger.debug('Available endpoints:');
+  logger.debug('');
+  logger.debug('  Auth:');
+  logger.debug('    POST /api/auth/login');
+  logger.debug('');
+  logger.debug('  Business (with capabilities):');
+  logger.debug('    GET  /api/businesses');
+  logger.debug('    GET  /api/companies/:companyId');
+  logger.debug('    PATCH /api/companies/:companyId');
+  logger.debug('');
+  logger.debug('  Locations (with mode enforcement):');
+  logger.debug('    GET  /api/companies/:companyId/locations');
+  logger.debug('    POST /api/companies/:companyId/locations');
+  logger.debug('    GET  /api/locations/:locationId');
+  logger.debug('    PATCH /api/locations/:locationId');
+  logger.debug('');
+  logger.debug('  Orders (scope: PARENT vs LOCATION):');
+  logger.debug('    GET  /api/companies/:companyId/orders');
+  logger.debug('    POST /api/companies/:companyId/orders (Parent)');
+  logger.debug('    POST /api/companies/:companyId/orders/:orderId/assign');
+  logger.debug('    GET  /api/locations/:locationId/orders');
+  logger.debug('    POST /api/locations/:locationId/orders (Independent only)');
+  logger.debug('');
+  logger.debug('  Invoices (scope: PARENT vs LOCATION):');
+  logger.debug('    GET  /api/companies/:companyId/invoices');
+  logger.debug('    POST /api/companies/:companyId/invoices (Parent)');
+  logger.debug('    GET  /api/locations/:locationId/invoices');
+  logger.debug('    POST /api/locations/:locationId/invoices (Independent only)');
+  logger.debug('');
+  logger.debug('  Stock:');
+  logger.debug('    GET  /api/companies/:companyId/stock');
+  logger.debug('    GET  /api/locations/:locationId/stock');
+  logger.debug('    PATCH /api/locations/:locationId/stock/:productId');
+  logger.debug('');
+  logger.debug('  Membership:');
+  logger.debug('    GET  /api/companies/:companyId/members');
+  logger.debug('    GET  /api/locations/:locationId/members');
+  logger.debug('    GET  /api/users/:userId/businesses');
+  logger.debug('    GET  /api/users/:userId/locations');
+  logger.debug('');
+  logger.debug('  Legacy (backwards compatible):');
+  logger.debug('    GET  /api/companies');
+  logger.debug('    GET  /api/companies/:companyId/products');
+  logger.debug('    GET  /api/companies/:companyId/deliveries');
+  logger.debug('    GET  /api/companies/:companyId/invoices');
+  logger.debug('    GET  /api/companies/:companyId/chats');
+  logger.debug('');
+  logger.debug('  Public Storefront (no auth required):');
+  logger.debug('    GET  /api/public/locations/:locationId');
+  logger.debug('    GET  /api/public/locations/:locationId/products');
+  logger.debug('    POST /api/public/locations/:locationId/orders');
+  logger.debug('');
+  logger.debug('  Other:');
+  logger.debug('    GET  /api/feed');
+  logger.debug('    POST /api/upload');
+  logger.debug('    GET  /api/health');
 }); 

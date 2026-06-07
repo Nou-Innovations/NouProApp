@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend-tests:
+    name: Backend smoke tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # Dummy values: the smoke tests exercise pure state-machine logic and never
+      # open a connection, but PrismaClient needs a datasource URL to construct.
+      DATABASE_URL: postgresql://test:test@localhost:5432/noupro_test
+      DIRECT_URL: postgresql://test:test@localhost:5432/noupro_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate --schema ./prisma/schema.prisma
+      - run: npm test
+
+# Frontend gates (lint + `tsc --noEmit`) are intentionally NOT run here yet:
+#   - `npm run lint` is broken at the repo level (the ESLint toolchain — expo config
+#     + eslint-plugin-import — needs repair; pre-existing, out of scope for this pass).
+#   - `tsc --noEmit` still reports ~176 known type errors being burned down.
+# Add a frontend job here once the lint toolchain is fixed and the tsc backlog is cleared.

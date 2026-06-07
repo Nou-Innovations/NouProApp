@@ -88,14 +88,6 @@ export async function updateInvoiceStatus(
 }
 
 /**
- * Get a temporary URL to download the invoice PDF.
- * TODO: Backend endpoint not yet implemented. Returns a rejected promise.
- */
-export async function getInvoicePdfUrl(_companyId: string, _invoiceId: string): Promise<string> {
-  throw new Error('PDF export is not yet available. This feature is coming soon.');
-}
-
-/**
  * Convert an estimate to an invoice.
  * Implemented via PATCH update (changes type from 'estimate' to 'invoice').
  */
@@ -143,7 +135,6 @@ const invoicesService = {
   createInvoice,
   updateInvoice,
   updateInvoiceStatus,
-  getInvoicePdfUrl,
   convertEstimateToInvoice,
   recordInvoicePayments,
   deleteInvoice,

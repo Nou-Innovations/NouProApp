@@ -25,10 +25,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { AppModal } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
-import invoicesService, { Invoice, convertEstimateToInvoice, getInvoicePdfUrl, deleteInvoice } from '../invoices.service';
+import invoicesService, { Invoice, convertEstimateToInvoice, deleteInvoice } from '../invoices.service';
 import { formatInvoiceCurrency, InvoiceStatus } from '@/shared/types/invoice';
 import { useProfileStore } from '@/shared/store/profileStore';
 import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { generateInvoicePdf, InvoicePdfData } from '../invoices.pdf';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { checkPaywall, PaywallCheck, shouldShowNouProBranding } from '@/shared/utils/permissions';
 import { createInvoiceCheckout } from '@/features/payments/payments.service';
@@ -112,6 +114,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadComplete, setDownloadComplete] = useState(false);
+  const [generatedPdfUri, setGeneratedPdfUri] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showMoreOptions, setShowMoreOptions] = useState(false);
@@ -315,51 +318,84 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
   };
 
   const proceedWithDownload = async () => {
-    if (!businessId) return;
-
-    // Guard: check if PDF URL is available before attempting download
-    const pdfUrl = invoice?.pdfUrl;
-    if (!pdfUrl) {
-      try {
-        await getInvoicePdfUrl(businessId, invoiceId);
-      } catch {
-        Alert.alert('PDF Unavailable', 'PDF generation failed. Please try again later.');
-        return;
-      }
-    }
+    if (!invoice) return;
 
     setShowDownloadModal(true);
     setIsDownloading(true);
     setDownloadProgress(0);
     setDownloadComplete(false);
+    setGeneratedPdfUri(null);
 
     try {
-      const resolvedPdfUrl = pdfUrl!;
-      const fileName = `${documentNumber}.pdf`;
-      const directory = FileSystem.documentDirectory ?? '';
-      const fileUri = `${directory}${fileName}`;
+      const pdfData: InvoicePdfData = {
+        documentTitle: isEstimate ? 'Estimate' : 'Invoice',
+        documentNumber,
+        status,
+        issueDate: formatDate(issueDate),
+        dueDate: formatDate(dueDate),
+        businessName: activeBusiness?.name,
+        businessAddress: (activeBusiness as any)?.address,
+        businessPhone: (activeBusiness as any)?.phone,
+        businessEmail: (activeBusiness as any)?.email,
+        clientName,
+        clientAddress: (invoice as any)?.clientAddress,
+        clientPhone: invoice?.clientPhone,
+        clientEmail: invoice?.clientEmail,
+        items: lineItems.map((li) => ({
+          description: li.description,
+          quantity: li.quantity,
+          unitPrice: fmtCurrency(li.unitPrice),
+          total: fmtCurrency(li.total),
+        })),
+        subtotal: fmtCurrency(subtotal),
+        discount: globalDiscount ? fmtCurrency(globalDiscount) : undefined,
+        tax: totalTax ? fmtCurrency(totalTax) : undefined,
+        shipping: shippingCost ? fmtCurrency(shippingCost) : undefined,
+        grandTotal: fmtCurrency(grandTotal),
+        notes,
+        terms,
+        showBranding: shouldShowNouProBranding(activeBusiness?.plan || null),
+      };
 
-      const downloadResumable = FileSystem.createDownloadResumable(
-        resolvedPdfUrl,
-        fileUri,
-        {},
-        (progress) => {
-          const total = progress.totalBytesExpectedToWrite;
-          if (total > 0) {
-            const percent = Math.round((progress.totalBytesWritten / total) * 100);
-            setDownloadProgress(percent);
-          }
-        }
-      );
+      // Generate the PDF on-device, then copy it to a friendly filename.
+      const tempUri = await generateInvoicePdf(pdfData);
+      const fileName = `${documentNumber}.pdf`.replace(/[^\w.\-]/g, '_');
+      const destUri = `${FileSystem.documentDirectory ?? ''}${fileName}`;
+      let finalUri = tempUri;
+      try {
+        await FileSystem.copyAsync({ from: tempUri, to: destUri });
+        finalUri = destUri;
+      } catch {
+        // Fall back to the cache URI if copy fails.
+      }
 
-      await downloadResumable.downloadAsync();
+      setGeneratedPdfUri(finalUri);
+      setDownloadProgress(100);
       setIsDownloading(false);
       setDownloadComplete(true);
     } catch (error) {
-      console.error('Error downloading PDF:', error);
+      console.error('Error generating PDF:', error);
       setIsDownloading(false);
       setShowDownloadModal(false);
-      Alert.alert('Error', 'Failed to download PDF. Please try again.');
+      Alert.alert('Error', 'Failed to generate PDF. Please try again.');
+    }
+  };
+
+  const handleShareGeneratedPdf = async () => {
+    if (!generatedPdfUri) return;
+    try {
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(generatedPdfUri, {
+          mimeType: 'application/pdf',
+          UTI: 'com.adobe.pdf',
+          dialogTitle: `${isEstimate ? 'Estimate' : 'Invoice'} ${documentNumber}`,
+        });
+      } else {
+        Alert.alert('Saved', `PDF saved to your device as ${documentNumber}.pdf`);
+      }
+    } catch (err) {
+      console.error('Error sharing PDF:', err);
+      Alert.alert('Error', 'Failed to share the PDF. Please try again.');
     }
   };
 
@@ -367,7 +403,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
     setShowDownloadModal(false);
     setDownloadProgress(0);
     setDownloadComplete(false);
-    setSuccessMessage(`${isEstimate ? 'Estimate' : 'Invoice'} PDF saved to your device!`);
+    setSuccessMessage(`${isEstimate ? 'Estimate' : 'Invoice'} PDF ready!`);
     setShowSuccessDialog(true);
   };
 
@@ -961,30 +997,16 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
             {!downloadComplete ? (
               <>
                 <View style={[styles.downloadIconContainer, { backgroundColor: theme.colors.primary + '20' }]}>
-                  <Icon name="download" size={32} color={theme.colors.primary} />
+                  <Icon name="document-text-outline" size={32} color={theme.colors.primary} />
                 </View>
                 <Text style={[styles.downloadTitle, { color: theme.colors.text }]}>
-                  Downloading PDF
+                  Generating PDF
                 </Text>
                 <Text style={[styles.downloadSubtitle, { color: theme.colors.textSecondary }]}>
                   {isEstimate ? 'Estimate' : 'Invoice'} {documentNumber}
                 </Text>
-                
-                {/* Progress Bar */}
-                <View style={[styles.progressBarContainer, { backgroundColor: theme.colors.surface }]}>
-                  <View 
-                    style={[
-                      styles.progressBar, 
-                      { 
-                        backgroundColor: theme.colors.primary,
-                        width: `${downloadProgress}%` 
-                      }
-                    ]} 
-                  />
-                </View>
-                <Text style={[styles.progressText, { color: theme.colors.textSecondary }]}>
-                  {downloadProgress}%
-                </Text>
+
+                <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginTop: 16 }} />
               </>
             ) : (
               <>
@@ -992,18 +1014,26 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
                   <Icon name="checkmark-circle" size={32} color={theme.colors.success} />
                 </View>
                 <Text style={[styles.downloadTitle, { color: theme.colors.text }]}>
-                  Download Complete
+                  PDF Ready
                 </Text>
                 <Text style={[styles.downloadSubtitle, { color: theme.colors.textSecondary }]}>
                   {isEstimate ? 'Estimate' : 'Invoice'} {documentNumber}.pdf
                 </Text>
-                
+
+                <AppButton
+                  title="Share / Save"
+                  onPress={handleShareGeneratedPdf}
+                  variant="primary"
+                  size="default"
+                  style={{ width: '100%' }}
+                />
+                <View style={{ height: 10 }} />
                 <AppButton
                   title="Done"
                   onPress={handleDownloadComplete}
-                  variant="primary"
-                  size="large"
-                  fullWidth
+                  variant="outline"
+                  size="default"
+                  style={{ width: '100%' }}
                 />
               </>
             )}

@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 /**
  * Peach Payments Service
  *
@@ -55,7 +56,7 @@ async function createCheckout({ amount, currency = 'MUR', orderId, tokenizeCard 
   const data = await response.json();
 
   if (!response.ok || !data.id) {
-    console.error('[PeachPayments] Checkout creation failed:', data);
+    logger.error('[PeachPayments] Checkout creation failed:', data);
     throw new Error(data.result?.description || 'Failed to create checkout');
   }
 

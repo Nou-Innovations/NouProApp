@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 /**
  * Automation-endpoint API-key guard.
  *
@@ -15,7 +16,7 @@
 module.exports = (errorResponse) => {
   const AUTOMATION_API_KEY = process.env.AUTOMATION_API_KEY;
   if (!AUTOMATION_API_KEY) {
-    console.warn('[SECURITY] AUTOMATION_API_KEY not set -- automation endpoints will reject all requests');
+    logger.warn('[SECURITY] AUTOMATION_API_KEY not set -- automation endpoints will reject all requests');
   }
 
   function requireAutomationAuth(req, res) {

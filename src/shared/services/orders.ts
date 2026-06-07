@@ -67,6 +67,33 @@ export async function createOrder(
   return post<Order>(`/companies/${sellerBusinessId}/orders`, payload);
 }
 
+/** Item shape sent when placing a public storefront order */
+export interface PublicOrderItemInput {
+  productId: string;
+  quantity: number;
+}
+
+/** Payload for placing an order from a business's public storefront */
+export interface CreatePublicOrderPayload {
+  customerName: string;
+  customerPhone: string;
+  customerAddress?: string;
+  items: PublicOrderItemInput[];
+  notes?: string;
+}
+
+/**
+ * Place an order from a business's public storefront (location-scoped).
+ * No business membership required — used by personal-mode customers viewing a
+ * business's public page. Prices and totals are computed server-side.
+ */
+export async function createPublicOrder(
+  locationId: string,
+  payload: CreatePublicOrderPayload,
+): Promise<Order> {
+  return post<Order>(`/public/locations/${locationId}/orders`, payload);
+}
+
 /**
  * Update order status
  */
