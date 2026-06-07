@@ -190,20 +190,59 @@ export function useChatMessages(chatId: string): UseChatMessagesResult {
     };
   }, [chatId]);
 
-  // ========== Socket.IO: Merge incoming socket messages into local state ==========
+  // ========== Socket.IO: Reconcile store changes into local state ==========
+  // Socket handlers (see chat.ts) write to the store for new messages, edits
+  // (message_edited), deletions (message_deleted) and read receipts. We reconcile
+  // those into local state while preserving in-flight optimistic (`temp-`) messages
+  // and local-only messages (e.g. order events) that were never written to the store.
+  // Using subscribeWithSelector's previous-value arg lets us tell a genuine remote
+  // deletion (was in the store, now gone) from a local-only message.
   useEffect(() => {
     const unsub = useInboxStore.subscribe(
       (state) => state.messages[chatId],
-      (storeMessages) => {
-        if (!storeMessages || storeMessages.length === 0) return;
+      (storeMessages, prevStoreMessages) => {
+        if (!storeMessages) return;
         setMessages((prev) => {
-          const existingIds = new Set(prev.map((m) => m.id));
-          const newFromSocket = storeMessages.filter(
-            (m) => !existingIds.has(m.id)
-          );
-          if (newFromSocket.length === 0) return prev;
-          const normalized = normalizeMessages(newFromSocket);
-          return [...normalized, ...prev];
+          const storeById = new Map(storeMessages.map((m) => [m.id, m]));
+          const prevStoreIds = new Set((prevStoreMessages ?? []).map((m) => m.id));
+          const localIds = new Set(prev.map((m) => m.id));
+          let changed = false;
+
+          // 1) Apply store updates to existing messages (edited text/editedAt, status),
+          //    drop genuine remote deletions, keep optimistic + local-only messages.
+          const next: Message[] = [];
+          for (const m of prev) {
+            const stored = storeById.get(m.id);
+            if (stored) {
+              let diff = false;
+              for (const key of ['text', 'editedAt', 'status'] as const) {
+                if ((stored as any)[key] !== undefined && (stored as any)[key] !== (m as any)[key]) {
+                  diff = true;
+                  break;
+                }
+              }
+              if (diff) {
+                changed = true;
+                next.push(normalizeMessages([{ ...m, ...stored } as Message])[0]);
+              } else {
+                next.push(m);
+              }
+            } else if (m.id.startsWith('temp-') || !prevStoreIds.has(m.id)) {
+              // Optimistic (not yet persisted) or never-in-store local message → keep.
+              next.push(m);
+            } else {
+              // Existed in the store before, gone now → deleted by another participant.
+              changed = true;
+            }
+          }
+
+          // 2) Prepend brand-new messages delivered via socket.
+          const fresh = storeMessages.filter((m) => !localIds.has(m.id));
+          if (fresh.length > 0) {
+            return [...normalizeMessages(fresh), ...next];
+          }
+
+          return changed ? next : prev;
         });
       }
     );

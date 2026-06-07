@@ -152,6 +152,7 @@ export default function ChatScreen() {
     hasMore,
     loadMore: loadMoreMessages,
     addOptimisticMessage,
+    updateMessage,
   } = useChatMessages(id);
 
   const [inputText, setInputText] = useState('');
@@ -507,15 +508,13 @@ export default function ChatScreen() {
         } else if (activeBusiness?.id) {
           await editMessageApi(activeBusiness.id, id, editingMessageId, inputText.trim());
         }
-        // The socket event will update the message in the store
-        // Also update locally for immediate feedback
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === editingMessageId
-              ? { ...m, text: inputText.trim(), editedAt: new Date().toISOString() } as Message
-              : m
-          )
-        );
+        // Update local state AND the store immediately so the edit shows right away
+        // (and so the store stays consistent before the message_edited socket echo
+        // arrives). The echo later reconciles the authoritative server editedAt.
+        updateMessage(editingMessageId, {
+          text: inputText.trim(),
+          editedAt: new Date().toISOString(),
+        } as Partial<Message>);
       } catch (err: any) {
         Alert.alert('Error', err?.message || 'Failed to edit message');
       }
