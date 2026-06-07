@@ -30,7 +30,7 @@ import { formatInvoiceCurrency, InvoiceStatus } from '@/shared/types/invoice';
 import { useProfileStore } from '@/shared/store/profileStore';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { generateInvoicePdf, InvoicePdfData } from '../invoices.pdf';
+import { generateInvoicePdf, InvoicePdfData } from '../invoicePdf';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { checkPaywall, PaywallCheck, shouldShowNouProBranding } from '@/shared/utils/permissions';
 import { createInvoiceCheckout } from '@/features/payments/payments.service';
