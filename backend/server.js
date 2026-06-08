@@ -3,6 +3,9 @@ const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+// IPv6-safe helper for custom keyGenerators that fall back to the client IP.
+// express-rate-limit v8 throws ERR_ERL_KEY_GEN_IPV6 if a raw IPv6 address is used directly.
+const { ipKeyGenerator } = rateLimit;
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const path = require('path');
@@ -296,7 +299,7 @@ const chatCreationLimiter = rateLimit({
 const joinRequestLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  keyGenerator: (req) => req.user?.id ?? req.ip,
+  keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req.ip),
   skip: (req) => !req.user,
   message: { success: false, error: 'Too many join requests, please try again later' },
   validate: { xForwardedForHeader: false },
@@ -317,7 +320,7 @@ const authLimiter = rateLimit({
 const twoFactorLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  keyGenerator: (req) => req.user?.id ?? req.ip,
+  keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req.ip),
   message: { success: false, error: 'Too many 2FA attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
