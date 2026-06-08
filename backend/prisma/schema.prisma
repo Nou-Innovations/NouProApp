@@ -672,6 +672,8 @@ enum MemberStatus {
   accepted
   rejected
   locked
+  invited
+  suspended
 }
 
 enum OrderStatus {
