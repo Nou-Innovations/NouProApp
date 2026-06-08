@@ -22,6 +22,7 @@ import { Avatar } from '@/shared/components/ui/Avatar';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
+import { useNotifications } from '@/shared/context/NotificationContext';
 import { authAPI } from '@/shared/services/api';
 
 // Enable LayoutAnimation on Android (no-op on the new architecture / iOS).
@@ -64,6 +65,9 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
   const userBusinesses = useProfileStore((state) => state.userBusinesses);
   const switchToPersonal = useProfileStore((state) => state.switchToPersonal);
   const switchToBusiness = useProfileStore((state) => state.switchToBusiness);
+
+  // Unread counts surfaced as badges on the workspace rows (Deliveries/Invoices moved here from tabs)
+  const { deliveriesUnreadCount, invoicesUnreadCount } = useNotifications();
 
   // Collapsible business sections (all collapsed by default) + top search field.
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
@@ -155,7 +159,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
           {
             title: 'Deliveries',
             items: [
-              { label: 'All deliveries', icon: 'truck-outline', onPress: () => go('Deliveries') },
+              { label: 'All deliveries', icon: 'truck-outline', onPress: () => go('Deliveries'), badge: deliveriesUnreadCount },
               { label: 'Orders', icon: 'cart-outline', onPress: () => go('Orders') },
               { label: 'Transfers', icon: 'swap-horizontal-outline', onPress: () => go('Transfers') },
             ],
@@ -177,7 +181,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
           {
             title: 'Accounting',
             items: [
-              { label: 'Invoices', icon: 'receipt-text-outline', onPress: () => go('Invoices') },
+              { label: 'Invoices', icon: 'receipt-text-outline', onPress: () => go('Invoices'), badge: invoicesUnreadCount },
               { label: 'Estimates', icon: 'document-text-outline', onPress: () => go('Invoices', { initialTab: 'estimates' }) },
               { label: 'Scan invoice', icon: 'scan-outline', onPress: () => comingSoon('Scan invoice') },
             ],
@@ -356,13 +360,22 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
               </Pressable>
               {open ? (
                 <View style={styles.sectionItems}>
-                  {section.items.map((item) => (
+                  {section.items.map((item: { label: string; icon: string; onPress: () => void; badge?: number }) => (
                     <Row
                       key={item.label}
                       onPress={item.onPress}
                       label={item.label}
                       leading={<Icon name={item.icon} size={22} color={C.icon} strokeWidth={2} />}
-                      trailing={<Icon name="chevron-forward" size={18} color={C.iconMuted} strokeWidth={2} />}
+                      trailing={
+                        <View style={styles.trailingGroup}>
+                          {item.badge && item.badge > 0 ? (
+                            <View style={[styles.badge, { backgroundColor: C.accent }]}>
+                              <Text style={styles.badgeText}>{item.badge > 9 ? '9+' : item.badge}</Text>
+                            </View>
+                          ) : null}
+                          <Icon name="chevron-forward" size={18} color={C.iconMuted} strokeWidth={2} />
+                        </View>
+                      }
                     />
                   ))}
                 </View>
@@ -478,6 +491,24 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     marginLeft: 10,
+  },
+  trailingGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   spacer: {
     flex: 1,

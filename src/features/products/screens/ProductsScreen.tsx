@@ -288,6 +288,7 @@ const ProductsScreen: React.FC = () => {
       <PrimaryHeader
         title={currentViewTitle}
         onTitlePress={toggleViewDropdown}
+        leftAction={navigation.canGoBack() ? { icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' } : undefined}
         actions={[
           { icon: 'plus', onPress: handleOpenCreateOptions, accessibilityLabel: 'Create product' },
           ...((isEditing || isAdmin()) ? [{

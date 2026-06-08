@@ -49,7 +49,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 export default function BusinessInboxScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
-  const { unreadCount, inboxUnreadCount, setInboxUnreadCount } = useNotifications();
+  const { inboxUnreadCount, setInboxUnreadCount } = useNotifications();
   const insets = useSafeAreaInsets();
   
   // Profile store
@@ -99,16 +99,6 @@ export default function BusinessInboxScreen() {
   
   
   // Navigation handlers
-  const navigateToExplore = useCallback(() => {
-    // @ts-ignore
-    navigation.navigate('ExploreOverlay');
-  }, [navigation]);
-  
-  const navigateToNotifications = useCallback(() => {
-    // @ts-ignore
-    navigation.navigate('Notifications');
-  }, [navigation]);
-
   const navigateToOrders = useCallback(() => {
     // @ts-ignore
     navigation.navigate('Orders');
@@ -324,9 +314,7 @@ export default function BusinessInboxScreen() {
       transparent
       leftAction={{ icon: 'menu', onPress: openDrawer, accessibilityLabel: 'Open menu' }}
       actions={[
-        { icon: 'bell', onPress: navigateToNotifications, badge: unreadCount, accessibilityLabel: 'Notifications' },
         { icon: 'cart', onPress: navigateToOrders, badge: undefined, accessibilityLabel: 'Orders' },
-        { icon: 'globe', onPress: navigateToExplore, badge: undefined, accessibilityLabel: 'Explore' },
       ]}
     />
   );
@@ -404,7 +392,7 @@ export default function BusinessInboxScreen() {
                 }))}
                 isLoading={loadingActivity}
                 maxItems={4}
-                onSeeAll={() => navigation.navigate('AllActivity' as never)}
+                onSeeAll={() => navigation.navigate('Activities' as never)}
               />
             </View>
             

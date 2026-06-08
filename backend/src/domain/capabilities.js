@@ -47,6 +47,10 @@ function deriveCapabilities(business) {
     canPublishOnFeed: isBusiness || isEnterprise,
     canPublishProductsOnFeed: isBusiness || isEnterprise,
 
+    // Marketplace growth (paid tiers can post Opportunities / host Events on Explore)
+    canPostOpportunities: isPaidTier,
+    canHostEvents: isPaidTier,
+
     // Order capabilities (granular)
     canReceiveOrders: true, // All tiers can receive B2B order requests
     canRequestOrders: true, // All tiers can create purchase order requests

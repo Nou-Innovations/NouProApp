@@ -153,6 +153,7 @@ export default function InvoicesScreen() {
       <PrimaryHeader
         title={activeTab === 'invoices' ? 'Invoices' : 'Estimates'}
         onTitlePress={toggleViewDropdown}
+        leftAction={navigation.canGoBack() ? { icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' } : undefined}
         actions={[
           { icon: 'plus', onPress: handleCreateNew, accessibilityLabel: 'Create invoice' },
         ]}

@@ -44,6 +44,8 @@ function getRepos() {
     certificationRepo: require('./prisma/certificationRepo.prisma'),
     skillRepo: require('./prisma/skillRepo.prisma'),
     taskRepo: require('./prisma/taskRepo.prisma'),
+    opportunityRepo: require('./prisma/opportunityRepo.prisma'),
+    eventRepo: require('./prisma/eventRepo.prisma'),
   };
 
   return cachedRepos;

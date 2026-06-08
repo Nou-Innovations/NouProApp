@@ -97,14 +97,14 @@ export type PersonalTabParamList = {
 
 /**
  * Business mode tabs (Pro Mode)
- * For businesses performing operational tasks
- * Note: Explore (feed) is now an overlay accessed from Inbox header, not a tab
+ * Tabs: Explore (feed) · Inbox · Activities (business timeline) · Profile.
+ * Deliveries / Products / Invoices now live in the sidebar and open as RootStack screens.
+ * Notifications are reached via the bell in the Explore header (not a tab).
  */
 export type BusinessTabParamList = {
+  BusinessExplore: undefined; // Feed / discovery, with notifications bell in header
   BusinessInbox: undefined; // Business inbox with activity timeline and chats
-  Deliveries: undefined;
-  Products: undefined;
-  Invoices: { initialTab?: 'invoices' | 'estimates' } | undefined;
+  Activities: undefined; // Business timeline / log
   BusinessProfile: undefined;
 };
 
@@ -124,6 +124,11 @@ export type RootStackParamList = {
   InboxOverlay: undefined; // Personal mode: chat list
   ExploreOverlay: undefined; // Business mode: feed/explore content
   Notifications: undefined;
+
+  // Business workspace list screens (opened from the sidebar; previously bottom tabs)
+  Deliveries: undefined;
+  Products: undefined;
+  Invoices: { initialTab?: 'invoices' | 'estimates' } | undefined;
   
   // Chat screens
   Chat: {
@@ -265,6 +270,16 @@ export type RootStackParamList = {
   
   // Business Activity
   AllActivity: undefined;
+
+  // Explore — Opportunities (B2B requests / "looking for")
+  Opportunities: undefined;
+  OpportunityDetail: { opportunityId: string };
+  CreateOpportunity: { businessId: string };
+
+  // Explore — Events
+  Events: undefined;
+  EventDetail: { eventId: string };
+  CreateEvent: { businessId: string };
 
   // Reusable "Coming soon" placeholder for not-yet-built features
   ComingSoon: { title: string };

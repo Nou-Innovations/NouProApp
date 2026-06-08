@@ -2094,7 +2094,7 @@ app.get('/api/businesses', requireAuth, async (req, res) => {
 // GET /api/companies/search?q=&page=1&limit=20
 app.get('/api/companies/search', requireAuth, async (req, res) => {
   try {
-    const { q = '', page = '1', limit = '20' } = req.query;
+    const { q = '', page = '1', limit = '20', category = '', city = '' } = req.query;
     const take = Math.min(parseInt(limit) || 20, 50);
     const skip = ((parseInt(page) || 1) - 1) * take;
 
@@ -2108,6 +2108,14 @@ app.get('/api/companies/search', requireAuth, async (req, res) => {
             { category: { contains: q, mode: 'insensitive' } },
           ],
         } : {}),
+        // Explore filters: by category and by city/region (matched against the address string,
+        // since there is no dedicated city column).
+        ...(typeof category === 'string' && category.trim()
+          ? { category: { contains: category, mode: 'insensitive' } }
+          : {}),
+        ...(typeof city === 'string' && city.trim()
+          ? { address: { contains: city, mode: 'insensitive' } }
+          : {}),
       },
       select: {
         id: true,
@@ -2116,13 +2124,348 @@ app.get('/api/companies/search', requireAuth, async (req, res) => {
         industry: true,
         category: true,
         description: true,
+        address: true,
+        isVerified: true,
+        _count: { select: { products: { where: { isListed: true } } } },
       },
       take,
       skip,
       orderBy: { name: 'asc' },
     });
 
-    return res.json(successResponse(businesses));
+    // Flatten the listed-product count so the client gets a plain `productsCount`.
+    const result = businesses.map(({ _count, ...rest }) => ({
+      ...rest,
+      productsCount: _count?.products ?? 0,
+    }));
+
+    return res.json(successResponse(result));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// ============================================================================
+// OPPORTUNITY ROUTES (B2B requests / "looking for")
+// ============================================================================
+
+// Discovery list of open opportunities (optionally filtered; excludes the viewer's own business).
+app.get('/api/opportunities', requireAuth, async (req, res) => {
+  try {
+    const { type, category, locationText, viewerBusinessId, page = '1', limit = '50' } = req.query;
+    const take = Math.min(parseInt(limit) || 50, 100);
+    const skip = ((parseInt(page) || 1) - 1) * take;
+    const items = await repos.opportunityRepo.listDiscovery({
+      type: type || undefined,
+      category: category || undefined,
+      locationText: locationText || undefined,
+      excludeBusinessId: viewerBusinessId || undefined,
+      take,
+      skip,
+    });
+    const result = items.map(({ _count, ...rest }) => ({ ...rest, responseCount: _count?.responses ?? 0 }));
+    return res.json(successResponse(result));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// My business's opportunities (all statuses). NOTE: declared before /:id so "mine" isn't treated as an id.
+app.get('/api/opportunities/mine', requireAuth, async (req, res) => {
+  try {
+    const businessId = req.query.businessId;
+    if (!businessId) return res.status(400).json(errorResponse('businessId is required'));
+    if (!(await requireBusinessMembership(req, res, businessId))) return;
+    const items = await repos.opportunityRepo.getByBusinessId(businessId);
+    const result = items.map(({ _count, ...rest }) => ({ ...rest, responseCount: _count?.responses ?? 0 }));
+    return res.json(successResponse(result));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Single opportunity.
+app.get('/api/opportunities/:id', requireAuth, async (req, res) => {
+  try {
+    const opp = await repos.opportunityRepo.getById(req.params.id);
+    if (!opp) return res.status(404).json(errorResponse('Opportunity not found'));
+    const { _count, ...rest } = opp;
+    return res.json(successResponse({ ...rest, responseCount: _count?.responses ?? 0 }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Create an opportunity (paid tiers only).
+app.post('/api/opportunities', requireAuth, async (req, res) => {
+  try {
+    const { businessId, title, description, type, category, budgetMin, budgetMax, currency, locationText, expiresAt } = req.body;
+    if (!businessId) return res.status(400).json(errorResponse('businessId is required'));
+    if (!(await requireBusinessMembership(req, res, businessId))) return;
+    if (!title || !title.trim()) return res.status(400).json(errorResponse('Title is required'));
+
+    const business = await repos.businessRepo.getById(businessId);
+    if (!business) return res.status(404).json(errorResponse('Business not found'));
+    if (!deriveCapabilities(business).canPostOpportunities) {
+      return res.status(403).json(paywallResponse('Upgrade your plan to post opportunities', 'post_opportunity', 'pro'));
+    }
+
+    const created = await repos.opportunityRepo.create({
+      businessId,
+      title: title.trim(),
+      description: description || null,
+      type: type || 'buying',
+      category: category || null,
+      budgetMin: budgetMin != null && budgetMin !== '' ? Number(budgetMin) : null,
+      budgetMax: budgetMax != null && budgetMax !== '' ? Number(budgetMax) : null,
+      currency: currency || 'MUR',
+      locationText: locationText || null,
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+      createdByUserId: req.user.id,
+    });
+    return res.status(201).json(successResponse(created, 'Opportunity created'));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Update / close an opportunity.
+app.patch('/api/opportunities/:id', requireAuth, async (req, res) => {
+  try {
+    const opp = await repos.opportunityRepo.getById(req.params.id);
+    if (!opp) return res.status(404).json(errorResponse('Opportunity not found'));
+    if (!(await requireBusinessMembership(req, res, opp.businessId))) return;
+
+    const { title, description, type, category, budgetMin, budgetMax, currency, locationText, status, expiresAt } = req.body;
+    const patch = {
+      ...(title !== undefined && { title }),
+      ...(description !== undefined && { description }),
+      ...(type !== undefined && { type }),
+      ...(category !== undefined && { category }),
+      ...(budgetMin !== undefined && { budgetMin: budgetMin != null && budgetMin !== '' ? Number(budgetMin) : null }),
+      ...(budgetMax !== undefined && { budgetMax: budgetMax != null && budgetMax !== '' ? Number(budgetMax) : null }),
+      ...(currency !== undefined && { currency }),
+      ...(locationText !== undefined && { locationText }),
+      ...(status !== undefined && { status }),
+      ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : null }),
+    };
+    const updated = await repos.opportunityRepo.update(req.params.id, patch);
+    return res.json(successResponse(updated, 'Opportunity updated'));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Delete an opportunity.
+app.delete('/api/opportunities/:id', requireAuth, async (req, res) => {
+  try {
+    const opp = await repos.opportunityRepo.getById(req.params.id);
+    if (!opp) return res.status(404).json(errorResponse('Opportunity not found'));
+    if (!(await requireBusinessMembership(req, res, opp.businessId))) return;
+    await repos.opportunityRepo.delete(req.params.id);
+    return res.json(successResponse(null, 'Opportunity deleted'));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Respond to an opportunity (any member business, once).
+app.post('/api/opportunities/:id/respond', requireAuth, async (req, res) => {
+  try {
+    const opp = await repos.opportunityRepo.getById(req.params.id);
+    if (!opp) return res.status(404).json(errorResponse('Opportunity not found'));
+    const { responderBusinessId, message } = req.body;
+    if (!responderBusinessId) return res.status(400).json(errorResponse('responderBusinessId is required'));
+    if (!(await requireBusinessMembership(req, res, responderBusinessId))) return;
+    if (responderBusinessId === opp.businessId) {
+      return res.status(400).json(errorResponse('You cannot respond to your own opportunity'));
+    }
+    try {
+      const created = await repos.opportunityRepo.createResponse({
+        opportunityId: opp.id,
+        responderBusinessId,
+        message: message || null,
+        createdByUserId: req.user.id,
+      });
+      return res.status(201).json(successResponse(created, 'Response sent'));
+    } catch (e) {
+      if (e.code === 'P2002') {
+        return res.status(409).json(errorResponse('Your business has already responded'));
+      }
+      throw e;
+    }
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// List responses to an opportunity (owner business only).
+app.get('/api/opportunities/:id/responses', requireAuth, async (req, res) => {
+  try {
+    const opp = await repos.opportunityRepo.getById(req.params.id);
+    if (!opp) return res.status(404).json(errorResponse('Opportunity not found'));
+    if (!(await requireBusinessMembership(req, res, opp.businessId))) return;
+    const responses = await repos.opportunityRepo.listResponses(opp.id);
+    return res.json(successResponse(responses));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// ============================================================================
+// EVENT ROUTES (B2B networking / workshops / conferences)
+// ============================================================================
+
+// Upcoming events (optionally filtered).
+app.get('/api/events', requireAuth, async (req, res) => {
+  try {
+    const { type, locationText, isOnline, page = '1', limit = '50' } = req.query;
+    const take = Math.min(parseInt(limit) || 50, 100);
+    const skip = ((parseInt(page) || 1) - 1) * take;
+    const items = await repos.eventRepo.listUpcoming({
+      type: type || undefined,
+      locationText: locationText || undefined,
+      isOnline: isOnline === undefined ? undefined : isOnline === 'true',
+      take,
+      skip,
+    });
+    const result = items.map(({ _count, ...rest }) => ({ ...rest, rsvpCount: _count?.rsvps ?? 0 }));
+    return res.json(successResponse(result));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Events organized by my business. NOTE: declared before /:id so "mine" isn't treated as an id.
+app.get('/api/events/mine', requireAuth, async (req, res) => {
+  try {
+    const businessId = req.query.businessId;
+    if (!businessId) return res.status(400).json(errorResponse('businessId is required'));
+    if (!(await requireBusinessMembership(req, res, businessId))) return;
+    const items = await repos.eventRepo.getByBusinessId(businessId);
+    const result = items.map(({ _count, ...rest }) => ({ ...rest, rsvpCount: _count?.rsvps ?? 0 }));
+    return res.json(successResponse(result));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Single event.
+app.get('/api/events/:id', requireAuth, async (req, res) => {
+  try {
+    const ev = await repos.eventRepo.getById(req.params.id);
+    if (!ev) return res.status(404).json(errorResponse('Event not found'));
+    const { _count, ...rest } = ev;
+    return res.json(successResponse({ ...rest, rsvpCount: _count?.rsvps ?? 0 }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Create an event (paid tiers only).
+app.post('/api/events', requireAuth, async (req, res) => {
+  try {
+    const { businessId, title, description, type, startAt, endAt, locationText, isOnline, onlineUrl, coverImageUrl, capacity } = req.body;
+    if (!businessId) return res.status(400).json(errorResponse('businessId is required'));
+    if (!(await requireBusinessMembership(req, res, businessId))) return;
+    if (!title || !title.trim()) return res.status(400).json(errorResponse('Title is required'));
+    if (!startAt) return res.status(400).json(errorResponse('Start date/time is required'));
+
+    const business = await repos.businessRepo.getById(businessId);
+    if (!business) return res.status(404).json(errorResponse('Business not found'));
+    if (!deriveCapabilities(business).canHostEvents) {
+      return res.status(403).json(paywallResponse('Upgrade your plan to host events', 'host_event', 'pro'));
+    }
+
+    const created = await repos.eventRepo.create({
+      businessId,
+      title: title.trim(),
+      description: description || null,
+      type: type || 'networking',
+      startAt: new Date(startAt),
+      endAt: endAt ? new Date(endAt) : null,
+      locationText: locationText || null,
+      isOnline: !!isOnline,
+      onlineUrl: onlineUrl || null,
+      coverImageUrl: coverImageUrl || null,
+      capacity: capacity != null && capacity !== '' ? parseInt(capacity) : null,
+      createdByUserId: req.user.id,
+    });
+    return res.status(201).json(successResponse(created, 'Event created'));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Update / cancel an event.
+app.patch('/api/events/:id', requireAuth, async (req, res) => {
+  try {
+    const ev = await repos.eventRepo.getById(req.params.id);
+    if (!ev) return res.status(404).json(errorResponse('Event not found'));
+    if (!(await requireBusinessMembership(req, res, ev.businessId))) return;
+
+    const { title, description, type, startAt, endAt, locationText, isOnline, onlineUrl, coverImageUrl, capacity, status } = req.body;
+    const patch = {
+      ...(title !== undefined && { title }),
+      ...(description !== undefined && { description }),
+      ...(type !== undefined && { type }),
+      ...(startAt !== undefined && { startAt: new Date(startAt) }),
+      ...(endAt !== undefined && { endAt: endAt ? new Date(endAt) : null }),
+      ...(locationText !== undefined && { locationText }),
+      ...(isOnline !== undefined && { isOnline: !!isOnline }),
+      ...(onlineUrl !== undefined && { onlineUrl }),
+      ...(coverImageUrl !== undefined && { coverImageUrl }),
+      ...(capacity !== undefined && { capacity: capacity != null && capacity !== '' ? parseInt(capacity) : null }),
+      ...(status !== undefined && { status }),
+    };
+    const updated = await repos.eventRepo.update(req.params.id, patch);
+    return res.json(successResponse(updated, 'Event updated'));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Delete an event.
+app.delete('/api/events/:id', requireAuth, async (req, res) => {
+  try {
+    const ev = await repos.eventRepo.getById(req.params.id);
+    if (!ev) return res.status(404).json(errorResponse('Event not found'));
+    if (!(await requireBusinessMembership(req, res, ev.businessId))) return;
+    await repos.eventRepo.delete(req.params.id);
+    return res.json(successResponse(null, 'Event deleted'));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// RSVP to an event (upsert; one per business).
+app.post('/api/events/:id/rsvp', requireAuth, async (req, res) => {
+  try {
+    const ev = await repos.eventRepo.getById(req.params.id);
+    if (!ev) return res.status(404).json(errorResponse('Event not found'));
+    const { businessId, status } = req.body;
+    if (!businessId) return res.status(400).json(errorResponse('businessId is required'));
+    if (!(await requireBusinessMembership(req, res, businessId))) return;
+    const rsvp = await repos.eventRepo.upsertRsvp({
+      eventId: ev.id,
+      businessId,
+      userId: req.user.id,
+      status: status || 'going',
+    });
+    return res.json(successResponse(rsvp, 'RSVP saved'));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// List RSVPs for an event (organizer business only).
+app.get('/api/events/:id/rsvps', requireAuth, async (req, res) => {
+  try {
+    const ev = await repos.eventRepo.getById(req.params.id);
+    if (!ev) return res.status(404).json(errorResponse('Event not found'));
+    if (!(await requireBusinessMembership(req, res, ev.businessId))) return;
+    const rsvps = await repos.eventRepo.listRsvps(ev.id);
+    return res.json(successResponse(rsvps));
   } catch (err) {
     return sendError(res, err);
   }

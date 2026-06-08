@@ -94,6 +94,9 @@ model Business {
   tasks               Task[]
   followers           BusinessFollow[]
   payments            Payment[]
+  opportunities        Opportunity[]
+  opportunityResponses OpportunityResponse[] @relation("OpportunityResponder")
+  events               Event[]
 }
 
 model Location {
@@ -1094,4 +1097,126 @@ enum PaymentProcessingStatus {
   FAILED
   CANCELED
   REFUNDED
+}
+
+// ── Opportunities (B2B requests / "looking for") ──
+
+enum OpportunityType {
+  buying
+  selling
+  partnership
+  service
+  hiring
+  other
+}
+
+enum OpportunityStatus {
+  open
+  closed
+  fulfilled
+}
+
+model Opportunity {
+  id              String                @id @default(uuid())
+  businessId      String
+  title           String
+  description     String?               @db.Text
+  type            OpportunityType       @default(buying)
+  category        String?
+  budgetMin       Float?
+  budgetMax       Float?
+  currency        String                @default("MUR")
+  locationText    String?
+  status          OpportunityStatus     @default(open)
+  expiresAt       DateTime?
+  createdByUserId String
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  business        Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  responses       OpportunityResponse[]
+
+  @@index([businessId])
+  @@index([status])
+  @@index([type, status])
+  @@index([category])
+}
+
+model OpportunityResponse {
+  id                  String      @id @default(uuid())
+  opportunityId       String
+  responderBusinessId String
+  message             String?     @db.Text
+  createdByUserId     String
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  opportunity         Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  responderBusiness   Business    @relation("OpportunityResponder", fields: [responderBusinessId], references: [id], onDelete: Cascade)
+
+  @@unique([opportunityId, responderBusinessId])
+  @@index([opportunityId])
+  @@index([responderBusinessId])
+}
+
+// ── Events (B2B networking / workshops / conferences) ──
+
+enum EventType {
+  workshop
+  coffee_connect
+  conference
+  panel
+  webinar
+  networking
+  other
+}
+
+enum EventStatus {
+  scheduled
+  cancelled
+  completed
+}
+
+enum RSVPStatus {
+  going
+  interested
+  cancelled
+}
+
+model Event {
+  id              String      @id @default(uuid())
+  businessId      String
+  title           String
+  description     String?     @db.Text
+  type            EventType   @default(networking)
+  startAt         DateTime
+  endAt           DateTime?
+  locationText    String?
+  isOnline        Boolean     @default(false)
+  onlineUrl       String?
+  coverImageUrl   String?
+  capacity        Int?
+  status          EventStatus @default(scheduled)
+  createdByUserId String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  business        Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  rsvps           EventRSVP[]
+
+  @@index([businessId])
+  @@index([status, startAt])
+  @@index([startAt])
+}
+
+model EventRSVP {
+  id         String     @id @default(uuid())
+  eventId    String
+  businessId String
+  userId     String
+  status     RSVPStatus @default(going)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  event      Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, businessId])
+  @@index([eventId])
+  @@index([businessId])
 }

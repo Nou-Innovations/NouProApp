@@ -1,322 +1,398 @@
 /**
- * BusinessExploreScreen - Pro Mode Explore/Feed Overlay
- * Slides in from right, sits above tabs
- * Displays the feed with brand presentations, company presentations, and new products
+ * BusinessExploreScreen - B2B discovery / marketplace.
  *
- * ARCHITECTURE: Data comes from the useFeed hook (API → Service → Hook → Screen),
- * the same hook used by the Personal-mode HomeScreen. No mock data.
+ * Answers "who can my business connect with, buy from, sell to, or work with?" — NOT a social feed.
+ * Sectioned discovery driven by a chip strip: Recommended, Business directory, Product discovery,
+ * Nearby, plus Opportunities & Events (backend arrives in later phases — shown as "coming soon" here).
+ *
+ * Dual-purpose: it is both the `BusinessExplore` tab AND the pushed `ExploreOverlay` (opened from
+ * Personal Home / Connections). The header left action branches on `navigation.canGoBack()`.
  */
-
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   FlatList,
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import theme from '@/shared/theme';
+import { useNotifications } from '@/shared/context/NotificationContext';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import {
-  EmptyState,
-  Skeleton,
-  SkeletonCircle,
-  SkeletonRow,
-  SkeletonColumn,
-} from '@/shared/components/ui';
-import { useProfileStore } from '@/shared/store/profileStore';
-import apiClient from '@/shared/services/api';
-import { FeedPost } from '@/shared/types/feed';
+import { EmptyState, ExploreChips } from '@/shared/components/ui';
+import AppSearchBar from '@/shared/components/ui/AppSearchBar';
+import BusinessListCard from '@/features/profile/components/BusinessListCard';
+import { useExploreDiscovery } from '@/features/explore';
+import type { ExploreBusiness } from '@/features/explore';
+import { useOpportunities, OpportunityCard } from '@/features/opportunities';
+import { useUpcomingEvents, EventCard } from '@/features/events';
+import type { UIProduct } from '@/shared/types/product';
 import { RootStackParamList } from '@/shared/types/navigation';
 
-// Feed Post Components (reuse from Personal mode)
-import {
-  BrandPresentationPost,
-  CompanyPresentationPost,
-  NewProductPost,
-} from '@/modes/personal/components';
-
-// ARCHITECTURE: Data comes from hook, not inline mock arrays
-import { useFeed } from '@/features/feed';
+const CHIPS = [
+  'Overall',
+  'Businesses',
+  'Products',
+  'Suppliers',
+  'Buyers',
+  'Opportunities',
+  'Events',
+  'Near Me',
+];
 
 export default function BusinessExploreScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { theme: appTheme } = useTheme();
+  const { unreadCount } = useNotifications();
+  const [selectedChip, setSelectedChip] = useState('Overall');
+  const [query, setQuery] = useState('');
 
-  // ========================================================================
-  // Data comes from useFeed hook (API → Service → Hook → Screen)
-  // ========================================================================
   const {
-    posts,
+    directory,
+    recommended,
+    nearby,
+    products,
     loading,
     refreshing,
-    loadingMore,
     error,
-    hasMore,
     refresh,
-    loadMore,
-  } = useFeed();
+    isConnected,
+    toggleConnect,
+    myCity,
+  } = useExploreDiscovery();
 
-  // Optimistic connection state overrides (companyId -> isConnected)
-  const [connectionOverrides, setConnectionOverrides] = useState<Record<string, boolean>>({});
+  const { items: opportunities } = useOpportunities({ limit: 10 });
+  const openOpportunity = (id: string) => navigation.navigate('OpportunityDetail', { opportunityId: id });
+  const { items: events } = useUpcomingEvents({ limit: 10 });
+  const openEvent = (id: string) => navigation.navigate('EventDetail', { eventId: id });
 
-  // Navigation handlers
-  const handleBack = () => {
-    navigation.goBack();
+  // ---- navigation helpers ----
+  const openDrawer = () => navigation.dispatch(DrawerActions.openDrawer());
+  const goBusiness = (businessId: string) => navigation.navigate('ViewBusinessProfile', { businessId });
+  const goProduct = (productId: string) => navigation.navigate('ProductDetail', { productId });
+  const submitSearch = () => {
+    if (query.trim()) navigation.navigate('CompanySearch', { query: query.trim() });
   };
 
-  const handleBusinessPress = (businessId: string, expandBrandId?: string) => {
-    navigation.navigate('ViewBusinessProfile', { businessId, expandBrandId });
-  };
-
-  const handleProductPress = (productId: string, _businessId?: string) => {
-    navigation.navigate('ProductDetail', { productId });
-  };
-
-  const handleBrandPress = (brandId: string, businessId: string) => {
-    navigation.navigate('ViewBusinessProfile', { businessId, expandBrandId: brandId });
-  };
-
-  const handleConnectPress = async (companyId: string, currentConnected: boolean) => {
-    // Optimistic toggle — immediately update UI
-    const newState = !currentConnected;
-    setConnectionOverrides((prev) => ({ ...prev, [companyId]: newState }));
-
-    try {
-      if (currentConnected) {
-        // Disconnect: find the connection and delete it
-        const res = await apiClient.get(`/companies/${companyId}/connections`);
-        const connections = res.data?.data || [];
-        if (connections.length > 0) {
-          const myBizId = useProfileStore.getState().activeBusiness?.id;
-          const conn = connections.find((c: any) => c.requesterBusinessId === myBizId);
-          if (conn) {
-            await apiClient.delete(`/companies/${companyId}/connections/${conn.id}`);
-          }
-        }
-      } else {
-        // Connect to this business
-        await apiClient.post(`/companies/${companyId}/connections`, {});
-      }
-    } catch {
-      // Revert optimistic update on failure
-      setConnectionOverrides((prev) => ({ ...prev, [companyId]: currentConnected }));
-    }
-  };
-
-  // Render feed post
-  const renderFeedPost = ({ item }: { item: FeedPost }) => {
-    switch (item.type) {
-      case 'brand_presentation':
-        return (
-          <BrandPresentationPost
-            id={item.id}
-            brandId={item.data.brandId}
-            brandName={item.data.brandName}
-            brandLogo={item.data.brandLogo}
-            distributorName={item.data.distributorName}
-            distributorId={item.data.distributorId}
-            products={item.data.products}
-            timestamp={item.timestamp}
-            createdAt={item.createdAt}
-            // Clicking the brand header goes to the distributor's business profile with that brand expanded
-            onBrandPress={(brandId, distributorId) => handleBrandPress(brandId, distributorId)}
-            onDistributorPress={() => handleBusinessPress(item.data.distributorId)}
-            // Product cards navigate to product detail (Order from ProductDetailScreen)
-            onProductPress={(productId) => handleProductPress(productId, item.data.distributorId)}
-          />
-        );
-
-      case 'company_presentation': {
-        const connected = connectionOverrides[item.data.companyId] ?? item.data.isConnected;
-        return (
-          <CompanyPresentationPost
-            id={item.data.companyId}
-            companyName={item.data.companyName}
-            companyLogo={item.data.companyLogo}
-            location={item.data.location}
-            relationshipAction="connect"
-            isActive={connected}
-            brands={item.data.brands}
-            timestamp={item.timestamp}
-            createdAt={item.createdAt}
-            onCompanyPress={() => handleBusinessPress(item.data.companyId)}
-            onActionPress={() => handleConnectPress(item.data.companyId, connected)}
-            // Clicking a brand card navigates to the company's business profile with that brand expanded
-            onBrandPress={(brandId: string) => handleBrandPress(brandId, item.data.companyId)}
-          />
-        );
-      }
-
-      case 'new_products':
-        return (
-          <NewProductPost
-            id={item.id}
-            postType={item.data.postType}
-            businessName={item.data.businessName}
-            businessLogo={item.data.businessLogo}
-            businessId={item.data.businessId}
-            products={item.data.products}
-            timestamp={item.timestamp}
-            createdAt={item.createdAt}
-            onBusinessPress={() => handleBusinessPress(item.data.businessId)}
-            // Product cards navigate to product detail
-            onProductPress={(productId) => handleProductPress(productId, item.data.businessId)}
-            onViewAllPress={() => handleBusinessPress(item.data.businessId)}
-          />
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  // Footer component for "load more" indicator
-  const renderFooter = () => {
-    if (!loadingMore) return null;
-    return (
-      <View style={styles.loadingMore}>
-        <ActivityIndicator size="small" color={appTheme.colors.primary} />
-      </View>
-    );
-  };
-
-  // Error banner with retry
-  const renderErrorBanner = () => {
-    if (!error) return null;
-    return (
-      <View style={[styles.errorBanner, { backgroundColor: appTheme.colors.error }]}>
-        <Text style={styles.errorBannerText}>{error}</Text>
-        <TouchableOpacity onPress={refresh} activeOpacity={0.7} style={styles.retryButton}>
-          <Text style={styles.retryButtonText}>Retry</Text>
+  // ---- renderers ----
+  const SectionHeader = ({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) => (
+    <View style={styles.sectionHeader}>
+      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>{title}</Text>
+      {onSeeAll && (
+        <TouchableOpacity onPress={onSeeAll} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={[styles.seeAll, { color: appTheme.colors.primary }]}>See all</Text>
         </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  const renderBusiness = (b: ExploreBusiness) => (
+    <BusinessListCard
+      key={b.id}
+      id={b.id}
+      name={b.name}
+      logo={b.logoUrl || undefined}
+      industry={b.industry || b.category || undefined}
+      description={b.description || b.address || undefined}
+      isConnected={isConnected(b.id)}
+      productsCount={b.productsCount}
+      onPress={() => goBusiness(b.id)}
+      onConnect={() => toggleConnect(b.id)}
+    />
+  );
+
+  const renderProductCard = ({ item }: { item: UIProduct }) => (
+    <TouchableOpacity
+      style={[styles.productCard, { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.borderColor }]}
+      onPress={() => goProduct(item.id)}
+      activeOpacity={0.85}
+    >
+      <Image source={{ uri: item.productPicture || 'https://via.placeholder.com/140' }} style={styles.productImg} />
+      <Text numberOfLines={1} style={[styles.productName, { color: appTheme.colors.text }]}>{item.name}</Text>
+      <Text numberOfLines={1} style={[styles.productMeta, { color: appTheme.colors.textMuted }]}>{item.brand || ''}</Text>
+      <Text numberOfLines={1} style={[styles.productPrice, { color: appTheme.colors.primary }]}>
+        {item.priceHidden ? 'Price on request' : `Rs ${item.price?.toFixed(2) ?? '0.00'}`}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderProductRow = (item: UIProduct) => (
+    <TouchableOpacity
+      key={item.id}
+      style={[styles.productRow, { borderBottomColor: appTheme.colors.borderColor }]}
+      onPress={() => goProduct(item.id)}
+      activeOpacity={0.7}
+    >
+      <Image source={{ uri: item.productPicture || 'https://via.placeholder.com/56' }} style={styles.productRowImg} />
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <Text numberOfLines={1} style={[styles.productName, { color: appTheme.colors.text }]}>{item.name}</Text>
+        <Text numberOfLines={1} style={[styles.productMeta, { color: appTheme.colors.textMuted }]}>{item.brand || ''}</Text>
       </View>
-    );
+      <Text style={[styles.productPrice, { color: appTheme.colors.primary }]}>
+        {item.priceHidden ? 'Price on request' : `Rs ${item.price?.toFixed(2) ?? '0.00'}`}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const ComingSoon = ({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) => (
+    <View style={styles.comingSoon}>
+      <EmptyState compact iconName={icon} title={title} subtitle={subtitle} />
+    </View>
+  );
+
+  const ProductCarousel = ({ data }: { data: UIProduct[] }) => (
+    <FlatList
+      horizontal
+      data={data}
+      keyExtractor={(p) => p.id}
+      renderItem={renderProductCard}
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.hList}
+    />
+  );
+
+  const renderSections = () => {
+    switch (selectedChip) {
+      case 'Businesses':
+        return (
+          <>
+            {recommended.length > 0 && (
+              <>
+                <SectionHeader title="Recommended for you" />
+                {recommended.slice(0, 5).map(renderBusiness)}
+              </>
+            )}
+            <SectionHeader title="All businesses" />
+            {directory.length ? directory.map(renderBusiness) : (
+              <ComingSoon icon="business-outline" title="No businesses found" subtitle="Try a different search or check back soon." />
+            )}
+          </>
+        );
+
+      case 'Products':
+        return (
+          <>
+            <SectionHeader title="Products from businesses" />
+            {products.length ? products.map(renderProductRow) : (
+              <ComingSoon icon="cube-outline" title="No products yet" subtitle="Public products from other businesses will show here." />
+            )}
+          </>
+        );
+
+      case 'Suppliers':
+        return (
+          <>
+            <SectionHeader title="Suppliers & distributors" />
+            {directory.length ? directory.map(renderBusiness) : (
+              <ComingSoon icon="business-outline" title="No suppliers found" subtitle="Connect with distributors and wholesalers here." />
+            )}
+          </>
+        );
+
+      case 'Buyers': {
+        const buyers = opportunities.filter((o) => o.type === 'buying');
+        return (
+          <>
+            <SectionHeader title="Businesses looking to buy" onSeeAll={() => navigation.navigate('Opportunities')} />
+            {buyers.length ? (
+              buyers.map((o) => (
+                <OpportunityCard key={o.id} opportunity={o} onPress={() => openOpportunity(o.id)} showRespond onRespond={() => openOpportunity(o.id)} />
+              ))
+            ) : (
+              <ComingSoon icon="megaphone-outline" title="No buyer requests yet" subtitle="Businesses looking to buy will appear here." />
+            )}
+          </>
+        );
+      }
+
+      case 'Opportunities':
+        return (
+          <>
+            <SectionHeader title="Opportunities" onSeeAll={() => navigation.navigate('Opportunities')} />
+            {opportunities.length ? (
+              opportunities.map((o) => (
+                <OpportunityCard key={o.id} opportunity={o} onPress={() => openOpportunity(o.id)} showRespond onRespond={() => openOpportunity(o.id)} />
+              ))
+            ) : (
+              <ComingSoon icon="megaphone-outline" title="No opportunities yet" subtitle="Post a request from the Opportunities screen." />
+            )}
+          </>
+        );
+
+      case 'Events':
+        return (
+          <>
+            <SectionHeader title="Upcoming events" onSeeAll={() => navigation.navigate('Events')} />
+            {events.length ? (
+              events.map((ev) => (
+                <EventCard key={ev.id} event={ev} onPress={() => openEvent(ev.id)} showRsvp onRsvp={() => openEvent(ev.id)} />
+              ))
+            ) : (
+              <ComingSoon icon="calendar-outline" title="No upcoming events" subtitle="Host one from the Events screen." />
+            )}
+          </>
+        );
+
+      case 'Near Me':
+        return (
+          <>
+            <SectionHeader title={myCity ? `Businesses near ${myCity}` : 'Nearby businesses'} />
+            {nearby.length ? nearby.map(renderBusiness) : (
+              <ComingSoon icon="location-outline" title="No nearby businesses" subtitle="Add your business address to find partners near you." />
+            )}
+          </>
+        );
+
+      case 'Overall':
+      default:
+        return (
+          <>
+            {recommended.length > 0 && (
+              <>
+                <SectionHeader title="Recommended for you" onSeeAll={() => setSelectedChip('Businesses')} />
+                {recommended.slice(0, 5).map(renderBusiness)}
+              </>
+            )}
+            {products.length > 0 && (
+              <>
+                <SectionHeader title="Popular products" onSeeAll={() => setSelectedChip('Products')} />
+                <ProductCarousel data={products.slice(0, 10)} />
+              </>
+            )}
+            <SectionHeader title="Business directory" onSeeAll={() => setSelectedChip('Businesses')} />
+            {directory.length ? directory.slice(0, 6).map(renderBusiness) : (
+              <ComingSoon icon="business-outline" title="No businesses found" subtitle="Discoverable businesses will appear here." />
+            )}
+            <SectionHeader title="Opportunities" onSeeAll={() => navigation.navigate('Opportunities')} />
+            {opportunities.length ? (
+              opportunities.slice(0, 3).map((o) => (
+                <OpportunityCard key={o.id} opportunity={o} onPress={() => openOpportunity(o.id)} showRespond onRespond={() => openOpportunity(o.id)} />
+              ))
+            ) : (
+              <ComingSoon icon="megaphone-outline" title="No opportunities yet" subtitle="Post a request to find partners, suppliers or buyers." />
+            )}
+            {nearby.length > 0 && (
+              <>
+                <SectionHeader title={myCity ? `Near ${myCity}` : 'Nearby'} onSeeAll={() => setSelectedChip('Near Me')} />
+                {nearby.slice(0, 4).map(renderBusiness)}
+              </>
+            )}
+            <SectionHeader title="Upcoming events" onSeeAll={() => navigation.navigate('Events')} />
+            {events.length ? (
+              events.slice(0, 3).map((ev) => (
+                <EventCard key={ev.id} event={ev} onPress={() => openEvent(ev.id)} showRsvp onRsvp={() => openEvent(ev.id)} />
+              ))
+            ) : (
+              <ComingSoon icon="calendar-outline" title="No upcoming events" subtitle="Host workshops, conferences and networking." />
+            )}
+          </>
+        );
+    }
   };
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]}
-      edges={['top']}
-    >
-      {/* Header */}
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <SecondaryHeader
         title="Explore"
-        leftAction={{ icon: 'chevron-left', onPress: handleBack }}
+        leftAction={
+          navigation.canGoBack()
+            ? { icon: 'chevron-left', onPress: () => navigation.goBack() }
+            : { icon: 'menu', onPress: openDrawer, accessibilityLabel: 'Open menu' }
+        }
+        rightActions={[
+          {
+            icon: 'notifications-outline',
+            onPress: () => navigation.navigate('Notifications'),
+            badge: unreadCount,
+            accessibilityLabel: 'Notifications',
+          },
+        ]}
       />
 
-      {/* Loading Skeleton */}
-      {loading && (
-        <View style={styles.loadingContainer}>
-          {[1, 2, 3].map((_, i) => (
-            <View key={i} style={{ paddingHorizontal: 16, marginBottom: 24, marginTop: i === 0 ? 12 : 0 }}>
-              <SkeletonRow gap={12} style={{ marginBottom: 12 }}>
-                <SkeletonCircle size={48} />
-                <SkeletonColumn gap={6} style={{ flex: 1 }}>
-                  <Skeleton width="50%" height={16} />
-                  <Skeleton width="30%" height={14} />
-                </SkeletonColumn>
-              </SkeletonRow>
-              <SkeletonRow gap={10}>
-                {[1, 2].map((_, j) => (
-                  <Skeleton key={j} width={160} height={200} borderRadius={12} />
-                ))}
-              </SkeletonRow>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Feed List */}
-      {!loading && (
-        <FlatList
-          data={posts}
-          keyExtractor={(item) => item.id}
-          renderItem={renderFeedPost}
-          ListHeaderComponent={renderErrorBanner}
-          ListEmptyComponent={() => (
-            <EmptyState
-              iconName="search-outline"
-              title="Discover businesses"
-              subtitle="Explore suppliers, partners, and opportunities for your business."
-              ctaLabel="Refresh"
-              onCtaPress={refresh}
-              testID="empty-business-explore"
-            />
-          )}
-          ListFooterComponent={renderFooter}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={refresh}
-              tintColor={appTheme.colors.primary}
-            />
-          }
-          onEndReached={hasMore ? loadMore : undefined}
-          onEndReachedThreshold={0.5}
-          showsVerticalScrollIndicator={false}
-          removeClippedSubviews
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          initialNumToRender={10}
-          contentContainerStyle={[
-            styles.listContent,
-            posts.length === 0 && { flex: 1 },
-          ]}
+      <View style={styles.searchRow}>
+        <AppSearchBar
+          placeholder="Search businesses, products, suppliers..."
+          value={query}
+          onChangeText={setQuery}
+          onSubmitEditing={submitSearch}
+          onClear={() => setQuery('')}
+          returnKeyType="search"
+          containerStyle={styles.search}
         />
+      </View>
+
+      <ExploreChips chips={CHIPS} selected={selectedChip} onSelect={setSelectedChip} />
+
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={appTheme.colors.primary} />
+        </View>
+      ) : error ? (
+        <View style={styles.center}>
+          <EmptyState
+            iconName="cloud-offline-outline"
+            title="Couldn't load Explore"
+            subtitle={error}
+            ctaLabel="Retry"
+            onCtaPress={refresh}
+          />
+        </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={appTheme.colors.primary} />
+          }
+        >
+          {renderSections()}
+        </ScrollView>
       )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  listContent: {
-    paddingBottom: theme.spacing.lg,
-    paddingTop: theme.spacing.sm,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
-  loadingMore: {
-    paddingVertical: theme.spacing.md,
-    alignItems: 'center',
-  },
-  errorBanner: {
+  safeArea: { flex: 1 },
+  searchRow: { paddingTop: 4 },
+  search: { marginHorizontal: 12, marginTop: 4, marginBottom: 4 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
+  scrollContent: { paddingBottom: 32 },
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    borderRadius: 6,
+    paddingHorizontal: 16,
+    marginTop: 18,
+    marginBottom: 6,
   },
-  errorBannerText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: theme.fonts.primary.medium,
-    flex: 1,
+  sectionTitle: { fontSize: 17, fontWeight: '700' },
+  seeAll: { fontSize: 14, fontWeight: '600' },
+  hList: { paddingHorizontal: 12, gap: 12, paddingVertical: 4 },
+  productCard: {
+    width: 150,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
   },
-  retryButton: {
-    marginLeft: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  productImg: { width: '100%', height: 110, borderRadius: 8, marginBottom: 8, backgroundColor: '#F3F4F6' },
+  productRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: theme.fonts.primary.bold,
-  },
+  productRowImg: { width: 56, height: 56, borderRadius: 8, backgroundColor: '#F3F4F6' },
+  productName: { fontSize: 14, fontWeight: '600' },
+  productMeta: { fontSize: 12, marginTop: 2 },
+  productPrice: { fontSize: 13, fontWeight: '700', marginTop: 4 },
+  comingSoon: { paddingVertical: 8 },
 });

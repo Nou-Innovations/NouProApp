@@ -1,39 +1,33 @@
 /**
  * Business Tab Navigator (Pro Mode)
  * Navigation for Business Profile mode
- * 
- * Updated navigation structure:
+ *
+ * Tab structure:
+ * - Explore: B2B discovery (businesses, products, suppliers, opportunities, events). Notifications bell in header.
  * - Inbox: Dashboard with Activity Timeline and Chat list
- * - Deliveries: Assign, track, create deliveries and transfers
- * - Products: Product catalog management, stock
- * - Invoices: Invoices, estimates (paid plans only)
- * - Business: Business profile, settings, staff, subscription
- * 
- * Note: Explore (feed) is now accessed via overlay from Inbox header (not a tab)
+ * - Activities: Business timeline / log
+ * - Profile: Business profile, settings, staff, subscription
+ *
+ * Note: Deliveries / Products / Invoices moved to the sidebar (opened as RootStack screens).
+ * Notifications are reached via the bell in the Explore header (not a tab).
  */
 
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { 
-  Mail, 
-  Car, 
-  Package,
-  ReceiptText, 
+import {
+  Compass,
+  Mail,
+  List,
 } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import { useNotifications } from '@/shared/context/NotificationContext';
 import { useProfileStore } from '@/shared/store/profileStore';
 import theme from '@/shared/theme';
 import { BusinessTabParamList } from '@/shared/types/navigation';
 
 // Import screens
-import DeliveryScreen from '@/features/deliveries/screens/DeliveryScreen';
-import ProductsScreen from '@/features/products/screens/ProductsScreen';
-import InvoicesScreen from '@/features/invoices/screens/InvoicesScreen';
-// Import business profile from modes
+import { BusinessExploreScreen, AllActivityScreen } from '@/modes/business/screens';
 import BusinessProfileOwnScreen from '@/modes/business/screens/BusinessProfileOwnScreen';
-// Import Business Inbox Screen
 import BusinessInboxScreen from '@/modes/business/screens/BusinessInboxScreen';
 
 const Tab = createBottomTabNavigator<BusinessTabParamList>();
@@ -43,7 +37,6 @@ const Tab = createBottomTabNavigator<BusinessTabParamList>();
  */
 export function BusinessTabNavigator() {
   const { theme: appTheme } = useTheme();
-  const { deliveriesUnreadCount, invoicesUnreadCount } = useNotifications();
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
 
   /**
@@ -85,6 +78,26 @@ export function BusinessTabNavigator() {
         },
       }}
     >
+      {/* Explore Tab - B2B discovery (notifications bell lives in this screen's header) */}
+      <Tab.Screen
+        name="BusinessExplore"
+        component={BusinessExploreScreen}
+        options={{
+          tabBarLabel: ({ focused, color }) => (
+            <Text style={{
+              fontSize: theme.fontSize.xs,
+              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
+              color,
+            }}>
+              Explore
+            </Text>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <Compass size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+          ),
+        }}
+      />
+
       {/* Inbox Tab - Dashboard with Activity + Chats */}
       <Tab.Screen
         name="BusinessInbox"
@@ -104,11 +117,11 @@ export function BusinessTabNavigator() {
           ),
         }}
       />
-      
-      {/* Deliveries Tab */}
+
+      {/* Activities Tab - Business timeline / log */}
       <Tab.Screen
-        name="Deliveries"
-        component={DeliveryScreen}
+        name="Activities"
+        component={AllActivityScreen}
         options={{
           tabBarLabel: ({ focused, color }) => (
             <Text style={{
@@ -116,73 +129,15 @@ export function BusinessTabNavigator() {
               fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
               color,
             }}>
-              Deliveries
+              Activities
             </Text>
           ),
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ position: 'relative' }}>
-              <Car size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-              {deliveriesUnreadCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>
-                    {deliveriesUnreadCount > 9 ? '9+' : deliveriesUnreadCount.toString()}
-                  </Text>
-                </View>
-              )}
-            </View>
+            <List size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />
-      
-      {/* Products Tab */}
-      <Tab.Screen
-        name="Products"
-        component={ProductsScreen}
-        options={{
-          tabBarLabel: ({ focused, color }) => (
-            <Text style={{
-              fontSize: theme.fontSize.xs,
-              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color,
-            }}>
-              Products
-            </Text>
-          ),
-          tabBarIcon: ({ color, focused }) => (
-            <Package size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-          ),
-        }}
-      />
-      
-      {/* Invoices Tab */}
-      <Tab.Screen
-        name="Invoices"
-        component={InvoicesScreen}
-        options={{
-          tabBarLabel: ({ focused, color }) => (
-            <Text style={{
-              fontSize: theme.fontSize.xs,
-              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color,
-            }}>
-              Invoices
-            </Text>
-          ),
-          tabBarIcon: ({ color, focused }) => (
-            <View style={{ position: 'relative' }}>
-              <ReceiptText size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-              {invoicesUnreadCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>
-                    {invoicesUnreadCount > 9 ? '9+' : invoicesUnreadCount.toString()}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ),
-        }}
-      />
-      
+
       {/* Business Profile Tab */}
       <Tab.Screen
         name="BusinessProfile"
@@ -205,24 +160,6 @@ export function BusinessTabNavigator() {
 }
 
 const styles = StyleSheet.create({
-  notificationBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -10,
-    backgroundColor: theme.colors.accent,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  notificationBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: theme.colors.textInverse,
-    textAlign: 'center',
-  },
   profileIconContainer: {
     width: 28,
     height: 28,

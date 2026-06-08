@@ -126,6 +126,17 @@ import CategoriesScreen from '@/features/products/screens/CategoriesScreen';
 import ProductVisibilityScreen from '@/features/products/screens/ProductVisibilityScreen';
 import TransfersScreen from '@/features/deliveries/screens/TransfersScreen';
 
+// Screens - Explore (Opportunities)
+import { OpportunitiesScreen, OpportunityDetailScreen, CreateOpportunityScreen } from '@/features/opportunities';
+
+// Screens - Explore (Events)
+import { EventsScreen, EventDetailScreen, CreateEventScreen } from '@/features/events';
+
+// Screens - Business workspace lists (moved from bottom tabs to the sidebar)
+import DeliveryScreen from '@/features/deliveries/screens/DeliveryScreen';
+import ProductsScreen from '@/features/products/screens/ProductsScreen';
+import InvoicesScreen from '@/features/invoices/screens/InvoicesScreen';
+
 // Screens - Personal (from modes)
 import EditPersonalProfileScreen from '@/modes/personal/screens/EditPersonalProfileScreen';
 import AddWorkExperienceScreen from '@/modes/personal/screens/AddWorkExperienceScreen';
@@ -525,6 +536,21 @@ function AppNavigator() {
         <RootStack.Screen name="Categories" component={CategoriesScreen} />
         <RootStack.Screen name="ProductVisibility" component={ProductVisibilityScreen} />
         <RootStack.Screen name="Transfers" component={TransfersScreen} />
+
+        {/* Explore — Opportunities */}
+        <RootStack.Screen name="Opportunities" component={OpportunitiesScreen} />
+        <RootStack.Screen name="OpportunityDetail" component={OpportunityDetailScreen} />
+        <RootStack.Screen name="CreateOpportunity" component={CreateOpportunityScreen} />
+
+        {/* Explore — Events */}
+        <RootStack.Screen name="Events" component={EventsScreen} />
+        <RootStack.Screen name="EventDetail" component={EventDetailScreen} />
+        <RootStack.Screen name="CreateEvent" component={CreateEventScreen} />
+
+        {/* Business workspace lists (opened from the sidebar; previously bottom tabs) */}
+        <RootStack.Screen name="Deliveries" component={DeliveryScreen} />
+        <RootStack.Screen name="Products" component={ProductsScreen} />
+        <RootStack.Screen name="Invoices" component={InvoicesScreen} />
         
         {/* Subscription */}
         <RootStack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />

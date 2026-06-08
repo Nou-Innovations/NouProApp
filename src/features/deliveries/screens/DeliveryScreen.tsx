@@ -174,6 +174,7 @@ export default function DeliveryScreen() {
       <PrimaryHeader
         title={getTabTitle()}
         onTitlePress={toggleViewDropdown}
+        leftAction={navigation.canGoBack() ? { icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' } : undefined}
         actions={[
           { icon: 'checkbox-outline', onPress: () => (navigation as any).navigate('Tasks'), accessibilityLabel: 'Tasks' },
           { icon: 'shopping-cart', onPress: handleOpenProcurement, badge: pendingProcurementCount, accessibilityLabel: 'Procurement' },

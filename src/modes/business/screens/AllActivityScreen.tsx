@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
@@ -141,6 +141,11 @@ export default function AllActivityScreen() {
     navigation.goBack();
   };
 
+  // Open the sidebar (when shown as the Activities tab root)
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
+
   // Handle search
   const handleSearchChange = (text: string) => {
     setSearch(text);
@@ -191,13 +196,18 @@ export default function AllActivityScreen() {
       style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} 
       edges={['top', 'bottom']}
     >
-      {/* Header */}
+      {/* Header — as the Activities tab root the left action opens the sidebar (hamburger);
+          a back chevron appears when this screen is pushed (e.g. the AllActivity route). */}
       <SecondaryHeader
-        title="Recent Activities"
-        leftAction={{
+        title="Activities"
+        leftAction={navigation.canGoBack() ? {
           icon: 'chevron-back',
           onPress: handleBack,
           accessibilityLabel: 'Go back',
+        } : {
+          icon: 'menu',
+          onPress: openDrawer,
+          accessibilityLabel: 'Open menu',
         }}
       />
 
