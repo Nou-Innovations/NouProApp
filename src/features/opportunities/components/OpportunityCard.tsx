@@ -38,7 +38,7 @@ export default function OpportunityCard({ opportunity, onPress, onRespond, showR
       avatar={{
         type: o.business?.logoUrl ? 'image' : 'icon',
         imageUri: o.business?.logoUrl,
-        icon: 'megaphone-outline',
+        icon: 'briefcase-outline',
         userId: o.businessId,
         userName: o.business?.name || 'Business',
       }}

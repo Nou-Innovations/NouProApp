@@ -57,7 +57,7 @@ export default function OpportunityDetailScreen({ navigation, route }: Props) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
         <SecondaryHeader title="Opportunity" leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }} />
-        <EmptyState iconName="cloud-offline-outline" title="Couldn't load" subtitle={error || 'Not found'} ctaLabel="Retry" onCtaPress={refresh} />
+        <EmptyState iconName="alert-circle-outline" title="Couldn't load" subtitle={error || 'Not found'} ctaLabel="Retry" onCtaPress={refresh} />
       </SafeAreaView>
     );
   }

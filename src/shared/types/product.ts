@@ -3,6 +3,8 @@
  * Based on app-logic.json dataModels.product and dataModels.brand
  */
 
+import { theme } from '@/shared/theme';
+
 /**
  * Product status enum
  * Based on app-logic.json statusEnums.productStatus
@@ -19,12 +21,12 @@ export type ProductStatus =
  * Product status colors for UI
  */
 export const PRODUCT_STATUS_COLORS: Record<ProductStatus, string> = {
-  available: '#22C55E',
-  out_of_stock: '#EF4444',
-  in_production: '#0EA5E9',
-  discontinued: '#F59E42',
-  inactive: '#6B7280',
-  low_stock: '#F59E0B',
+  available: theme.colors.success,
+  out_of_stock: theme.colors.statusOutOfStock,
+  in_production: theme.colors.statusInProduction,
+  discontinued: theme.colors.statusDiscontinued,
+  inactive: theme.colors.statusInactive,
+  low_stock: theme.colors.statusLowStock,
 };
 
 /**

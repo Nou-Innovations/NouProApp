@@ -9,6 +9,7 @@ interface AvatarProps {
   userName: string;
   imageUri?: string | null;
   size?: number;
+  /** @deprecated Avatars are always rounded squares now — this prop is ignored. */
   borderRadius?: number;
   style?: ViewStyle;
   textStyle?: TextStyle;
@@ -20,7 +21,6 @@ export const Avatar: React.FC<AvatarProps> = ({
   userName,
   imageUri,
   size = theme.avatarSizes.sm, // Default to sm (40px)
-  borderRadius = theme.borderRadius.md, // Default to 8px
   style,
   textStyle,
   showFallback = true,
@@ -54,14 +54,18 @@ export const Avatar: React.FC<AvatarProps> = ({
   const hasValidImage = isValidImageUri(imageUri) && !imageLoadError;
   const shouldShowFallback = showFallback && (!hasValidImage || isLoading);
 
+  // Every profile picture in the app is a rounded square ("squircle"), never a circle.
+  // The radius is derived from the size for a uniform look and applied AFTER `style`
+  // so callers can't override the shape back to a circle.
+  const squareRadius = Math.round(size * 0.25);
   const avatarStyle: ViewStyle = {
     width: size,
     height: size,
-    borderRadius,
     backgroundColor: shouldShowFallback ? backgroundColor : 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     ...style,
+    borderRadius: squareRadius,
   };
 
   const fontSize = Math.max(theme.fontSize.xs, size * 0.4); // Dynamic font size based on avatar size

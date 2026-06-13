@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   avatarPlaceholder: {
     width: 80,
     height: 80,
-    borderRadius: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: 80,
     height: 80,
-    borderRadius: 40,
+    borderRadius: 20,
   },
   avatarLabel: {
     fontSize: theme.fontSize.sm,

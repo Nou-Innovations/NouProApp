@@ -244,13 +244,13 @@ const styles = StyleSheet.create({
   logoImage: {
     width: 100,
     height: 100,
-    borderRadius: 50,
+    borderRadius: 25,
     marginBottom: 16,
   },
   logoPlaceholder: {
     width: 100,
     height: 100,
-    borderRadius: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,

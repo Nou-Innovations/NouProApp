@@ -7,6 +7,8 @@
  * Based on backend API response shapes.
  */
 
+import { theme } from '@/shared/theme';
+
 // ============================================================================
 // Status Types
 // ============================================================================
@@ -155,15 +157,15 @@ export interface InvoiceWithDisplay extends Invoice {
 // ============================================================================
 
 export const INVOICE_STATUS_COLORS: Record<string, string> = {
-  draft: '#6B7280',          // Gray
-  sent: '#3B82F6',           // Blue
-  partially_paid: '#F59E0B', // Amber
-  paid: '#22C55E',           // Green
-  overdue: '#EF4444',        // Red
-  canceled: '#9CA3AF',       // Light Gray
-  cancelled: '#9CA3AF',      // Light Gray (alias)
-  void: '#6B7280',           // Gray
-  refunded: '#8B5CF6',       // Purple
+  draft: theme.colors.neutral,          // Gray
+  sent: theme.colors.info,              // Blue
+  partially_paid: theme.colors.warning, // Amber
+  paid: theme.colors.success,           // Green
+  overdue: theme.colors.error,          // Red
+  canceled: theme.colors.neutral,       // Light Gray
+  cancelled: theme.colors.neutral,      // Light Gray (alias)
+  void: theme.colors.neutral,           // Gray
+  refunded: theme.colors.statusInReview, // Purple
 };
 
 export const INVOICE_STATUS_LABELS: Record<string, string> = {
@@ -186,7 +188,7 @@ export const INVOICE_STATUS_LABELS: Record<string, string> = {
  * Get status color
  */
 export function getInvoiceStatusColor(status: InvoiceStatus): string {
-  return INVOICE_STATUS_COLORS[status] || '#6B7280';
+  return INVOICE_STATUS_COLORS[status] || theme.colors.neutral;
 }
 
 /**

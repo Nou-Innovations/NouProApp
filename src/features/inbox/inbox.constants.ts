@@ -5,27 +5,29 @@
  * Based on design.json specifications.
  */
 
+import { theme } from '@/shared/theme';
+
 // ============================================================================
 // Order Status Colors (from design.json)
 // ============================================================================
 
 export const ORDER_STATUS_COLORS: Record<string, string> = {
-  'pending': '#FFB600',
-  'accepted': '#0075FF',
-  'completed': '#2ACF01',
-  'cancelled': '#A4AAB8',
-  'Done': '#2ACF01',
-  'New': '#6E0000',
-  'Ongoing': '#0075FF',
-  'Pending': '#FFB600',
-  'Cancel': '#FF6B6B',
-  'Delivery Pending Confirmation': '#FFB600',
+  'pending': theme.colors.warning,
+  'accepted': theme.colors.info,
+  'completed': theme.colors.success,
+  'cancelled': theme.colors.neutral,
+  'Done': theme.colors.statusDone,
+  'New': theme.colors.statusNewOrder,
+  'Ongoing': theme.colors.statusOngoing,
+  'Pending': theme.colors.warning,
+  'Cancel': theme.colors.statusCanceled,
+  'Delivery Pending Confirmation': theme.colors.warning,
 };
 
 export const PAYMENT_STATUS_COLORS: Record<string, string> = {
-  'Paid': '#2ACF01',
-  'Unpaid': '#FF2400',
-  'Payment Pending Confirmation': '#FFB600',
+  'Paid': theme.colors.statusPaid,
+  'Unpaid': theme.colors.error,
+  'Payment Pending Confirmation': theme.colors.warning,
 };
 
 // ============================================================================
@@ -85,14 +87,14 @@ export const CHAT_FILTER_LABELS: Record<string, string> = {
 /**
  * Get order status color with fallback
  */
-export function getOrderStatusColor(status: string, fallback = '#6b7280'): string {
+export function getOrderStatusColor(status: string, fallback = theme.colors.neutral): string {
   return ORDER_STATUS_COLORS[status] || fallback;
 }
 
 /**
  * Get payment status color with fallback
  */
-export function getPaymentStatusColor(status: string, fallback = '#FF2400'): string {
+export function getPaymentStatusColor(status: string, fallback = theme.colors.error): string {
   return PAYMENT_STATUS_COLORS[status] || fallback;
 }
 

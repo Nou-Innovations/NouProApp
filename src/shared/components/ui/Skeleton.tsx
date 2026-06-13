@@ -77,9 +77,10 @@ export function Skeleton({ width, height, borderRadius = 4, style }: SkeletonPro
 
 // ─── Convenience Variants ───────────────────────────────────────────────────
 
-/** Circle skeleton (avatar placeholder) */
+/** Avatar placeholder skeleton — a rounded square matching the Avatar component.
+ *  (Name kept as SkeletonCircle for backwards compatibility with existing call sites.) */
 export function SkeletonCircle({ size, style }: { size: number; style?: ViewStyle }) {
-  return <Skeleton width={size} height={size} borderRadius={size / 2} style={style} />;
+  return <Skeleton width={size} height={size} borderRadius={Math.round(size * 0.25)} style={style} />;
 }
 
 // ─── Row / Group Helpers ────────────────────────────────────────────────────
@@ -130,7 +131,7 @@ export function SkeletonListItem({
   style?: ViewStyle;
 }) {
   const { theme: appTheme } = useTheme();
-  const radius = avatarRadius ?? avatarSize * 0.17; // default matching Avatar component
+  const radius = avatarRadius ?? avatarSize * 0.25; // default matching Avatar component
 
   return (
     <View style={[skeletonStyles.listItem, style]}>

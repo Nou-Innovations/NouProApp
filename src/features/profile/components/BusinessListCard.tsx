@@ -101,7 +101,7 @@ export function BusinessListCard({
 
   // Container style for featured
   const containerStyle: ViewStyle | undefined = featured 
-    ? { borderLeftWidth: 3, borderLeftColor: '#D23030' }
+    ? { borderLeftWidth: 3, borderLeftColor: '#FF7A00' }
     : undefined;
 
   // Featured badge as top element

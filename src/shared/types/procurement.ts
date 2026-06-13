@@ -6,6 +6,8 @@
  * These match the Prisma schema and backend response shapes.
  */
 
+import { theme } from '@/shared/theme';
+
 // ============================================================================
 // Status Enums (match Prisma enums exactly)
 // ============================================================================
@@ -33,9 +35,9 @@ export type PaymentStatus = import('./order').PaymentStatus;
 // ============================================================================
 
 export const SUPPLIER_STATUS_COLORS: Record<SupplierStatus, string> = {
-  ACTIVE: '#2ACF01',
-  INACTIVE: '#A4AAB8',
-  BLOCKED: '#FF2400',
+  ACTIVE: theme.colors.success,
+  INACTIVE: theme.colors.neutral,
+  BLOCKED: theme.colors.error,
 };
 
 export const SUPPLIER_STATUS_LABELS: Record<SupplierStatus, string> = {
@@ -45,11 +47,11 @@ export const SUPPLIER_STATUS_LABELS: Record<SupplierStatus, string> = {
 };
 
 export const PR_STATUS_COLORS: Record<PurchaseRequestStatus, string> = {
-  DRAFT: '#A4AAB8',
-  SUBMITTED: '#0075FF',
-  APPROVED: '#2ACF01',
-  REJECTED: '#FF2400',
-  CONVERTED: '#2ACF01',
+  DRAFT: theme.colors.neutral,
+  SUBMITTED: theme.colors.info,
+  APPROVED: theme.colors.success,
+  REJECTED: theme.colors.error,
+  CONVERTED: theme.colors.success,
 };
 
 export const PR_STATUS_LABELS: Record<PurchaseRequestStatus, string> = {
@@ -61,9 +63,9 @@ export const PR_STATUS_LABELS: Record<PurchaseRequestStatus, string> = {
 };
 
 export const PR_PRIORITY_COLORS: Record<PurchaseRequestPriority, string> = {
-  LOW: '#A4AAB8',
-  NORMAL: '#0075FF',
-  URGENT: '#FF2400',
+  LOW: theme.colors.neutral,
+  NORMAL: theme.colors.info,
+  URGENT: theme.colors.error,
 };
 
 export const PR_PRIORITY_LABELS: Record<PurchaseRequestPriority, string> = {
@@ -73,12 +75,12 @@ export const PR_PRIORITY_LABELS: Record<PurchaseRequestPriority, string> = {
 };
 
 export const PO_STATUS_COLORS: Record<PurchaseOrderStatus, string> = {
-  DRAFT: '#A4AAB8',
-  SENT: '#0075FF',
-  CONFIRMED: '#2ACF01',
-  PARTIALLY_RECEIVED: '#FFB600',
-  RECEIVED: '#2ACF01',
-  CANCELED: '#FF6B6B',
+  DRAFT: theme.colors.neutral,
+  SENT: theme.colors.info,
+  CONFIRMED: theme.colors.success,
+  PARTIALLY_RECEIVED: theme.colors.warning,
+  RECEIVED: theme.colors.success,
+  CANCELED: theme.colors.statusCanceled,
 };
 
 export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
@@ -91,9 +93,9 @@ export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
 };
 
 export const GRN_STATUS_COLORS: Record<GoodsReceiptStatus, string> = {
-  PENDING: '#FFB600',
-  COMPLETED: '#2ACF01',
-  DISPUTED: '#FF2400',
+  PENDING: theme.colors.warning,
+  COMPLETED: theme.colors.success,
+  DISPUTED: theme.colors.error,
 };
 
 export const GRN_STATUS_LABELS: Record<GoodsReceiptStatus, string> = {

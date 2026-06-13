@@ -26,6 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Icon } from '@/shared/utils/icons';
+import AnimatedMenuIcon from '@/shared/components/ui/AnimatedMenuIcon';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -83,7 +84,7 @@ export default function HomeScreen() {
   }, [navigation]);
 
   const openDrawer = useCallback(() => {
-    navigation.dispatch(DrawerActions.openDrawer());
+    navigation.dispatch(DrawerActions.toggleDrawer());
   }, [navigation]);
 
   const handleBusinessPress = (businessId: string, expandBrandId?: string) => {
@@ -161,7 +162,7 @@ export default function HomeScreen() {
         accessibilityLabel="Open menu"
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Icon name="menu" size={26} color={appTheme.colors.text} />
+        <AnimatedMenuIcon size={30} color={appTheme.colors.text} />
       </TouchableOpacity>
       <View style={styles.headerActions}>
         {/* Notifications Button */}

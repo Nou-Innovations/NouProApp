@@ -8,12 +8,13 @@
  * the sidebar matches the rest of the app in both light and dark mode.
  *
  * Sections:
- * - Profile header (avatar + name + email) → opens own profile
- * - Mode switcher (Personal ⇄ Business) → switchToPersonal / switchToBusiness
+ * - Profile header → collapsing account switcher (tap to expand the list of accounts)
+ * - Account list (when expanded): Personal + every connected business (switch / request
+ *   access for staff-only memberships) + "Add account"
  * - Navigation: grouped Business Workspace sections (business mode) or a simple menu (personal)
  * - Logout footer
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { DrawerContentScrollView, DrawerContentComponentProps } from '@react-navigation/drawer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,9 +22,14 @@ import { Icon } from '@/shared/utils/icons';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import { useProfileStore } from '@/shared/store/profileStore';
+import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { authAPI } from '@/shared/services/api';
+import { getCapabilities } from '@/shared/auth/capabilities';
+import roleRequestService from '@/features/team/roleRequest.service';
+import { RoleRequest } from '@/shared/types/roleRequest';
+import { UserBusiness } from '@/shared/types/business';
 
 // Enable LayoutAnimation on Android (no-op on the new architecture / iOS).
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -31,6 +37,15 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const LEADING_SLOT = 36; // fixed leading column so all row labels align
+
+// High-contrast selection palette for the account switcher: the active business with branches
+// renders as a white "paper" section, and the selected branch/account renders as a black "ink"
+// row. These are intentionally literal (same in light + dark mode) per the requested design.
+const INK = '#111827'; // black section background
+const INK_TEXT = '#FFFFFF'; // text/icons on the black section
+const PAPER = '#FFFFFF'; // white section background (business that has branches)
+const PAPER_TEXT = '#111827'; // text on the white section
+const PAPER_MUTED = '#6B7280'; // muted text/icons on the white section
 
 type ShortcutItem = {
   key: string;
@@ -62,9 +77,17 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
   const activeMode = useProfileStore((state) => state.activeMode);
   const activeBusinessId = useProfileStore((state) => state.activeBusinessId);
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
+  const currentUserRole = useProfileStore((state) => state.currentUserRole);
   const userBusinesses = useProfileStore((state) => state.userBusinesses);
   const switchToPersonal = useProfileStore((state) => state.switchToPersonal);
   const switchToBusiness = useProfileStore((state) => state.switchToBusiness);
+
+  // Branches (locations) belong to the active business. businessStore keeps them in sync with
+  // profileStore.activeBusiness (see CompanyStoreInitializer in App.tsx), so `locations` always
+  // describes the currently-active business. null currentLocationId = "All locations".
+  const locations = useBusinessStore((state) => state.locations);
+  const currentLocationId = useBusinessStore((state) => state.currentLocationId);
+  const setLocation = useBusinessStore((state) => state.setLocation);
 
   // Unread counts surfaced as badges on the workspace rows (Deliveries/Invoices moved here from tabs)
   const { deliveriesUnreadCount, invoicesUnreadCount } = useNotifications();
@@ -72,6 +95,37 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
   // Collapsible business sections (all collapsed by default) + top search field.
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Profile header doubles as a collapsing account switcher (collapsed by default).
+  const [accountsOpen, setAccountsOpen] = useState(false);
+  // Pending/decided admin-access requests for staff-only memberships, keyed by business id.
+  const [roleRequests, setRoleRequests] = useState<Map<string, RoleRequest>>(new Map());
+
+  // When the account list opens, load access-request statuses for any staff-only memberships
+  // so the rows can show "Request pending / declined / tap to request access".
+  useEffect(() => {
+    if (!accountsOpen) return;
+    const staffBusinesses = userBusinesses.filter((ub) => ub.role === 'staff');
+    if (staffBusinesses.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const requests = new Map<string, RoleRequest>();
+      for (const ub of staffBusinesses) {
+        try {
+          const request = await roleRequestService.getMyRoleRequest(ub.business.id);
+          if (request) requests.set(ub.business.id, request);
+        } catch {
+          // No request exists for this business — that's fine.
+        }
+      }
+      if (!cancelled) setRoleRequests(requests);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accountsOpen, userBusinesses]);
 
   if (!currentUser) {
     return null;
@@ -105,18 +159,82 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     }
   };
 
-  const handleSwitchPersonal = () => {
+  // Expand/collapse the account switcher embedded in the profile header.
+  const handleToggleAccounts = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setAccountsOpen((open) => !open);
+  };
+
+  const handleSelectPersonal = () => {
     if (activeMode !== 'personal') {
       switchToPersonal();
     }
     closeDrawer();
   };
 
-  const handleSwitchBusiness = async (businessId: string) => {
-    if (businessId !== activeBusinessId || activeMode !== 'business') {
-      await switchToBusiness(businessId);
+  const handleSelectBusiness = async (ub: UserBusiness) => {
+    // Staff can't enter Business mode — offer to request admin access instead of switching.
+    if (getCapabilities(ub.role).isStaff) {
+      const request = roleRequests.get(ub.business.id);
+      if (request?.status === 'PENDING') {
+        Alert.alert(
+          'Request pending',
+          `Your admin-access request for ${ub.business.name} is still awaiting review.`
+        );
+        return;
+      }
+      Alert.alert(
+        'Access restricted',
+        `You're a Staff member in ${ub.business.name}. Only Admins can open Business mode.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Request Admin Access', onPress: () => handleRequestAccess(ub) },
+        ]
+      );
+      return;
+    }
+
+    if (ub.business.id !== activeBusinessId || activeMode !== 'business') {
+      await switchToBusiness(ub.business.id);
     }
     closeDrawer();
+  };
+
+  // Send (or re-send) an admin-access request for a staff-only membership.
+  const handleRequestAccess = async (ub: UserBusiness) => {
+    try {
+      await roleRequestService.createRoleRequest(ub.business.id, {
+        requestedRole: 'admin',
+        message: 'Requesting admin access to help manage business operations',
+      });
+      Alert.alert(
+        'Request sent',
+        `Your admin-access request for ${ub.business.name} has been sent to the owner. You'll be notified when it's reviewed.`
+      );
+      // Reflect the new pending state on the row.
+      const request = await roleRequestService.getMyRoleRequest(ub.business.id);
+      if (request) {
+        setRoleRequests((prev) => new Map(prev).set(ub.business.id, request));
+      }
+    } catch (error: any) {
+      const msg = error?.message ?? '';
+      if (msg.includes('already exists') || msg.includes('pending')) {
+        Alert.alert('Request already sent', 'You already have a pending admin-access request for this business.');
+      } else if (msg.includes('cooldown') || msg.includes('recently rejected')) {
+        Alert.alert('Request cooldown', 'Your previous request was recently reviewed. Please wait before requesting again.');
+      } else {
+        Alert.alert('Request failed', 'Failed to send the admin-access request. Please try again.');
+      }
+    }
+  };
+
+  // Add a business: let the user choose between creating a new one or joining an existing one.
+  const handleAddAccount = () => {
+    Alert.alert('Add account', 'Create a new business or join an existing one.', [
+      { text: 'Create new business', onPress: () => go('BusinessBasicInfo', { fromProfileSwitcher: true }) },
+      { text: 'Join existing business', onPress: () => go('SelectCompany') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const handleLogout = () => {
@@ -126,8 +244,23 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     ]);
   };
 
-  // Only businesses the user can actually open in business mode (staff are personal-only).
-  const switchableBusinesses = userBusinesses.filter((ub) => ub.role !== 'staff');
+  // Active identity shown in the (collapsed) profile header — business when in business mode, else personal.
+  const activeIdentity =
+    activeMode === 'business' && activeBusiness
+      ? {
+          name: activeBusiness.name,
+          subtitle: getRoleDisplayName(currentUserRole),
+          avatarId: activeBusiness.id,
+          avatarUri: activeBusiness.logo_url ?? null,
+          borderRadius: 13,
+        }
+      : {
+          name: currentUser.name,
+          subtitle: currentUser.email ?? 'Personal',
+          avatarId: currentUser.id,
+          avatarUri: currentUser.avatar_url,
+          borderRadius: 26,
+        };
 
   const shortcuts: ShortcutItem[] = [
     {
@@ -238,6 +371,88 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     </Pressable>
   );
 
+  // Richer row used by the account switcher: avatar + name + optional role badge and
+  // status pill (staff). The selected account renders as a high-contrast black row.
+  const AccountRow = ({
+    avatar,
+    name,
+    badgeText,
+    selected,
+    pill,
+    onPress,
+  }: {
+    avatar: React.ReactNode;
+    name: string;
+    badgeText?: string | null;
+    selected?: boolean;
+    pill?: { icon: string; text: string } | null;
+    onPress: () => void;
+  }) => (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.accountRow,
+        selected && { backgroundColor: INK },
+        pressed && !selected && { backgroundColor: C.highlight },
+      ]}
+    >
+      <View style={styles.leading}>{avatar}</View>
+      <View style={styles.accountInfo}>
+        <View style={styles.accountNameRow}>
+          <Text
+            style={[styles.accountName, { color: selected ? INK_TEXT : C.text, fontWeight: selected ? '700' : '600' }]}
+            numberOfLines={1}
+          >
+            {name}
+          </Text>
+          {badgeText ? (
+            <View style={[styles.roleBadge, { backgroundColor: selected ? 'rgba(255,255,255,0.18)' : C.highlight }]}>
+              <Text style={[styles.roleBadgeText, { color: selected ? INK_TEXT : C.textMuted }]}>{badgeText}</Text>
+            </View>
+          ) : null}
+        </View>
+        {pill ? (
+          <View style={[styles.statusPill, { backgroundColor: selected ? 'rgba(255,255,255,0.18)' : C.highlight }]}>
+            <Icon name={pill.icon} size={13} color={selected ? INK_TEXT : C.textMuted} strokeWidth={2} />
+            <Text style={[styles.statusText, { color: selected ? INK_TEXT : C.textMuted }]}>{pill.text}</Text>
+          </View>
+        ) : null}
+      </View>
+      {selected ? <Icon name="checkmark" size={20} color={INK_TEXT} strokeWidth={2.5} /> : null}
+    </Pressable>
+  );
+
+  // A branch (location) row shown inside the white business section. The selected branch is black.
+  const BranchRow = ({
+    icon,
+    label,
+    selected,
+    onPress,
+  }: {
+    icon: string;
+    label: string;
+    selected?: boolean;
+    onPress: () => void;
+  }) => (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.branchRow,
+        selected && { backgroundColor: INK },
+        pressed && !selected && { backgroundColor: '#F3F4F6' },
+      ]}
+    >
+      <Icon name={icon} size={18} color={selected ? INK_TEXT : PAPER_MUTED} strokeWidth={2} />
+      <Text
+        style={[styles.branchLabel, { color: selected ? INK_TEXT : PAPER_TEXT, fontWeight: selected ? '700' : '500' }]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+      {selected ? <Icon name="checkmark" size={18} color={INK_TEXT} strokeWidth={2.5} /> : null}
+    </Pressable>
+  );
+
   return (
     <DrawerContentScrollView
       {...props}
@@ -254,30 +469,152 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
       ]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Profile header */}
+      {/* Profile header — tap to expand the account switcher */}
       <Pressable
-        onPress={handleOpenProfile}
+        onPress={handleToggleAccounts}
         style={({ pressed }) => [styles.profileCard, pressed && { backgroundColor: C.highlight }]}
       >
         <Avatar
-          userId={currentUser.id}
-          userName={currentUser.name}
-          imageUri={currentUser.avatar_url}
+          userId={activeIdentity.avatarId}
+          userName={activeIdentity.name}
+          imageUri={activeIdentity.avatarUri}
           size={52}
-          borderRadius={26}
+          borderRadius={activeIdentity.borderRadius}
         />
         <View style={styles.profileInfo}>
           <Text style={[styles.profileName, { color: C.text }]} numberOfLines={1}>
-            {currentUser.name}
+            {activeIdentity.name}
           </Text>
-          {currentUser.email ? (
+          {activeIdentity.subtitle ? (
             <Text style={[styles.profileEmail, { color: C.textMuted }]} numberOfLines={1}>
-              {currentUser.email}
+              {activeIdentity.subtitle}
             </Text>
           ) : null}
         </View>
-        <Icon name="chevron-forward" size={20} color={C.iconMuted} strokeWidth={2} />
+        <Icon name={accountsOpen ? 'chevron-up' : 'chevron-down'} size={20} color={C.iconMuted} strokeWidth={2} />
       </Pressable>
+
+      {/* Account switcher (expanded): Personal + every connected business + add account */}
+      {accountsOpen ? (
+        <View style={styles.accountList}>
+          <View style={styles.accountListHeader}>
+            <Text style={[styles.sectionLabel, { color: C.textMuted, marginBottom: 0 }]}>ACCOUNTS</Text>
+            <Pressable
+              onPress={handleAddAccount}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.addAccountBtn,
+                pressed && { backgroundColor: C.highlight },
+              ]}
+            >
+              <Icon name="add" size={20} color={C.icon} strokeWidth={2.5} />
+            </Pressable>
+          </View>
+
+          {/* Personal account */}
+          <AccountRow
+            avatar={
+              <Avatar
+                userId={currentUser.id}
+                userName={currentUser.name}
+                imageUri={currentUser.avatar_url}
+                size={36}
+                borderRadius={18}
+              />
+            }
+            name={currentUser.name}
+            selected={activeMode === 'personal'}
+            onPress={handleSelectPersonal}
+          />
+
+          {/* Business accounts */}
+          {userBusinesses.map((ub) => {
+            const isStaff = getCapabilities(ub.role).isStaff;
+            const isActiveBiz = activeMode === 'business' && activeBusinessId === ub.business.id;
+            const badgeText = ub.role === 'super_admin' ? 'OWNER' : ub.role.toUpperCase();
+
+            // Active business with 2+ branches → white section listing its branches, with the
+            // selected branch (or "All locations") shown as a black row. Only the active business
+            // has its locations loaded, so only it can expand into branches.
+            if (isActiveBiz && locations.length > 1) {
+              // The company's main (primary) branch is its default account — selected when no
+              // specific branch has been chosen yet. Falls back to the first location if none is flagged.
+              const mainLocationId = (locations.find((l) => l.is_primary) ?? locations[0])?.id;
+              return (
+                <View key={ub.business.id} style={styles.branchContainer}>
+                  <View style={styles.branchHeader}>
+                    <Avatar
+                      userId={ub.business.id}
+                      userName={ub.business.name}
+                      imageUri={ub.business.logo_url ?? null}
+                      size={30}
+                      borderRadius={8}
+                    />
+                    <Text style={styles.branchHeaderName} numberOfLines={1}>
+                      {ub.business.name}
+                    </Text>
+                    <View style={styles.branchHeaderBadge}>
+                      <Text style={styles.branchHeaderBadgeText}>{badgeText}</Text>
+                    </View>
+                  </View>
+                  {locations.map((loc) => (
+                    <BranchRow
+                      key={loc.id}
+                      icon="location"
+                      label={loc.name}
+                      selected={currentLocationId === loc.id || (currentLocationId === null && loc.id === mainLocationId)}
+                      onPress={() => setLocation(loc)}
+                    />
+                  ))}
+                </View>
+              );
+            }
+
+            // Otherwise a single switch row. Staff-only memberships show a request-access pill.
+            let pill: { icon: string; text: string } | null = null;
+            if (isStaff) {
+              const request = roleRequests.get(ub.business.id);
+              if (request?.status === 'PENDING') {
+                pill = { icon: 'time-outline', text: 'Request pending' };
+              } else if (request?.status === 'REJECTED') {
+                pill = { icon: 'close-circle-outline', text: 'Request declined' };
+              } else {
+                pill = { icon: 'lock-closed-outline', text: 'Tap to request access' };
+              }
+            }
+            return (
+              <AccountRow
+                key={ub.business.id}
+                avatar={
+                  <Avatar
+                    userId={ub.business.id}
+                    userName={ub.business.name}
+                    imageUri={ub.business.logo_url ?? null}
+                    size={36}
+                    borderRadius={9}
+                  />
+                }
+                name={ub.business.name}
+                badgeText={badgeText}
+                selected={isActiveBiz}
+                pill={pill}
+                onPress={() => handleSelectBusiness(ub)}
+              />
+            );
+          })}
+
+          {/* Add account */}
+          <Pressable
+            onPress={handleAddAccount}
+            style={({ pressed }) => [styles.accountRow, pressed && { backgroundColor: C.highlight }]}
+          >
+            <View style={styles.leading}>
+              <Icon name="add" size={20} color={C.icon} strokeWidth={2.5} />
+            </View>
+            <Text style={[styles.accountName, { color: C.text, fontWeight: '600' }]}>Add account</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* Search (business mode) */}
       {businessSections ? (
@@ -291,52 +628,6 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
           returnKeyType="search"
         />
       ) : null}
-
-      <View style={[styles.divider, { backgroundColor: C.divider }]} />
-
-      {/* Mode switcher */}
-      <SectionLabel text="SWITCH MODE" />
-      <Row
-        onPress={handleSwitchPersonal}
-        active={activeMode === 'personal'}
-        label="Personal"
-        leading={
-          <Icon
-            name="person-outline"
-            size={22}
-            color={activeMode === 'personal' ? C.text : C.icon}
-            strokeWidth={2}
-          />
-        }
-        trailing={
-          activeMode === 'personal' ? (
-            <Icon name="checkmark" size={20} color={C.accent} strokeWidth={2.5} />
-          ) : null
-        }
-      />
-      {switchableBusinesses.map((ub) => {
-        const isActive = activeMode === 'business' && activeBusinessId === ub.business.id;
-        return (
-          <Row
-            key={ub.business.id}
-            onPress={() => handleSwitchBusiness(ub.business.id)}
-            active={isActive}
-            label={ub.business.name}
-            leading={
-              <Avatar
-                userId={ub.business.id}
-                userName={ub.business.name}
-                imageUri={ub.business.logo_url ?? null}
-                size={30}
-                borderRadius={8}
-              />
-            }
-            trailing={
-              isActive ? <Icon name="checkmark" size={20} color={C.accent} strokeWidth={2.5} /> : null
-            }
-          />
-        );
-      })}
 
       <View style={[styles.divider, { backgroundColor: C.divider }]} />
 
@@ -491,6 +782,113 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     marginLeft: 10,
+  },
+  accountList: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  accountListHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    minHeight: 32,
+    marginBottom: 2,
+  },
+  addAccountBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 52,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  accountInfo: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  accountNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  accountName: {
+    fontSize: 16,
+    flexShrink: 1,
+  },
+  roleBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  branchContainer: {
+    backgroundColor: PAPER,
+    borderRadius: 14,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    marginVertical: 2,
+  },
+  branchHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+  },
+  branchHeaderName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: PAPER_TEXT,
+  },
+  branchHeaderBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: '#F3F4F6',
+  },
+  branchHeaderBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    color: PAPER_MUTED,
+  },
+  branchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 44,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+  },
+  branchLabel: {
+    flex: 1,
+    fontSize: 15,
   },
   trailingGroup: {
     flexDirection: 'row',

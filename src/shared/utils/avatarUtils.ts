@@ -42,7 +42,7 @@ export const generateInitials = (name: string): string => {
  * Returns [backgroundColor, textColor] pair
  */
 export const generateAvatarColors = (name: string): [string, string] => {
-  if (!name) return ['#F3F4F6', '#6B7280']; // Default gray
+  if (!name) return ['#F4F0EB', '#57534E']; // Default warm greige
   
   // Simple hash function to generate consistent colors
   let hash = 0;
@@ -80,7 +80,7 @@ export const generateAvatarColors = (name: string): [string, string] => {
  * @deprecated Use generateAvatarColors instead for button-style colors
  */
 export const generateAvatarGradient = (name: string): [string, string] => {
-  if (!name) return ['#6B7280', '#4B5563']; // Default gray gradient
+  if (!name) return ['#A8A29E', '#57534E']; // Default warm greige gradient
   
   // Simple hash function to generate consistent colors
   let hash = 0;

@@ -5,6 +5,8 @@
  * These match the mockDeliveries structure and backend response shapes.
  */
 
+import { theme } from '@/shared/theme';
+
 // ============================================================================
 // Status Enums
 // ============================================================================
@@ -39,13 +41,13 @@ export type DeliveryDirection = 'incoming' | 'outgoing';
 // ============================================================================
 
 export const DELIVERY_STATUS_COLORS: Record<DeliveryStatus, string> = {
-  NOT_ASSIGNED: '#6B7280',     // gray
-  ASSIGNED: '#1E40AF',         // dark blue
-  PACKED: '#5B21B6',           // purple
-  OUT_FOR_DELIVERY: '#0075FF', // blue
-  DELIVERED: '#065F46',        // dark green
-  FAILED: '#FF2400',           // red
-  CANCELED: '#6B7280',         // gray
+  NOT_ASSIGNED: theme.colors.neutral,       // gray
+  ASSIGNED: theme.colors.info,              // blue
+  PACKED: theme.colors.statusInReview,      // purple
+  OUT_FOR_DELIVERY: theme.colors.info,      // blue
+  DELIVERED: theme.colors.success,          // green
+  FAILED: theme.colors.error,               // red
+  CANCELED: theme.colors.neutral,           // gray
 };
 
 export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {

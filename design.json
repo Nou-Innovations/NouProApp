@@ -40,15 +40,15 @@
   "colors": {
     "semantic": {
       "primary": {
-        "value": "#000000",
+        "value": "#1C1917",
         "usage": "Primary actions, headers, important text, main buttons"
       },
       "secondary": {
-        "value": "#33363A",
+        "value": "#57534E",
         "usage": "Secondary text, supporting information"
       },
       "accent": {
-        "value": "#D23030",
+        "value": "#FF7A00",
         "usage": "Notifications, badges, attention-grabbing elements, accent indicators"
       },
       "background": {
@@ -56,29 +56,29 @@
         "usage": "Main screen backgrounds, card backgrounds"
       },
       "surface": {
-        "value": "#F6F7F9",
+        "value": "#FAF8F5",
         "usage": "Elevated surfaces, input backgrounds, secondary backgrounds"
       },
       "confirmDialogDarkRed": {
-        "value": "#160000",
+        "value": "#2A0E07",
         "usage": "Background color for delete/destructive confirmation dialogs (used at 90% opacity)"
       },
       "confirmDialogDarkGreen": {
-        "value": "#001004",
+        "value": "#10391F",
         "usage": "Background color for success/positive confirmation dialogs (used at 90% opacity). Also used as text color for confirm button."
       }
     },
     "text": {
       "primary": {
-        "value": "#000000",
+        "value": "#1C1917",
         "usage": "Headings, primary content, important labels"
       },
       "secondary": {
-        "value": "#575B66",
+        "value": "#57534E",
         "usage": "Descriptions, captions, helper text, timestamps"
       },
       "muted": {
-        "value": "#A4AAB8",
+        "value": "#A8A29E",
         "usage": "Placeholders, inactive states, disabled text, muted icons"
       },
       "inverse": {
@@ -88,91 +88,91 @@
     },
     "status": {
       "success": {
-        "value": "#2ACF01",
+        "value": "#34A853",
         "usage": "Completed orders, paid invoices, available products, positive states"
       },
       "error": {
-        "value": "#FF2400",
+        "value": "#D6453E",
         "usage": "Failed actions, overdue payments, out of stock, validation errors"
       },
       "warning": {
-        "value": "#FFB600",
+        "value": "#F2A900",
         "usage": "Pending items, attention needed, expiring items"
       },
       "info": {
-        "value": "#0075FF",
+        "value": "#2A75E6",
         "usage": "In-progress states, informational messages, ongoing deliveries, links"
       },
       "neutral": {
-        "value": "#A4AAB8",
+        "value": "#A8A29E",
         "usage": "Draft states, inactive items, cancelled orders"
       }
     },
     "statusSpecific": {
       "newOrder": {
-        "value": "#6E0000",
+        "value": "#7A1F12",
         "usage": "New order status, discontinued products"
       },
       "discontinued": {
-        "value": "#6E0000",
+        "value": "#7A1F12",
         "usage": "Discontinued products (alias for newOrder)"
       },
       "ongoing": {
-        "value": "#0075FF",
+        "value": "#2A75E6",
         "usage": "Ongoing deliveries, in-progress tasks"
       },
       "done": {
-        "value": "#2ACF01",
+        "value": "#34A853",
         "usage": "Completed deliveries, done status"
       },
       "paid": {
-        "value": "#2ACF01",
+        "value": "#34A853",
         "usage": "Paid invoices (alias for done)"
       },
       "import": {
-        "value": "#2ACF01",
+        "value": "#34A853",
         "usage": "Import deliveries (alias for done)"
       },
       "inReview": {
-        "value": "#A76AF0",
+        "value": "#8B5CF6",
         "usage": "Items pending review, under evaluation"
       },
       "pending": {
-        "value": "#FFB600",
+        "value": "#F2A900",
         "usage": "Pending orders, awaiting action"
       },
       "inProduction": {
-        "value": "#FFB600",
+        "value": "#F2A900",
         "usage": "Products in production (alias for pending)"
       },
       "lowStock": {
-        "value": "#FF7A00",
+        "value": "#E8590C",
         "usage": "Low stock warning, inventory alerts"
       },
       "export": {
-        "value": "#FF7A00",
+        "value": "#E8590C",
         "usage": "Export deliveries (alias for lowStock)"
       },
       "canceled": {
-        "value": "#FF6B6B",
+        "value": "#F0705F",
         "usage": "Canceled orders, canceled deliveries"
       },
       "unpaid": {
-        "value": "#FF2400",
+        "value": "#D6453E",
         "usage": "Unpaid invoices, overdue payments"
       },
       "outOfStock": {
-        "value": "#FF2400",
+        "value": "#D6453E",
         "usage": "Out of stock products (alias for unpaid)"
       },
       "inactive": {
-        "value": "#7BA9C1",
+        "value": "#A89B92",
         "usage": "Inactive products, disabled items"
       }
     },
     "ui": {
       "border": {
-        "value": "#E1E4EA",
+        "value": "#ECE6DF",
         "usage": "Card borders, dividers, input borders, list separators"
       },
       "inputBackground": {
@@ -180,7 +180,7 @@
         "usage": "Input field backgrounds (default state)"
       },
       "inputBackgroundFocused": {
-        "value": "#F6F7F9",
+        "value": "#FAF8F5",
         "usage": "Input field backgrounds (focused state)"
       },
       "cardBackground": {
@@ -192,22 +192,22 @@
         "usage": "Modal overlays, bottom sheet backdrops"
       },
       "highlightedRow": {
-        "value": "#F6F7F9",
+        "value": "#FAF8F5",
         "usage": "Unread messages, new items, highlighted states"
       },
       "iconColor": {
-        "value": "#393E47",
+        "value": "#44403C",
         "usage": "Primary icons, active icons"
       },
       "iconMuted": {
-        "value": "#A4AAB8",
+        "value": "#A8A29E",
         "usage": "Muted icons, inactive icons, disabled icons"
       }
     },
     "avatarColors": {
       "description": "Colors for random avatar background assignment",
       "values": [
-        "#FF6B6B",
+        "#F0705F",
         "#4ECDC4",
         "#45B7D1",
         "#96CEB4",
@@ -467,38 +467,38 @@
       },
       "variants": {
         "primary": {
-          "backgroundColor": "#000000",
+          "backgroundColor": "#1C1917",
           "textColor": "#FFFFFF",
           "borderWidth": 0,
           "usage": "Main CTAs, primary actions"
         },
         "secondary": {
           "backgroundColor": "#FFFFFF",
-          "textColor": "#000000",
+          "textColor": "#1C1917",
           "borderWidth": 0,
           "usage": "Secondary actions"
         },
         "outline": {
           "backgroundColor": "transparent",
-          "textColor": "#000000",
+          "textColor": "#1C1917",
           "borderWidth": 1,
-          "borderColor": "#000000",
+          "borderColor": "#1C1917",
           "usage": "Tertiary actions, cancel buttons"
         },
         "disabled": {
-          "backgroundColor": "#F6F7F9",
-          "textColor": "#A4AAB8",
+          "backgroundColor": "#F4F0EB",
+          "textColor": "#A8A29E",
           "borderWidth": 0,
           "usage": "Disabled state for all buttons"
         },
         "alert": {
-          "backgroundColor": "#FF2400",
+          "backgroundColor": "#D6453E",
           "textColor": "#FFFFFF",
           "borderWidth": 0,
           "usage": "Destructive actions, delete, cancel orders"
         },
         "confirm": {
-          "backgroundColor": "#2ACF01",
+          "backgroundColor": "#34A853",
           "textColor": "#FFFFFF",
           "borderWidth": 0,
           "usage": "Confirmation actions, success states"
@@ -561,7 +561,7 @@
       },
       "variants": {
         "add": {
-          "backgroundColor": "#000000",
+          "backgroundColor": "#1C1917",
           "iconColor": "#FFFFFF",
           "borderWidth": 0,
           "icon": "add",
@@ -569,7 +569,7 @@
         },
         "remove": {
           "backgroundColor": "#FFFFFF",
-          "iconColor": "#000000",
+          "iconColor": "#1C1917",
           "borderWidth": 0,
           "icon": "remove",
           "usage": "Remove items, decrement quantity"
@@ -596,21 +596,21 @@
         "unchecked": {
           "backgroundColor": "#FFFFFF",
           "borderWidth": 2,
-          "borderColor": "#A4AAB8",
+          "borderColor": "#A8A29E",
           "iconColor": "transparent"
         },
         "checked": {
-          "backgroundColor": "#000000",
+          "backgroundColor": "#1C1917",
           "borderWidth": 0,
           "borderColor": "transparent",
           "iconColor": "#FFFFFF",
           "icon": "checkmark"
         },
         "disabled": {
-          "backgroundColor": "#F6F7F9",
+          "backgroundColor": "#F4F0EB",
           "borderWidth": 2,
-          "borderColor": "#E1E4EA",
-          "iconColor": "#A4AAB8",
+          "borderColor": "#ECE6DF",
+          "iconColor": "#A8A29E",
           "opacity": 0.5
         }
       },
@@ -637,14 +637,14 @@
           "width": 32,
           "height": 32,
           "borderWidth": 1,
-          "borderColor": "#A4AAB8",
+          "borderColor": "#A8A29E",
           "backgroundColor": "#FFFFFF",
           "borderRadius": 8
         },
         "checkedStyle": {
           "width": 32,
           "height": 32,
-          "backgroundColor": "#000000",
+          "backgroundColor": "#1C1917",
           "borderRadius": 8,
           "alignItems": "center",
           "justifyContent": "center"
@@ -677,7 +677,7 @@
         "caret": {
           "width": 2,
           "height": 24,
-          "color": "#000000"
+          "color": "#1C1917"
         },
         
         "states": {
@@ -693,7 +693,7 @@
           },
           "selected": {
             "description": "Field is focused/active, before typing",
-            "borderColor": "#000000",
+            "borderColor": "#1C1917",
             "placeholder": {
               "fontFamily": "Inter-Regular",
               "fontSize": 16,
@@ -703,12 +703,12 @@
           },
           "typing": {
             "description": "User is actively typing",
-            "borderColor": "#000000",
+            "borderColor": "#1C1917",
             "placeholder": "hidden",
             "inputText": {
               "fontFamily": "Inter-SemiBold",
               "fontSize": 16,
-              "color": "#000000",
+              "color": "#1C1917",
               "verticalAlign": "center"
             }
           },
@@ -718,7 +718,7 @@
             "inputText": {
               "fontFamily": "Inter-SemiBold",
               "fontSize": 16,
-              "color": "#000000",
+              "color": "#1C1917",
               "verticalAlign": "center"
             }
           },
@@ -810,30 +810,30 @@
         "states": {
           "inactive": {
             "description": "Not selected/focused state",
-            "borderColor": "#575B66",
-            "iconColor": "#575B66",
-            "textColor": "#575B66",
-            "placeholderColor": "#575B66",
+            "borderColor": "#57534E",
+            "iconColor": "#57534E",
+            "textColor": "#57534E",
+            "placeholderColor": "#57534E",
             "fontWeight": "medium",
-            "caretColor": "#000000"
+            "caretColor": "#1C1917"
           },
           "active": {
             "description": "Selected/focused but not typing",
-            "borderColor": "#000000",
-            "iconColor": "#A4AAB8",
-            "textColor": "#A4AAB8",
-            "placeholderColor": "#A4AAB8",
+            "borderColor": "#1C1917",
+            "iconColor": "#A8A29E",
+            "textColor": "#A8A29E",
+            "placeholderColor": "#A8A29E",
             "fontWeight": "medium",
-            "caretColor": "#000000"
+            "caretColor": "#1C1917"
           },
           "typing": {
             "description": "Focused and has text input",
-            "borderColor": "#000000",
-            "iconColor": "#000000",
-            "textColor": "#000000",
-            "placeholderColor": "#A4AAB8",
+            "borderColor": "#1C1917",
+            "iconColor": "#1C1917",
+            "textColor": "#1C1917",
+            "placeholderColor": "#A8A29E",
             "fontWeight": "semiBold",
-            "caretColor": "#000000"
+            "caretColor": "#1C1917"
           }
         }
       }
@@ -844,7 +844,7 @@
         "paddingVertical": 12,
         "paddingHorizontal": 16,
         "borderBottomWidth": 1,
-        "borderColor": "#E1E4EA",
+        "borderColor": "#ECE6DF",
         "description": "Standard card for list items (products, invoices, deliveries)"
       },
       "elevatedCard": {
@@ -872,12 +872,12 @@
         "paddingVertical": 8,
         "paddingHorizontal": 4,
         "borderBottomWidth": 1,
-        "borderColor": "#E1E4EA"
+        "borderColor": "#ECE6DF"
       },
       "headerCell": {
         "fontFamily": "Inter-Medium",
         "fontSize": 12,
-        "color": "#575B66",
+        "color": "#57534E",
         "textTransform": "uppercase"
       },
       "columns": {
@@ -914,7 +914,7 @@
         "paddingVertical": 12,
         "paddingLeft": 4,
         "borderBottomWidth": 1,
-        "borderColor": "#E1E4EA"
+        "borderColor": "#ECE6DF"
       },
       "productInfo": {
         "image": {
@@ -926,19 +926,19 @@
         "name": {
           "fontFamily": "Inter-SemiBold",
           "fontSize": 14,
-          "color": "#000000"
+          "color": "#1C1917"
         },
         "unit": {
           "fontFamily": "Inter-Regular",
           "fontSize": 12,
-          "color": "#575B66",
+          "color": "#57534E",
           "marginTop": 2
         }
       },
       "quantityText": {
         "fontFamily": "Inter-SemiBold",
         "fontSize": 18,
-        "color": "#000000",
+        "color": "#1C1917",
         "textAlign": "center",
         "responsiveFontSize": {
           "description": "Reduce font size when quantity has more than 5 digits",
@@ -949,7 +949,7 @@
       "stockWarning": {
         "fontFamily": "Inter-Medium",
         "fontSize": 12,
-        "color": "#FF2400",
+        "color": "#D6453E",
         "marginTop": 4,
         "textAlign": "center",
         "format": {
@@ -975,21 +975,21 @@
       "fontFamily": "Inter-Medium",
       "textColor": "#FFFFFF",
       "statusColors": {
-        "available": "#2ACF01",
-        "outOfStock": "#FF2400",
-        "inProduction": "#0075FF",
-        "inactive": "#A4AAB8",
-        "discontinued": "#FFB600",
-        "paid": "#2ACF01",
-        "sent": "#FF2400",
-        "unpaid": "#FFB600",
-        "overdue": "#FF2400",
-        "draft": "#A4AAB8",
-        "cancelled": "#A4AAB8",
-        "newOrder": "#FF2400",
-        "pending": "#FFB600",
-        "ongoing": "#0075FF",
-        "delivered": "#2ACF01"
+        "available": "#34A853",
+        "outOfStock": "#D6453E",
+        "inProduction": "#2A75E6",
+        "inactive": "#A8A29E",
+        "discontinued": "#F2A900",
+        "paid": "#34A853",
+        "sent": "#D6453E",
+        "unpaid": "#F2A900",
+        "overdue": "#D6453E",
+        "draft": "#A8A29E",
+        "cancelled": "#A8A29E",
+        "newOrder": "#D6453E",
+        "pending": "#F2A900",
+        "ongoing": "#2A75E6",
+        "delivered": "#34A853"
       }
     },
     "avatars": {
@@ -1001,13 +1001,13 @@
         "xl": 72
       },
       "borderRadius": 8,
-      "placeholderBackgroundColor": "#F6F7F9",
-      "initialsTextColor": "#575B66",
+      "placeholderBackgroundColor": "#FAF8F5",
+      "initialsTextColor": "#57534E",
       "initialsFontSize": "40% of avatar size"
     },
     "badges": {
       "notification": {
-        "backgroundColor": "#D23030",
+        "backgroundColor": "#FF7A00",
         "textColor": "#FFFFFF",
         "minWidth": 20,
         "height": 20,
@@ -1222,17 +1222,17 @@
     "bottomTabBar": {
       "description": "Bottom tab navigation bar for Personal and Business modes",
       "backgroundColor": "#FFFFFF",
-      "borderTopColor": "#E1E4EA",
+      "borderTopColor": "#ECE6DF",
       "label": {
         "fontSize": 12,
         "selected": {
           "fontFamily": "Inter-ExtraBold",
-          "color": "#000000",
+          "color": "#1C1917",
           "description": "Primary color, extraBold weight for selected tab"
         },
         "unselected": {
           "fontFamily": "Inter-Medium",
-          "color": "#575B66",
+          "color": "#57534E",
           "description": "textSecondary color, medium weight for unselected tabs"
         }
       },
@@ -1248,8 +1248,8 @@
         "borderRadius": 4,
         "borderWidth": 1,
         "focusedBorderWidth": 1.5,
-        "focusedBorderColor": "#000000",
-        "placeholderBackgroundColor": "#000000",
+        "focusedBorderColor": "#1C1917",
+        "placeholderBackgroundColor": "#1C1917",
         "initialsFontSize": 14,
         "initialsFontFamily": "Inter-Bold",
         "initialsColor": "#FFFFFF"
@@ -1309,12 +1309,12 @@
               "description": "Default outline button - primary color for text and border",
               "backgroundColor": "transparent",
               "borderWidth": 1,
-              "borderColor": "#000000",
-              "textColor": "#000000"
+              "borderColor": "#1C1917",
+              "textColor": "#1C1917"
             },
             "selected": {
               "description": "Selected/active option - filled primary button",
-              "backgroundColor": "#000000",
+              "backgroundColor": "#1C1917",
               "borderWidth": 0,
               "textColor": "#FFFFFF"
             },
@@ -1322,8 +1322,8 @@
               "description": "Remove/delete/cancel actions - error red for text and border",
               "backgroundColor": "transparent",
               "borderWidth": 1,
-              "borderColor": "#FF2400",
-              "textColor": "#FF2400",
+              "borderColor": "#D6453E",
+              "textColor": "#D6453E",
               "keywords": ["remove", "delete", "cancel", "decline", "reject", "report"]
             }
           }
@@ -1361,7 +1361,7 @@
             "paddingHorizontal": 12,
             "alignItems": "center",
             "shadow": {
-              "shadowColor": "#000000",
+              "shadowColor": "#1C1917",
               "shadowOffset": { "width": 0, "height": 12 },
               "shadowOpacity": 0.25,
               "shadowRadius": 24,
@@ -1399,7 +1399,7 @@
             "description": "Dark red variant for destructive actions (delete, remove, discard)",
             "container": {
               "backgroundColor": "rgba(22, 0, 0, 0.9)",
-              "backgroundColorHex": "#160000",
+              "backgroundColorHex": "#2A0E07",
               "backgroundOpacity": 0.9
             },
             "iconContainer": null,
@@ -1411,7 +1411,7 @@
             },
             "primaryAction": {
               "variant": "alert",
-              "backgroundColor": "#FF2400",
+              "backgroundColor": "#D6453E",
               "textColor": "#FFFFFF"
             },
             "secondaryAction": {
@@ -1423,7 +1423,7 @@
             "useCases": ["Save changes?", "Confirm order?", "Proceed with action?", "Apply changes?"],
             "container": {
               "backgroundColor": "rgba(0, 16, 4, 0.9)",
-              "backgroundColorHex": "#001004",
+              "backgroundColorHex": "#10391F",
               "backgroundOpacity": 0.9
             },
             "iconContainer": null,
@@ -1435,8 +1435,8 @@
             },
             "primaryAction": {
               "variant": "confirm",
-              "backgroundColor": "#2ACF01",
-              "textColor": "#001004"
+              "backgroundColor": "#34A853",
+              "textColor": "#10391F"
             },
             "secondaryAction": {
               "color": "#FFFFFF"
@@ -1447,7 +1447,7 @@
             "useCases": ["Changes saved successfully!", "Password changed!", "Profile created!", "Request sent!", "Order confirmed!", "Product updated!"],
             "container": {
               "backgroundColor": "rgba(0, 16, 4, 0.9)",
-              "backgroundColorHex": "#001004",
+              "backgroundColorHex": "#10391F",
               "backgroundOpacity": 0.9
             },
             "iconContainer": {
@@ -1455,7 +1455,7 @@
               "height": 64,
               "borderRadius": 32,
               "borderWidth": 1,
-              "borderColor": "#2ACF01",
+              "borderColor": "#34A853",
               "backgroundColor": "transparent",
               "marginBottom": 24,
               "icon": "checkmark",
@@ -1470,8 +1470,8 @@
             },
             "primaryAction": {
               "variant": "confirm",
-              "backgroundColor": "#2ACF01",
-              "textColor": "#001004"
+              "backgroundColor": "#34A853",
+              "textColor": "#10391F"
             },
             "secondaryAction": {
               "color": "#FFFFFF"
@@ -1505,8 +1505,8 @@
           "destructiveColor": "#DC2626"
         },
         "switch": {
-          "trackColorOff": "#E9E9EA",
-          "trackColorOn": "#2ACF01",
+          "trackColorOff": "#E7E1DA",
+          "trackColorOn": "#34A853",
           "thumbColor": "#FFFFFF"
         },
         "usage": "Settings screens, option menus, navigation lists with icon + title + chevron pattern"
@@ -1605,12 +1605,12 @@
       },
       "incoming": {
         "backgroundColor": "#FFFFFF",
-        "textColor": "#000000",
+        "textColor": "#1C1917",
         "borderWidth": 0,
         "alignment": "flex-start"
       },
       "outgoing": {
-        "backgroundColor": "#000000",
+        "backgroundColor": "#1C1917",
         "textColor": "#FFFFFF",
         "borderWidth": 0,
         "alignment": "flex-end"
@@ -1618,7 +1618,7 @@
       "timestamp": {
         "fontSize": 11,
         "color": {
-          "incoming": "#575B66",
+          "incoming": "#57534E",
           "outgoing": "rgba(255,255,255,0.7)"
         },
         "format": {
@@ -1647,8 +1647,8 @@
             "fontSize": 12,
             "fontWeight": "600",
             "colors": {
-              "import": "#2ACF01",
-              "export": "#FF7A00"
+              "import": "#34A853",
+              "export": "#E8590C"
             }
           },
           "orderId": {
@@ -1664,16 +1664,16 @@
             "marginBottom": 4
           },
           "statusColors": {
-            "Done": "#2ACF01",
-            "New": "#6E0000",
-            "Ongoing": "#0075FF",
-            "Pending": "#FFB600",
-            "Cancel": "#FF6B6B"
+            "Done": "#34A853",
+            "New": "#7A1F12",
+            "Ongoing": "#2A75E6",
+            "Pending": "#F2A900",
+            "Cancel": "#F0705F"
           },
           "paymentStatusColors": {
-            "Paid": "#2ACF01",
-            "Unpaid": "#FF2400",
-            "Payment Pending Confirmation": "#FFB600"
+            "Paid": "#34A853",
+            "Unpaid": "#D6453E",
+            "Payment Pending Confirmation": "#F2A900"
           },
           "actionButton": {
             "height": 40,
@@ -1683,12 +1683,12 @@
             "fontWeight": "600",
             "marginTop": 4,
             "backgroundColor": {
-              "incoming": "#000000",
+              "incoming": "#1C1917",
               "outgoing": "#FFFFFF"
             },
             "textColor": {
               "incoming": "#FFFFFF",
-              "outgoing": "#000000"
+              "outgoing": "#1C1917"
             }
           }
         },
@@ -1769,14 +1769,14 @@
       "statusIndicator": {
         "iconSize": 14,
         "colors": {
-          "sent": "#A4AAB8",
-          "delivered": "#A4AAB8",
-          "read": "#2ACF01"
+          "sent": "#A8A29E",
+          "delivered": "#A8A29E",
+          "read": "#34A853"
         }
       },
       "linkDetection": {
         "incoming": {
-          "color": "#0075FF",
+          "color": "#2A75E6",
           "textDecorationLine": "underline"
         },
         "outgoing": {
@@ -1896,7 +1896,7 @@
       "infoLabel": {
         "fontSize": 18,
         "fontFamily": "Inter-Bold",
-        "color": "#000000",
+        "color": "#1C1917",
         "marginBottom": 8
       },
       "infoValue": {
@@ -1913,7 +1913,7 @@
         "sectionTitle": {
           "fontSize": 18,
           "fontFamily": "Inter-Bold",
-          "color": "#000000",
+          "color": "#1C1917",
           "marginBottom": 16
         },
         "row": {
@@ -1924,7 +1924,7 @@
         "dayText": {
           "fontSize": 16,
           "fontFamily": "Inter-Medium",
-          "color": "#000000"
+          "color": "#1C1917"
         },
         "timeText": {
           "fontSize": 16,
@@ -1940,15 +1940,15 @@
     },
     "switch": {
       "description": "Toggle/Switch component for boolean settings",
-      "trackColorOff": "#E9E9EA",
-      "trackColorOn": "#2ACF01",
+      "trackColorOff": "#E7E1DA",
+      "trackColorOn": "#34A853",
       "thumbColor": "#FFFFFF",
-      "ios_backgroundColor": "#E9E9EA",
+      "ios_backgroundColor": "#E7E1DA",
       "usage": "Privacy toggles, settings switches, feature toggles",
       "implementation": {
-        "trackColor": "{ false: '#E9E9EA', true: '#2ACF01' }",
+        "trackColor": "{ false: '#E7E1DA', true: '#34A853' }",
         "thumbColor": "#FFFFFF",
-        "ios_backgroundColor": "#E9E9EA"
+        "ios_backgroundColor": "#E7E1DA"
       }
     },
     "userProfile": {
@@ -1959,12 +1959,12 @@
         "nameTypography": {
           "fontFamily": "Inter-Bold",
           "fontSize": 24,
-          "color": "#000000"
+          "color": "#1C1917"
         },
         "jobTitleTypography": {
           "fontFamily": "Inter-Regular",
           "fontSize": 16,
-          "color": "#575B66"
+          "color": "#57534E"
         }
       },
       "aboutSection": {
@@ -1973,7 +1973,7 @@
           "fontFamily": "Inter-Regular",
           "fontSize": 14,
           "lineHeight": 20,
-          "color": "#575B66"
+          "color": "#57534E"
         },
         "marginTop": 12,
         "marginBottom": 16
@@ -1987,12 +1987,12 @@
           "countTypography": {
             "fontFamily": "Inter-Bold",
             "fontSize": 18,
-            "color": "#000000"
+            "color": "#1C1917"
           },
           "labelTypography": {
             "fontFamily": "Inter-Regular",
             "fontSize": 14,
-            "color": "#575B66"
+            "color": "#57534E"
           },
           "touchable": true,
           "pressedOpacity": 0.7
@@ -2002,29 +2002,29 @@
         "title": {
           "fontFamily": "Inter-Bold",
           "fontSize": 18,
-          "color": "#000000",
+          "color": "#1C1917",
           "marginBottom": 16
         },
         "card": {
           "paddingVertical": 12,
           "borderBottomWidth": 1,
-          "borderColor": "#E1E4EA",
+          "borderColor": "#ECE6DF",
           "logoSize": 48,
           "logoRadius": 8,
           "companyName": {
             "fontFamily": "Inter-Medium",
             "fontSize": 16,
-            "color": "#000000"
+            "color": "#1C1917"
           },
           "role": {
             "fontFamily": "Inter-Regular",
             "fontSize": 14,
-            "color": "#575B66"
+            "color": "#57534E"
           },
           "dateRange": {
             "fontFamily": "Inter-Regular",
             "fontSize": 12,
-            "color": "#A4AAB8"
+            "color": "#A8A29E"
           }
         }
       },
@@ -2033,33 +2033,33 @@
         "title": {
           "fontFamily": "Inter-Bold",
           "fontSize": 18,
-          "color": "#000000",
+          "color": "#1C1917",
           "marginBottom": 16
         },
         "item": {
           "paddingVertical": 12,
           "iconSize": 20,
-          "iconColor": "#575B66",
+          "iconColor": "#57534E",
           "labelTypography": {
             "fontFamily": "Inter-Medium",
             "fontSize": 14,
-            "color": "#A4AAB8"
+            "color": "#A8A29E"
           },
           "valueTypography": {
             "fontFamily": "Inter-Regular",
             "fontSize": 16,
-            "color": "#000000"
+            "color": "#1C1917"
           },
           "linkTypography": {
             "fontFamily": "Inter-Regular",
             "fontSize": 16,
-            "color": "#0075FF"
+            "color": "#2A75E6"
           }
         },
         "privacyNote": {
           "fontFamily": "Inter-Regular",
           "fontSize": 12,
-          "color": "#A4AAB8",
+          "color": "#A8A29E",
           "fontStyle": "italic"
         }
       }
@@ -2079,33 +2079,33 @@
         "paddingVertical": 12,
         "paddingHorizontal": 16,
         "borderBottomWidth": 1,
-        "borderColor": "#E1E4EA",
+        "borderColor": "#ECE6DF",
         "avatarSize": 48,
         "avatarRadius": 8,
         "contentGap": 12,
         "nameTypography": {
           "fontFamily": "Inter-Medium",
           "fontSize": 16,
-          "color": "#000000"
+          "color": "#1C1917"
         },
         "subtitleTypography": {
           "fontFamily": "Inter-Regular",
           "fontSize": 14,
-          "color": "#575B66"
+          "color": "#57534E"
         }
       },
       "emptyState": {
         "iconSize": 60,
-        "iconColor": "#A4AAB8",
+        "iconColor": "#A8A29E",
         "title": {
           "fontFamily": "Inter-Medium",
           "fontSize": 16,
-          "color": "#000000"
+          "color": "#1C1917"
         },
         "subtitle": {
           "fontFamily": "Inter-Regular",
           "fontSize": 14,
-          "color": "#575B66"
+          "color": "#57534E"
         }
       }
     },
@@ -2118,12 +2118,12 @@
           "name": {
             "fontFamily": "Inter-SemiBold",
             "fontSize": 20,
-            "color": "#000000"
+            "color": "#1C1917"
           },
           "subtitle": {
             "fontFamily": "Inter-Medium",
             "fontSize": 14,
-            "color": "#575B66"
+            "color": "#57534E"
           }
         },
         "borderBottomWidth": 0.5,
@@ -2140,25 +2140,25 @@
         "name": {
           "fontFamily": "Inter-SemiBold",
           "fontSize": 16,
-          "color": "#000000",
+          "color": "#1C1917",
           "numberOfLines": 2
         },
         "unit": {
           "fontFamily": "Inter-Regular",
           "fontSize": 14,
-          "color": "#575B66",
+          "color": "#57534E",
           "examples": ["1L", "10cmx10cm", "12Kg", "500g", "6 pack"]
         },
         "price": {
           "fontFamily": "Inter-Medium",
           "fontSize": 16,
-          "color": "#000000"
+          "color": "#1C1917"
         },
         "orderButton": {
           "paddingVertical": 10,
           "paddingHorizontal": 16,
           "borderRadius": 8,
-          "backgroundColor": "#000000",
+          "backgroundColor": "#1C1917",
           "textColor": "#FFFFFF",
           "fontFamily": "Inter-SemiBold",
           "fontSize": 14
@@ -2170,7 +2170,7 @@
           "paddingVertical": 3,
           "paddingHorizontal": 8,
           "borderRadius": 4,
-          "backgroundColor": "#2ACF01",
+          "backgroundColor": "#34A853",
           "textColor": "#FFFFFF",
           "fontFamily": "Inter-Bold",
           "fontSize": 10
@@ -2187,14 +2187,14 @@
         "name": {
           "fontFamily": "Inter-SemiBold",
           "fontSize": 16,
-          "color": "#000000",
+          "color": "#1C1917",
           "textAlign": "center",
           "numberOfLines": 2
         },
         "productsCount": {
           "fontFamily": "Inter-Medium",
           "fontSize": 14,
-          "color": "#575B66",
+          "color": "#57534E",
           "textAlign": "center"
         },
         "backgroundColor": "transparent",
@@ -2206,12 +2206,12 @@
           "brandName": {
             "fontFamily": "Inter-SemiBold",
             "fontSize": 20,
-            "color": "#000000"
+            "color": "#1C1917"
           },
           "distributorName": {
             "fontFamily": "Inter-Medium",
             "fontSize": 14,
-            "color": "#575B66",
+            "color": "#57534E",
             "prefix": "by "
           }
         },
@@ -2232,18 +2232,18 @@
           "companyName": {
             "fontFamily": "Inter-SemiBold",
             "fontSize": 20,
-            "color": "#000000"
+            "color": "#1C1917"
           },
           "location": {
             "fontFamily": "Inter-Medium",
             "fontSize": 14,
-            "color": "#575B66"
+            "color": "#57534E"
           }
         },
         "connectButton": {
           "alignment": "vertically centered with company name and location",
           "default": {
-            "backgroundColor": "#000000",
+            "backgroundColor": "#1C1917",
             "textColor": "#FFFFFF",
             "icon": "person-add-outline",
             "iconSize": 16,
@@ -2252,7 +2252,7 @@
           "connected": {
             "description": "Secondary button style when already connected",
             "backgroundColor": "#FFFFFF",
-            "textColor": "#000000",
+            "textColor": "#1C1917",
             "borderWidth": 0,
             "icon": "checkmark",
             "iconSize": 16,
@@ -2268,7 +2268,7 @@
           "text": "Brands in Store",
           "fontFamily": "Inter-Bold",
           "fontSize": 16,
-          "color": "#000000"
+          "color": "#1C1917"
         },
         "brandsCarousel": {
           "snapToInterval": 136,
@@ -2286,25 +2286,25 @@
           "businessName": {
             "fontFamily": "Inter-SemiBold",
             "fontSize": 20,
-            "color": "#000000"
+            "color": "#1C1917"
           },
           "action": {
             "fontFamily": "Inter-Medium",
             "fontSize": 14,
-            "color": "#575B66"
+            "color": "#57534E"
           }
         },
         "actionIcons": {
           "distributor_added": {
             "icon": "add",
             "description": "Plus icon without circle for 'added new products'",
-            "color": "#2ACF01",
+            "color": "#34A853",
             "size": 14
           },
           "business_received": {
             "icon": "arrow-down",
             "description": "Down arrow for 'received new products'",
-            "color": "#2ACF01",
+            "color": "#34A853",
             "size": 14
           }
         },
@@ -2312,10 +2312,10 @@
           "paddingVertical": 6,
           "paddingHorizontal": 12,
           "borderRadius": 4,
-          "backgroundColor": "#F6F7F9",
+          "backgroundColor": "#FAF8F5",
           "fontFamily": "Inter-Medium",
           "fontSize": 14,
-          "color": "#000000"
+          "color": "#1C1917"
         },
         "timestamp": {
           "hidden": true,
@@ -2351,8 +2351,8 @@
           "paddingVertical": 12,
           "borderRadius": 12,
           "borderWidth": 1,
-          "borderColor": "#E1E4EA",
-          "backgroundColor": "#F6F7F9",
+          "borderColor": "#ECE6DF",
+          "backgroundColor": "#F4F0EB",
           "minWidth": 100,
           "gap": 6
         },
@@ -2365,12 +2365,12 @@
         "label": {
           "fontFamily": "Inter-Medium",
           "fontSize": 12,
-          "color": "#575B66"
+          "color": "#57534E"
         },
         "value": {
           "fontFamily": "Inter-Bold",
           "fontSize": 20,
-          "color": "#000000"
+          "color": "#1C1917"
         }
       },
       "quickActions": {
@@ -2389,8 +2389,8 @@
           "paddingHorizontal": 14,
           "borderRadius": 14,
           "borderWidth": 1,
-          "borderColor": "#E1E4EA",
-          "backgroundColor": "#F6F7F9",
+          "borderColor": "#ECE6DF",
+          "backgroundColor": "#F4F0EB",
           "gap": 10
         },
         "iconWrapper": {
@@ -2402,7 +2402,7 @@
         "label": {
           "fontFamily": "Inter-SemiBold",
           "fontSize": 14,
-          "color": "#000000",
+          "color": "#1C1917",
           "textAlign": "center"
         }
       },
@@ -2412,13 +2412,13 @@
         "sectionTitle": {
           "fontFamily": "Inter-Bold",
           "fontSize": 18,
-          "color": "#000000"
+          "color": "#1C1917"
         },
         "countBadge": {
           "paddingHorizontal": 8,
           "paddingVertical": 2,
           "borderRadius": 10,
-          "backgroundColor": "#D23030",
+          "backgroundColor": "#FF7A00",
           "fontSize": 12,
           "fontFamily": "Inter-Bold",
           "textColor": "#FFFFFF"
@@ -2428,8 +2428,8 @@
           "paddingRight": 12,
           "borderRadius": 12,
           "borderWidth": 1,
-          "borderColor": "#E1E4EA",
-          "backgroundColor": "#F6F7F9",
+          "borderColor": "#ECE6DF",
+          "backgroundColor": "#FAF8F5",
           "gap": 10
         },
         "urgencyBar": {
@@ -2437,9 +2437,9 @@
           "borderTopLeftRadius": 12,
           "borderBottomLeftRadius": 12,
           "colors": {
-            "high": "#FF2400",
-            "medium": "#FFB600",
-            "low": "#0075FF"
+            "high": "#D6453E",
+            "medium": "#F2A900",
+            "low": "#2A75E6"
           }
         },
         "iconContainer": {
@@ -2451,7 +2451,7 @@
         "itemTitle": {
           "fontFamily": "Inter-SemiBold",
           "fontSize": 15,
-          "color": "#000000"
+          "color": "#1C1917"
         },
         "typePill": {
           "paddingHorizontal": 8,
@@ -2463,18 +2463,18 @@
         "itemSubtitle": {
           "fontFamily": "Inter-Regular",
           "fontSize": 13,
-          "color": "#575B66"
+          "color": "#57534E"
         },
         "timestamp": {
           "fontFamily": "Inter-Regular",
           "fontSize": 11,
-          "color": "#A4AAB8"
+          "color": "#A8A29E"
         },
         "actionButton": {
           "paddingHorizontal": 12,
           "paddingVertical": 6,
           "borderRadius": 6,
-          "backgroundColor": "#000000",
+          "backgroundColor": "#1C1917",
           "fontSize": 12,
           "fontFamily": "Inter-SemiBold",
           "textColor": "#FFFFFF"
@@ -2483,7 +2483,7 @@
           "paddingVertical": 12,
           "borderRadius": 10,
           "borderWidth": 1,
-          "borderColor": "#E1E4EA",
+          "borderColor": "#ECE6DF",
           "fontFamily": "Inter-SemiBold",
           "fontSize": 14
         }
@@ -2510,11 +2510,11 @@
         "sectionTitle": {
           "fontFamily": "Inter-Bold",
           "fontSize": 18,
-          "color": "#000000"
+          "color": "#1C1917"
         },
         "container": {
           "borderRadius": 12,
-          "backgroundColor": "#F6F7F9",
+          "backgroundColor": "#FAF8F5",
           "paddingVertical": 8
         },
         "itemContainer": {
@@ -2534,21 +2534,21 @@
           "fontFamily": "Inter-SemiBold",
           "fontSize": 16,
           "lineHeight": 20,
-          "color": "#000000"
+          "color": "#1C1917"
         },
         "itemDescription": {
           "fontFamily": "Inter-SemiBold",
           "fontSize": 14,
-          "color": "#575B66"
+          "color": "#57534E"
         },
         "timestamp": {
           "fontFamily": "Inter-Medium",
           "fontSize": 14,
-          "color": "#A4AAB8"
+          "color": "#A8A29E"
         },
         "chevron": {
           "size": 20,
-          "color": "#A4AAB8"
+          "color": "#A8A29E"
         }
       },
       "postsSection": {
@@ -2564,19 +2564,19 @@
         "sectionTitle": {
           "fontFamily": "Inter-Bold",
           "fontSize": 18,
-          "color": "#000000",
+          "color": "#1C1917",
           "paddingHorizontal": 16,
           "marginBottom": 8
         },
         "note": "Uses same feed post components as Personal mode (BrandPresentationPost, CompanyPresentationPost, NewProductPost)"
       },
       "typeColors": {
-        "order": "#0075FF",
-        "delivery": "#2ACF01",
-        "invoice": "#A76AF0",
-        "stock": "#FF7A00",
-        "payment": "#2ACF01",
-        "message": "#0075FF",
+        "order": "#2A75E6",
+        "delivery": "#34A853",
+        "invoice": "#8B5CF6",
+        "stock": "#E8590C",
+        "payment": "#34A853",
+        "message": "#2A75E6",
         "system": "#6B7280"
       }
     },
@@ -2608,11 +2608,11 @@
           "paddingVertical": 14,
           "paddingHorizontal": 16,
           "borderBottomWidth": 1,
-          "borderColor": "#E1E4EA",
+          "borderColor": "#ECE6DF",
           "gap": 12,
           "unreadState": {
             "description": "Unread items use highlighted background (consistent with DeliveryCard/InvoiceCard)",
-            "backgroundColor": "#F6F7F9",
+            "backgroundColor": "#FAF8F5",
             "colorToken": "highlightedRow"
           },
           "iconContainer": {
@@ -2624,13 +2624,13 @@
           "title": {
             "fontFamily": "Inter-SemiBold",
             "fontSize": 16,
-            "color": "#000000",
+            "color": "#1C1917",
             "colorToken": "primary"
           },
           "subtitle": {
             "fontFamily": "Inter-Medium",
             "fontSize": 14,
-            "color": "#575B66",
+            "color": "#57534E",
             "colorToken": "textSecondary",
             "numberOfLines": 2
           },
@@ -2638,7 +2638,7 @@
             "description": "Displayed on same line as title",
             "fontFamily": "Inter-Medium",
             "fontSize": 14,
-            "color": "#A4AAB8",
+            "color": "#A8A29E",
             "colorToken": "textMuted"
           },
           "staffButton": {
@@ -2646,9 +2646,9 @@
             "height": 40,
             "borderRadius": 8,
             "borderWidth": 1,
-            "borderColor": "#000000",
+            "borderColor": "#1C1917",
             "backgroundColor": "transparent",
-            "textColor": "#000000",
+            "textColor": "#1C1917",
             "fontSize": 14,
             "fontFamily": "Inter-SemiBold"
           }
@@ -2691,7 +2691,7 @@
       },
       "badges": {
         "position": "absolute top-right of icon",
-        "backgroundColor": "#D23030"
+        "backgroundColor": "#FF7A00"
       }
     },
     "listScreen": {

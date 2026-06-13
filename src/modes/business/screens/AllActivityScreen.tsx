@@ -120,7 +120,7 @@ export default function AllActivityScreen() {
         navigation.navigate('DeliveryDetail', { deliveryId: item.entityId });
         break;
       case 'order':
-        navigation.navigate('DeliveryDetail', { deliveryId: item.entityId });
+        navigation.navigate('OrderDetails', { orderId: item.entityId });
         break;
       case 'product':
         navigation.navigate('ProductDetail', { productId: item.entityId });
@@ -143,7 +143,7 @@ export default function AllActivityScreen() {
 
   // Open the sidebar (when shown as the Activities tab root)
   const openDrawer = () => {
-    navigation.dispatch(DrawerActions.openDrawer());
+    navigation.dispatch(DrawerActions.toggleDrawer());
   };
 
   // Handle search

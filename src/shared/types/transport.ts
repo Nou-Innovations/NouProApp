@@ -3,6 +3,8 @@
  * Types for business fleet/transport management
  */
 
+import { theme } from '@/shared/theme';
+
 /**
  * Vehicle type classification
  */
@@ -107,8 +109,8 @@ export const getVehicleStatusLabel = (status: VehicleStatus): string => {
  * Status colors for vehicles
  */
 export const VEHICLE_STATUS_COLORS: Record<VehicleStatus, string> = {
-  available: '#2ACF01',
-  in_use: '#0075FF',
-  maintenance: '#FFB600',
-  inactive: '#A4AAB8',
+  available: theme.colors.success,
+  in_use: theme.colors.info,
+  maintenance: theme.colors.warning,
+  inactive: theme.colors.statusInactive,
 };

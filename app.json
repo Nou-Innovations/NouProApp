@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/launch/splash-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#1A1714"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -74,7 +74,7 @@
         {
           "image": "./assets/launch/splash-logo.png",
           "imageResizeMode": "contain",
-          "backgroundColor": "#000000"
+          "backgroundColor": "#1A1714"
         }
       ],
       [

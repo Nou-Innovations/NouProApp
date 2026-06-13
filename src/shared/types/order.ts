@@ -8,6 +8,7 @@
  * Re-exported from constants for convenience
  */
 import type { OrderStatus as OrderStatusType } from '@/shared/constants/orderStatus';
+import { theme } from '@/shared/theme';
 
 export type { OrderStatus } from '@/shared/constants/orderStatus';
 export { 
@@ -46,13 +47,13 @@ export type DeliveryStatus =
  * Delivery status colors for UI
  */
 export const DELIVERY_STATUS_COLORS: Record<DeliveryStatus, string> = {
-  NOT_ASSIGNED: '#6B7280',     // gray
-  ASSIGNED: '#1E40AF',         // dark blue
-  PACKED: '#5B21B6',           // purple
-  OUT_FOR_DELIVERY: '#0075FF', // blue
-  DELIVERED: '#065F46',        // dark green
-  FAILED: '#FF2400',           // red
-  CANCELED: '#6B7280',         // gray
+  NOT_ASSIGNED: theme.colors.neutral,       // gray
+  ASSIGNED: theme.colors.info,              // blue
+  PACKED: theme.colors.statusInReview,      // purple
+  OUT_FOR_DELIVERY: theme.colors.info,      // blue
+  DELIVERED: theme.colors.success,          // green
+  FAILED: theme.colors.error,               // red
+  CANCELED: theme.colors.neutral,           // gray
 };
 
 /**
@@ -91,19 +92,19 @@ export type PaymentStatus =
  * Payment status colors for UI
  */
 export const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
-  UNPAID: '#6B7280',           // gray
-  PARTIALLY_PAID: '#F59E0B',   // amber
-  PAID: '#059669',             // green
-  PAYMENT_PENDING: '#3B82F6',  // blue
-  PENDING_CONFIRMATION: '#8B5CF6', // purple
-  PROCESSING: '#0EA5E9',       // sky blue
-  OVERDUE: '#DC2626',          // red
-  DUE_TODAY: '#F97316',        // orange
-  FAILED: '#DC2626',           // red
-  CANCELED: '#6B7280',         // gray
-  REFUNDED: '#10B981',         // emerald
-  PARTIALLY_REFUNDED: '#14B8A6', // teal
-  DISPUTED: '#EF4444',         // red
+  UNPAID: theme.colors.neutral,              // gray
+  PARTIALLY_PAID: theme.colors.warning,      // amber
+  PAID: theme.colors.success,                // green
+  PAYMENT_PENDING: theme.colors.info,        // blue
+  PENDING_CONFIRMATION: theme.colors.statusInReview, // purple
+  PROCESSING: theme.colors.info,             // sky blue
+  OVERDUE: theme.colors.error,               // red
+  DUE_TODAY: theme.colors.warning,           // orange
+  FAILED: theme.colors.error,                // red
+  CANCELED: theme.colors.neutral,            // gray
+  REFUNDED: theme.colors.success,            // emerald
+  PARTIALLY_REFUNDED: theme.colors.info,     // teal
+  DISPUTED: theme.colors.error,              // red
 };
 
 /**

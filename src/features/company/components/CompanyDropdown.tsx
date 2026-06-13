@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   companyItemLogo: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 12,
     marginRight: 12,
   },
   companyItemText: {
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   personalProfileIcon: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,

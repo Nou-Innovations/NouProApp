@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
+import AnimatedMenuIcon from '@/shared/components/ui/AnimatedMenuIcon';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 
 export type HeaderAction = {
@@ -80,12 +81,16 @@ export default function PrimaryHeader({
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityLabel={leftAction.accessibilityLabel}
         >
-          <Icon
-            name={leftAction.icon}
-            size={26}
-            color={leftAction.iconColor ?? theme.colors.text}
-            strokeWidth={2}
-          />
+          {leftAction.icon === 'menu' || leftAction.icon === 'menu-outline' ? (
+            <AnimatedMenuIcon size={30} color={leftAction.iconColor ?? theme.colors.text} />
+          ) : (
+            <Icon
+              name={leftAction.icon}
+              size={26}
+              color={leftAction.iconColor ?? theme.colors.text}
+              strokeWidth={2}
+            />
+          )}
         </TouchableOpacity>
       ) : null}
 

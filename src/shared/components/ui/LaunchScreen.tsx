@@ -8,8 +8,8 @@
  * 4. (Signed in) Progress bar appears instead
  * 
  * Colors:
- * - Background: #000000 (pure black)
- * - Accent: #D23030 (NouPro brand red)
+ * - Background: #1A1714 (warm espresso)
+ * - Accent: #FF7A00 (NouPro brand orange)
  * - Text: #FFFFFF
  */
 
@@ -40,8 +40,8 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // NouPro brand colors
 const COLORS = {
-  background: '#000000',
-  accent: '#D23030',
+  background: '#1A1714',
+  accent: '#FF7A00',
   text: '#FFFFFF',
   textMuted: 'rgba(255, 255, 255, 0.85)',
 } as const;

@@ -731,6 +731,26 @@ export const PAYWALL_TRIGGERS: PaywallTrigger[] = [
     title: 'Accept staff requests',
     description: 'Accept staff join requests with Pro.',
   },
+  {
+    id: 'post_opportunity',
+    featureKey: 'post_opportunity',
+    action: 'opportunities.create',
+    requiredPlan: 'pro',
+    appliesTo: ['free'],
+    modalType: 'feature_gate',
+    title: 'Post opportunities',
+    description: 'Share what your business is looking for and receive responses from other businesses. Available on Pro and above.',
+  },
+  {
+    id: 'host_event',
+    featureKey: 'host_event',
+    action: 'events.create',
+    requiredPlan: 'pro',
+    appliesTo: ['free'],
+    modalType: 'feature_gate',
+    title: 'Host events',
+    description: 'Create workshops, conferences and networking events for the community. Available on Pro and above.',
+  },
   // Limit triggers - Free (listed products)
   {
     id: 'listed_limit_reached_free',

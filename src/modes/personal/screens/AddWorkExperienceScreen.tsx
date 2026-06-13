@@ -536,8 +536,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderTopWidth: 1,
-    borderTopColor: '#E1E4EA',
-    backgroundColor: '#F6F7F9',
+    borderTopColor: '#ECE6DF',
+    backgroundColor: '#F4F0EB',
   },
   addCompanyText: {
     fontSize: 14,

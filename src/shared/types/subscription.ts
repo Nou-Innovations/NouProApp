@@ -3,6 +3,8 @@
  * Based on app-logic.json subscriptionPlans
  */
 
+import { theme } from '@/shared/theme';
+
 /**
  * Subscription plan types
  */
@@ -23,9 +25,9 @@ export type SubscriptionStatus = 'active' | 'grace' | 'expired';
  * Subscription status colors
  */
 export const SUBSCRIPTION_STATUS_COLORS: Record<SubscriptionStatus, string> = {
-  active: '#22C55E',
-  grace: '#F59E0B',
-  expired: '#EF4444',
+  active: theme.colors.success,
+  grace: theme.colors.warning,
+  expired: theme.colors.error,
 };
 
 /**

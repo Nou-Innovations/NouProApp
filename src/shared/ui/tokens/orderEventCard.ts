@@ -145,26 +145,26 @@ export const ORDER_EVENT_TYPOGRAPHY = {
 export const ORDER_EVENT_COLORS_LIGHT = {
   // Card
   cardBackground: '#FFFFFF',
-  cardBorder: '#E6E8EC',
-  cardShadow: 'rgba(16, 24, 40, 0.06)',
-  
+  cardBorder: '#ECE6DF',
+  cardShadow: 'rgba(28, 25, 23, 0.06)',
+
   // Text
-  textPrimary: '#111827',
-  textSecondary: '#4B5563',
-  textMuted: '#6B7280',
-  textLink: '#0075FF',
-  
+  textPrimary: '#1C1917',
+  textSecondary: '#57534E',
+  textMuted: '#A8A29E',
+  textLink: '#2A75E6',
+
   // Business block
-  businessBlockBackground: '#F7F8FA',
-  
+  businessBlockBackground: '#FAF8F5',
+
   // Connector
-  connectorColor: '#D1D5DB',
-  
+  connectorColor: '#ECE6DF',
+
   // Timeline
-  timelineActive: '#0075FF',
-  timelineInactive: '#E6E8EC',
-  timelineDotActive: '#0075FF',
-  timelineDotInactive: '#D1D5DB',
+  timelineActive: '#2A75E6',
+  timelineInactive: '#ECE6DF',
+  timelineDotActive: '#2A75E6',
+  timelineDotInactive: '#ECE6DF',
 } as const;
 
 // ============================================================================
@@ -173,27 +173,27 @@ export const ORDER_EVENT_COLORS_LIGHT = {
 
 export const ORDER_EVENT_COLORS_DARK = {
   // Card
-  cardBackground: '#0F141A',
-  cardBorder: '#202733',
+  cardBackground: '#232020',
+  cardBorder: '#332E2A',
   cardShadow: 'rgba(0, 0, 0, 0.35)',
-  
+
   // Text
-  textPrimary: '#F9FAFB',
-  textSecondary: '#D1D5DB',
-  textMuted: '#9AA4B2',
-  textLink: '#60A5FA',
-  
+  textPrimary: '#FAFAF9',
+  textSecondary: '#D6D3D1',
+  textMuted: '#A8A29E',
+  textLink: '#2A75E6',
+
   // Business block
-  businessBlockBackground: '#151B23',
-  
+  businessBlockBackground: '#2A2622',
+
   // Connector
-  connectorColor: '#374151',
-  
+  connectorColor: '#44403C',
+
   // Timeline
-  timelineActive: '#60A5FA',
-  timelineInactive: '#374151',
-  timelineDotActive: '#60A5FA',
-  timelineDotInactive: '#4B5563',
+  timelineActive: '#2A75E6',
+  timelineInactive: '#44403C',
+  timelineDotActive: '#2A75E6',
+  timelineDotInactive: '#57534E',
 } as const;
 
 // ============================================================================
@@ -211,8 +211,8 @@ export interface StatusBadgeConfig {
 export const ORDER_EVENT_STATUS_CONFIG: Record<OrderEventStatus, StatusBadgeConfig> = {
   NEW: {
     label: 'New',
-    backgroundColor: '#E8F1FF',
-    textColor: '#1B4DFF',
+    backgroundColor: '#EAF1FB',
+    textColor: '#2A75E6',
     icon: 'plus-circle',
     title: 'New Order Placed',
   },

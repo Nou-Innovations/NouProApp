@@ -74,7 +74,7 @@ export default function BusinessExploreScreen() {
   const openEvent = (id: string) => navigation.navigate('EventDetail', { eventId: id });
 
   // ---- navigation helpers ----
-  const openDrawer = () => navigation.dispatch(DrawerActions.openDrawer());
+  const openDrawer = () => navigation.dispatch(DrawerActions.toggleDrawer());
   const goBusiness = (businessId: string) => navigation.navigate('ViewBusinessProfile', { businessId });
   const goProduct = (productId: string) => navigation.navigate('ProductDetail', { productId });
   const submitSearch = () => {
@@ -206,7 +206,7 @@ export default function BusinessExploreScreen() {
                 <OpportunityCard key={o.id} opportunity={o} onPress={() => openOpportunity(o.id)} showRespond onRespond={() => openOpportunity(o.id)} />
               ))
             ) : (
-              <ComingSoon icon="megaphone-outline" title="No buyer requests yet" subtitle="Businesses looking to buy will appear here." />
+              <ComingSoon icon="briefcase-outline" title="No buyer requests yet" subtitle="Businesses looking to buy will appear here." />
             )}
           </>
         );
@@ -221,7 +221,7 @@ export default function BusinessExploreScreen() {
                 <OpportunityCard key={o.id} opportunity={o} onPress={() => openOpportunity(o.id)} showRespond onRespond={() => openOpportunity(o.id)} />
               ))
             ) : (
-              <ComingSoon icon="megaphone-outline" title="No opportunities yet" subtitle="Post a request from the Opportunities screen." />
+              <ComingSoon icon="briefcase-outline" title="No opportunities yet" subtitle="Post a request from the Opportunities screen." />
             )}
           </>
         );
@@ -276,7 +276,7 @@ export default function BusinessExploreScreen() {
                 <OpportunityCard key={o.id} opportunity={o} onPress={() => openOpportunity(o.id)} showRespond onRespond={() => openOpportunity(o.id)} />
               ))
             ) : (
-              <ComingSoon icon="megaphone-outline" title="No opportunities yet" subtitle="Post a request to find partners, suppliers or buyers." />
+              <ComingSoon icon="briefcase-outline" title="No opportunities yet" subtitle="Post a request to find partners, suppliers or buyers." />
             )}
             {nearby.length > 0 && (
               <>
@@ -337,7 +337,7 @@ export default function BusinessExploreScreen() {
       ) : error ? (
         <View style={styles.center}>
           <EmptyState
-            iconName="cloud-offline-outline"
+            iconName="alert-circle-outline"
             title="Couldn't load Explore"
             subtitle={error}
             ctaLabel="Retry"

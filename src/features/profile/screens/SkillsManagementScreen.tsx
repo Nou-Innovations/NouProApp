@@ -162,7 +162,7 @@ export default function SkillsManagementScreen() {
           {/* "Add custom" option when search has text but no exact match */}
           {searchQuery.trim() && !searchResults.some((s) => s.name.toLowerCase() === searchQuery.trim().toLowerCase()) && (
             <TouchableOpacity
-              style={[styles.addCustomButton, { backgroundColor: '#F6F7F9' }]}
+              style={[styles.addCustomButton, { backgroundColor: '#F4F0EB' }]}
               onPress={() => handleAddSkill(searchQuery.trim())}
               disabled={isAdding}
             >

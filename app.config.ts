@@ -27,7 +27,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     splash: {
       image: './assets/launch/splash-logo.png',
       resizeMode: 'contain',
-      backgroundColor: '#000000',
+      backgroundColor: '#1A1714',
     },
     assetBundlePatterns: ['**/*'],
     ios: {
@@ -89,7 +89,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         {
           image: './assets/launch/splash-logo.png',
           imageResizeMode: 'contain',
-          backgroundColor: '#000000',
+          backgroundColor: '#1A1714',
         },
       ],
       'expo-asset',

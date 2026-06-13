@@ -142,7 +142,7 @@ export default function BusinessInboxScreen() {
   };
 
   const openDrawer = useCallback(() => {
-    navigation.dispatch(DrawerActions.openDrawer());
+    navigation.dispatch(DrawerActions.toggleDrawer());
   }, [navigation]);
 
   // Render chat item

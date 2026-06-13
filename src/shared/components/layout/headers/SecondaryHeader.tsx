@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
+import AnimatedMenuIcon from '@/shared/components/ui/AnimatedMenuIcon';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 
@@ -67,13 +68,17 @@ export default function SecondaryHeader({
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel={leftAction.accessibilityLabel}
           >
-            {/* Chevron icons need larger size (32px) for visual balance with other icons (28px) */}
-            <Icon 
-              name={leftAction.icon} 
-              size={leftAction.icon.includes('chevron') ? 32 : 28} 
-              color={theme.colors.iconColor} 
-              strokeWidth={2} 
-            />
+            {leftAction.icon === 'menu' || leftAction.icon === 'menu-outline' ? (
+              <AnimatedMenuIcon size={30} color={theme.colors.iconColor} />
+            ) : (
+              /* Chevron icons need larger size (32px) for visual balance with other icons (28px) */
+              <Icon
+                name={leftAction.icon}
+                size={leftAction.icon.includes('chevron') ? 32 : 28}
+                color={theme.colors.iconColor}
+                strokeWidth={2}
+              />
+            )}
           </TouchableOpacity>
         ) : (
           <View style={styles.iconButton} />
@@ -108,7 +113,7 @@ export default function SecondaryHeader({
                 accessibilityLabel={a.accessibilityLabel}
               >
                 <Icon name={a.icon} size={28} color={theme.colors.iconColor} strokeWidth={2} />
-                {a.badge && a.badge > 0 && (
+                {a.badge != null && a.badge > 0 && (
                   <View style={[styles.badge, { backgroundColor: theme.colors.error }]}>
                     <Text style={styles.badgeText}>
                       {a.badge > 9 ? '9+' : a.badge}

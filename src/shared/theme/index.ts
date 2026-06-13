@@ -8,72 +8,72 @@ export const lightTheme = {
   lineHeight,
   typography,
   colors: {
-    // Primary colors
-    primary: '#000000',
-    secondary: '#33363A',
+    // Primary colors (warm bespoke palette — warm near-black + orange accent)
+    primary: '#1C1917',
+    secondary: '#57534E',
     background: '#FFFFFF',
-    surface: '#F6F7F9',
-    accent: '#D23030',
-    
+    surface: '#FAF8F5',
+    accent: '#FF7A00',
+
     // Text colors
-    text: '#000000',
-    textSecondary: '#575B66',
-    textMuted: '#A4AAB8',
+    text: '#1C1917',
+    textSecondary: '#57534E',
+    textMuted: '#A8A29E',
     textInverse: '#FFFFFF',
-    
+
     // @deprecated - Use textSecondary instead
-    textLight: '#575B66',
-    
-    // Status colors (base)
-    success: '#2ACF01',
-    error: '#FF2400',
-    warning: '#FFB600',
-    info: '#0075FF',
-    neutral: '#A4AAB8',
-    
+    textLight: '#57534E',
+
+    // Status colors (base) - harmonized with warm palette
+    success: '#34A853',
+    error: '#D6453E',
+    warning: '#F2A900',
+    info: '#2A75E6',
+    neutral: '#A8A29E',
+
     // Status colors (specific states)
-    statusNewOrder: '#6E0000',       // New order / Discontinued
-    statusDiscontinued: '#6E0000',   // Discontinued (alias)
-    statusDiscontinuedBg: '#200000', // Discontinued background (dark red)
-    statusOngoing: '#0075FF',        // Ongoing
-    statusDone: '#2ACF01',           // Done / Paid / Import
-    statusPaid: '#2ACF01',           // Paid (alias)
-    statusPaidText: '#001004',       // Paid text (dark green)
-    statusImport: '#2ACF01',         // Import (alias)
-    statusInReview: '#A76AF0',       // In review
-    statusPending: '#FFB600',        // Pending / In Production
-    statusInProduction: '#FFB600',   // In Production (alias)
-    statusLowStock: '#FF7A00',       // Low Stock / Export
-    statusLowStockText: '#FFEBBD',   // Low Stock text
-    statusExport: '#FF7A00',         // Export (alias)
-    statusCanceled: '#FF6B6B',       // Canceled
-    statusUnpaid: '#FF2400',         // Unpaid / Out of Stock
-    statusOutOfStock: '#FF2400',     // Out of Stock (alias)
-    statusInactive: '#7BA9C1',       // Inactive
-    
+    statusNewOrder: '#7A1F12',       // New order / Discontinued
+    statusDiscontinued: '#7A1F12',   // Discontinued (alias)
+    statusDiscontinuedBg: '#2A0E07', // Discontinued background (dark warm brown-red)
+    statusOngoing: '#2A75E6',        // Ongoing
+    statusDone: '#34A853',           // Done / Paid / Import
+    statusPaid: '#34A853',           // Paid (alias)
+    statusPaidText: '#10391F',       // Paid text (dark green)
+    statusImport: '#34A853',         // Import (alias)
+    statusInReview: '#8B5CF6',       // In review
+    statusPending: '#F2A900',        // Pending / In Production
+    statusInProduction: '#F2A900',   // In Production (alias)
+    statusLowStock: '#E8590C',       // Low Stock / Export (deeper burnt orange, distinct from accent)
+    statusLowStockText: '#FFE4C4',   // Low Stock text
+    statusExport: '#E8590C',         // Export (alias)
+    statusCanceled: '#F0705F',       // Canceled
+    statusUnpaid: '#D6453E',         // Unpaid / Out of Stock
+    statusOutOfStock: '#D6453E',     // Out of Stock (alias)
+    statusInactive: '#A89B92',       // Inactive
+
     // @deprecated - Status color aliases for backward compatibility (will be removed)
     // Use success, error, warning, info instead
-    errorBright: '#FF2400',
-    warningBright: '#FFB600',
-    warningOrange: '#FFB600',
-    infoBright: '#0075FF',
-    
+    errorBright: '#D6453E',
+    warningBright: '#F2A900',
+    warningOrange: '#F2A900',
+    infoBright: '#2A75E6',
+
     // UI colors
     cardBackground: '#FFFFFF',
-    borderColor: '#E1E4EA',
-    iconColor: '#393E47',
-    iconMuted: '#A4AAB8',
-    buttonBackground: '#F6F7F9',
-    buttonBackgroundDisabled: '#F6F7F9',
-    
+    borderColor: '#ECE6DF',
+    iconColor: '#44403C',
+    iconMuted: '#A8A29E',
+    buttonBackground: '#F4F0EB',
+    buttonBackgroundDisabled: '#F4F0EB',
+
     // Input colors
     inputBackground: '#FFFFFF',
-    inputBackgroundFocused: '#F6F7F9',
-    inputBorder: '#E1E4EA',
-    inputBorderFocused: '#000000',
-    inputPlaceholder: '#A4AAB8',
-    caretColor: '#000000',
-    
+    inputBackgroundFocused: '#FAF8F5',
+    inputBorder: '#ECE6DF',
+    inputBorderFocused: '#1C1917',
+    inputPlaceholder: '#A8A29E',
+    caretColor: '#1C1917',
+
     // Text field specific colors (consolidated)
     textFieldBorderDefault: 'textMuted',
     textFieldBorderSelected: 'primary',
@@ -81,48 +81,45 @@ export const lightTheme = {
     textFieldPlaceholderDefault: 'textMuted',
     textFieldPlaceholderSelected: 'borderColor',
     textFieldText: 'primary',
-    
+
     // Switch colors (from design.json)
-    switchTrackOff: '#E9E9EA',
-    switchTrackOn: '#2ACF01',
+    switchTrackOff: '#E7E1DA',
+    switchTrackOn: '#34A853',
     switchThumb: '#FFFFFF',
-    
+
     // Highlight/special states
-    highlightedRow: '#F6F7F9',
-    selectedBackground: '#000000',
-    overlay: 'rgba(0, 0, 0, 0.5)',
-    
+    highlightedRow: '#FAF8F5',
+    selectedBackground: '#1C1917',
+    overlay: 'rgba(28, 25, 23, 0.5)',
+
     // Confirmation dialog backgrounds
-    confirmDialogDarkRed: 'rgba(22, 0, 0, 0.9)',   // #160000 at 90%
-    confirmDialogDarkGreen: 'rgba(0, 16, 4, 0.9)', // #001004 at 90%
-    confirmDialogDarkGreenSolid: '#001004',        // Solid dark green for text
-    
+    confirmDialogDarkRed: 'rgba(42, 14, 7, 0.9)',   // #2A0E07 at 90%
+    confirmDialogDarkGreen: 'rgba(16, 57, 31, 0.9)', // #10391F at 90%
+    confirmDialogDarkGreenSolid: '#10391F',          // Solid dark green for text
+
     // Special purpose colors
-    imagePlaceholder: '#F6F7F9',
-    badgeBackground: '#D23030',
-    linkColor: '#0075FF',
-    
+    imagePlaceholder: '#FAF8F5',
+    badgeBackground: '#FF7A00',
+    linkColor: '#2A75E6',
+
     // Divider
-    divider: '#E1E4EA',
+    divider: '#ECE6DF',
   },
   
-  // Avatar colors for random assignment
+  // Avatar colors for random assignment (muted, warm-leaning set)
   avatarColors: [
-    '#FF6B6B', // Coral Red
-    '#4ECDC4', // Teal
-    '#45B7D1', // Sky Blue
-    '#96CEB4', // Sage Green
-    '#FFEAA7', // Soft Yellow
-    '#DDA0DD', // Plum
-    '#98D8C8', // Mint
-    '#F7DC6F', // Golden Yellow
-    '#BB8FCE', // Lavender
-    '#85C1E9', // Light Blue
-    '#F8B500', // Amber
-    '#00CED1', // Dark Cyan
-    '#FF7F50', // Coral
-    '#6B5B95', // Purple
-    '#88B04B', // Greenery
+    '#F0705F', // Coral
+    '#E8825A', // Terracotta
+    '#E8A33D', // Amber
+    '#C9A227', // Gold
+    '#8DA34B', // Olive
+    '#5FA88C', // Sage Teal
+    '#4E9BB5', // Blue
+    '#5B7FD6', // Indigo
+    '#8B6FD6', // Violet
+    '#B06BB5', // Orchid
+    '#C77BA0', // Rose
+    '#A8826B', // Clay
   ],
   
   spacing: {
@@ -244,101 +241,101 @@ export const lightTheme = {
 export const darkTheme = {
   ...lightTheme,
   colors: {
-    // Primary colors
-    primary: '#FFFFFF',
-    secondary: '#C4C7CC',
-    background: '#121212',
-    surface: '#1E1E1E',
-    accent: '#D23030',
-    
+    // Primary colors (warm dark palette)
+    primary: '#FAFAF9',
+    secondary: '#D6D3D1',
+    background: '#1A1714',
+    surface: '#232020',
+    accent: '#FF7A00',
+
     // Text colors
-    text: '#FFFFFF',
-    textSecondary: '#A4AAB8',
-    textMuted: '#6B7280',
-    textInverse: '#000000',
-    
+    text: '#FAFAF9',
+    textSecondary: '#A8A29E',
+    textMuted: '#78716C',
+    textInverse: '#1A1714',
+
     // @deprecated - Use textSecondary instead
-    textLight: '#A4AAB8',
-    
-    // Status colors (base)
-    success: '#2ACF01',
-    error: '#FF2400',
-    warning: '#FFB600',
-    info: '#0075FF',
-    neutral: '#6B7280',
-    
+    textLight: '#A8A29E',
+
+    // Status colors (base) - harmonized with warm palette
+    success: '#34A853',
+    error: '#D6453E',
+    warning: '#F2A900',
+    info: '#2A75E6',
+    neutral: '#78716C',
+
     // Status colors (specific states) - same as light theme
-    statusNewOrder: '#6E0000',
-    statusDiscontinued: '#6E0000',
-    statusDiscontinuedBg: '#200000',
-    statusOngoing: '#0075FF',
-    statusDone: '#2ACF01',
-    statusPaid: '#2ACF01',
-    statusPaidText: '#001004',
-    statusImport: '#2ACF01',
-    statusInReview: '#A76AF0',
-    statusPending: '#FFB600',
-    statusInProduction: '#FFB600',
-    statusLowStock: '#FF7A00',
-    statusLowStockText: '#FFEBBD',
-    statusExport: '#FF7A00',
-    statusCanceled: '#FF6B6B',
-    statusUnpaid: '#FF2400',
-    statusOutOfStock: '#FF2400',
-    statusInactive: '#7BA9C1',
-    
+    statusNewOrder: '#7A1F12',
+    statusDiscontinued: '#7A1F12',
+    statusDiscontinuedBg: '#2A0E07',
+    statusOngoing: '#2A75E6',
+    statusDone: '#34A853',
+    statusPaid: '#34A853',
+    statusPaidText: '#10391F',
+    statusImport: '#34A853',
+    statusInReview: '#8B5CF6',
+    statusPending: '#F2A900',
+    statusInProduction: '#F2A900',
+    statusLowStock: '#E8590C',
+    statusLowStockText: '#FFE4C4',
+    statusExport: '#E8590C',
+    statusCanceled: '#F0705F',
+    statusUnpaid: '#D6453E',
+    statusOutOfStock: '#D6453E',
+    statusInactive: '#A89B92',
+
     // @deprecated - Status color aliases for backward compatibility (will be removed)
-    errorBright: '#FF2400',
-    warningBright: '#FFB600',
-    warningOrange: '#FFB600',
-    infoBright: '#0075FF',
-    
+    errorBright: '#D6453E',
+    warningBright: '#F2A900',
+    warningOrange: '#F2A900',
+    infoBright: '#2A75E6',
+
     // UI colors
-    cardBackground: '#1E1E1E',
-    borderColor: '#2D2D2D',
-    iconColor: '#C4C7CC',
-    iconMuted: '#6B7280',
-    buttonBackground: '#2D2D2D',
-    buttonBackgroundDisabled: '#2D2D2D',
-    
+    cardBackground: '#232020',
+    borderColor: '#332E2A',
+    iconColor: '#D6D3D1',
+    iconMuted: '#78716C',
+    buttonBackground: '#332E2A',
+    buttonBackgroundDisabled: '#332E2A',
+
     // Input colors
-    inputBackground: '#2D2D2D',
-    inputBackgroundFocused: '#3F3F46',
-    inputBorder: '#3F3F46',
-    inputBorderFocused: '#FFFFFF',
-    inputPlaceholder: '#6B7280',
-    caretColor: '#FFFFFF',
-    
+    inputBackground: '#332E2A',
+    inputBackgroundFocused: '#44403C',
+    inputBorder: '#44403C',
+    inputBorderFocused: '#FAFAF9',
+    inputPlaceholder: '#78716C',
+    caretColor: '#FAFAF9',
+
     // Text field specific colors
-    textFieldBorderDefault: '#3F3F46',
-    textFieldBorderSelected: '#FFFFFF',
-    textFieldLabelDefault: '#A4AAB8',
-    textFieldLabelSelected: '#FFFFFF',
-    textFieldPlaceholder: '#6B7280',
-    textFieldText: '#FFFFFF',
-    
+    textFieldBorderDefault: '#44403C',
+    textFieldBorderSelected: '#FAFAF9',
+    textFieldLabelDefault: '#A8A29E',
+    textFieldLabelSelected: '#FAFAF9',
+    textFieldPlaceholder: '#78716C',
+    textFieldText: '#FAFAF9',
+
     // Switch colors (from design.json)
-    switchTrackOff: '#3F3F46',
-    switchTrackOn: '#2ACF01',
+    switchTrackOff: '#44403C',
+    switchTrackOn: '#34A853',
     switchThumb: '#FFFFFF',
-    
+
     // Highlight/special states
-    highlightedRow: '#27272A',
-    selectedBackground: '#FFFFFF',
+    highlightedRow: '#2A2622',
+    selectedBackground: '#FAFAF9',
     overlay: 'rgba(0, 0, 0, 0.7)',
-    
+
     // Confirmation dialog backgrounds
-    confirmDialogDarkRed: 'rgba(22, 0, 0, 0.9)',   // #160000 at 90%
-    confirmDialogDarkGreen: 'rgba(0, 16, 4, 0.9)', // #001004 at 90%
-    confirmDialogDarkGreenSolid: '#001004',        // Solid dark green for text
-    
+    confirmDialogDarkRed: 'rgba(42, 14, 7, 0.9)',   // #2A0E07 at 90%
+    confirmDialogDarkGreen: 'rgba(16, 57, 31, 0.9)', // #10391F at 90%
+    confirmDialogDarkGreenSolid: '#10391F',          // Solid dark green for text
+
     // Special purpose colors
-    imagePlaceholder: '#27272A',
-    badgeBackground: '#D23030',
-    linkColor: '#0075FF',
-    
+    imagePlaceholder: '#2A2622',
+    badgeBackground: '#FF7A00',
+    linkColor: '#2A75E6',
+
     // Divider
-    divider: '#2D2D2D',
+    divider: '#332E2A',
   },
   
   // Avatar colors (same for both themes)

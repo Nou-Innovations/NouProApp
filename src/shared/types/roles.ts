@@ -5,6 +5,7 @@
 
 import { StaffRole, StaffRoleType, StaffPermissions } from './business';
 import { SubscriptionPlan } from './subscription';
+import { theme } from '@/shared/theme';
 
 /**
  * Profile mode - whether user is in personal or business context
@@ -192,10 +193,10 @@ export const DEFAULT_STAFF_PERMISSIONS: Record<StaffRoleType, Partial<StaffPermi
  * Staff status colors for UI
  */
 export const STAFF_STATUS_COLORS: Record<string, string> = {
-  pending: '#F59E0B',
-  accepted: '#22C55E',
-  rejected: '#EF4444',
-  locked: '#6B7280',
+  pending: theme.colors.warning,
+  accepted: theme.colors.success,
+  rejected: theme.colors.error,
+  locked: theme.colors.neutral,
 };
 
 /**
