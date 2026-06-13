@@ -3,3 +3,4 @@
  */
 
 export * from './activity.service';
+export * from './dashboard.service';

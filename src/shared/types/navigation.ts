@@ -97,14 +97,16 @@ export type PersonalTabParamList = {
 
 /**
  * Business mode tabs (Pro Mode)
- * Tabs: Explore (feed) · Inbox · Activities (business timeline) · Profile.
- * Deliveries / Products / Invoices now live in the sidebar and open as RootStack screens.
- * Notifications are reached via the bell in the Explore header (not a tab).
+ * Tabs: Home (dashboard) · Explore (feed) · Inbox · Profile.
+ * The full Activities timeline opens as the RootStack `AllActivity` screen
+ * (reached via "See all" on the Home screen).
+ * Deliveries / Products / Invoices live in the sidebar and open as RootStack screens.
+ * Notifications are reached via the bell in the Home/Explore header (not a tab).
  */
 export type BusinessTabParamList = {
+  BusinessHome: undefined; // Dashboard: KPIs, priority queue, quick actions, recent activity
   BusinessExplore: undefined; // Feed / discovery, with notifications bell in header
   BusinessInbox: undefined; // Business inbox with activity timeline and chats
-  Activities: undefined; // Business timeline / log
   BusinessProfile: undefined;
 };
 

@@ -10926,6 +10926,159 @@ app.get('/api/feed', optionalAuth, async (req, res) => {
   }
 });
 
+// Aggregate recent invoices, deliveries, orders, POs and PRs into one timeline.
+// Shared by the /activity-feed route and the /dashboard route below.
+async function buildActivityFeed(companyId, locationId, maxLimit) {
+  // Helper to format currency
+  const formatCurrency = (amount) => `Rs ${Number(amount).toFixed(2)}`;
+
+  let activities = [];
+
+  // 1. Recent invoices (fetch only what we need via Prisma directly)
+  const businessInvoices = await prisma.invoice.findMany({
+    where: { businessId: companyId, ...(locationId ? { issuedByLocationId: locationId } : {}) },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+  const recentInvoices = businessInvoices
+    .map(inv => ({
+      id: `inv-${inv.id}`,
+      type: 'invoice_sent',
+      title: `Invoice ${inv.id} sent`,
+      description: `${inv.clientName} - ${formatCurrency(inv.totalAmount)}`,
+      timestamp: inv.createdAt,
+      entityId: inv.id,
+      entityType: 'invoice',
+      metadata: {
+        status: inv.status,
+        amount: inv.totalAmount,
+        clientName: inv.clientName,
+      },
+    }));
+  activities.push(...recentInvoices);
+
+  // 2. Recent deliveries (fetch only what we need via Prisma directly)
+  const businessDeliveries = await prisma.delivery.findMany({
+    where: { businessId: companyId, ...(locationId ? { locationId } : {}) },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+  const recentDeliveries = businessDeliveries
+    .map(del => {
+      const statusMap = {
+        'PENDING': 'delivery_pending',
+        'IN_TRANSIT': 'delivery_started',
+        'DELIVERED': 'delivery_completed',
+        'CANCELED': 'delivery_canceled',
+      };
+      const activityType = statusMap[del.deliveryStatus] || 'delivery_started';
+
+      return {
+        id: `del-${del.id}`,
+        type: activityType,
+        title: `Delivery #${del.id} ${del.deliveryStatus.toLowerCase().replace('_', ' ')}`,
+        description: `${del.clientCompanyName} - ${del.itemCount} items`,
+        timestamp: del.updatedAt || del.createdAt,
+        entityId: del.id,
+        entityType: 'delivery',
+        metadata: {
+          status: del.deliveryStatus,
+          clientName: del.clientCompanyName,
+          itemCount: del.itemCount,
+        },
+      };
+    });
+  activities.push(...recentDeliveries);
+
+  // 3. Recent orders (fetch only what we need via Prisma directly)
+  const businessOrders = await prisma.order.findMany({
+    where: { businessId: companyId, ...(locationId ? { soldByLocationId: locationId } : {}) },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+  const recentOrders = businessOrders
+    .map(ord => ({
+      id: `ord-${ord.id}`,
+      type: 'order_created',
+      title: `Order #${ord.id} created`,
+      description: `${ord.clientName || 'Client'} - ${formatCurrency(ord.totalAmount)}`,
+      timestamp: ord.createdAt,
+      entityId: ord.id,
+      entityType: 'order',
+      metadata: {
+        status: ord.status,
+        amount: ord.totalAmount,
+      },
+    }));
+  activities.push(...recentOrders);
+
+  // 4. Recent purchase orders
+  try {
+    const businessPOs = await repos.procurementRepo.getPurchaseOrders(companyId);
+    const recentPOs = businessPOs
+      .slice(0, 20)
+      .map(po => {
+        const statusMap = {
+          'DRAFT': 'purchase_order_created',
+          'SENT': 'purchase_order_sent',
+          'CONFIRMED': 'purchase_order_confirmed',
+          'PARTIALLY_RECEIVED': 'purchase_order_receiving',
+          'RECEIVED': 'purchase_order_received',
+          'CANCELED': 'purchase_order_canceled',
+        };
+        return {
+          id: `po-${po.id}`,
+          type: statusMap[po.status] || 'purchase_order_created',
+          title: `PO ${po.id} ${po.status.toLowerCase().replace('_', ' ')}`,
+          description: `${po.supplier?.name || 'Supplier'} - ${formatCurrency(po.totalAmount)}`,
+          timestamp: po.updatedAt || po.createdAt,
+          entityId: po.id,
+          entityType: 'purchase_order',
+          metadata: {
+            status: po.status,
+            amount: po.totalAmount,
+            supplierName: po.supplier?.name,
+          },
+        };
+      });
+    activities.push(...recentPOs);
+  } catch (_) {}
+
+  // 5. Recent purchase requests
+  try {
+    const businessPRs = await repos.procurementRepo.getPurchaseRequests(companyId);
+    const recentPRs = businessPRs
+      .slice(0, 20)
+      .map(pr => {
+        const statusMap = {
+          'DRAFT': 'purchase_request_created',
+          'SUBMITTED': 'purchase_request_submitted',
+          'APPROVED': 'purchase_request_approved',
+          'REJECTED': 'purchase_request_rejected',
+          'CONVERTED': 'purchase_request_approved',
+        };
+        return {
+          id: `pr-${pr.id}`,
+          type: statusMap[pr.status] || 'purchase_request_created',
+          title: `Request ${pr.id} ${pr.status.toLowerCase()}`,
+          description: `${pr.supplier?.name || 'No supplier'} - ${pr.priority} priority`,
+          timestamp: pr.updatedAt || pr.createdAt,
+          entityId: pr.id,
+          entityType: 'purchase_request',
+          metadata: {
+            status: pr.status,
+            priority: pr.priority,
+          },
+        };
+      });
+    activities.push(...recentPRs);
+  } catch (_) {}
+
+  // Sort by timestamp (newest first) and limit
+  activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  return activities.slice(0, maxLimit);
+}
+
 // Activity Feed - Aggregates invoices, deliveries, orders for business timeline
 // GET /api/companies/:companyId/activity-feed?locationId=...&limit=50
 app.get('/api/companies/:companyId/activity-feed', requireAuth, async (req, res) => {
@@ -10933,166 +11086,150 @@ app.get('/api/companies/:companyId/activity-feed', requireAuth, async (req, res)
     const { companyId } = req.params;
     const { locationId, limit = 50 } = req.query;
     const maxLimit = Math.min(parseInt(limit, 10), 100);
-    
+
     // Verify user has access to this business
     const userId = req.user?.id;
     if (!userId || !(await isBusinessMember(companyId, userId))) {
       return res.status(403).json(errorResponse('ACCESS_DENIED', 'You do not have access to this business'));
     }
-    
-    // Helper to format currency
-    const formatCurrency = (amount) => `Rs ${Number(amount).toFixed(2)}`;
-    
-    let activities = [];
-    
-    // 1. Recent invoices (fetch only what we need via Prisma directly)
-    const businessInvoices = await prisma.invoice.findMany({
-      where: { businessId: companyId, ...(locationId ? { issuedByLocationId: locationId } : {}) },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    });
-    const recentInvoices = businessInvoices
-      .map(inv => ({
-        id: `inv-${inv.id}`,
-        type: 'invoice_sent',
-        title: `Invoice ${inv.id} sent`,
-        description: `${inv.clientName} - ${formatCurrency(inv.totalAmount)}`,
-        timestamp: inv.createdAt,
-        entityId: inv.id,
-        entityType: 'invoice',
-        metadata: {
-          status: inv.status,
-          amount: inv.totalAmount,
-          clientName: inv.clientName,
-        },
-      }));
-    activities.push(...recentInvoices);
-    
-    // 2. Recent deliveries (fetch only what we need via Prisma directly)
-    const businessDeliveries = await prisma.delivery.findMany({
-      where: { businessId: companyId, ...(locationId ? { locationId } : {}) },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    });
-    const recentDeliveries = businessDeliveries
-      .map(del => {
-        const statusMap = {
-          'PENDING': 'delivery_pending',
-          'IN_TRANSIT': 'delivery_started',
-          'DELIVERED': 'delivery_completed',
-          'CANCELED': 'delivery_canceled',
-        };
-        const activityType = statusMap[del.deliveryStatus] || 'delivery_started';
-        
-        return {
-          id: `del-${del.id}`,
-          type: activityType,
-          title: `Delivery #${del.id} ${del.deliveryStatus.toLowerCase().replace('_', ' ')}`,
-          description: `${del.clientCompanyName} - ${del.itemCount} items`,
-          timestamp: del.updatedAt || del.createdAt,
-          entityId: del.id,
-          entityType: 'delivery',
-          metadata: {
-            status: del.deliveryStatus,
-            clientName: del.clientCompanyName,
-            itemCount: del.itemCount,
-          },
-        };
-      });
-    activities.push(...recentDeliveries);
-    
-    // 3. Recent orders (fetch only what we need via Prisma directly)
-    const businessOrders = await prisma.order.findMany({
-      where: { businessId: companyId, ...(locationId ? { soldByLocationId: locationId } : {}) },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    });
-    const recentOrders = businessOrders
-      .map(ord => ({
-        id: `ord-${ord.id}`,
-        type: 'order_created',
-        title: `Order #${ord.id} created`,
-        description: `${ord.clientName || 'Client'} - ${formatCurrency(ord.totalAmount)}`,
-        timestamp: ord.createdAt,
-        entityId: ord.id,
-        entityType: 'order',
-        metadata: {
-          status: ord.status,
-          amount: ord.totalAmount,
-        },
-      }));
-    activities.push(...recentOrders);
 
-    // 4. Recent purchase orders
-    try {
-      const businessPOs = await repos.procurementRepo.getPurchaseOrders(companyId);
-      const recentPOs = businessPOs
-        .slice(0, 20)
-        .map(po => {
-          const statusMap = {
-            'DRAFT': 'purchase_order_created',
-            'SENT': 'purchase_order_sent',
-            'CONFIRMED': 'purchase_order_confirmed',
-            'PARTIALLY_RECEIVED': 'purchase_order_receiving',
-            'RECEIVED': 'purchase_order_received',
-            'CANCELED': 'purchase_order_canceled',
-          };
-          return {
-            id: `po-${po.id}`,
-            type: statusMap[po.status] || 'purchase_order_created',
-            title: `PO ${po.id} ${po.status.toLowerCase().replace('_', ' ')}`,
-            description: `${po.supplier?.name || 'Supplier'} - ${formatCurrency(po.totalAmount)}`,
-            timestamp: po.updatedAt || po.createdAt,
-            entityId: po.id,
-            entityType: 'purchase_order',
-            metadata: {
-              status: po.status,
-              amount: po.totalAmount,
-              supplierName: po.supplier?.name,
-            },
-          };
-        });
-      activities.push(...recentPOs);
-    } catch (_) {}
-
-    // 5. Recent purchase requests
-    try {
-      const businessPRs = await repos.procurementRepo.getPurchaseRequests(companyId);
-      const recentPRs = businessPRs
-        .slice(0, 20)
-        .map(pr => {
-          const statusMap = {
-            'DRAFT': 'purchase_request_created',
-            'SUBMITTED': 'purchase_request_submitted',
-            'APPROVED': 'purchase_request_approved',
-            'REJECTED': 'purchase_request_rejected',
-            'CONVERTED': 'purchase_request_approved',
-          };
-          return {
-            id: `pr-${pr.id}`,
-            type: statusMap[pr.status] || 'purchase_request_created',
-            title: `Request ${pr.id} ${pr.status.toLowerCase()}`,
-            description: `${pr.supplier?.name || 'No supplier'} - ${pr.priority} priority`,
-            timestamp: pr.updatedAt || pr.createdAt,
-            entityId: pr.id,
-            entityType: 'purchase_request',
-            metadata: {
-              status: pr.status,
-              priority: pr.priority,
-            },
-          };
-        });
-      activities.push(...recentPRs);
-    } catch (_) {}
-
-    // Sort by timestamp (newest first) and limit
-    activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    activities = activities.slice(0, maxLimit);
-    
+    const activities = await buildActivityFeed(companyId, locationId, maxLimit);
     return res.json(successResponse({ activities }));
   } catch (err) {
     logger.error('Error fetching activity feed:', err);
     return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch activity feed'));
+  }
+});
+
+// Business Dashboard - summary counts, priority queue and recent activity for the Home screen
+// GET /api/companies/:companyId/dashboard?locationId=...
+app.get('/api/companies/:companyId/dashboard', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { locationId } = req.query;
+
+    // Verify user has access to this business
+    const userId = req.user?.id;
+    if (!userId || !(await isBusinessMember(companyId, userId))) {
+      return res.status(403).json(errorResponse('ACCESS_DENIED', 'You do not have access to this business'));
+    }
+
+    const now = new Date();
+    const formatCurrency = (amount) => `Rs ${Number(amount || 0).toFixed(2)}`;
+    const orderLoc = locationId ? { soldByLocationId: locationId } : {};
+    const deliveryLoc = locationId ? { locationId } : {};
+    const invoiceLoc = locationId ? { issuedByLocationId: locationId } : {};
+    const taskLoc = locationId ? { locationId } : {};
+
+    // Deliveries that still need action (anything not delivered / failed / canceled)
+    const ACTIVE_DELIVERY = ['NOT_ASSIGNED', 'ASSIGNED', 'PACKED', 'OUT_FOR_DELIVERY'];
+    // Invoices that are still owed money
+    const UNPAID_INVOICE = ['SENT', 'PARTIALLY_PAID', 'OVERDUE'];
+    // Tasks not yet finished
+    const OPEN_TASK = ['TODO', 'IN_PROGRESS'];
+    const LOW_STOCK_THRESHOLD = 5;
+
+    // Run a sub-query but never let one failure take down the whole dashboard
+    const settle = async (fn, fallback) => {
+      try { return await fn(); } catch (e) { logger.error('[Dashboard] sub-query failed:', e?.message); return fallback; }
+    };
+
+    const [
+      newOrders,
+      pendingDeliveries,
+      unpaidInvoices,
+      openTasks,
+      pendingOrderRows,
+      pendingDeliveryRows,
+      overdueInvoiceRows,
+      lowStockRows,
+      recentActivity,
+    ] = await Promise.all([
+      // --- summary counts (KPI chips) ---
+      settle(() => prisma.order.count({ where: { businessId: companyId, status: 'NEW', ...orderLoc } }), 0),
+      settle(() => prisma.delivery.count({ where: { businessId: companyId, deliveryStatus: { in: ACTIVE_DELIVERY }, ...deliveryLoc } }), 0),
+      settle(() => prisma.invoice.count({ where: { businessId: companyId, status: { in: UNPAID_INVOICE }, ...invoiceLoc } }), 0),
+      settle(() => prisma.task.count({ where: { businessId: companyId, status: { in: OPEN_TASK }, ...taskLoc } }), 0),
+      // --- priority queue source rows ---
+      settle(() => prisma.order.findMany({ where: { businessId: companyId, status: 'NEW', ...orderLoc }, orderBy: { createdAt: 'desc' }, take: 10 }), []),
+      settle(() => prisma.delivery.findMany({ where: { businessId: companyId, deliveryStatus: 'NOT_ASSIGNED', ...deliveryLoc }, orderBy: { createdAt: 'desc' }, take: 10 }), []),
+      settle(() => prisma.invoice.findMany({ where: { businessId: companyId, OR: [{ status: 'OVERDUE' }, { status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: now } }], ...invoiceLoc }, orderBy: { dueDate: 'asc' }, take: 10 }), []),
+      settle(() => prisma.stock.findMany({ where: { businessId: companyId, qtyOnHand: { lte: LOW_STOCK_THRESHOLD }, ...(locationId ? { locationId } : {}) }, orderBy: { qtyOnHand: 'asc' }, take: 10, include: { product: { select: { name: true } } } }), []),
+      // --- recent activity preview ---
+      settle(() => buildActivityFeed(companyId, locationId, 8), []),
+    ]);
+
+    // Build the priority queue. Backend supplies the data; the app attaches handlers.
+    const priorityItems = [];
+
+    for (const ord of pendingOrderRows) {
+      priorityItems.push({
+        id: `order-${ord.id}`,
+        type: 'order_pending',
+        title: `Order #${ord.id}`,
+        subtitle: `${ord.customerName || ord.buyerBusinessName || 'Customer'} · ${formatCurrency(ord.totalAmount)}`,
+        timestamp: ord.createdAt,
+        urgency: 'medium',
+        entityType: 'order',
+        entityId: ord.id,
+      });
+    }
+
+    for (const del of pendingDeliveryRows) {
+      priorityItems.push({
+        id: `delivery-${del.id}`,
+        type: 'delivery_pending',
+        title: `Delivery #${del.id}`,
+        subtitle: `${del.clientCompanyName || 'Unassigned'} · ${del.itemCount || 0} items`,
+        timestamp: del.createdAt,
+        urgency: 'medium',
+        entityType: 'delivery',
+        entityId: del.id,
+      });
+    }
+
+    for (const inv of overdueInvoiceRows) {
+      priorityItems.push({
+        id: `invoice-${inv.id}`,
+        type: 'invoice_overdue',
+        title: `Invoice ${inv.invoiceNumber || inv.id}`,
+        subtitle: `${inv.clientName || 'Client'} · ${formatCurrency(inv.totalAmount)}`,
+        timestamp: inv.dueDate || inv.createdAt,
+        urgency: 'high',
+        entityType: 'invoice',
+        entityId: inv.id,
+      });
+    }
+
+    for (const st of lowStockRows) {
+      priorityItems.push({
+        id: `stock-${st.id}`,
+        type: 'stock_alert',
+        title: st.product?.name || 'Product low on stock',
+        subtitle: st.qtyOnHand <= 0 ? 'Out of stock' : `${st.qtyOnHand} left`,
+        timestamp: now,
+        urgency: st.qtyOnHand <= 0 ? 'high' : 'medium',
+        entityType: 'product',
+        entityId: st.productId,
+      });
+    }
+
+    // Most urgent first (high > medium > low), then newest first, capped at 10
+    const urgencyRank = { high: 0, medium: 1, low: 2 };
+    priorityItems.sort((a, b) => {
+      const u = urgencyRank[a.urgency] - urgencyRank[b.urgency];
+      if (u !== 0) return u;
+      return new Date(b.timestamp) - new Date(a.timestamp);
+    });
+
+    return res.json(successResponse({
+      summary: { newOrders, pendingDeliveries, unpaidInvoices, openTasks },
+      priorityItems: priorityItems.slice(0, 10),
+      recentActivity,
+    }));
+  } catch (err) {
+    logger.error('Error fetching business dashboard:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch dashboard'));
   }
 });
 

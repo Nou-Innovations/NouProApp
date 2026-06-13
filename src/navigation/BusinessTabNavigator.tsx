@@ -3,22 +3,23 @@
  * Navigation for Business Profile mode
  *
  * Tab structure:
- * - Explore: B2B discovery (businesses, products, suppliers, opportunities, events). Notifications bell in header.
- * - Inbox: Dashboard with Activity Timeline and Chat list
- * - Activities: Business timeline / log
+ * - Home: Dashboard (KPIs, priority queue, quick actions, recent activity). Notifications bell in header.
+ * - Explore: B2B discovery (businesses, products, suppliers, opportunities, events).
+ * - Inbox: Conversation list / messaging
  * - Profile: Business profile, settings, staff, subscription
  *
- * Note: Deliveries / Products / Invoices moved to the sidebar (opened as RootStack screens).
- * Notifications are reached via the bell in the Explore header (not a tab).
+ * Note: The full Activities timeline opens as the RootStack `AllActivity` screen
+ * (via "See all" on the Home screen), not a tab.
+ * Deliveries / Products / Invoices live in the sidebar (opened as RootStack screens).
  */
 
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
+  Home,
   Compass,
   Mail,
-  List,
 } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -26,7 +27,7 @@ import theme from '@/shared/theme';
 import { BusinessTabParamList } from '@/shared/types/navigation';
 
 // Import screens
-import { BusinessExploreScreen, AllActivityScreen } from '@/modes/business/screens';
+import { BusinessHomeScreen, BusinessExploreScreen } from '@/modes/business/screens';
 import BusinessProfileOwnScreen from '@/modes/business/screens/BusinessProfileOwnScreen';
 import BusinessInboxScreen from '@/modes/business/screens/BusinessInboxScreen';
 
@@ -78,6 +79,26 @@ export function BusinessTabNavigator() {
         },
       }}
     >
+      {/* Home Tab - Dashboard (KPIs, priority queue, quick actions, recent activity) */}
+      <Tab.Screen
+        name="BusinessHome"
+        component={BusinessHomeScreen}
+        options={{
+          tabBarLabel: ({ focused, color }) => (
+            <Text style={{
+              fontSize: theme.fontSize.xs,
+              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
+              color,
+            }}>
+              Home
+            </Text>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <Home size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+          ),
+        }}
+      />
+
       {/* Explore Tab - B2B discovery (notifications bell lives in this screen's header) */}
       <Tab.Screen
         name="BusinessExplore"
@@ -114,26 +135,6 @@ export function BusinessTabNavigator() {
           ),
           tabBarIcon: ({ color, focused }) => (
             <Mail size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-          ),
-        }}
-      />
-
-      {/* Activities Tab - Business timeline / log */}
-      <Tab.Screen
-        name="Activities"
-        component={AllActivityScreen}
-        options={{
-          tabBarLabel: ({ focused, color }) => (
-            <Text style={{
-              fontSize: theme.fontSize.xs,
-              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color,
-            }}>
-              Activities
-            </Text>
-          ),
-          tabBarIcon: ({ color, focused }) => (
-            <List size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />
