@@ -45,22 +45,22 @@ type ExpandedRow = 'Order' | 'items' | 'total' | 'payment' | null;
 // ============================================================================
 
 const STATUS_COLORS: Record<string, string> = {
-  NEW: '#991B1B',
-  ONGOING: '#1E40AF',
-  PENDING: '#0075FF',
-  DONE: '#065F46',
-  IN_REVIEW: '#5B21B6',
-  CANCELED: '#6B7280',
-  ACCEPTED: '#065F46',
-  REJECTED: '#991B1B',
+  NEW: '#7A1F12',
+  ONGOING: '#2A75E6',
+  PENDING: '#2A75E6',
+  DONE: '#34A853',
+  IN_REVIEW: '#8B5CF6',
+  CANCELED: '#57534E',
+  ACCEPTED: '#34A853',
+  REJECTED: '#D6453E',
 };
 
 const PAYMENT_COLORS: Record<string, string> = {
-  UNPAID: '#DC2626',
-  PAID: '#059669',
-  PENDING_CONFIRMATION: '#D97706',
-  PAYMENT_PENDING: '#D97706',
-  PARTIALLY_PAID: '#D97706',
+  UNPAID: '#D6453E',
+  PAID: '#34A853',
+  PENDING_CONFIRMATION: '#F2A900',
+  PAYMENT_PENDING: '#F2A900',
+  PARTIALLY_PAID: '#F2A900',
 };
 
 // ============================================================================
@@ -236,22 +236,22 @@ export function OrderEventCard({
   // Colors - outgoing cards use primary color like chat bubbles
   const isOutgoingCard = message.isOutgoing;
   const colors = {
-    cardBg: isOutgoingCard 
-      ? (isDarkMode ? '#000000' : '#000000')  // Black for outgoing
-      : (isDarkMode ? '#1F2937' : '#FFFFFF'), // White/dark for incoming
+    cardBg: isOutgoingCard
+      ? (isDarkMode ? '#1C1917' : '#1C1917')  // Warm near-black for outgoing
+      : (isDarkMode ? '#232020' : '#FFFFFF'), // White/dark for incoming
     cardBorder: isOutgoingCard
-      ? (isDarkMode ? '#000000' : '#000000')
-      : (isDarkMode ? '#374151' : '#E5E7EB'),
-    textPrimary: isOutgoingCard ? '#FFFFFF' : (isDarkMode ? '#F9FAFB' : '#111827'),
-    textSecondary: isOutgoingCard ? '#D1D5DB' : (isDarkMode ? '#D1D5DB' : '#6B7280'),
-    textMuted: isOutgoingCard ? '#9CA3AF' : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
-    border: isOutgoingCard ? '#374151' : (isDarkMode ? '#374151' : '#F3F4F6'),
-    iconColor: isOutgoingCard ? '#FFFFFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+      ? (isDarkMode ? '#1C1917' : '#1C1917')
+      : (isDarkMode ? '#332E2A' : '#ECE6DF'),
+    textPrimary: isOutgoingCard ? '#FFFFFF' : (isDarkMode ? '#FAFAF9' : '#1C1917'),
+    textSecondary: isOutgoingCard ? '#D6D3D1' : (isDarkMode ? '#D6D3D1' : '#57534E'),
+    textMuted: isOutgoingCard ? '#A8A29E' : (isDarkMode ? '#A8A29E' : '#A8A29E'),
+    border: isOutgoingCard ? '#44403C' : (isDarkMode ? '#332E2A' : '#FAF8F5'),
+    iconColor: isOutgoingCard ? '#FFFFFF' : (isDarkMode ? '#A8A29E' : '#57534E'),
     // Button colors based on direction
-    confirmBg: isOutgoingCard ? '#FFFFFF' : '#000000',
-    confirmText: isOutgoingCard ? '#000000' : '#FFFFFF',
-    declineBorder: isOutgoingCard ? '#FFFFFF' : '#000000',
-    declineText: isOutgoingCard ? '#FFFFFF' : '#000000',
+    confirmBg: isOutgoingCard ? '#FFFFFF' : '#1C1917',
+    confirmText: isOutgoingCard ? '#1C1917' : '#FFFFFF',
+    declineBorder: isOutgoingCard ? '#FFFFFF' : '#1C1917',
+    declineText: isOutgoingCard ? '#FFFFFF' : '#1C1917',
   };
   
   // Status
@@ -343,7 +343,7 @@ export function OrderEventCard({
         <View style={styles.headerSpacer} />
         <View style={[
           styles.directionPill,
-          { backgroundColor: message.isOutgoing ? '#FFB600' : '#2ACF01' }
+          { backgroundColor: message.isOutgoing ? '#E8590C' : '#34A853' }
         ]}>
           <Text style={[
             styles.directionPillText,

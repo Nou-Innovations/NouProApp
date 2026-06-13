@@ -576,51 +576,51 @@ export default function CompanyEditScreen() {
       </Text>
 
       <View style={styles.infoItem}>
-        <Text style={[styles.infoLabel, { color: '#777777' }]}>Business Name</Text>
+        <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Business Name</Text>
         <TextInput
           style={[
             styles.infoInput,
             {
               color: appTheme.colors.text,
-              borderColor: '#DAD3D1',
+              borderColor: appTheme.colors.borderColor,
               backgroundColor: '#FFFFFF',
             },
           ]}
           value={companyName}
           onChangeText={setCompanyName}
           placeholder="Enter business name"
-          placeholderTextColor="#777777"
+          placeholderTextColor={appTheme.colors.textMuted}
         />
       </View>
 
       <View style={styles.infoItem}>
-        <Text style={[styles.infoLabel, { color: '#777777' }]}>Business Description</Text>
+        <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Business Description</Text>
         <TextInput
           style={[
             styles.infoInput,
             styles.aboutInput,
             {
               color: appTheme.colors.text,
-              borderColor: '#DAD3D1',
+              borderColor: appTheme.colors.borderColor,
               backgroundColor: '#FFFFFF',
             },
           ]}
           value={businessDescription}
           onChangeText={setBusinessDescription}
           placeholder="Describe your business"
-          placeholderTextColor="#777777"
+          placeholderTextColor={appTheme.colors.textMuted}
           multiline
           numberOfLines={4}
         />
       </View>
 
       <View style={styles.infoItem}>
-        <Text style={[styles.infoLabel, { color: '#777777' }]}>Business Type</Text>
+        <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Business Type</Text>
         <TouchableOpacity 
           style={[
             styles.dropdownInput,
             {
-              borderColor: '#DAD3D1',
+              borderColor: appTheme.colors.borderColor,
               backgroundColor: '#FFFFFF',
             },
           ]}
@@ -628,25 +628,25 @@ export default function CompanyEditScreen() {
         >
           <View style={styles.dropdownContent}>
             <Icon 
-              name={getSelectedBusinessType()?.icon as any || 'business-outline'} 
-              size={20} 
-              color="#777777" 
+              name={getSelectedBusinessType()?.icon as any || 'business-outline'}
+              size={20}
+              color={appTheme.colors.iconMuted}
             />
             <Text style={[styles.dropdownText, { color: appTheme.colors.text }]}>
               {getSelectedBusinessType()?.title || 'Select Business Type'}
             </Text>
           </View>
-          <Icon name="chevron-down" size={20} color="#777777" />
+          <Icon name="chevron-down" size={20} color={appTheme.colors.iconMuted} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.infoItem}>
-        <Text style={[styles.infoLabel, { color: '#777777' }]}>Business Category</Text>
+        <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Business Category</Text>
         <TouchableOpacity
           style={[
             styles.dropdownInput,
             {
-              borderColor: '#DAD3D1',
+              borderColor: appTheme.colors.borderColor,
               backgroundColor: '#FFFFFF',
             },
           ]}
@@ -656,32 +656,32 @@ export default function CompanyEditScreen() {
             <Icon
               name={(getCategoryById(businessCategory)?.icon || 'grid-outline') as any}
               size={20}
-              color="#777777"
+              color={appTheme.colors.iconMuted}
             />
             <Text style={[styles.dropdownText, { color: appTheme.colors.text }]}>
               {businessCategory ? getCategoryLabel(businessCategory) : 'Select Business Category'}
             </Text>
           </View>
-          <Icon name="chevron-down" size={20} color="#777777" />
+          <Icon name="chevron-down" size={20} color={appTheme.colors.iconMuted} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.infoItem}>
-        <Text style={[styles.infoLabel, { color: '#777777' }]}>Address</Text>
+        <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Address</Text>
         <TextInput
           style={[
             styles.infoInput,
             styles.addressInput,
             {
               color: appTheme.colors.text,
-              borderColor: '#DAD3D1',
+              borderColor: appTheme.colors.borderColor,
               backgroundColor: '#FFFFFF',
             },
           ]}
           value={address}
           onChangeText={setAddress}
           placeholder="123 Main Street, City, State"
-          placeholderTextColor="#777777"
+          placeholderTextColor={appTheme.colors.textMuted}
           multiline
           numberOfLines={2}
         />
@@ -696,33 +696,33 @@ export default function CompanyEditScreen() {
       </Text>
 
       <View style={styles.infoItem}>
-        <Text style={[styles.infoLabel, { color: '#777777' }]}>Email</Text>
+        <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Email</Text>
         <TextInput
           style={[
             styles.infoInput,
             {
               color: appTheme.colors.text,
-              borderColor: '#DAD3D1',
+              borderColor: appTheme.colors.borderColor,
               backgroundColor: '#FFFFFF',
             },
           ]}
           value={email}
           onChangeText={setEmail}
           placeholder="company@email.com"
-          placeholderTextColor="#777777"
+          placeholderTextColor={appTheme.colors.textMuted}
           keyboardType="email-address"
           autoCapitalize="none"
         />
       </View>
 
       <View style={styles.infoItem}>
-        <Text style={[styles.infoLabel, { color: '#777777' }]}>Business Phone Number</Text>
+        <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Business Phone Number</Text>
         <View style={styles.phoneInputContainer}>
           <TouchableOpacity 
             style={[
               styles.countryCodeInput,
               {
-                borderColor: '#DAD3D1',
+                borderColor: appTheme.colors.borderColor,
                 backgroundColor: '#FFFFFF',
               },
             ]}
@@ -730,7 +730,7 @@ export default function CompanyEditScreen() {
           >
             <Text style={styles.flagText}>{getSelectedCountryCode()?.flag}</Text>
             <Text style={[styles.countryCodeText, { color: appTheme.colors.text }]}>{countryCode}</Text>
-            <Icon name="chevron-down" size={16} color="#777777" />
+            <Icon name="chevron-down" size={16} color={appTheme.colors.iconMuted} />
           </TouchableOpacity>
           <TextInput
             style={[
@@ -738,34 +738,34 @@ export default function CompanyEditScreen() {
               styles.phoneNumberInput,
               {
                 color: appTheme.colors.text,
-                borderColor: '#DAD3D1',
+                borderColor: appTheme.colors.borderColor,
                 backgroundColor: '#FFFFFF',
               },
             ]}
             value={phoneNumber}
             onChangeText={setPhoneNumber}
             placeholder="123456789"
-            placeholderTextColor="#777777"
+            placeholderTextColor={appTheme.colors.textMuted}
             keyboardType="phone-pad"
           />
         </View>
       </View>
 
       <View style={styles.infoItem}>
-        <Text style={[styles.infoLabel, { color: '#777777' }]}>Business Website</Text>
+        <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Business Website</Text>
         <TextInput
           style={[
             styles.infoInput,
             {
               color: appTheme.colors.text,
-              borderColor: '#DAD3D1',
+              borderColor: appTheme.colors.borderColor,
               backgroundColor: '#FFFFFF',
             },
           ]}
           value={website}
           onChangeText={setWebsite}
           placeholder="www.yourcompany.com"
-          placeholderTextColor="#777777"
+          placeholderTextColor={appTheme.colors.textMuted}
           keyboardType="url"
           autoCapitalize="none"
         />
@@ -790,9 +790,9 @@ export default function CompanyEditScreen() {
               <Switch
                 value={hour.isOpen}
                 onValueChange={(value) => handleToggleDay(dayIndex, value)}
-                trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+                trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.switchTrackOn }}
                 thumbColor="#FFFFFF"
-                ios_backgroundColor="#E9E9EA"
+                ios_backgroundColor={appTheme.colors.switchTrackOff}
               />
             </View>
           </View>
@@ -847,57 +847,57 @@ export default function CompanyEditScreen() {
       </Text>
 
       <View style={styles.infoItem}>
-        <Text style={[styles.infoLabel, { color: '#777777' }]}>Currency</Text>
+        <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Currency</Text>
         <TextInput
           style={[
             styles.infoInput,
             {
               color: appTheme.colors.text,
-              borderColor: '#DAD3D1',
+              borderColor: appTheme.colors.borderColor,
               backgroundColor: '#FFFFFF',
             },
           ]}
           value={currency}
           onChangeText={setCurrency}
           placeholder="USD"
-          placeholderTextColor="#777777"
+          placeholderTextColor={appTheme.colors.textMuted}
         />
       </View>
 
       <View style={styles.infoItem}>
-        <Text style={[styles.infoLabel, { color: '#777777' }]}>Tax Rate (%)</Text>
+        <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Tax Rate (%)</Text>
         <TextInput
           style={[
             styles.infoInput,
             {
               color: appTheme.colors.text,
-              borderColor: '#DAD3D1',
+              borderColor: appTheme.colors.borderColor,
               backgroundColor: '#FFFFFF',
             },
           ]}
           value={taxRate}
           onChangeText={setTaxRate}
           placeholder="15"
-          placeholderTextColor="#777777"
+          placeholderTextColor={appTheme.colors.textMuted}
           keyboardType="numeric"
         />
       </View>
 
       <View style={styles.infoItem}>
-        <Text style={[styles.infoLabel, { color: '#777777' }]}>Invoice Prefix</Text>
+        <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Invoice Prefix</Text>
         <TextInput
           style={[
             styles.infoInput,
             {
               color: appTheme.colors.text,
-              borderColor: '#DAD3D1',
+              borderColor: appTheme.colors.borderColor,
               backgroundColor: '#FFFFFF',
             },
           ]}
           value={invoicePrefix}
           onChangeText={setInvoicePrefix}
           placeholder="INV"
-          placeholderTextColor="#777777"
+          placeholderTextColor={appTheme.colors.textMuted}
         />
       </View>
 
@@ -918,9 +918,9 @@ export default function CompanyEditScreen() {
         <Switch
           value={allowPartialPayments}
           onValueChange={setAllowPartialPayments}
-          trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+          trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.switchTrackOn }}
           thumbColor="#FFFFFF"
-          ios_backgroundColor="#E9E9EA"
+          ios_backgroundColor={appTheme.colors.switchTrackOff}
         />
       </View>
 
@@ -941,9 +941,9 @@ export default function CompanyEditScreen() {
         <Switch
           value={autoGenerateInvoices}
           onValueChange={setAutoGenerateInvoices}
-          trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+          trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.switchTrackOn }}
           thumbColor="#FFFFFF"
-          ios_backgroundColor="#E9E9EA"
+          ios_backgroundColor={appTheme.colors.switchTrackOff}
         />
       </View>
     </View>
@@ -1021,7 +1021,7 @@ export default function CompanyEditScreen() {
           styles.actionButton,
           styles.saveButton,
           {
-            backgroundColor: (hasChanges && !isSaving) ? '#22C55E' : appTheme.colors.buttonBackgroundDisabled,
+            backgroundColor: (hasChanges && !isSaving) ? appTheme.colors.success : appTheme.colors.buttonBackgroundDisabled,
           },
         ]}
         onPress={handleSave}
@@ -1050,7 +1050,7 @@ export default function CompanyEditScreen() {
         ]}
         onPress={handleCancel}
       >
-        <Text style={[styles.cancelButtonText, { color: '#000000' }]}>
+        <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>
           Cancel
         </Text>
       </TouchableOpacity>
@@ -1360,7 +1360,7 @@ const styles = StyleSheet.create({
   timeButton: {
     backgroundColor: 'white',
     borderWidth: 1,
-    borderColor: '#DAD3D1',
+    borderColor: '#ECE6DF',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,

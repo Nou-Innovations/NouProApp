@@ -278,7 +278,7 @@ export function ProfileSwitcher({
           isBusinessMode && styles.businessAvatarPlaceholder,
         ]}
       >
-        <Icon name={iconName} size={iconSize} color="#6B7280" />
+        <Icon name={iconName} size={iconSize} color={appTheme.colors.textSecondary} />
       </View>
     );
   };
@@ -335,7 +335,7 @@ export function ProfileSwitcher({
               ]}>
                 <Text style={[
                   styles.roleBadgeText,
-                  { color: isStaff ? '#92400E' : '#1E40AF' }
+                  { color: isStaff ? appTheme.colors.warning : appTheme.colors.info }
                 ]}>
                   {userBusiness.role === 'super_admin' ? 'OWNER' : userBusiness.role.toUpperCase()}
                 </Text>
@@ -349,24 +349,24 @@ export function ProfileSwitcher({
             <View style={styles.staffStatusContainer}>
               {staffButtonState === 'pending' && (
                 <View style={[styles.statusPill, { backgroundColor: '#FEF3C7' }]}>
-                  <View style={[styles.statusDot, { backgroundColor: '#F59E0B' }]} />
-                  <Text style={[styles.statusText, { color: '#92400E' }]}>
+                  <View style={[styles.statusDot, { backgroundColor: appTheme.colors.warning }]} />
+                  <Text style={[styles.statusText, { color: appTheme.colors.warning }]}>
                     Request Pending
                   </Text>
                 </View>
               )}
               {staffButtonState === 'rejected' && (
                 <View style={[styles.statusPill, { backgroundColor: '#FEE2E2' }]}>
-                  <Icon name="close-circle" size={14} color="#DC2626" />
-                  <Text style={[styles.statusText, { color: '#991B1B' }]}>
+                  <Icon name="close-circle" size={14} color={appTheme.colors.error} />
+                  <Text style={[styles.statusText, { color: appTheme.colors.error }]}>
                     Request Declined
                   </Text>
                 </View>
               )}
               {staffButtonState === 'restricted' && (
-                <View style={[styles.statusPill, { backgroundColor: '#F3F4F6' }]}>
-                  <Icon name="lock-closed" size={14} color="#6B7280" />
-                  <Text style={[styles.statusText, { color: '#374151' }]}>
+                <View style={[styles.statusPill, { backgroundColor: appTheme.colors.surface }]}>
+                  <Icon name="lock-closed" size={14} color={appTheme.colors.textSecondary} />
+                  <Text style={[styles.statusText, { color: appTheme.colors.text }]}>
                     Tap to request access
                   </Text>
                 </View>
@@ -375,7 +375,7 @@ export function ProfileSwitcher({
           )}
         </View>
         {isActive && !isStaff && (
-          <Icon name="checkmark-circle" size={24} color="#22C55E" />
+          <Icon name="checkmark-circle" size={24} color={appTheme.colors.success} />
         )}
       </TouchableOpacity>
     );
@@ -489,7 +489,7 @@ export function ProfileSwitcher({
                   onPress={handleCreateBusiness}
                 >
                   <View style={styles.actionIconContainer}>
-                    <Icon name="add" size={20} color="#6B7280" />
+                    <Icon name="add" size={20} color={appTheme.colors.textSecondary} />
                   </View>
                   <Text style={styles.actionText}>Create New Business</Text>
                 </TouchableOpacity>
@@ -499,7 +499,7 @@ export function ProfileSwitcher({
                   onPress={handleJoinBusiness}
                 >
                   <View style={styles.actionIconContainer}>
-                    <Icon name="people" size={20} color="#6B7280" />
+                    <Icon name="people" size={20} color={appTheme.colors.textSecondary} />
                   </View>
                   <Text style={styles.actionText}>Join Existing Business</Text>
                 </TouchableOpacity>
@@ -520,7 +520,7 @@ export function ProfileSwitcher({
           <View style={[styles.dialogContent, { backgroundColor: appTheme.colors.cardBackground }]}>
             {/* Icon */}
             <View style={[styles.dialogIcon, { backgroundColor: '#FEF3C7' }]}>
-              <Icon name="lock-closed" size={32} color="#F59E0B" />
+              <Icon name="lock-closed" size={32} color={appTheme.colors.warning} />
             </View>
             
             {/* Title */}
@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
   },
   avatarPlaceholder: {
     borderRadius: 10,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FAF8F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -628,7 +628,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   modalTitle: {
     fontSize: theme.fontSize.lg,
@@ -665,7 +665,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 12,
     marginBottom: 8,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FAF8F5',
   },
   profileRowActive: {
     backgroundColor: '#ECFDF5',
@@ -673,9 +673,9 @@ const styles = StyleSheet.create({
     borderColor: '#A7F3D0',
   },
   profileRowRestricted: {
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#FAF8F5',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#ECE6DF',
   },
   profileRowInfo: {
     flex: 1,
@@ -690,7 +690,7 @@ const styles = StyleSheet.create({
   profileRowName: {
     fontSize: theme.fontSize.base,
     fontFamily: theme.fonts.primary.medium,
-    color: '#111827',
+    color: '#1C1917',
   },
   profileRowNameActive: {
     fontFamily: theme.fonts.primary.bold,
@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
   profileRowSubtitle: {
     fontSize: theme.fontSize.sm,
     fontFamily: theme.fonts.primary.regular,
-    color: '#6B7280',
+    color: '#57534E',
     marginTop: 2,
   },
   roleBadge: {
@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#ECE6DF',
   },
   actionButton: {
     flexDirection: 'row',
@@ -752,14 +752,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FAF8F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
   actionText: {
     fontSize: theme.fontSize.base,
     fontFamily: theme.fonts.primary.medium,
-    color: '#374151',
+    color: '#1C1917',
     marginLeft: 12,
   },
   

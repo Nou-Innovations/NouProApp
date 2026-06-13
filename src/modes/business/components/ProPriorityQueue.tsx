@@ -45,17 +45,17 @@ interface ProPriorityQueueProps {
 }
 
 const TYPE_CONFIG: Record<PriorityItemType, { icon: keyof typeof Icon.glyphMap; color: string; label: string }> = {
-  order_pending: { icon: 'cart-outline', color: '#0075FF', label: 'Order' },
-  delivery_pending: { icon: 'car-outline', color: '#FFB600', label: 'Delivery' },
-  stock_alert: { icon: 'cube-outline', color: '#FF7A00', label: 'Stock' },
-  invoice_overdue: { icon: 'receipt-text-outline', color: '#FF2400', label: 'Invoice' },
-  message_urgent: { icon: 'mail-outline', color: '#A76AF0', label: 'Message' },
+  order_pending: { icon: 'cart-outline', color: theme.colors.info, label: 'Order' },
+  delivery_pending: { icon: 'car-outline', color: theme.colors.warning, label: 'Delivery' },
+  stock_alert: { icon: 'cube-outline', color: theme.colors.accent, label: 'Stock' },
+  invoice_overdue: { icon: 'receipt-text-outline', color: theme.colors.error, label: 'Invoice' },
+  message_urgent: { icon: 'mail-outline', color: theme.colors.statusInReview, label: 'Message' },
 };
 
 const URGENCY_COLORS = {
-  high: '#FF2400',
-  medium: '#FFB600',
-  low: '#0075FF',
+  high: theme.colors.error,
+  medium: theme.colors.warning,
+  low: theme.colors.info,
 };
 
 export function ProPriorityQueue({ 

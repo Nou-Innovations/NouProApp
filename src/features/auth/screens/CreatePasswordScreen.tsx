@@ -192,12 +192,12 @@ export default function CreatePasswordScreen({ navigation, route }: Props) {
                       <Icon
                         name={showStatus && met ? 'checkmark-circle' : 'ellipse-outline'}
                         size={16}
-                        color={showStatus && met ? '#10B981' : appTheme.colors.textMuted}
+                        color={showStatus && met ? appTheme.colors.success : appTheme.colors.textMuted}
                       />
                       <Text
                         style={[
                           styles.requirementText,
-                          { color: showStatus && met ? '#10B981' : appTheme.colors.textMuted },
+                          { color: showStatus && met ? appTheme.colors.success : appTheme.colors.textMuted },
                         ]}
                       >
                         {label}

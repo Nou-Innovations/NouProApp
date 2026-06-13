@@ -44,10 +44,10 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Plan colors based on design system
 const PLAN_COLORS: Record<SubscriptionPlan, string> = {
-  free: '#6B7280',    // Gray for free
-  pro: '#0075FF',     // Blue for pro
-  business: '#A76AF0', // Purple for business
-  enterprise: '#FFB600', // Gold for enterprise
+  free: '#A8A29E',     // Warm greige for free
+  pro: '#2A75E6',      // Info blue for pro
+  business: '#8B5CF6', // Violet for business
+  enterprise: '#F2A900', // Warm gold for enterprise
 };
 
 // Plan icons
@@ -108,7 +108,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, isCurrentPlan, on
           styles.planCard,
           { 
             backgroundColor: appTheme.colors.background,
-            borderColor: isCurrentPlan ? '#22C55E' : (isSelected ? planColor : appTheme.colors.borderColor),
+            borderColor: isCurrentPlan ? appTheme.colors.success : (isSelected ? planColor : appTheme.colors.borderColor),
             borderWidth: isCurrentPlan ? 2 : (isSelected ? 2 : 1),
           },
         ]}
@@ -124,7 +124,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, isCurrentPlan, on
           </View>
         )}
         {isCurrentPlan && (
-          <View style={[styles.topBadge, plan === 'business' ? styles.topBadgeRight : styles.topBadgeLeft, { backgroundColor: '#22C55E' }]}>
+          <View style={[styles.topBadge, plan === 'business' ? styles.topBadgeRight : styles.topBadgeLeft, { backgroundColor: appTheme.colors.success }]}>
             <Text style={styles.topBadgeText}>Current Plan</Text>
           </View>
         )}
@@ -170,7 +170,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, isCurrentPlan, on
         {(billingPeriod === 'YEARLY' && plan !== 'free' && savings > 0) || FREE_TRIAL_DAYS[plan] > 0 ? (
           <View style={styles.badgesRow}>
             {billingPeriod === 'YEARLY' && plan !== 'free' && savings > 0 && (
-              <View style={[styles.savingsBadge, { backgroundColor: '#22C55E' }]}>
+              <View style={[styles.savingsBadge, { backgroundColor: appTheme.colors.success }]}>
                 <Text style={[styles.savingsText, { color: '#ffffff' }]}>
                   Save {CURRENCY.symbol}{savings.toLocaleString()}/year
                 </Text>
@@ -405,7 +405,7 @@ export default function SubscriptionPlansScreen() {
         {selectedPlan !== 'free' && selectedPlan !== currentPlan && (
           <>
             {billingPeriod === 'YEARLY' ? (
-              <Text style={[styles.ctaSubtext, { color: '#22C55E' }]}>
+              <Text style={[styles.ctaSubtext, { color: appTheme.colors.success }]}>
                 Save {CURRENCY.symbol}{getYearlySavings(selectedPlan).toLocaleString()}/year
               </Text>
             ) : (
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
   yearlySaveText: {
     fontSize: 11,
     fontFamily: theme.fonts.primary.semiBold,
-    color: '#22C55E',
+    color: '#34A853',
     marginTop: 2,
   },
   plansContainer: {
@@ -642,7 +642,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 32,
     borderTopWidth: 1,
-    borderTopColor: '#E1E4EA',
+    borderTopColor: '#ECE6DF',
   },
   ctaSubtext: {
     fontSize: 16,

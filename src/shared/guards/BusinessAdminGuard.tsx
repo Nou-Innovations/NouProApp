@@ -64,7 +64,7 @@ export function BusinessAdminGuard({
       >
         <View style={styles.content}>
           <View style={[styles.iconCircle, { backgroundColor: '#FEF3C7' }]}>
-            <Icon name="lock-closed" size={48} color="#F59E0B" />
+            <Icon name="lock-closed" size={48} color={appTheme.colors.warning} />
           </View>
           
           <Text style={[styles.title, { color: appTheme.colors.text }]}>

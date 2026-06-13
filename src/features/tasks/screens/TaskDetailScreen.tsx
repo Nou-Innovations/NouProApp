@@ -27,16 +27,16 @@ import type { Task, TaskStatus } from '@/shared/types/task';
 type RouteParams = { TaskDetail: { taskId: string; businessId: string } };
 
 const STATUS_COLORS: Record<string, string> = {
-  TODO: '#F59E0B',
-  IN_PROGRESS: '#0EA5E9',
-  COMPLETED: '#22C55E',
-  CANCELLED: '#6B7280',
+  TODO: '#F2A900',
+  IN_PROGRESS: '#2A75E6',
+  COMPLETED: '#34A853',
+  CANCELLED: '#A8A29E',
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  LOW: '#6B7280',
-  NORMAL: '#0EA5E9',
-  URGENT: '#EF4444',
+  LOW: '#A8A29E',
+  NORMAL: '#2A75E6',
+  URGENT: '#D6453E',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -145,8 +145,8 @@ export default function TaskDetailScreen() {
             <View style={[styles.badge, { backgroundColor: PRIORITY_COLORS[task.priority] + '20' }]}>
               <Text style={[styles.badgeText, { color: PRIORITY_COLORS[task.priority] }]}>{TASK_PRIORITY_LABELS[task.priority]}</Text>
             </View>
-            <View style={[styles.badge, { backgroundColor: '#F3F4F6' }]}>
-              <Text style={[styles.badgeText, { color: '#666666' }]}>{TASK_TYPE_LABELS[task.type]}</Text>
+            <View style={[styles.badge, { backgroundColor: appTheme.colors.surface }]}>
+              <Text style={[styles.badgeText, { color: appTheme.colors.textSecondary }]}>{TASK_TYPE_LABELS[task.type]}</Text>
             </View>
           </View>
         </View>
@@ -154,50 +154,50 @@ export default function TaskDetailScreen() {
         {/* Description */}
         {task.description ? (
           <View style={styles.detailSection}>
-            <Text style={[styles.sectionLabel, { color: '#777777' }]}>Description</Text>
+            <Text style={[styles.sectionLabel, { color: appTheme.colors.textMuted }]}>Description</Text>
             <Text style={[styles.descriptionText, { color: appTheme.colors.text }]}>{task.description}</Text>
           </View>
         ) : null}
 
         {/* Details */}
         <View style={styles.detailSection}>
-          <Text style={[styles.sectionLabel, { color: '#777777' }]}>Details</Text>
+          <Text style={[styles.sectionLabel, { color: appTheme.colors.textMuted }]}>Details</Text>
 
           <View style={styles.detailRow}>
-            <Icon name="calendar-outline" size={18} color="#777777" />
-            <Text style={[styles.detailLabel, { color: '#777777' }]}>Due Date</Text>
-            <Text style={[styles.detailValue, { color: isOverdue ? '#EF4444' : appTheme.colors.text }]}>
+            <Icon name="calendar-outline" size={18} color={appTheme.colors.textMuted} />
+            <Text style={[styles.detailLabel, { color: appTheme.colors.textMuted }]}>Due Date</Text>
+            <Text style={[styles.detailValue, { color: isOverdue ? appTheme.colors.error : appTheme.colors.text }]}>
               {formatDate(task.dueDate)}{isOverdue ? ' (Overdue)' : ''}
             </Text>
           </View>
 
           {task.completedAt && (
             <View style={styles.detailRow}>
-              <Icon name="checkmark-circle-outline" size={18} color="#22C55E" />
-              <Text style={[styles.detailLabel, { color: '#777777' }]}>Completed</Text>
+              <Icon name="checkmark-circle-outline" size={18} color={appTheme.colors.success} />
+              <Text style={[styles.detailLabel, { color: appTheme.colors.textMuted }]}>Completed</Text>
               <Text style={[styles.detailValue, { color: appTheme.colors.text }]}>{formatDate(task.completedAt)}</Text>
             </View>
           )}
 
           {task.assignedToUser && (
             <View style={styles.detailRow}>
-              <Icon name="person-outline" size={18} color="#777777" />
-              <Text style={[styles.detailLabel, { color: '#777777' }]}>Assigned To</Text>
+              <Icon name="person-outline" size={18} color={appTheme.colors.textMuted} />
+              <Text style={[styles.detailLabel, { color: appTheme.colors.textMuted }]}>Assigned To</Text>
               <Text style={[styles.detailValue, { color: appTheme.colors.text }]}>{task.assignedToUser.name}</Text>
             </View>
           )}
 
           {task.createdByUser && (
             <View style={styles.detailRow}>
-              <Icon name="person-add-outline" size={18} color="#777777" />
-              <Text style={[styles.detailLabel, { color: '#777777' }]}>Created By</Text>
+              <Icon name="person-add-outline" size={18} color={appTheme.colors.textMuted} />
+              <Text style={[styles.detailLabel, { color: appTheme.colors.textMuted }]}>Created By</Text>
               <Text style={[styles.detailValue, { color: appTheme.colors.text }]}>{task.createdByUser.name}</Text>
             </View>
           )}
 
           <View style={styles.detailRow}>
-            <Icon name="time-outline" size={18} color="#777777" />
-            <Text style={[styles.detailLabel, { color: '#777777' }]}>Created</Text>
+            <Icon name="time-outline" size={18} color={appTheme.colors.textMuted} />
+            <Text style={[styles.detailLabel, { color: appTheme.colors.textMuted }]}>Created</Text>
             <Text style={[styles.detailValue, { color: appTheme.colors.text }]}>{formatDate(task.createdAt)}</Text>
           </View>
         </View>
@@ -205,7 +205,7 @@ export default function TaskDetailScreen() {
         {/* Status Actions */}
         {validTransitions.length > 0 && (
           <View style={styles.actionsSection}>
-            <Text style={[styles.sectionLabel, { color: '#777777' }]}>Actions</Text>
+            <Text style={[styles.sectionLabel, { color: appTheme.colors.textMuted }]}>Actions</Text>
             {validTransitions.map((newStatus) => {
               const isPrimary = newStatus === 'COMPLETED' || newStatus === 'IN_PROGRESS';
               return (
@@ -247,13 +247,13 @@ const styles = StyleSheet.create({
   badge: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16 },
   badgeDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   badgeText: { fontSize: 13, fontFamily: themeConstants.fonts.primary.medium },
-  detailSection: { paddingHorizontal: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
+  detailSection: { paddingHorizontal: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#ECE6DF' },
   sectionLabel: { fontSize: 13, fontFamily: themeConstants.fonts.primary.medium, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   descriptionText: { fontSize: 15, fontFamily: themeConstants.fonts.primary.regular, lineHeight: 22 },
   detailRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   detailLabel: { fontSize: 14, fontFamily: themeConstants.fonts.primary.regular, marginLeft: 10, width: 90 },
   detailValue: { fontSize: 14, fontFamily: themeConstants.fonts.primary.medium, flex: 1 },
-  actionsSection: { paddingHorizontal: 16, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
+  actionsSection: { paddingHorizontal: 16, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#ECE6DF' },
   actionButton: { borderRadius: 8, height: 48, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
   actionButtonText: { fontSize: 16, fontFamily: themeConstants.fonts.primary.semiBold },
 });

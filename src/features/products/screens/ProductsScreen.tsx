@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   emptyListText: {
-    color: '#6B7280',
+    color: '#57534E',
     fontSize: 16,
   },
   locationSection: {

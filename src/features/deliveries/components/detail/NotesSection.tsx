@@ -126,7 +126,7 @@ export function NotesSection({
                   <Icon
                     name={expandedNotes.has(note.id) ? 'chevron-up' : 'chevron-down'}
                     size={16}
-                    color="#6B7280"
+                    color={theme.colors.textSecondary}
                   />
                 </View>
               </View>
@@ -172,12 +172,12 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: theme.colors.borderColor,
   },
   title: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
+    color: theme.colors.text,
     fontFamily: 'InterCustom-SemiBold',
     marginBottom: 8,
   },
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderLeftWidth: 0,
     borderRightWidth: 0,
-    borderColor: '#E5E7EB',
+    borderColor: theme.colors.borderColor,
     borderRadius: 0,
     paddingVertical: 12,
     paddingHorizontal: 0,
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   noteBusinessName: {
     fontSize: 16,
     fontFamily: 'InterCustom-SemiBold',
-    color: '#111827',
+    color: theme.colors.text,
     flex: 1,
   },
   noteCardHeaderRight: {
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'InterCustom-Medium',
     lineHeight: 20,
-    color: '#111827',
+    color: theme.colors.text,
     marginTop: 12,
   },
   noteInputContainer: {
@@ -256,14 +256,14 @@ const styles = StyleSheet.create({
   },
   noteInput: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: theme.colors.borderColor,
     borderRadius: 8,
     padding: 12,
     minHeight: 80,
     fontSize: 14,
     fontFamily: 'InterCustom-Medium',
-    color: '#111827',
-    backgroundColor: '#F9FAFB',
+    color: theme.colors.text,
+    backgroundColor: theme.colors.surface,
     textAlignVertical: 'top',
   },
   sendNoteButton: {
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
   sendNoteButtonDisabled: {
     backgroundColor: theme.colors.buttonBackgroundDisabled,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: theme.colors.borderColor,
   },
   sendNoteButtonText: {
     fontSize: 14,

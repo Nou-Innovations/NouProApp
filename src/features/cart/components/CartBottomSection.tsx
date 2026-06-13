@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   placeOrderText: {
-    color: '#000000',
+    color: '#1C1917',
     fontSize: 16,
     fontWeight: '600',
   },

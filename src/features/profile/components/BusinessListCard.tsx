@@ -67,7 +67,7 @@ export function BusinessListCard({
         )}
         {rating !== undefined && (
           <View style={styles.stat}>
-            <Icon name="star" size={14} color="#F59E0B" />
+            <Icon name="star" size={14} color={appTheme.colors.warning} />
             <Text style={[styles.statText, { color: appTheme.colors.textMuted }]}>
               {rating.toFixed(1)}
             </Text>
@@ -101,7 +101,7 @@ export function BusinessListCard({
 
   // Container style for featured
   const containerStyle: ViewStyle | undefined = featured 
-    ? { borderLeftWidth: 3, borderLeftColor: '#FF7A00' }
+    ? { borderLeftWidth: 3, borderLeftColor: appTheme.colors.accent }
     : undefined;
 
   // Featured badge as top element

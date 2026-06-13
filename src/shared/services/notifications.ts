@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { apiClient } from '@/shared/config/api';
+import { theme } from '@/shared/theme';
 
 // Configure notification handler for foreground
 Notifications.setNotificationHandler({
@@ -49,7 +50,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
       name: 'Messages',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#0075FF',
+      lightColor: theme.colors.info,
     });
   }
 

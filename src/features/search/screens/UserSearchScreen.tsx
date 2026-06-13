@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   avatar: {
     width: 50,
@@ -162,11 +162,11 @@ const styles = StyleSheet.create({
   },
   itemName: {
     fontSize: 16,
-    color: '#111827',
+    color: '#1C1917',
   },
   highlightedText: {
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#1C1917',
   },
   emptyContainer: {
     padding: 20,
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#57534E',
     textAlign: 'center',
   },
 });

@@ -163,7 +163,7 @@ export function ProductListSection({
               {showItemStatusMenu && (
                 <View style={[styles.tableCell, styles.menuCell]}>
                   <TouchableOpacity onPress={() => handleItemStatusChange(item.id)}>
-                    <Icon name="ellipsis-vertical" size={20} color="#6B7280" />
+                    <Icon name="ellipsis-vertical" size={20} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
               )}
@@ -180,12 +180,12 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: theme.colors.borderColor,
   },
   title: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
+    color: theme.colors.text,
     fontFamily: 'InterCustom-SemiBold',
     paddingHorizontal: 16,
     marginBottom: 16,
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 14,
     fontWeight: '400',
-    color: '#374151',
+    color: theme.colors.text,
     marginBottom: 8,
     fontFamily: 'InterCustom-SemiBold',
   },
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   productImage: {
     width: 48,
     height: 48,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.colors.surface,
     borderRadius: 8,
     marginRight: 8,
   },

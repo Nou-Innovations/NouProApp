@@ -163,7 +163,7 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
   const renderNotCompatible = () => (
     <View style={[styles.statusCard, { backgroundColor: appTheme.colors.cardBackground }]}>
       <View style={styles.statusIcon}>
-        <Icon name="close-circle" size={48} color="#EF4444" />
+        <Icon name="close-circle" size={48} color={appTheme.colors.error} />
       </View>
       <Text style={[styles.statusTitle, { color: appTheme.colors.text }]}>
         Biometric Authentication Not Available
@@ -177,7 +177,7 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
   const renderNotEnrolled = () => (
     <View style={[styles.statusCard, { backgroundColor: appTheme.colors.cardBackground }]}>
       <View style={styles.statusIcon}>
-        <Icon name="warning" size={48} color="#F59E0B" />
+        <Icon name="warning" size={48} color={appTheme.colors.warning} />
       </View>
       <Text style={[styles.statusTitle, { color: appTheme.colors.text }]}>
         No {getBiometricName()} Enrolled
@@ -204,7 +204,7 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
     <View style={styles.enabledContainer}>
       <View style={[styles.statusCard, { backgroundColor: appTheme.colors.cardBackground }]}>
         <View style={styles.statusIcon}>
-          <Icon name={getBiometricIcon()} size={48} color="#10B981" />
+          <Icon name={getBiometricIcon()} size={48} color={appTheme.colors.success} />
         </View>
         <Text style={[styles.statusTitle, { color: appTheme.colors.text }]}>
           {getBiometricName()} is Active
@@ -315,9 +315,9 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
                 <Switch
                   value={biometricEnabled}
                   onValueChange={handleToggle}
-                  trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+                  trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.success }}
                   thumbColor="#FFFFFF"
-                  ios_backgroundColor="#E9E9EA"
+                  ios_backgroundColor={appTheme.colors.switchTrackOff}
                   disabled={isAuthenticating}
                 />
               </View>

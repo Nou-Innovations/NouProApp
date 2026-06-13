@@ -55,14 +55,14 @@ const MODAL_CONFIG: Record<PaywallModalType, {
 }> = {
   feature_gate: {
     icon: 'lock-closed',
-    iconColor: '#F59E0B',
+    iconColor: '#F2A900',
     iconBgColor: '#FEF3C7',
     primaryCTA: 'Upgrade Now',
     secondaryCTA: 'Maybe Later',
   },
   limit_reached: {
     icon: 'alert-circle',
-    iconColor: '#EF4444',
+    iconColor: '#D6453E',
     iconBgColor: '#FEE2E2',
     primaryCTA: 'Upgrade',
     secondaryCTA: 'Manage Limits',
@@ -77,7 +77,7 @@ const MODAL_CONFIG: Record<PaywallModalType, {
   },
   soft_upsell: {
     icon: 'sparkles',
-    iconColor: '#3B82F6',
+    iconColor: '#2A75E6',
     iconBgColor: '#DBEAFE',
     primaryCTA: 'Learn More',
     secondaryCTA: 'Not Now',
@@ -163,7 +163,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
 
           {/* Current Limit Info (for limit_reached) */}
           {modalType === 'limit_reached' && currentLimit !== undefined && (
-            <View style={[styles.limitBadge, { backgroundColor: isDarkMode ? '#374151' : '#F3F4F6' }]}>
+            <View style={[styles.limitBadge, { backgroundColor: isDarkMode ? '#1C1917' : '#FAF8F5' }]}>
               <Text style={[styles.limitText, { color: appTheme.colors.textLight }]}>
                 Your limit: {currentLimit}
               </Text>
@@ -171,7 +171,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
           )}
 
           {/* Plan Card */}
-          <View style={[styles.planCard, { backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB', borderColor: '#22C55E' }]}>
+          <View style={[styles.planCard, { backgroundColor: isDarkMode ? '#1C1917' : '#FAF8F5', borderColor: appTheme.colors.success }]}>
             <View style={styles.planHeader}>
               <Text style={[styles.planName, { color: appTheme.colors.text }]}>
                 {planInfo.name}
@@ -189,7 +189,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
             <View style={styles.planFeatures}>
               {planInfo.highlights.slice(0, 4).map((feature, index) => (
                 <View key={index} style={styles.featureRow}>
-                  <Icon name="checkmark-circle" size={18} color="#22C55E" />
+                  <Icon name="checkmark-circle" size={18} color={appTheme.colors.success} />
                   <Text style={[styles.featureText, { color: appTheme.colors.text }]}>
                     {feature}
                   </Text>
@@ -205,7 +205,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
           {/* Buttons */}
           <View style={styles.buttons}>
             <TouchableOpacity
-              style={[styles.upgradeButton, { backgroundColor: '#22C55E' }]}
+              style={[styles.upgradeButton, { backgroundColor: appTheme.colors.success }]}
               onPress={onUpgrade}
             >
               <Text style={styles.upgradeButtonText}>{config.primaryCTA}</Text>
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   planName: {
     fontSize: 18,

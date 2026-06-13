@@ -89,26 +89,26 @@ const ONBOARDING_NOTIFICATIONS: Notification[] = [
 
 const TYPE_COLORS: Record<string, string> = {
   // Business mode
-  staff_request: '#A76AF0',
-  join_accepted: '#A76AF0',
-  invite_pending: '#0075FF',
+  staff_request: '#8B5CF6',
+  join_accepted: '#8B5CF6',
+  invite_pending: '#2A75E6',
   company_request: '#FF7A00',
-  connection_accepted: '#2ACF01',
-  invoice: '#A76AF0',
-  delivery: '#2ACF01',
-  stock_alert: '#EF4444',
+  connection_accepted: '#34A853',
+  invoice: '#8B5CF6',
+  delivery: '#34A853',
+  stock_alert: '#D6453E',
   order_update: '#FF7A00',
-  subscription_due: '#EF4444',
+  subscription_due: '#D6453E',
   // Personal mode
-  invite_received: '#0075FF',
-  join_request_accepted: '#2ACF01',
-  join_request_rejected: '#EF4444',
-  status_change: '#A76AF0',
-  delivery_assigned: '#2ACF01',
+  invite_received: '#2A75E6',
+  join_request_accepted: '#34A853',
+  join_request_rejected: '#D6453E',
+  status_change: '#8B5CF6',
+  delivery_assigned: '#34A853',
   // Shared
-  message: '#0075FF',
-  system: '#6B7280',
-  onboarding_create_business: '#0075FF',
+  message: '#2A75E6',
+  system: '#57534E',
+  onboarding_create_business: '#2A75E6',
   onboarding_join_company: '#FF7A00',
 };
 
@@ -160,7 +160,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
   const isAccepted = notification.status === 'accepted';
   const iconColor =
     notification.type === 'subscription_due' && notification.requestData?.severity === 'warning'
-      ? '#FF7A00'  // Orange for "renewing soon" — red is reserved for expired (critical)
+      ? appTheme.colors.accent  // Orange for "renewing soon" — red is reserved for expired (critical)
       : getIconColor(notification.type);
 
   const handleRequestAction = (action: 'accept' | 'decline') => {

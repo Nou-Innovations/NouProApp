@@ -15,8 +15,8 @@ interface SubscriptionWarningBannerProps {
 const BANNER_CONFIG: Record<string, { bg: string; border: string; icon: string; title: string; getMessage: (days: number) => string }> = {
   grace: {
     bg: '#FEF3C7',
-    border: '#F59E0B',
-    icon: '#F59E0B',
+    border: '#F2A900',
+    icon: '#F2A900',
     title: 'Payment Failed',
     getMessage: (days: number) =>
       days > 0
@@ -25,8 +25,8 @@ const BANNER_CONFIG: Record<string, { bg: string; border: string; icon: string; 
   },
   expired: {
     bg: '#FEE2E2',
-    border: '#EF4444',
-    icon: '#EF4444',
+    border: '#D6453E',
+    icon: '#D6453E',
     title: 'Subscription Expired',
     getMessage: () =>
       'Your subscription has expired. Renew now to keep access to your features.',
@@ -50,8 +50,8 @@ export default function SubscriptionWarningBanner({ status, daysRemaining = 0, o
     >
       <AlertTriangle size={20} color={config.icon} strokeWidth={2} />
       <View style={styles.textContainer}>
-        <Text style={[styles.title, { color: '#1F2937' }]}>{config.title}</Text>
-        <Text style={[styles.message, { color: '#4B5563' }]}>
+        <Text style={[styles.title, { color: appTheme.colors.text }]}>{config.title}</Text>
+        <Text style={[styles.message, { color: appTheme.colors.textSecondary }]}>
           {config.getMessage(daysRemaining)}
         </Text>
         {onPress && (

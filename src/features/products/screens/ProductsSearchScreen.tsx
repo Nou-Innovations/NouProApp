@@ -250,14 +250,14 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 6,
     marginRight: 14,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FAF8F5',
   },
   brandImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
     marginRight: 14,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FAF8F5',
   },
   rowContent: { flex: 1 },
   itemName: {

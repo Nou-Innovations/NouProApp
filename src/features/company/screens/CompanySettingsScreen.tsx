@@ -65,12 +65,12 @@ const SettingsOption: React.FC<SettingsOptionProps> = ({
       <View style={styles.optionLeft}>
         <Icon 
           size={24} 
-          color={isDestructive ? '#DC2626' : appTheme.colors.iconColor} 
+          color={isDestructive ? appTheme.colors.error : appTheme.colors.iconColor}
           strokeWidth={2}
         />
         <Text style={[
           styles.optionTitle, 
-          { color: isDestructive ? '#DC2626' : appTheme.colors.text }
+          { color: isDestructive ? appTheme.colors.error : appTheme.colors.text }
         ]}>
           {title}
         </Text>
@@ -261,9 +261,9 @@ export default function CompanySettingsScreen() {
               </Text>
             </View>
             <Switch
-              trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+              trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.switchTrackOn }}
               thumbColor="#FFFFFF"
-              ios_backgroundColor="#E9E9EA"
+              ios_backgroundColor={appTheme.colors.switchTrackOff}
               onValueChange={handlePricePrivacyToggle}
               value={pricePrivacyEnabled}
               style={{ transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] }}
@@ -300,10 +300,10 @@ export default function CompanySettingsScreen() {
         >
           <View style={styles.communityContent}>
             <View style={[styles.communityIcon]}>
-              <Heart size={24} color="#3B82F6" strokeWidth={2} />
+              <Heart size={24} color={appTheme.colors.info} strokeWidth={2} />
             </View>
             <View style={styles.communityText}>
-              <Text style={[styles.communityTitle, { color: "#3B82F6", fontFamily: theme.fonts.primary.bold}]}>
+              <Text style={[styles.communityTitle, { color: appTheme.colors.info, fontFamily: theme.fonts.primary.bold}]}>
                 Help the Community grow
               </Text>
               <Text style={[styles.communitySubtitle, { color: appTheme.colors.secondary }]}>

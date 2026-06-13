@@ -71,7 +71,7 @@ export default function SecuritySettingsScreen({ navigation }: SecuritySettingsS
               <Icon name="shield-checkmark-outline" size={24} color={appTheme.colors.iconColor} />
               <View style={styles.settingTextContainer}>
                 <Text style={[styles.settingTitle, { color: appTheme.colors.text }]}>Two-Factor Authentication</Text>
-                <Text style={[styles.settingDescription, { color: twoFactorEnabled ? '#10B981' : appTheme.colors.textLight }]}>
+                <Text style={[styles.settingDescription, { color: twoFactorEnabled ? appTheme.colors.success : appTheme.colors.textLight }]}>
                   {twoFactorEnabled ? 'Enabled' : 'Disabled'}
                 </Text>
               </View>
@@ -87,7 +87,7 @@ export default function SecuritySettingsScreen({ navigation }: SecuritySettingsS
               <Icon name="finger-print-outline" size={24} color={appTheme.colors.iconColor} />
               <View style={styles.settingTextContainer}>
                 <Text style={[styles.settingTitle, { color: appTheme.colors.text }]}>Biometric Login</Text>
-                <Text style={[styles.settingDescription, { color: biometricEnabled ? '#10B981' : appTheme.colors.textLight }]}>
+                <Text style={[styles.settingDescription, { color: biometricEnabled ? appTheme.colors.success : appTheme.colors.textLight }]}>
                   {biometricEnabled ? 'Enabled' : 'Disabled'}
                 </Text>
               </View>
@@ -112,9 +112,9 @@ export default function SecuritySettingsScreen({ navigation }: SecuritySettingsS
           <Switch
             value={staySignedIn}
             onValueChange={handleStaySignedInToggle}
-            trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+            trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.success }}
             thumbColor="#FFFFFF"
-            ios_backgroundColor="#E9E9EA"
+            ios_backgroundColor={appTheme.colors.switchTrackOff}
           />
         </View>
       )}

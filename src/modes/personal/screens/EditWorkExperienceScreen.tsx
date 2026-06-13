@@ -216,44 +216,44 @@ export default function EditWorkExperienceScreen() {
 
           <View style={styles.section}>
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Role / Position</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Role / Position</Text>
               <TextInput
                 style={[
                   styles.infoInput,
                   {
                     color: appTheme.colors.text,
-                    borderColor: '#DAD3D1',
+                    borderColor: appTheme.colors.borderColor,
                     backgroundColor: '#FFFFFF',
                   },
                 ]}
                 value={role}
                 onChangeText={setRole}
                 placeholder="Enter your role"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
               />
             </View>
 
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Start Date</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Start Date</Text>
               <TextInput
                 style={[
                   styles.infoInput,
                   {
                     color: appTheme.colors.text,
-                    borderColor: '#DAD3D1',
+                    borderColor: appTheme.colors.borderColor,
                     backgroundColor: '#FFFFFF',
                   },
                 ]}
                 value={startDate ? formatExperienceDate(startDate) : ''}
                 onChangeText={setStartDate}
                 placeholder="e.g., Jan 2020"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
               />
             </View>
 
             <View style={styles.infoItem}>
               <View style={styles.labelRow}>
-                <Text style={[styles.infoLabel, styles.labelNoMargin, { color: '#777777' }]}>End Date</Text>
+                <Text style={[styles.infoLabel, styles.labelNoMargin, { color: appTheme.colors.textSecondary }]}>End Date</Text>
                 <TouchableOpacity
                   style={styles.checkboxRow}
                   onPress={() => setIsCurrentRole(!isCurrentRole)}
@@ -262,14 +262,14 @@ export default function EditWorkExperienceScreen() {
                     style={[
                       styles.checkbox,
                       {
-                        borderColor: '#DAD3D1',
-                        backgroundColor: isCurrentRole ? '#22C55E' : 'transparent',
+                        borderColor: appTheme.colors.borderColor,
+                        backgroundColor: isCurrentRole ? appTheme.colors.success : 'transparent',
                       },
                     ]}
                   >
                     {isCurrentRole && <Icon name="checkmark" size={14} color="#FFFFFF" />}
                   </View>
-                  <Text style={[styles.checkboxLabel, { color: '#777777' }]}>
+                  <Text style={[styles.checkboxLabel, { color: appTheme.colors.textSecondary }]}>
                     I currently work here
                   </Text>
                 </TouchableOpacity>
@@ -279,7 +279,7 @@ export default function EditWorkExperienceScreen() {
                   styles.infoInput,
                   {
                     color: appTheme.colors.text,
-                    borderColor: '#DAD3D1',
+                    borderColor: appTheme.colors.borderColor,
                     backgroundColor: isCurrentRole
                       ? appTheme.colors.buttonBackgroundDisabled
                       : '#FFFFFF',
@@ -288,7 +288,7 @@ export default function EditWorkExperienceScreen() {
                 value={isCurrentRole ? 'Present' : (endDate ? formatExperienceDate(endDate) : '')}
                 onChangeText={setEndDate}
                 placeholder="e.g., Dec 2023"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
                 editable={!isCurrentRole}
               />
             </View>
@@ -303,7 +303,7 @@ export default function EditWorkExperienceScreen() {
                 styles.actionButton,
                 styles.saveButton,
                 {
-                  backgroundColor: hasChanges ? '#22C55E' : appTheme.colors.buttonBackgroundDisabled,
+                  backgroundColor: hasChanges ? appTheme.colors.success : appTheme.colors.buttonBackgroundDisabled,
                 },
               ]}
               onPress={handleSave}
@@ -323,7 +323,7 @@ export default function EditWorkExperienceScreen() {
               style={styles.deleteButton}
               onPress={handleDelete}
             >
-              <Icon name="trash-outline" size={20} color="#EF4444" />
+              <Icon name="trash-outline" size={20} color={appTheme.colors.error} />
               <Text style={styles.deleteButtonText}>
                 {isCurrentRole ? 'Leave Company' : 'Remove Experience'}
               </Text>
@@ -338,7 +338,7 @@ export default function EditWorkExperienceScreen() {
               ]}
               onPress={handleCancel}
             >
-              <Text style={[styles.cancelButtonText, { color: '#000000' }]}>
+              <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>
                 Cancel
               </Text>
             </TouchableOpacity>
@@ -501,13 +501,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#EF4444',
+    borderColor: '#D6453E',
     marginTop: 8,
   },
   deleteButtonText: {
     fontSize: 16,
     fontFamily: theme.fonts.primary.medium,
-    color: '#EF4444',
+    color: '#D6453E',
     marginLeft: 8,
   },
 });

@@ -382,9 +382,9 @@ export default function LocationsScreen() {
                   <View style={[
                     styles.sheetStatusBadge,
                     { 
-                      backgroundColor: selectedLocation.operating_mode === 'INDEPENDENT' 
-                        ? 'rgba(42, 207, 1, 0.1)' 
-                        : 'rgba(0, 117, 255, 0.1)'
+                      backgroundColor: selectedLocation.operating_mode === 'INDEPENDENT'
+                        ? 'rgba(52, 168, 83, 0.1)'
+                        : 'rgba(42, 117, 230, 0.1)'
                     }
                   ]}>
                     <Text style={[

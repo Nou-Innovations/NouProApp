@@ -211,7 +211,7 @@ export default function SelectCompanyScreen({ navigation, route }: Props) {
 
         {errorMessage && (
           <View style={styles.errorContainer}>
-            <Text style={[styles.errorText, { color: appTheme.colors.error || '#EF4444' }]}>
+            <Text style={[styles.errorText, { color: appTheme.colors.error || '#D6453E' }]}>
               {errorMessage}
             </Text>
           </View>
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 8,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#FAF8F5',
   },
   companyLogoFallback: {
     justifyContent: 'center',

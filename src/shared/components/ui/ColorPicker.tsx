@@ -163,10 +163,10 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   whiteColorBorder: {
-    borderColor: '#D1D5DB',
+    borderColor: '#ECE6DF',
   },
   selectedColor: {
-    borderColor: '#000',
+    borderColor: '#1C1917',
     borderWidth: 2,
   },
   confirmButton: {

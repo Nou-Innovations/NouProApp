@@ -231,7 +231,7 @@ const ProductCardOtherCompany: React.FC<ProductCardOtherCompanyProps> = ({
                 onBlur={handleQuantityBlur}
                 keyboardType="number-pad"
                 placeholder="1"
-                placeholderTextColor="#D0CAC8"
+                placeholderTextColor={appTheme.colors.textMuted}
                 selectionColor={appTheme.colors.primary}
                 returnKeyType="done"
                 onSubmitEditing={handleSubmitEditing}
@@ -261,7 +261,7 @@ const ProductCardOtherCompany: React.FC<ProductCardOtherCompanyProps> = ({
               style={styles.cancelButton}
               onPress={handleCancelAdding}
             >
-              <Icon name="close" size={20} color="#D0CAC8" />
+              <Icon name="close" size={20} color={appTheme.colors.iconMuted} />
             </TouchableOpacity>
           </View>
         </View>
@@ -299,8 +299,8 @@ const styles = StyleSheet.create({
   productImage: { 
     width: '100%', 
     height: '100%', 
-    borderRadius: theme.borderRadius.md, 
-    backgroundColor: '#F0F0F0' 
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: '#FAF8F5'
   },
   imagePlaceholder: { 
     width: '100%', 

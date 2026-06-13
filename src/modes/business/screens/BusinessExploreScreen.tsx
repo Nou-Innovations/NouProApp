@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 10,
   },
-  productImg: { width: '100%', height: 110, borderRadius: 8, marginBottom: 8, backgroundColor: '#F3F4F6' },
+  productImg: { width: '100%', height: 110, borderRadius: 8, marginBottom: 8, backgroundColor: '#FAF8F5' },
   productRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  productRowImg: { width: 56, height: 56, borderRadius: 8, backgroundColor: '#F3F4F6' },
+  productRowImg: { width: 56, height: 56, borderRadius: 8, backgroundColor: '#FAF8F5' },
   productName: { fontSize: 14, fontWeight: '600' },
   productMeta: { fontSize: 12, marginTop: 2 },
   productPrice: { fontSize: 13, fontWeight: '700', marginTop: 4 },

@@ -59,7 +59,7 @@ interface BusinessVehicle {
 
 // Get status color for vehicle
 const getVehicleStatusColor = (status: VehicleStatus): string => {
-  return VEHICLE_STATUS_COLORS[status] || '#9CA3AF';
+  return VEHICLE_STATUS_COLORS[status] || '#A8A29E';
 };
 
 interface SelectedStaffMember {
@@ -473,7 +473,7 @@ export default function CreateDeliveryScreen() {
 
   // Get color for avatar based on name hash
   const getAvatarColor = (name: string): string => {
-    const colors = ['#4ECDC4', '#6366F1', '#EC4899', '#F59E0B', '#10B981', '#8B5CF6'];
+    const colors = ['#F0705F', '#E8A33D', '#8DA34B', '#5FA88C', '#5B7FD6', '#B06BB5'];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
       hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -733,7 +733,7 @@ export default function CreateDeliveryScreen() {
                   type: 'icon',
                   icon: 'location',
                   iconColor: '#FFFFFF',
-                  backgroundColor: '#EAB308',
+                  backgroundColor: appTheme.colors.warning,
                 }}
                 title={item.name}
                 subtitle={item.address}
@@ -1220,7 +1220,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 8,
     marginRight: 12,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#FAF8F5',
   },
   productInfo: {
     flex: 1,

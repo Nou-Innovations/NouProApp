@@ -1008,7 +1008,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
               {business?.name}
             </Text>
             {business?.isVerified && (
-              <Icon name="checkmark-circle" size={22} color="#0075FF" />
+              <Icon name="checkmark-circle" size={22} color={appTheme.colors.info} />
             )}
           </View>
 
@@ -1211,7 +1211,7 @@ const styles = StyleSheet.create({
   coverContainer: {
     height: COVER_HEIGHT,
     width: '100%',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FAF8F5',
     position: 'relative',
   },
   coverImage: {
@@ -1328,7 +1328,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyStateText: {
-    color: '#9ca3af',
+    color: '#A8A29E',
     marginTop: 80,
   },
   // About tab styles - matching BusinessProfileOwnScreen
@@ -1338,7 +1338,7 @@ const styles = StyleSheet.create({
   mapContainer: {
     height: 280,
     width: '100%',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FAF8F5',
   },
   map: {
     flex: 1,
@@ -1362,7 +1362,7 @@ const styles = StyleSheet.create({
   infoLink: {
     fontSize: 16,
     fontFamily: theme.fonts.primary.regular,
-    color: '#0066FF',
+    color: '#2A75E6',
   },
   businessHoursSection: {
     marginTop: 8,
@@ -1381,12 +1381,12 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.regular,
   },
   emptyCartText: {
-    color: '#9ca3af',
+    color: '#A8A29E',
     marginTop: 15,
   },
   orderButton: {
     marginTop: 24,
-    backgroundColor: '#000',
+    backgroundColor: '#1C1917',
     borderRadius: 8,
     height: 40,
     paddingHorizontal: 24,
@@ -1404,7 +1404,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyListText: {
-    color: '#9ca3af',
+    color: '#A8A29E',
     marginTop: 40,
   },
   // Public storefront checkout modal

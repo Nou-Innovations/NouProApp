@@ -249,7 +249,7 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
     <View style={styles.enabledContainer}>
       <View style={[styles.statusCard, { backgroundColor: appTheme.colors.cardBackground }]}>
         <View style={styles.statusIcon}>
-          <Icon name="shield-checkmark" size={48} color="#10B981" />
+          <Icon name="shield-checkmark" size={48} color={appTheme.colors.success} />
         </View>
         <Text style={[styles.statusTitle, { color: appTheme.colors.text }]}>
           Two-Factor Authentication is Active
@@ -297,9 +297,9 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
             <Switch
               value={twoFactorEnabled || isSettingUp}
               onValueChange={handleToggle}
-              trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+              trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.success }}
               thumbColor="#FFFFFF"
-              ios_backgroundColor="#E9E9EA"
+              ios_backgroundColor={appTheme.colors.switchTrackOff}
               disabled={isLoading}
             />
           </View>

@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   timestampText: {
-    color: '#ccc',
+    color: '#A8A29E',
     fontSize: 12,
   },
   footer: {

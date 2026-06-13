@@ -45,7 +45,7 @@ const LABEL_MAPS: Record<string, Record<string, string>> = {
   priority: PR_PRIORITY_LABELS,
 };
 
-const FALLBACK_COLOR = '#A4AAB8';
+const FALLBACK_COLOR = '#A8A29E';
 
 const ProcurementStatusBadge: React.FC<ProcurementStatusBadgeProps> = ({ status, type }) => {
   const colorMap = COLOR_MAPS[type] || {};

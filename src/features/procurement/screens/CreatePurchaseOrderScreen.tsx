@@ -210,7 +210,7 @@ export default function CreatePurchaseOrderScreen() {
                   <Text style={[styles.itemIndex, { color: appTheme.colors.textSecondary }]}>Item {index + 1}</Text>
                   {items.length > 1 && (
                     <TouchableOpacity onPress={() => removeItemRow(item.key)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                      <Icon name="close-circle" size={22} color="#FF2400" />
+                      <Icon name="close-circle" size={22} color={appTheme.colors.error} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderRadius: 8,
-    backgroundColor: '#000000',
+    backgroundColor: '#1C1917',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -85,81 +85,81 @@ export default function AddEducationScreen() {
         >
           <View style={styles.section}>
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Institution *</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Institution *</Text>
               <TextInput
-                style={[styles.infoInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]}
+                style={[styles.infoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]}
                 value={institution}
                 onChangeText={setInstitution}
                 placeholder="Enter institution name"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
               />
             </View>
 
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Degree</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Degree</Text>
               <TextInput
-                style={[styles.infoInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]}
+                style={[styles.infoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]}
                 value={degree}
                 onChangeText={setDegree}
                 placeholder="e.g., Bachelor's, Master's"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
               />
             </View>
 
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Field of Study</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Field of Study</Text>
               <TextInput
-                style={[styles.infoInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]}
+                style={[styles.infoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]}
                 value={fieldOfStudy}
                 onChangeText={setFieldOfStudy}
                 placeholder="e.g., Computer Science"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
               />
             </View>
 
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Start Date</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Start Date</Text>
               <TextInput
-                style={[styles.infoInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]}
+                style={[styles.infoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]}
                 value={startDate}
                 onChangeText={setStartDate}
                 placeholder="e.g., Sep 2018"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
               />
             </View>
 
             <View style={styles.infoItem}>
               <View style={styles.labelRow}>
-                <Text style={[styles.infoLabel, styles.labelNoMargin, { color: '#777777' }]}>End Date</Text>
+                <Text style={[styles.infoLabel, styles.labelNoMargin, { color: appTheme.colors.textMuted }]}>End Date</Text>
                 <TouchableOpacity style={styles.checkboxRow} onPress={() => setIsCurrent(!isCurrent)}>
-                  <View style={[styles.checkbox, { borderColor: '#DAD3D1', backgroundColor: isCurrent ? '#22C55E' : 'transparent' }]}>
+                  <View style={[styles.checkbox, { borderColor: appTheme.colors.borderColor, backgroundColor: isCurrent ? appTheme.colors.success : 'transparent' }]}>
                     {isCurrent && <Icon name="checkmark" size={14} color="#FFFFFF" />}
                   </View>
-                  <Text style={[styles.checkboxLabel, { color: '#777777' }]}>Currently studying</Text>
+                  <Text style={[styles.checkboxLabel, { color: appTheme.colors.textMuted }]}>Currently studying</Text>
                 </TouchableOpacity>
               </View>
               <TextInput
                 style={[styles.infoInput, {
                   color: appTheme.colors.text,
-                  borderColor: '#DAD3D1',
+                  borderColor: appTheme.colors.borderColor,
                   backgroundColor: isCurrent ? appTheme.colors.buttonBackgroundDisabled : '#FFFFFF',
                 }]}
                 value={isCurrent ? 'Present' : endDate}
                 onChangeText={setEndDate}
                 placeholder="e.g., Jun 2022"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
                 editable={!isCurrent}
               />
             </View>
 
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Description</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Description</Text>
               <TextInput
-                style={[styles.multilineInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]}
+                style={[styles.multilineInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]}
                 value={description}
                 onChangeText={setDescription}
                 placeholder="Activities, societies, description..."
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
@@ -172,7 +172,7 @@ export default function AddEducationScreen() {
           <View style={styles.actionButtonsContainer}>
             <TouchableOpacity
               style={[styles.actionButton, styles.saveButton, {
-                backgroundColor: hasChanges ? '#22C55E' : appTheme.colors.buttonBackgroundDisabled,
+                backgroundColor: hasChanges ? appTheme.colors.success : appTheme.colors.buttonBackgroundDisabled,
               }]}
               onPress={handleSave}
               disabled={!hasChanges || isSaving}
@@ -185,7 +185,7 @@ export default function AddEducationScreen() {
               style={[styles.actionButton, styles.cancelButton, { backgroundColor: '#FFFFFF' }]}
               onPress={handleCancel}
             >
-              <Text style={[styles.cancelButtonText, { color: '#000000' }]}>Cancel</Text>
+              <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>

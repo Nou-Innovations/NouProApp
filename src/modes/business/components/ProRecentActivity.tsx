@@ -26,17 +26,17 @@ interface ProRecentActivityProps {
 }
 
 const ENTITY_CONFIG: Record<string, { icon: string; color: string }> = {
-  invoice: { icon: 'receipt-text-outline', color: '#FF2400' },
-  delivery: { icon: 'car-outline', color: '#FFB600' },
-  order: { icon: 'cart-outline', color: '#0075FF' },
-  product: { icon: 'cube-outline', color: '#2ACF01' },
-  purchase_order: { icon: 'cart-outline', color: '#A76AF0' },
-  purchase_request: { icon: 'clipboard-outline', color: '#A76AF0' },
+  invoice: { icon: 'receipt-text-outline', color: theme.colors.error },
+  delivery: { icon: 'car-outline', color: theme.colors.warning },
+  order: { icon: 'cart-outline', color: theme.colors.info },
+  product: { icon: 'cube-outline', color: theme.colors.success },
+  purchase_order: { icon: 'cart-outline', color: theme.colors.statusInReview },
+  purchase_request: { icon: 'clipboard-outline', color: theme.colors.statusInReview },
 };
 
 const DEFAULT_CONFIG: { icon: string; color: string } = {
   icon: 'document-outline',
-  color: '#575B66',
+  color: theme.colors.textSecondary,
 };
 
 export function ProRecentActivity({

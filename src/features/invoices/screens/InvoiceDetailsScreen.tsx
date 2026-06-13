@@ -847,7 +847,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
             {isAdmin && isInvoiceOwner && status === 'draft' && (
               <TouchableOpacity
                 onPress={sendDocument}
-                style={[styles.actionButton, { backgroundColor: '#EA5A5A' }]}
+                style={[styles.actionButton, { backgroundColor: theme.colors.error }]}
               >
                 <Text style={styles.actionButtonText}>Send Invoice</Text>
               </TouchableOpacity>
@@ -1119,11 +1119,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#FAF8F5',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#DAD3D1',
+    borderBottomColor: '#ECE6DF',
     paddingTop: Platform.OS === 'ios' ? 50 : 12,
   },
   backButton: {
@@ -1264,7 +1264,7 @@ const styles = StyleSheet.create({
   // Totals Section
   totalsSection: {
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#ECE6DF',
     marginTop: 8,
   },
   totalRow: {
@@ -1364,7 +1364,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   modalTitle: {
     fontSize: 18,

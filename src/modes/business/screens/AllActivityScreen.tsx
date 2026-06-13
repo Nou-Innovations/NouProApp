@@ -33,30 +33,30 @@ interface ActivityItem extends APIActivityItem {
 
 // Type configuration for icons and colors
 const TYPE_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
-  order_created: { icon: 'cart', color: '#007AFF', label: 'Order' },
-  order_confirmed: { icon: 'checkmark-circle', color: '#34C759', label: 'Order' },
-  delivery_completed: { icon: 'checkmark-done', color: '#34C759', label: 'Delivery' },
-  delivery_started: { icon: 'car', color: '#FF9500', label: 'Delivery' },
-  delivery_pending: { icon: 'time', color: '#FFB600', label: 'Delivery' },
-  delivery_canceled: { icon: 'close-circle', color: '#FF3B30', label: 'Delivery' },
-  invoice_sent: { icon: 'send', color: '#9C27B0', label: 'Invoice' },
-  invoice_paid: { icon: 'cash', color: '#34C759', label: 'Invoice' },
-  product_added: { icon: 'add-circle', color: '#007AFF', label: 'Product' },
-  stock_updated: { icon: 'cube', color: '#FF9500', label: 'Stock' },
-  message_received: { icon: 'mail', color: '#007AFF', label: 'Message' },
+  order_created: { icon: 'cart', color: theme.colors.info, label: 'Order' },
+  order_confirmed: { icon: 'checkmark-circle', color: theme.colors.success, label: 'Order' },
+  delivery_completed: { icon: 'checkmark-done', color: theme.colors.success, label: 'Delivery' },
+  delivery_started: { icon: 'car', color: theme.colors.warning, label: 'Delivery' },
+  delivery_pending: { icon: 'time', color: theme.colors.warning, label: 'Delivery' },
+  delivery_canceled: { icon: 'close-circle', color: theme.colors.error, label: 'Delivery' },
+  invoice_sent: { icon: 'send', color: theme.colors.statusInReview, label: 'Invoice' },
+  invoice_paid: { icon: 'cash', color: theme.colors.success, label: 'Invoice' },
+  product_added: { icon: 'add-circle', color: theme.colors.info, label: 'Product' },
+  stock_updated: { icon: 'cube', color: theme.colors.warning, label: 'Stock' },
+  message_received: { icon: 'mail', color: theme.colors.info, label: 'Message' },
   // Procurement events
-  purchase_request_created: { icon: 'document-text', color: '#0075FF', label: 'Purchase Request' },
-  purchase_request_submitted: { icon: 'paper-plane', color: '#0075FF', label: 'Purchase Request' },
-  purchase_request_approved: { icon: 'checkmark-circle', color: '#2ACF01', label: 'Purchase Request' },
-  purchase_request_rejected: { icon: 'close-circle', color: '#FF2400', label: 'Purchase Request' },
-  purchase_order_created: { icon: 'cart', color: '#A4AAB8', label: 'Purchase Order' },
-  purchase_order_sent: { icon: 'cart', color: '#0075FF', label: 'Purchase Order' },
-  purchase_order_confirmed: { icon: 'checkmark-circle', color: '#2ACF01', label: 'Purchase Order' },
-  purchase_order_receiving: { icon: 'cube', color: '#FFB600', label: 'Purchase Order' },
-  purchase_order_received: { icon: 'cube', color: '#2ACF01', label: 'Purchase Order' },
-  purchase_order_canceled: { icon: 'close-circle', color: '#FF6B6B', label: 'Purchase Order' },
-  purchase_order_status_changed: { icon: 'cart', color: '#0075FF', label: 'Purchase Order' },
-  goods_received: { icon: 'archive', color: '#A76AF0', label: 'Goods Receipt' },
+  purchase_request_created: { icon: 'document-text', color: theme.colors.info, label: 'Purchase Request' },
+  purchase_request_submitted: { icon: 'paper-plane', color: theme.colors.info, label: 'Purchase Request' },
+  purchase_request_approved: { icon: 'checkmark-circle', color: theme.colors.success, label: 'Purchase Request' },
+  purchase_request_rejected: { icon: 'close-circle', color: theme.colors.error, label: 'Purchase Request' },
+  purchase_order_created: { icon: 'cart', color: theme.colors.textMuted, label: 'Purchase Order' },
+  purchase_order_sent: { icon: 'cart', color: theme.colors.info, label: 'Purchase Order' },
+  purchase_order_confirmed: { icon: 'checkmark-circle', color: theme.colors.success, label: 'Purchase Order' },
+  purchase_order_receiving: { icon: 'cube', color: theme.colors.warning, label: 'Purchase Order' },
+  purchase_order_received: { icon: 'cube', color: theme.colors.success, label: 'Purchase Order' },
+  purchase_order_canceled: { icon: 'close-circle', color: theme.colors.statusCanceled, label: 'Purchase Order' },
+  purchase_order_status_changed: { icon: 'cart', color: theme.colors.info, label: 'Purchase Order' },
+  goods_received: { icon: 'archive', color: theme.colors.statusInReview, label: 'Goods Receipt' },
 };
 
 export default function AllActivityScreen() {
@@ -157,7 +157,7 @@ export default function AllActivityScreen() {
 
   // Render activity item
   const renderItem = ({ item }: { item: ActivityItem }) => {
-    const config = TYPE_CONFIG[item.type] || { icon: 'information-circle', color: '#6B7280', label: 'Activity' };
+    const config = TYPE_CONFIG[item.type] || { icon: 'information-circle', color: appTheme.colors.textSecondary, label: 'Activity' };
 
     return (
       <ListItemCard

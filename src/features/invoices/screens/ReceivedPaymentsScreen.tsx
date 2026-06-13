@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   summaryRowLast: {
     borderBottomWidth: 0,

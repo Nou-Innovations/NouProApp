@@ -35,21 +35,21 @@ function OrderOptionCard({
   const getIconColor = () => {
     switch (type) {
       case 'assign':
-        return '#0075FF'; // primary
+        return '#2A75E6'; // info
       case 'payment':
-        return '#059669'; // green
+        return '#34A853'; // success
       case 'delivery':
-        return '#5B21B6'; // purple
+        return '#8B5CF6'; // statusInReview (purple)
       case 'invoice':
-        return '#F59E0B'; // amber
+        return '#F2A900'; // warning (amber)
       case 'chat':
-        return '#0EA5E9'; // sky
+        return '#2A75E6'; // info (sky)
       case 'notes':
-        return '#4B5563'; // gray-600
+        return '#57534E'; // textSecondary
       case 'history':
-        return '#6B7280'; // gray-500
+        return '#57534E'; // textSecondary
       default:
-        return '#6B7280';
+        return '#57534E';
     }
   };
 
@@ -97,7 +97,7 @@ function OrderOptionCard({
             <Text className="text-xs text-white font-medium">{badge}</Text>
           </View>
         ) : (
-          <Icon name="chevron-right" size={20} color="#9CA3AF" />
+          <Icon name="chevron-right" size={20} color="#A8A29E" />
         )}
       </View>
     </TouchableOpacity>

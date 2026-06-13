@@ -169,7 +169,7 @@ export default function AddWorkExperienceScreen() {
         </ScrollView>
         {/* Add this company button */}
         <TouchableOpacity
-          style={[styles.addCompanyButton, { borderTopColor: '#DAD3D1' }]}
+          style={[styles.addCompanyButton, { borderTopColor: appTheme.colors.borderColor }]}
           onPress={handleAddNewCompany}
         >
           <Icon name="add-circle-outline" size={20} color={appTheme.colors.text} />
@@ -200,51 +200,51 @@ export default function AddWorkExperienceScreen() {
         >
           <View style={styles.section}>
             <View style={[styles.infoItem, styles.companyInputContainer]}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Company Name *</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Company Name *</Text>
               <TextInput
                 style={[
                   styles.infoInput,
                   {
                     color: appTheme.colors.text,
-                    borderColor: showSuggestions ? '#000000' : '#DAD3D1',
+                    borderColor: showSuggestions ? appTheme.colors.primary : appTheme.colors.borderColor,
                     backgroundColor: '#FFFFFF',
                   },
                 ]}
                 value={companyName}
                 onChangeText={handleCompanyInputChange}
                 placeholder="Enter company name"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
                 onFocus={() => companyName.trim() && setShowSuggestions(true)}
               />
               {renderSuggestions()}
             </View>
 
             <View style={[styles.infoItem, { zIndex: 1 }]}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Role / Position *</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Role / Position *</Text>
               <TextInput
                 style={[
                   styles.infoInput,
                   {
                     color: appTheme.colors.text,
-                    borderColor: '#DAD3D1',
+                    borderColor: appTheme.colors.borderColor,
                     backgroundColor: '#FFFFFF',
                   },
                 ]}
                 value={role}
                 onChangeText={setRole}
                 placeholder="Enter your role"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
               />
             </View>
 
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Description</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Description</Text>
               <TextInput
                 style={[
                   styles.infoInput,
                   {
                     color: appTheme.colors.text,
-                    borderColor: '#DAD3D1',
+                    borderColor: appTheme.colors.borderColor,
                     backgroundColor: '#FFFFFF',
                     minHeight: 80,
                     paddingTop: 12,
@@ -256,69 +256,69 @@ export default function AddWorkExperienceScreen() {
                 value={description}
                 onChangeText={setDescription}
                 placeholder="Describe your responsibilities..."
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
                 multiline
                 numberOfLines={3}
               />
             </View>
 
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Industry</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Industry</Text>
               <TextInput
                 style={[
                   styles.infoInput,
                   {
                     color: appTheme.colors.text,
-                    borderColor: '#DAD3D1',
+                    borderColor: appTheme.colors.borderColor,
                     backgroundColor: '#FFFFFF',
                   },
                 ]}
                 value={industry}
                 onChangeText={setIndustry}
                 placeholder="e.g., Food & Beverage"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
               />
             </View>
 
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Location</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Location</Text>
               <TextInput
                 style={[
                   styles.infoInput,
                   {
                     color: appTheme.colors.text,
-                    borderColor: '#DAD3D1',
+                    borderColor: appTheme.colors.borderColor,
                     backgroundColor: '#FFFFFF',
                   },
                 ]}
                 value={location}
                 onChangeText={setLocation}
                 placeholder="e.g., Paris, France"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
               />
             </View>
 
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Start Date</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Start Date</Text>
               <TextInput
                 style={[
                   styles.infoInput,
                   {
                     color: appTheme.colors.text,
-                    borderColor: '#DAD3D1',
+                    borderColor: appTheme.colors.borderColor,
                     backgroundColor: '#FFFFFF',
                   },
                 ]}
                 value={startDate}
                 onChangeText={setStartDate}
                 placeholder="e.g., Jan 2020"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
               />
             </View>
 
             <View style={styles.infoItem}>
               <View style={styles.labelRow}>
-                <Text style={[styles.infoLabel, styles.labelNoMargin, { color: '#777777' }]}>End Date</Text>
+                <Text style={[styles.infoLabel, styles.labelNoMargin, { color: appTheme.colors.textSecondary }]}>End Date</Text>
                 <TouchableOpacity
                   style={styles.checkboxRow}
                   onPress={() => setIsCurrentRole(!isCurrentRole)}
@@ -327,14 +327,14 @@ export default function AddWorkExperienceScreen() {
                     style={[
                       styles.checkbox,
                       {
-                        borderColor: '#DAD3D1',
-                        backgroundColor: isCurrentRole ? '#22C55E' : 'transparent',
+                        borderColor: appTheme.colors.borderColor,
+                        backgroundColor: isCurrentRole ? appTheme.colors.success : 'transparent',
                       },
                     ]}
                   >
                     {isCurrentRole && <Icon name="checkmark" size={14} color="#FFFFFF" />}
                   </View>
-                  <Text style={[styles.checkboxLabel, { color: '#777777' }]}>
+                  <Text style={[styles.checkboxLabel, { color: appTheme.colors.textSecondary }]}>
                     I currently work here
                   </Text>
                 </TouchableOpacity>
@@ -344,7 +344,7 @@ export default function AddWorkExperienceScreen() {
                   styles.infoInput,
                   {
                     color: appTheme.colors.text,
-                    borderColor: '#DAD3D1',
+                    borderColor: appTheme.colors.borderColor,
                     backgroundColor: isCurrentRole
                       ? appTheme.colors.buttonBackgroundDisabled
                       : '#FFFFFF',
@@ -353,7 +353,7 @@ export default function AddWorkExperienceScreen() {
                 value={isCurrentRole ? 'Present' : endDate}
                 onChangeText={setEndDate}
                 placeholder="e.g., Dec 2023"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
                 editable={!isCurrentRole}
               />
             </View>
@@ -368,7 +368,7 @@ export default function AddWorkExperienceScreen() {
                 styles.actionButton,
                 styles.saveButton,
                 {
-                  backgroundColor: hasChanges ? '#22C55E' : appTheme.colors.buttonBackgroundDisabled,
+                  backgroundColor: hasChanges ? appTheme.colors.success : appTheme.colors.buttonBackgroundDisabled,
                 },
               ]}
               onPress={handleSave}
@@ -393,7 +393,7 @@ export default function AddWorkExperienceScreen() {
               ]}
               onPress={handleCancel}
             >
-              <Text style={[styles.cancelButtonText, { color: '#000000' }]}>
+              <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>
                 Cancel
               </Text>
             </TouchableOpacity>
@@ -494,7 +494,7 @@ const styles = StyleSheet.create({
     right: 0,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#DAD3D1',
+    borderColor: '#ECE6DF',
     maxHeight: 350,
     zIndex: 1000,
     shadowColor: '#000',
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E1E4EA',
+    borderBottomColor: '#ECE6DF',
   },
   suggestionText: {
     fontSize: 16,

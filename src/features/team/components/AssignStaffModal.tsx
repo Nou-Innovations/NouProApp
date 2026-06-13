@@ -72,13 +72,13 @@ export default function AssignStaffModal({
   const getAssignedRoleColor = (role: 'driver' | 'teamLeader' | 'support') => {
     switch (role) {
       case 'driver':
-        return '#0500FF1A'; // Blue with opacity
+        return '#2A75E61A'; // Blue with opacity
       case 'teamLeader':
-        return '#F59E0B1A'; // Orange with opacity
+        return '#F2A9001A'; // Orange with opacity
       case 'support':
-        return '#10B9811A'; // Green with opacity
+        return '#34A8531A'; // Green with opacity
       default:
-        return '#F9FAFB'; // Light gray
+        return '#FAF8F5'; // Light gray
     }
   };
 
@@ -162,15 +162,15 @@ export default function AssignStaffModal({
     // Role icon prefix
     const roleIconPrefix = staffMember?.assignedRole === 'driver' ? (
       <View style={styles.roleIcon}>
-        <Icon name="car" size={20} color="#0500FF" />
+        <Icon name="car" size={20} color="#2A75E6" />
       </View>
     ) : staffMember?.assignedRole === 'teamLeader' ? (
       <View style={styles.roleIcon}>
-        <Icon name="star" size={20} color="#F59E0B" />
+        <Icon name="star" size={20} color="#F2A900" />
       </View>
     ) : staffMember?.assignedRole === 'support' ? (
       <View style={styles.roleIcon}>
-        <Icon name="construct" size={20} color="#10B981" />
+        <Icon name="construct" size={20} color="#34A853" />
       </View>
     ) : null;
 
@@ -318,13 +318,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   driverButton: {
-    backgroundColor: '#0500FF',
+    backgroundColor: '#2A75E6',
   },
   teamLeaderButton: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#F2A900',
   },
   supportButton: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#34A853',
   },
   roleButtonActive: {
     opacity: 1,

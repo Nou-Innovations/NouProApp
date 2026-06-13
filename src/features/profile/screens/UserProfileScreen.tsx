@@ -643,20 +643,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#000000',
+    borderColor: '#1C1917',
     borderRadius: 8,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   messageButtonText: {
-    color: '#000000',
+    color: '#1C1917',
     fontSize: 16,
     fontFamily: theme.fonts.primary.bold,
   },
   connectButton: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#1C1917',
     borderRadius: 8,
     height: 40,
     justifyContent: 'center',
@@ -670,10 +670,10 @@ const styles = StyleSheet.create({
   connectedButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#000000',
+    borderColor: '#1C1917',
   },
   connectedButtonText: {
-    color: '#000000',
+    color: '#1C1917',
   },
   // Section styles - matching PersonalProfileScreen
   section: {

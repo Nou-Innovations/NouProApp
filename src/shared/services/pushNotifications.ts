@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { post, del } from '@/shared/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { theme } from '@/shared/theme';
 
 const PUSH_TOKEN_KEY = 'noupro_push_token';
 
@@ -46,7 +47,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
       name: 'Default',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#2ACF01',
+      lightColor: theme.colors.success,
     });
   }
 

@@ -14,6 +14,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { RootStackParamList } from '@/shared/types/navigation';
+import { theme } from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import { SubscriptionPlan } from '@/shared/types/subscription';
@@ -136,7 +137,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
         label: 'New Orders',
         value: s.newOrders,
         icon: 'cart-outline',
-        color: '#0075FF',
+        color: theme.colors.info,
         onPress: () => navigation.navigate('Orders', { initialTab: 'incoming' }),
       },
       {
@@ -144,7 +145,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
         label: 'Deliveries',
         value: s.pendingDeliveries,
         icon: 'car-outline',
-        color: '#FFB600',
+        color: theme.colors.warning,
         onPress: () => navigation.navigate('Deliveries'),
       },
       {
@@ -152,7 +153,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
         label: 'Unpaid Invoices',
         value: s.unpaidInvoices,
         icon: 'receipt-text-outline',
-        color: '#FF2400',
+        color: theme.colors.error,
         onPress: () => navigation.navigate('Invoices'),
       },
       {
@@ -160,7 +161,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
         label: 'Open Tasks',
         value: s.openTasks,
         icon: 'checkbox-outline',
-        color: '#A76AF0',
+        color: theme.colors.statusInReview,
         onPress: () => navigation.navigate('Tasks'),
       },
     ];
@@ -188,7 +189,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
         id: 'invoice',
         label: 'New Invoice',
         icon: 'document-text-outline',
-        color: '#FF2400',
+        color: theme.colors.error,
         onPress: () => navigation.navigate('CreateInvoice', { type: 'invoice' }),
       });
     }
@@ -197,7 +198,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
         id: 'delivery',
         label: 'New Delivery',
         icon: 'car-outline',
-        color: '#FFB600',
+        color: theme.colors.warning,
         onPress: () => navigation.navigate('CreateDelivery', {}),
       });
     }
@@ -206,7 +207,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
         id: 'po',
         label: 'New Purchase Order',
         icon: 'cart-outline',
-        color: '#0075FF',
+        color: theme.colors.info,
         onPress: () => navigation.navigate('CreatePurchaseOrder', {}),
       });
     }
@@ -215,7 +216,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
         id: 'product',
         label: 'New Product',
         icon: 'cube-outline',
-        color: '#2ACF01',
+        color: theme.colors.success,
         onPress: () => navigation.navigate('CreateProduct', {}),
       });
     }
@@ -224,7 +225,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
         id: 'task',
         label: 'New Task',
         icon: 'checkbox-outline',
-        color: '#A76AF0',
+        color: theme.colors.statusInReview,
         onPress: () => navigation.navigate('CreateTask', { businessId: activeBusinessId }),
       });
     }

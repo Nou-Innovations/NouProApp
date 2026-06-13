@@ -69,36 +69,36 @@ import { convertEstimateToInvoice } from '@/features/invoices/invoices.service';
 
 // Order status colors from design.json (supports both legacy and UPPERCASE)
 const ORDER_STATUS_COLORS: Record<string, string> = {
-  'pending': '#FFB600',
-  'accepted': '#0075FF',
-  'completed': '#2ACF01',
-  'cancelled': '#A4AAB8',
-  'Done': '#2ACF01',
-  'New': '#6E0000',
-  'Ongoing': '#0075FF',
-  'Pending': '#FFB600',
-  'Cancel': '#FF6B6B',
+  'pending': '#F2A900',
+  'accepted': '#2A75E6',
+  'completed': '#34A853',
+  'cancelled': '#A8A29E',
+  'Done': '#34A853',
+  'New': '#7A1F12',
+  'Ongoing': '#2A75E6',
+  'Pending': '#F2A900',
+  'Cancel': '#F0705F',
   // UPPERCASE enum values
-  'NEW': '#6E0000',
-  'ACCEPTED': '#0075FF',
-  'ONGOING': '#0075FF',
-  'PENDING': '#FFB600',
+  'NEW': '#7A1F12',
+  'ACCEPTED': '#2A75E6',
+  'ONGOING': '#2A75E6',
+  'PENDING': '#F2A900',
   'IN_REVIEW': '#8B5CF6',
-  'DONE': '#2ACF01',
-  'CANCELED': '#A4AAB8',
-  'REJECTED': '#FF6B6B',
+  'DONE': '#34A853',
+  'CANCELED': '#A8A29E',
+  'REJECTED': '#F0705F',
 };
 
 const PAYMENT_STATUS_COLORS: Record<string, string> = {
-  'Paid': '#2ACF01',
-  'Unpaid': '#FF2400',
-  'Payment Pending Confirmation': '#FFB600',
+  'Paid': '#34A853',
+  'Unpaid': '#D6453E',
+  'Payment Pending Confirmation': '#F2A900',
   // UPPERCASE enum values
-  'PAID': '#2ACF01',
-  'UNPAID': '#FF2400',
-  'PENDING_CONFIRMATION': '#FFB600',
-  'PARTIALLY_PAID': '#F59E0B',
-  'OVERDUE': '#DC2626',
+  'PAID': '#34A853',
+  'UNPAID': '#D6453E',
+  'PENDING_CONFIRMATION': '#F2A900',
+  'PARTIALLY_PAID': '#F2A900',
+  'OVERDUE': '#D6453E',
 };
 
 // MessageBubble component is now imported from ../components/MessageBubble
@@ -1665,7 +1665,7 @@ export default function ChatScreen() {
         onNext={() => handleSearchNavigate('next')}
       />
       {!isConnected && (
-        <View style={[styles.offlineBanner, { backgroundColor: appTheme.colors.error || '#FF3B30' }]}>
+        <View style={[styles.offlineBanner, { backgroundColor: appTheme.colors.error || '#D6453E' }]}>
           <Icon name="wifi-off" size={14} color="#fff" />
           <Text style={styles.offlineBannerText}>No connection - messages will be sent when back online</Text>
         </View>
@@ -1737,9 +1737,9 @@ export default function ChatScreen() {
         {/* Edit Mode Banner */}
         {editingMessageId && (
           <View style={[styles.replyPreviewContainer, { backgroundColor: appTheme.colors.background, borderTopColor: appTheme.colors.borderColor }]}>
-            <View style={[styles.replyPreviewBar, { backgroundColor: appTheme.colors.warning || '#FFB600' }]} />
+            <View style={[styles.replyPreviewBar, { backgroundColor: appTheme.colors.warning || '#F2A900' }]} />
             <View style={styles.replyPreviewContent}>
-              <Text style={[styles.replyPreviewSender, { color: appTheme.colors.warning || '#FFB600' }]} numberOfLines={1}>
+              <Text style={[styles.replyPreviewSender, { color: appTheme.colors.warning || '#F2A900' }]} numberOfLines={1}>
                 Editing message
               </Text>
             </View>
@@ -1823,7 +1823,7 @@ export default function ChatScreen() {
                 styles.sendButton,
                 {
                   backgroundColor: inputText.trim().length > 0
-                    ? (editingMessageId ? (appTheme.colors.warning || '#FFB600') : appTheme.colors.primary)
+                    ? (editingMessageId ? (appTheme.colors.warning || '#F2A900') : appTheme.colors.primary)
                     : appTheme.colors.textMuted,
                   opacity: inputText.trim().length > 0 ? 1 : 0.5,
                 }

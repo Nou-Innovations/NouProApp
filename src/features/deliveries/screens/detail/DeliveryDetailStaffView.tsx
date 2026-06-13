@@ -353,7 +353,7 @@ export function DeliveryDetailStaffView({ delivery }: DeliveryDetailStaffViewPro
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Update Delivery Status</Text>
               <TouchableOpacity onPress={handleHideStatusModal}>
-                <Icon name="close" size={24} color="#6B7280" />
+                <Icon name="close" size={24} color={appTheme.colors.iconColor} />
               </TouchableOpacity>
             </View>
             <View>
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   quickActionButton: {
     flex: 1,
@@ -437,12 +437,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: '#1C1917',
     fontFamily: 'InterCustom-SemiBold',
   },
   modalItem: {
@@ -451,13 +451,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   modalItemIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FAF8F5',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -468,13 +468,13 @@ const styles = StyleSheet.create({
   modalItemName: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#111827',
+    color: '#1C1917',
     marginBottom: 4,
     fontFamily: 'InterCustom-Medium',
   },
   modalItemDetails: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#57534E',
     fontFamily: 'InterCustom-Regular',
   },
 });

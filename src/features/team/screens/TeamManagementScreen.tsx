@@ -752,7 +752,7 @@ const styles = StyleSheet.create({
     height: 40,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   tab: {
     flex: 1,
@@ -765,11 +765,11 @@ const styles = StyleSheet.create({
   },
   tabTextSelected: {
     fontFamily: 'InterCustom-Bold',
-    color: '#000000',
+    color: '#1C1917',
   },
   tabTextUnselected: {
     fontFamily: 'InterCustom-Medium',
-    color: '#A4AAB8',
+    color: '#A8A29E',
   },
   // Location Dropdown (above search bar)
   locationDropdown: {
@@ -782,7 +782,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2.5,
-    backgroundColor: '#000000',
+    backgroundColor: '#1C1917',
   },
   listContent: {
     paddingBottom: 24,

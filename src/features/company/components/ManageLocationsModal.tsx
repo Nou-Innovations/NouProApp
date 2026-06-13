@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   selectedLocationItem: {
-    backgroundColor: '#000000',
+    backgroundColor: '#1C1917',
   },
   checkmarkIcon: {
     marginRight: 8,

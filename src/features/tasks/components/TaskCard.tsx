@@ -39,16 +39,16 @@ const TASK_ICONS: Record<TaskType, string> = {
 };
 
 const PRIORITY_INDICATOR: Record<TaskPriorityDisplay, { color: string; show: boolean }> = {
-  LOW: { color: '#6B7280', show: false },
-  NORMAL: { color: '#0EA5E9', show: false },
-  URGENT: { color: '#EF4444', show: true },
+  LOW: { color: '#A8A29E', show: false },
+  NORMAL: { color: '#2A75E6', show: false },
+  URGENT: { color: '#D6453E', show: true },
 };
 
 const STATUS_COLORS: Record<TaskStatus, string> = {
-  pending: '#F59E0B',
-  in_progress: '#0EA5E9',
-  completed: '#22C55E',
-  cancelled: '#6B7280',
+  pending: '#F2A900',
+  in_progress: '#2A75E6',
+  completed: '#34A853',
+  cancelled: '#A8A29E',
 };
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -146,7 +146,7 @@ export function TaskCard({
   // Container style with overdue or urgent indicator
   const showPriorityIndicator = priority && PRIORITY_INDICATOR[priority]?.show;
   const containerStyle: ViewStyle | undefined = isOverdue()
-    ? { borderLeftWidth: 3, borderLeftColor: '#EF4444' }
+    ? { borderLeftWidth: 3, borderLeftColor: appTheme.colors.error }
     : showPriorityIndicator
     ? { borderLeftWidth: 3, borderLeftColor: PRIORITY_INDICATOR[priority!].color }
     : undefined;

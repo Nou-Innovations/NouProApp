@@ -595,8 +595,8 @@ export default function EditPersonalProfileScreen() {
         activeOpacity={0.7}
       >
         <View style={styles.accountOptionLeft}>
-          <LogOut size={24} color="#DC2626" strokeWidth={2} />
-          <Text style={[styles.accountOptionText, { color: '#DC2626' }]}>Log out</Text>
+          <LogOut size={24} color={appTheme.colors.error} strokeWidth={2} />
+          <Text style={[styles.accountOptionText, { color: appTheme.colors.error }]}>Log out</Text>
         </View>
       </TouchableOpacity>
 
@@ -606,8 +606,8 @@ export default function EditPersonalProfileScreen() {
         activeOpacity={0.7}
       >
         <View style={styles.accountOptionLeft}>
-          <Trash2 size={24} color="#DC2626" strokeWidth={2} />
-          <Text style={[styles.accountOptionText, { color: '#DC2626' }]}>Delete account</Text>
+          <Trash2 size={24} color={appTheme.colors.error} strokeWidth={2} />
+          <Text style={[styles.accountOptionText, { color: appTheme.colors.error }]}>Delete account</Text>
         </View>
       </TouchableOpacity>
     </View>

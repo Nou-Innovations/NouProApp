@@ -41,11 +41,11 @@ const LEADING_SLOT = 36; // fixed leading column so all row labels align
 // High-contrast selection palette for the account switcher: the active business with branches
 // renders as a white "paper" section, and the selected branch/account renders as a black "ink"
 // row. These are intentionally literal (same in light + dark mode) per the requested design.
-const INK = '#111827'; // black section background
+const INK = '#1C1917'; // black section background
 const INK_TEXT = '#FFFFFF'; // text/icons on the black section
 const PAPER = '#FFFFFF'; // white section background (business that has branches)
-const PAPER_TEXT = '#111827'; // text on the white section
-const PAPER_MUTED = '#6B7280'; // muted text/icons on the white section
+const PAPER_TEXT = '#1C1917'; // text on the white section
+const PAPER_MUTED = '#57534E'; // muted text/icons on the white section
 
 type ShortcutItem = {
   key: string;
@@ -439,7 +439,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
       style={({ pressed }) => [
         styles.branchRow,
         selected && { backgroundColor: INK },
-        pressed && !selected && { backgroundColor: '#F3F4F6' },
+        pressed && !selected && { backgroundColor: '#F4F0EB' },
       ]}
     >
       <Icon name={icon} size={18} color={selected ? INK_TEXT : PAPER_MUTED} strokeWidth={2} />
@@ -870,7 +870,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FAF8F5',
   },
   branchHeaderBadgeText: {
     fontSize: 10,

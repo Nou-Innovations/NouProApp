@@ -305,9 +305,9 @@ export default function PersonalSettingsScreen() {
         <Switch
           value={notificationsEnabled}
           onValueChange={handleNotificationsToggle}
-          trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+          trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.switchTrackOn }}
           thumbColor="#FFFFFF"
-          ios_backgroundColor="#E9E9EA"
+          ios_backgroundColor={appTheme.colors.switchTrackOff}
         />
       </View>
 
@@ -336,9 +336,9 @@ export default function PersonalSettingsScreen() {
         <Switch
           value={isDarkMode}
           onValueChange={toggleTheme}
-          trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+          trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.switchTrackOn }}
           thumbColor="#FFFFFF"
-          ios_backgroundColor="#E9E9EA"
+          ios_backgroundColor={appTheme.colors.switchTrackOff}
         />
       </View>
 
@@ -382,10 +382,10 @@ export default function PersonalSettingsScreen() {
     >
       <View style={styles.communityContent}>
         <View style={styles.communityIcon}>
-          <Icon name="heart-outline" size={24} color="#3B82F6" />
+          <Icon name="heart-outline" size={24} color={appTheme.colors.info} />
         </View>
         <View style={styles.communityText}>
-          <Text style={[styles.communityTitle, { color: '#3B82F6', fontFamily: theme.fonts.primary.bold }]}>
+          <Text style={[styles.communityTitle, { color: appTheme.colors.info, fontFamily: theme.fonts.primary.bold }]}>
             Help the Community grow
           </Text>
           <Text style={[styles.communitySubtitle, { color: appTheme.colors.secondary }]}>
@@ -835,7 +835,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F4F0EB',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -846,10 +846,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     marginHorizontal: 0,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#E1E4EA',
+    borderBottomColor: '#ECE6DF',
   },
   profileRowActive: {
-    backgroundColor: '#000000',
+    backgroundColor: '#1C1917',
     borderRadius: 0,
     borderBottomWidth: 0,
     marginHorizontal: -12,
@@ -859,7 +859,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FAF8F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -886,10 +886,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#E1E4EA',
+    borderBottomColor: '#ECE6DF',
   },
   locationRowActive: {
-    backgroundColor: '#000000',
+    backgroundColor: '#1C1917',
     borderBottomWidth: 0,
     marginHorizontal: -12,
     paddingHorizontal: 12,
@@ -927,13 +927,13 @@ const styles = StyleSheet.create({
   primaryBadgeText: {
     fontSize: 10,
     fontFamily: theme.fonts.primary.semiBold,
-    color: '#2E7D32',
+    color: '#34A853',
   },
   addNewBusinessButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000',
+    backgroundColor: '#1C1917',
     borderRadius: 8,
     height: 56,
     marginTop: 24,
@@ -961,7 +961,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 12,
     marginBottom: 8,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FAF8F5',
   },
   addOptionIconContainer: {
     width: 48,

@@ -498,7 +498,7 @@ export function DeliveryDetailSupplierView({
 
   // Status options
   const orderStatusOptions = [
-    { id: 'NOT_ASSIGNED', name: 'Not Assigned', value: 'NOT_ASSIGNED', icon: 'add-circle-outline', color: '#FF3B30' },
+    { id: 'NOT_ASSIGNED', name: 'Not Assigned', value: 'NOT_ASSIGNED', icon: 'add-circle-outline', color: theme.colors.error },
     { id: 'ASSIGNED', name: 'Assigned', value: 'ASSIGNED', icon: 'person-outline', color: theme.colors.warning },
     { id: 'PACKED', name: 'Packed', value: 'PACKED', icon: 'cube-outline', color: theme.colors.info },
     { id: 'OUT_FOR_DELIVERY', name: 'Out for Delivery', value: 'OUT_FOR_DELIVERY', icon: 'bicycle-outline', color: theme.colors.info },
@@ -692,11 +692,11 @@ export function DeliveryDetailSupplierView({
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Transport</Text>
               <TouchableOpacity onPress={handleHideTransportModal}>
-                <Icon name="close" size={24} color="#6B7280" />
+                <Icon name="close" size={24} color={appTheme.colors.iconColor} />
               </TouchableOpacity>
             </View>
             <View style={styles.searchContainer}>
-              <Icon name="search" size={20} color="#6B7280" />
+              <Icon name="search" size={20} color={appTheme.colors.iconColor} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search transport..."
@@ -712,7 +712,7 @@ export function DeliveryDetailSupplierView({
                   onPress={() => handleSelectTransport(transport)}
                 >
                   <View style={styles.modalItemIconContainer}>
-                    <Icon name={getVehicleIcon(transport.vehicle_type) as any} size={24} color="#6B7280" />
+                    <Icon name={getVehicleIcon(transport.vehicle_type) as any} size={24} color={appTheme.colors.iconColor} />
                   </View>
                   <View style={styles.modalItemInfo}>
                     <Text style={styles.modalItemName}>{transport.name}</Text>
@@ -757,7 +757,7 @@ export function DeliveryDetailSupplierView({
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Change Order Status</Text>
               <TouchableOpacity onPress={handleHideOrderStatusModal}>
-                <Icon name="close" size={24} color="#6B7280" />
+                <Icon name="close" size={24} color={appTheme.colors.iconColor} />
               </TouchableOpacity>
             </View>
             <View>
@@ -824,7 +824,7 @@ export function DeliveryDetailSupplierView({
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Change Payment Status</Text>
               <TouchableOpacity onPress={handleHidePaymentStatusModal}>
-                <Icon name="close" size={24} color="#6B7280" />
+                <Icon name="close" size={24} color={appTheme.colors.iconColor} />
               </TouchableOpacity>
             </View>
             <View>
@@ -891,7 +891,7 @@ export function DeliveryDetailSupplierView({
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Reschedule Delivery</Text>
               <TouchableOpacity onPress={closeSchedulingModal}>
-                <Icon name="close-outline" size={24} color="#6B7280" />
+                <Icon name="close-outline" size={24} color={appTheme.colors.iconColor} />
               </TouchableOpacity>
             </View>
 
@@ -912,7 +912,7 @@ export function DeliveryDetailSupplierView({
                   year: 'numeric',
                 })}
               </Text>
-              <Icon name="chevron-forward" size={18} color="#9CA3AF" />
+              <Icon name="chevron-forward" size={18} color={appTheme.colors.textMuted} />
             </TouchableOpacity>
             {showDatePicker && (
               <DateTimePicker
@@ -1058,7 +1058,7 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   acceptButton: {
     flex: 2,
@@ -1082,12 +1082,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: '#1C1917',
     fontFamily: 'InterCustom-SemiBold',
   },
   searchContainer: {
@@ -1096,7 +1096,7 @@ const styles = StyleSheet.create({
     height: 48,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: '#ECE6DF',
     borderRadius: 8,
     margin: 20,
     marginVertical: 8,
@@ -1114,13 +1114,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   modalItemIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FAF8F5',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -1131,13 +1131,13 @@ const styles = StyleSheet.create({
   modalItemName: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#111827',
+    color: '#1C1917',
     marginBottom: 4,
     fontFamily: 'InterCustom-Medium',
   },
   modalItemDetails: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#57534E',
     fontFamily: 'InterCustom-Regular',
   },
   schedulingModalContent: {
@@ -1155,7 +1155,7 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   schedulingDateRow: {
     flexDirection: 'row',
@@ -1168,18 +1168,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#ECE6DF',
   },
   schedulingDateText: {
     flex: 1,
     fontSize: 16,
     fontWeight: '500',
-    color: '#111827',
+    color: '#1C1917',
   },
   schedulingSectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
+    color: '#1C1917',
     marginBottom: 0,
     fontFamily: 'InterCustom-SemiBold',
   },
@@ -1195,14 +1195,14 @@ const styles = StyleSheet.create({
   schedulingTimeValue: {
     fontSize: 24,
     fontWeight: '500',
-    color: '#111827',
+    color: '#1C1917',
     marginVertical: 8,
     fontFamily: 'InterCustom-Medium',
   },
   schedulingTimeSeparator: {
     fontSize: 24,
     fontWeight: '500',
-    color: '#111827',
+    color: '#1C1917',
   },
   schedulingAdjustButton: {
     padding: 8,
@@ -1221,7 +1221,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   schedulingCancelButton: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F4F0EB',
   },
   schedulingConfirmButton: {
     backgroundColor: theme.colors.primary,
@@ -1229,7 +1229,7 @@ const styles = StyleSheet.create({
   schedulingCancelButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#374151',
+    color: '#1C1917',
     fontFamily: 'InterCustom-Medium',
   },
   schedulingConfirmButtonText: {

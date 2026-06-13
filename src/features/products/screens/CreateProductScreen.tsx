@@ -334,9 +334,9 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
               Sold in cartons
             </Text>
             <Switch
-              trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+              trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.switchTrackOn }}
               thumbColor="#FFFFFF"
-              ios_backgroundColor="#E9E9EA"
+              ios_backgroundColor={appTheme.colors.switchTrackOff}
               onValueChange={setHasCarton}
               value={hasCarton}
               style={styles.switchControl}
@@ -375,9 +375,9 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
               Retail price limit
             </Text>
             <Switch
-              trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+              trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.switchTrackOn }}
               thumbColor="#FFFFFF"
-              ios_backgroundColor="#E9E9EA"
+              ios_backgroundColor={appTheme.colors.switchTrackOff}
               onValueChange={setHasRetailPriceLimit}
               value={hasRetailPriceLimit}
               style={styles.switchControl}
@@ -470,9 +470,9 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
               {isListed ? 'Listed' : 'Unlisted'}
             </Text>
             <Switch
-              trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+              trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.switchTrackOn }}
               thumbColor="#FFFFFF"
-              ios_backgroundColor="#E9E9EA"
+              ios_backgroundColor={appTheme.colors.switchTrackOff}
               onValueChange={handleListedToggle}
               value={isListed}
               style={styles.switchControl}

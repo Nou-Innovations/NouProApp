@@ -204,9 +204,9 @@ export default function PurchaseRequestDetailScreen() {
         {/* Rejection reason */}
         {pr.status === 'REJECTED' && !!pr.rejectionReason && (
           <>
-            <Text style={[styles.sectionTitle, { color: '#FF2400' }]}>Rejection Reason</Text>
+            <Text style={[styles.sectionTitle, { color: appTheme.colors.error }]}>Rejection Reason</Text>
             <View style={[styles.card, { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}>
-              <Text style={[styles.notesText, { color: '#991B1B' }]}>{pr.rejectionReason}</Text>
+              <Text style={[styles.notesText, { color: appTheme.colors.error }]}>{pr.rejectionReason}</Text>
             </View>
           </>
         )}
@@ -215,14 +215,14 @@ export default function PurchaseRequestDetailScreen() {
         {pr.status === 'SUBMITTED' && (
           <View style={styles.actionRow}>
             <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#2ACF01' }]}
+              style={[styles.actionButton, { backgroundColor: appTheme.colors.success }]}
               onPress={onApprove}
               disabled={actionLoading}
             >
               <Text style={styles.actionButtonText}>Approve</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#FF2400' }]}
+              style={[styles.actionButton, { backgroundColor: appTheme.colors.error }]}
               onPress={onReject}
               disabled={actionLoading}
             >
@@ -233,7 +233,7 @@ export default function PurchaseRequestDetailScreen() {
 
         {pr.status === 'APPROVED' && (
           <TouchableOpacity
-            style={[styles.convertButton, { backgroundColor: '#000000', opacity: actionLoading ? 0.6 : 1 }]}
+            style={[styles.convertButton, { backgroundColor: appTheme.colors.primary, opacity: actionLoading ? 0.6 : 1 }]}
             onPress={onConvert}
             disabled={actionLoading}
           >

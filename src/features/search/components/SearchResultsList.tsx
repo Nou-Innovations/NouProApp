@@ -236,10 +236,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#374151',
+    color: '#1C1917',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FAF8F5',
   },
   loadingRow: {
     paddingVertical: 16,
@@ -250,21 +250,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 10,
     marginRight: 12,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#ECE6DF',
   },
   messageContent: {
     flex: 1,
   },
   itemName: {
     fontSize: 16,
-    color: '#111827',
+    color: '#1C1917',
     marginBottom: 2,
   },
   messagePreview: {
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#57534E',
     marginLeft: 8,
   },
   seeMoreContainer: {
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#ECE6DF',
   },
   seeMoreText: {
     fontSize: 14,
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   },
   noResultsText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#57534E',
     textAlign: 'center',
     padding: 20,
   },

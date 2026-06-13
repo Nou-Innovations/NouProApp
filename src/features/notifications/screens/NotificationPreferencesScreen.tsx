@@ -99,9 +99,9 @@ export default function NotificationPreferencesScreen() {
               <Switch
                 value={prefs?.[cat.key] ?? true}
                 onValueChange={(value) => handleToggle(cat.key, value)}
-                trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+                trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.switchTrackOn }}
                 thumbColor="#FFFFFF"
-                ios_backgroundColor="#E9E9EA"
+                ios_backgroundColor={appTheme.colors.switchTrackOff}
               />
             </View>
           ))}

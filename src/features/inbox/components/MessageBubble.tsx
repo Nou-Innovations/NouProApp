@@ -78,19 +78,20 @@ export interface MessageBubbleProps {
 // Sender Name Colors - Consistent colors based on sender name hash
 // ============================================================================
 
+// Warm-biased per-sender palette (matches the theme's warm avatar tones)
 const SENDER_COLORS = [
-  '#E91E63', // Pink
-  '#9C27B0', // Purple
-  '#673AB7', // Deep Purple
-  '#3F51B5', // Indigo
-  '#2196F3', // Blue
-  '#00BCD4', // Cyan
-  '#009688', // Teal
-  '#4CAF50', // Green
-  '#8BC34A', // Light Green
-  '#FF9800', // Orange
-  '#FF5722', // Deep Orange
-  '#795548', // Brown
+  '#F0705F', // Coral
+  '#E8825A', // Terracotta
+  '#E8A33D', // Amber
+  '#C9A227', // Gold
+  '#8DA34B', // Olive
+  '#5FA88C', // Sage Teal
+  '#4E9BB5', // Blue
+  '#5B7FD6', // Indigo
+  '#8B6FD6', // Violet
+  '#B06BB5', // Orchid
+  '#C77BA0', // Rose
+  '#A8826B', // Clay
 ];
 
 function getSenderNameColor(senderName: string): string {
@@ -1099,7 +1100,7 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#A8A29E',
     marginRight: 2,
   },
   timestampContainer: {
@@ -1293,12 +1294,12 @@ const styles = StyleSheet.create({
   replyContextContainerIncoming: {
     backgroundColor: 'rgba(0, 0, 0, 0.05)',
     borderLeftWidth: 4,
-    borderLeftColor: '#d1d5db',
+    borderLeftColor: '#ECE6DF',
   },
   replyContextContainerOutgoing: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderLeftWidth: 4,
-    borderLeftColor: '#E2E8F0',
+    borderLeftColor: '#ECE6DF',
   },
   replyContextIndicator: {
     width: 4,

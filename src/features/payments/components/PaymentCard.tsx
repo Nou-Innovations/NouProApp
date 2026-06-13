@@ -8,11 +8,11 @@ import { Payment, PaymentProcessingStatus } from '@/shared/types/payment';
 import { CURRENCY } from '@/shared/types/subscription';
 
 const STATUS_COLORS: Record<PaymentProcessingStatus, string> = {
-  PENDING: '#F59E0B',
-  PROCESSING: '#3B82F6',
-  SUCCEEDED: '#22C55E',
-  FAILED: '#EF4444',
-  CANCELED: '#6B7280',
+  PENDING: '#F2A900',
+  PROCESSING: '#2A75E6',
+  SUCCEEDED: '#34A853',
+  FAILED: '#D6453E',
+  CANCELED: '#57534E',
   REFUNDED: '#8B5CF6',
 };
 

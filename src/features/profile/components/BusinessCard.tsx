@@ -24,7 +24,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ businessName, businessLogo,
       style={[
         styles.cardContainer, 
         { 
-          backgroundColor: '#F6F3F0',
+          backgroundColor: appTheme.colors.surface,
           borderBottomColor: appTheme.colors.borderColor 
         }
       ]}

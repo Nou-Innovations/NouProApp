@@ -84,7 +84,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({
   calendarHeight = 340,
   disabled = false,
   selectedColor = theme.colors.primary,
-  todayColor = '#F3F4F6',
+  todayColor = theme.colors.surface,
   firstDayOfWeek = 0,
   onMonthChange,
 }) => {
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
   monthTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
+    color: '#1C1917',
     textAlign: 'center',
     marginBottom: 32,
     fontFamily: 'InterCustom-SemiBold',
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   weekdayText: {
     fontSize: 14,
     fontWeight: '400',
-    color: '#6B7280',
+    color: '#57534E',
     width: 40,
     textAlign: 'center',
     fontFamily: 'InterCustom-Regular',
@@ -432,12 +432,12 @@ const styles = StyleSheet.create({
   },
   dayText: {
     fontSize: 16,
-    color: '#111827',
+    color: '#1C1917',
     textAlign: 'center',
     fontFamily: 'InterCustom-Regular',
   },
   dayToday: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FAF8F5',
   },
   dayTodayText: {
     fontWeight: '600',
@@ -453,16 +453,16 @@ const styles = StyleSheet.create({
   },
   dayOtherMonth: {
     opacity: 0.3,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FAF8F5',
   },
   dayOtherMonthText: {
-    color: '#9CA3AF',
+    color: '#A8A29E',
   },
   dayDisabled: {
     opacity: 0.3,
   },
   dayDisabledText: {
-    color: '#9CA3AF',
+    color: '#A8A29E',
   },
 });
 

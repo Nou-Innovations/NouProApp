@@ -152,7 +152,7 @@ export function OrderUpdatesTimeline({
                 <View
                   style={[
                     styles.timelineLine,
-                    { backgroundColor: update.completed ? '#22C55E' : '#E5E7EB' }
+                    { backgroundColor: update.completed ? theme.colors.success : theme.colors.borderColor }
                   ]}
                 />
               )}
@@ -166,7 +166,7 @@ export function OrderUpdatesTimeline({
               <Text
                 style={[
                   styles.timelineStatus,
-                  { color: update.completed || update.isCurrent ? '#111827' : '#9CA3AF' }
+                  { color: update.completed || update.isCurrent ? theme.colors.text : theme.colors.textMuted }
                 ]}
               >
                 {update.status}
@@ -183,12 +183,12 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: theme.colors.borderColor,
   },
   title: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
+    color: theme.colors.text,
     fontFamily: 'InterCustom-SemiBold',
     marginBottom: 16,
   },
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 8,
-    backgroundColor: '#22C55E',
+    backgroundColor: theme.colors.success,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: theme.colors.borderColor,
     backgroundColor: 'transparent',
   },
   timelineLine: {

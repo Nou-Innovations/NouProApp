@@ -104,15 +104,15 @@ const CartItemCard: React.FC<CartItemCardProps> = ({ item, businessId }) => {
       {/* Remove Button */}
       <TouchableOpacity 
         style={[
-          styles.removeButton, 
-          { backgroundColor: '#F6F3F0' }
+          styles.removeButton,
+          { backgroundColor: appTheme.colors.buttonBackground }
         ]}
         onPress={handleRemove}
       >
-        <Icon 
-          name="remove" 
-          size={20} 
-          color="#D0CAC8" 
+        <Icon
+          name="remove"
+          size={20}
+          color={appTheme.colors.textMuted}
         />
       </TouchableOpacity>
 
@@ -135,7 +135,7 @@ const CartItemCard: React.FC<CartItemCardProps> = ({ item, businessId }) => {
                onBlur={handleQuantityBlur}
                keyboardType="number-pad"
                placeholder="1"
-               placeholderTextColor="#D0CAC8"
+               placeholderTextColor={appTheme.colors.textMuted}
                selectionColor={appTheme.colors.primary}
                selectTextOnFocus={false}
                autoFocus={false}
@@ -184,8 +184,8 @@ const styles = StyleSheet.create({
   productImage: { 
     width: '100%', 
     height: '100%', 
-    borderRadius: theme.borderRadius.md, 
-    backgroundColor: '#F0F0F0' 
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: '#FAF8F5'
   },
   imagePlaceholder: { 
     width: '100%', 

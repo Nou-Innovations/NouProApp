@@ -39,13 +39,13 @@ const SettingsOption: React.FC<SettingsOptionProps> = ({
   
   const getIconColor = () => {
     if (disabled) return appTheme.colors.textMuted;
-    if (isDestructive) return '#DC2626';
+    if (isDestructive) return appTheme.colors.error;
     return appTheme.colors.iconColor;
   };
 
   const getTextColor = () => {
     if (disabled) return appTheme.colors.textMuted;
-    if (isDestructive) return '#DC2626';
+    if (isDestructive) return appTheme.colors.error;
     return appTheme.colors.text;
   };
   

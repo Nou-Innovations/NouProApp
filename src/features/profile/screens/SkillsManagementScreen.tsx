@@ -102,11 +102,11 @@ export default function SkillsManagementScreen() {
 
   const renderSearchResult = ({ item }: { item: Skill }) => (
     <TouchableOpacity
-      style={[styles.searchItem, { borderBottomColor: '#E1E4EA' }]}
+      style={[styles.searchItem, { borderBottomColor: appTheme.colors.borderColor }]}
       onPress={() => handleAddSkill(item.name)}
       disabled={isAdding}
     >
-      <Icon name="add-circle-outline" size={20} color="#22C55E" />
+      <Icon name="add-circle-outline" size={20} color={appTheme.colors.success} />
       <Text style={[styles.searchItemText, { color: appTheme.colors.text }]}>{item.name}</Text>
     </TouchableOpacity>
   );
@@ -115,7 +115,7 @@ export default function SkillsManagementScreen() {
     <View style={styles.skillPill}>
       <Text style={styles.skillPillText}>{item.skill.name}</Text>
       <TouchableOpacity onPress={() => handleRemoveSkill(item.skillId)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Icon name="close-circle" size={18} color="#EF4444" />
+        <Icon name="close-circle" size={18} color={appTheme.colors.error} />
       </TouchableOpacity>
     </View>
   );
@@ -130,18 +130,18 @@ export default function SkillsManagementScreen() {
       <View style={styles.content}>
         {/* Search bar */}
         <View style={styles.searchContainer}>
-          <View style={[styles.searchInputWrapper, { borderColor: searchQuery ? '#000000' : '#DAD3D1', backgroundColor: '#FFFFFF' }]}>
-            <Icon name="search-outline" size={20} color="#777777" />
+          <View style={[styles.searchInputWrapper, { borderColor: searchQuery ? appTheme.colors.text : appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]}>
+            <Icon name="search-outline" size={20} color={appTheme.colors.textMuted} />
             <TextInput
               style={[styles.searchInput, { color: appTheme.colors.text }]}
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search skills to add..."
-              placeholderTextColor="#777777"
+              placeholderTextColor={appTheme.colors.textMuted}
             />
             {searchQuery ? (
               <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
-                <Icon name="close-circle" size={20} color="#777777" />
+                <Icon name="close-circle" size={20} color={appTheme.colors.textMuted} />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -162,7 +162,7 @@ export default function SkillsManagementScreen() {
           {/* "Add custom" option when search has text but no exact match */}
           {searchQuery.trim() && !searchResults.some((s) => s.name.toLowerCase() === searchQuery.trim().toLowerCase()) && (
             <TouchableOpacity
-              style={[styles.addCustomButton, { backgroundColor: '#F4F0EB' }]}
+              style={[styles.addCustomButton, { backgroundColor: appTheme.colors.buttonBackground }]}
               onPress={() => handleAddSkill(searchQuery.trim())}
               disabled={isAdding}
             >
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   searchDropdown: {
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#DAD3D1',
+    borderColor: '#ECE6DF',
     maxHeight: 200,
     marginTop: 4,
     shadowColor: '#000',
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
   skillPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#FAF8F5',
     borderRadius: 20,
     paddingVertical: 8,
     paddingLeft: 14,
@@ -286,6 +286,6 @@ const styles = StyleSheet.create({
   skillPillText: {
     fontSize: 14,
     fontFamily: theme.fonts.primary.medium,
-    color: '#333333',
+    color: '#1C1917',
   },
 });

@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#FF3B30',
+    backgroundColor: '#D6453E',
   },
   timer: {
     fontSize: theme.fontSize.lg,

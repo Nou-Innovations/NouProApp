@@ -908,7 +908,7 @@ const styles = StyleSheet.create({
   coverContainer: {
     height: COVER_HEIGHT,
     width: '100%',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FAF8F5',
     position: 'relative',
   },
   coverImage: {
@@ -997,7 +997,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#000000',
+    borderColor: '#1C1917',
     borderRadius: 8,
     height: 40,
     justifyContent: 'center',
@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
   },
   shareButton: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#1C1917',
     borderRadius: 8,
     height: 40,
     justifyContent: 'center',
@@ -1100,7 +1100,7 @@ const styles = StyleSheet.create({
   infoLink: {
     fontSize: 16,
     fontFamily: theme.fonts.primary.regular,
-    color: '#0066FF',
+    color: '#2A75E6',
   },
   businessHoursSection: {
     marginTop: 8,
@@ -1168,10 +1168,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     marginHorizontal: 0,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#E1E4EA',
+    borderBottomColor: '#ECE6DF',
   },
   profileRowActive: {
-    backgroundColor: '#000000',
+    backgroundColor: '#1C1917',
     borderRadius: 0,
     borderBottomWidth: 0,
     marginHorizontal: -12,
@@ -1181,7 +1181,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FAF8F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1208,10 +1208,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#E1E4EA',
+    borderBottomColor: '#ECE6DF',
   },
   locationRowActive: {
-    backgroundColor: '#000000',
+    backgroundColor: '#1C1917',
     borderBottomWidth: 0,
     marginHorizontal: -12,
     paddingHorizontal: 12,
@@ -1249,13 +1249,13 @@ const styles = StyleSheet.create({
   primaryBadgeText: {
     fontSize: 10,
     fontFamily: theme.fonts.primary.semiBold,
-    color: '#2E7D32',
+    color: '#34A853',
   },
   addNewBusinessButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000',
+    backgroundColor: '#1C1917',
     borderRadius: 8,
     height: 56,
     marginTop: 24,
@@ -1283,7 +1283,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 12,
     marginBottom: 8,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FAF8F5',
   },
   addOptionIconContainer: {
     width: 48,

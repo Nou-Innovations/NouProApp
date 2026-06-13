@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
   },
   selectedCompanyItem: {
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    backgroundColor: 'rgba(42, 117, 230, 0.1)',
   },
   companyItemContent: {
     flexDirection: 'row',

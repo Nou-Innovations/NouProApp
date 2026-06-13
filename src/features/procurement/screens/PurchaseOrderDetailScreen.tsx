@@ -251,7 +251,7 @@ export default function PurchaseOrderDetailScreen() {
           <View style={styles.actionsSection}>
             {po.status === 'DRAFT' && (
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#0075FF' }]}
+                style={[styles.actionButton, { backgroundColor: appTheme.colors.info }]}
                 onPress={onSend}
                 disabled={actionLoading}
               >
@@ -261,7 +261,7 @@ export default function PurchaseOrderDetailScreen() {
 
             {po.status === 'SENT' && (
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#2ACF01' }]}
+                style={[styles.actionButton, { backgroundColor: appTheme.colors.success }]}
                 onPress={onConfirm}
                 disabled={actionLoading}
               >
@@ -271,7 +271,7 @@ export default function PurchaseOrderDetailScreen() {
 
             {po.status === 'CONFIRMED' && (
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#2ACF01' }]}
+                style={[styles.actionButton, { backgroundColor: appTheme.colors.success }]}
                 onPress={onReceiveGoods}
                 disabled={actionLoading}
               >
@@ -280,7 +280,7 @@ export default function PurchaseOrderDetailScreen() {
             )}
 
             <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#FF2400' }]}
+              style={[styles.actionButton, { backgroundColor: appTheme.colors.error }]}
               onPress={onCancel}
               disabled={actionLoading}
             >

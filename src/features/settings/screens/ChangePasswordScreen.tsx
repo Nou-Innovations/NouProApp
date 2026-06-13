@@ -116,11 +116,11 @@ export default function ChangePasswordScreen({ navigation }: ChangePasswordScree
           <Icon 
             name={passwordValidation[key as keyof PasswordValidation] ? "checkmark-circle" : "ellipse-outline"} 
             size={16} 
-            color={passwordValidation[key as keyof PasswordValidation] ? '#10B981' : appTheme.colors.textLight} 
+            color={passwordValidation[key as keyof PasswordValidation] ? appTheme.colors.success : appTheme.colors.textLight}
           />
           <Text style={[
             styles.requirementText, 
-            { color: passwordValidation[key as keyof PasswordValidation] ? '#10B981' : appTheme.colors.textLight }
+            { color: passwordValidation[key as keyof PasswordValidation] ? appTheme.colors.success : appTheme.colors.textLight }
           ]}>
             {requirement}
           </Text>
@@ -176,9 +176,9 @@ export default function ChangePasswordScreen({ navigation }: ChangePasswordScree
               <Icon 
                 name={passwordsMatch ? "checkmark-circle" : "close-circle"} 
                 size={16} 
-                color={passwordsMatch ? '#10B981' : '#EF4444'} 
+                color={passwordsMatch ? appTheme.colors.success : appTheme.colors.error}
               />
-              <Text style={[styles.matchText, { color: passwordsMatch ? '#10B981' : '#EF4444' }]}>
+              <Text style={[styles.matchText, { color: passwordsMatch ? appTheme.colors.success : appTheme.colors.error }]}>
                 {passwordsMatch ? 'Passwords match' : 'Passwords do not match'}
               </Text>
             </View>

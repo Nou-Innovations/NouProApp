@@ -162,51 +162,51 @@ export default function EditCertificationScreen() {
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.section}>
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Certification Name *</Text>
-              <TextInput style={[styles.infoInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]} value={name} onChangeText={setName} placeholder="Certification name" placeholderTextColor="#777777" />
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Certification Name *</Text>
+              <TextInput style={[styles.infoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]} value={name} onChangeText={setName} placeholder="Certification name" placeholderTextColor={appTheme.colors.textMuted} />
             </View>
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Issuing Organization *</Text>
-              <TextInput style={[styles.infoInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]} value={issuingOrganization} onChangeText={setIssuingOrganization} placeholder="Issuing organization" placeholderTextColor="#777777" />
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Issuing Organization *</Text>
+              <TextInput style={[styles.infoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]} value={issuingOrganization} onChangeText={setIssuingOrganization} placeholder="Issuing organization" placeholderTextColor={appTheme.colors.textMuted} />
             </View>
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Issue Date</Text>
-              <TextInput style={[styles.infoInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]} value={issueDate} onChangeText={setIssueDate} placeholder="e.g., Mar 2024" placeholderTextColor="#777777" />
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Issue Date</Text>
+              <TextInput style={[styles.infoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]} value={issueDate} onChangeText={setIssueDate} placeholder="e.g., Mar 2024" placeholderTextColor={appTheme.colors.textMuted} />
             </View>
             <View style={styles.infoItem}>
               <View style={styles.labelRow}>
-                <Text style={[styles.infoLabel, styles.labelNoMargin, { color: '#777777' }]}>Expiration Date</Text>
+                <Text style={[styles.infoLabel, styles.labelNoMargin, { color: appTheme.colors.textMuted }]}>Expiration Date</Text>
                 <TouchableOpacity style={styles.checkboxRow} onPress={() => setDoesNotExpire(!doesNotExpire)}>
-                  <View style={[styles.checkbox, { borderColor: '#DAD3D1', backgroundColor: doesNotExpire ? '#22C55E' : 'transparent' }]}>
+                  <View style={[styles.checkbox, { borderColor: appTheme.colors.borderColor, backgroundColor: doesNotExpire ? appTheme.colors.success : 'transparent' }]}>
                     {doesNotExpire && <Icon name="checkmark" size={14} color="#FFFFFF" />}
                   </View>
-                  <Text style={[styles.checkboxLabel, { color: '#777777' }]}>Does not expire</Text>
+                  <Text style={[styles.checkboxLabel, { color: appTheme.colors.textMuted }]}>Does not expire</Text>
                 </TouchableOpacity>
               </View>
-              <TextInput style={[styles.infoInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: doesNotExpire ? appTheme.colors.buttonBackgroundDisabled : '#FFFFFF' }]} value={doesNotExpire ? 'No Expiration' : expirationDate} onChangeText={setExpirationDate} placeholder="e.g., Mar 2027" placeholderTextColor="#777777" editable={!doesNotExpire} />
+              <TextInput style={[styles.infoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: doesNotExpire ? appTheme.colors.buttonBackgroundDisabled : '#FFFFFF' }]} value={doesNotExpire ? 'No Expiration' : expirationDate} onChangeText={setExpirationDate} placeholder="e.g., Mar 2027" placeholderTextColor={appTheme.colors.textMuted} editable={!doesNotExpire} />
             </View>
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Credential ID</Text>
-              <TextInput style={[styles.infoInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]} value={credentialId} onChangeText={setCredentialId} placeholder="Optional credential ID" placeholderTextColor="#777777" />
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Credential ID</Text>
+              <TextInput style={[styles.infoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]} value={credentialId} onChangeText={setCredentialId} placeholder="Optional credential ID" placeholderTextColor={appTheme.colors.textMuted} />
             </View>
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Credential URL</Text>
-              <TextInput style={[styles.infoInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]} value={credentialUrl} onChangeText={setCredentialUrl} placeholder="https://..." placeholderTextColor="#777777" autoCapitalize="none" keyboardType="url" />
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Credential URL</Text>
+              <TextInput style={[styles.infoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]} value={credentialUrl} onChangeText={setCredentialUrl} placeholder="https://..." placeholderTextColor={appTheme.colors.textMuted} autoCapitalize="none" keyboardType="url" />
             </View>
           </View>
         </ScrollView>
 
         <View style={styles.bottomContainer}>
           <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity style={[styles.actionButton, styles.saveButton, { backgroundColor: hasChanges ? '#22C55E' : appTheme.colors.buttonBackgroundDisabled }]} onPress={handleSave} disabled={!hasChanges || isSaving}>
+            <TouchableOpacity style={[styles.actionButton, styles.saveButton, { backgroundColor: hasChanges ? appTheme.colors.success : appTheme.colors.buttonBackgroundDisabled }]} onPress={handleSave} disabled={!hasChanges || isSaving}>
               <Text style={[styles.saveButtonText, { color: hasChanges ? '#FFFFFF' : appTheme.colors.textMuted }]}>{isSaving ? 'Saving...' : 'Save Changes'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.deleteButton} onPress={() => setShowDeleteDialog(true)}>
-              <Icon name="trash-outline" size={20} color="#EF4444" />
+              <Icon name="trash-outline" size={20} color={appTheme.colors.error} />
               <Text style={styles.deleteButtonText}>Remove Certification</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.actionButton, styles.cancelButton, { backgroundColor: '#FFFFFF' }]} onPress={() => navigation.goBack()}>
-              <Text style={[styles.cancelButtonText, { color: '#000000' }]}>Cancel</Text>
+              <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -241,6 +241,6 @@ const styles = StyleSheet.create({
   saveButtonText: { fontSize: 16, fontFamily: theme.fonts.primary.semiBold },
   cancelButton: {},
   cancelButtonText: { fontSize: 16, fontFamily: theme.fonts.primary.semiBold },
-  deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 56, borderRadius: 8, backgroundColor: 'transparent', borderWidth: 1, borderColor: '#EF4444', marginTop: 8 },
-  deleteButtonText: { fontSize: 16, fontFamily: theme.fonts.primary.medium, color: '#EF4444', marginLeft: 8 },
+  deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 56, borderRadius: 8, backgroundColor: 'transparent', borderWidth: 1, borderColor: '#D6453E', marginTop: 8 },
+  deleteButtonText: { fontSize: 16, fontFamily: theme.fonts.primary.medium, color: '#D6453E', marginLeft: 8 },
 });

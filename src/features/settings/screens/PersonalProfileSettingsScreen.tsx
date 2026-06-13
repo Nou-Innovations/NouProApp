@@ -44,12 +44,12 @@ const SettingsOption: React.FC<SettingsOptionProps> = ({
       <View style={styles.settingLeft}>
         <Icon 
           size={24} 
-          color={isDestructive ? '#DC2626' : appTheme.colors.iconColor} 
+          color={isDestructive ? appTheme.colors.error : appTheme.colors.iconColor}
           strokeWidth={2}
         />
         <Text style={[
           styles.settingText, 
-          { color: isDestructive ? '#DC2626' : appTheme.colors.text }
+          { color: isDestructive ? appTheme.colors.error : appTheme.colors.text }
         ]}>
           {title}
         </Text>

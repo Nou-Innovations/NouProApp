@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 20,
     fontFamily: theme.fonts.primary.medium,
-    color: '#000000',
+    color: '#1C1917',
     marginTop: 28,
   },
   userNameRow: {
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 40,
     fontFamily: theme.fonts.primary.bold,
-    color: '#000000',
+    color: '#1C1917',
     marginTop: 2,
     marginBottom: 20,
   },

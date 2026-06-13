@@ -35,7 +35,7 @@ export interface AnimatedMenuIconProps {
  */
 export default function AnimatedMenuIcon({
   size = 26,
-  color = '#000000',
+  color = '#1C1917',
   lineWidth = 22,
   strokeWidth = 2.5,
   gap = 7,

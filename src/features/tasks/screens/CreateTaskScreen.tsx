@@ -42,9 +42,9 @@ const TYPE_OPTIONS: { label: string; value: TaskType }[] = [
 ];
 
 const PRIORITY_OPTIONS: { label: string; value: TaskPriority; color: string }[] = [
-  { label: 'Low', value: 'LOW', color: '#6B7280' },
-  { label: 'Normal', value: 'NORMAL', color: '#0EA5E9' },
-  { label: 'Urgent', value: 'URGENT', color: '#EF4444' },
+  { label: 'Low', value: 'LOW', color: '#A8A29E' },
+  { label: 'Normal', value: 'NORMAL', color: '#2A75E6' },
+  { label: 'Urgent', value: 'URGENT', color: '#D6453E' },
 ];
 
 export default function CreateTaskScreen() {
@@ -110,25 +110,25 @@ export default function CreateTaskScreen() {
           <View style={styles.section}>
             {/* Title */}
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Title *</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Title *</Text>
               <TextInput
-                style={[styles.infoInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]}
+                style={[styles.infoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]}
                 value={title}
                 onChangeText={setTitle}
                 placeholder="What needs to be done?"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
               />
             </View>
 
             {/* Description */}
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Description</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Description</Text>
               <TextInput
-                style={[styles.multilineInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]}
+                style={[styles.multilineInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]}
                 value={description}
                 onChangeText={setDescription}
                 placeholder="Add details..."
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
@@ -137,7 +137,7 @@ export default function CreateTaskScreen() {
 
             {/* Type selector */}
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Type</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Type</Text>
               <View style={styles.chipRow}>
                 {TYPE_OPTIONS.map((opt) => (
                   <TouchableOpacity
@@ -153,7 +153,7 @@ export default function CreateTaskScreen() {
 
             {/* Priority selector */}
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Priority</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Priority</Text>
               <View style={styles.chipRow}>
                 {PRIORITY_OPTIONS.map((opt) => (
                   <TouchableOpacity
@@ -172,13 +172,13 @@ export default function CreateTaskScreen() {
 
             {/* Due Date */}
             <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: '#777777' }]}>Due Date</Text>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.textMuted }]}>Due Date</Text>
               <TextInput
-                style={[styles.infoInput, { color: appTheme.colors.text, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' }]}
+                style={[styles.infoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: '#FFFFFF' }]}
                 value={dueDate}
                 onChangeText={setDueDate}
                 placeholder="e.g., Apr 15, 2026"
-                placeholderTextColor="#777777"
+                placeholderTextColor={appTheme.colors.textMuted}
               />
             </View>
           </View>
@@ -187,14 +187,14 @@ export default function CreateTaskScreen() {
         <View style={styles.bottomContainer}>
           <View style={styles.actionButtonsContainer}>
             <TouchableOpacity
-              style={[styles.actionButton, styles.saveButton, { backgroundColor: hasChanges ? '#22C55E' : appTheme.colors.buttonBackgroundDisabled }]}
+              style={[styles.actionButton, styles.saveButton, { backgroundColor: hasChanges ? appTheme.colors.success : appTheme.colors.buttonBackgroundDisabled }]}
               onPress={handleSave}
               disabled={!hasChanges || isSaving}
             >
               <Text style={[styles.saveButtonText, { color: hasChanges ? '#FFFFFF' : appTheme.colors.textMuted }]}>{isSaving ? 'Creating...' : 'Create Task'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.actionButton, styles.cancelButton, { backgroundColor: '#FFFFFF' }]} onPress={() => navigation.goBack()}>
-              <Text style={[styles.cancelButtonText, { color: '#000000' }]}>Cancel</Text>
+              <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -216,9 +216,9 @@ const styles = StyleSheet.create({
   infoInput: { fontSize: 16, fontFamily: themeConstants.fonts.primary.semiBold, borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, height: 40, justifyContent: 'center' },
   multilineInput: { fontSize: 16, fontFamily: themeConstants.fonts.primary.semiBold, borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, minHeight: 100 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: '#DAD3D1', backgroundColor: '#FFFFFF' },
-  chipSelected: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
-  chipText: { fontSize: 14, fontFamily: themeConstants.fonts.primary.medium, color: '#666666' },
+  chip: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: '#ECE6DF', backgroundColor: '#FFFFFF' },
+  chipSelected: { backgroundColor: '#34A853', borderColor: '#34A853' },
+  chipText: { fontSize: 14, fontFamily: themeConstants.fonts.primary.medium, color: '#57534E' },
   chipTextSelected: { color: '#FFFFFF' },
   bottomContainer: { paddingBottom: 32 },
   actionButtonsContainer: { paddingHorizontal: 12, gap: 0 },

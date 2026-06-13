@@ -71,14 +71,14 @@ const formatDateTime = (date: Date) => {
 // Get color for delivery status
 const getDeliveryStatusColor = (status: DeliveryStatus) => {
   switch (status) {
-    case 'NOT_ASSIGNED': return '#FF3B30';
+    case 'NOT_ASSIGNED': return theme.colors.error;
     case 'ASSIGNED': return theme.colors.warning;
     case 'PACKED': return theme.colors.info;
     case 'OUT_FOR_DELIVERY': return theme.colors.info;
     case 'DELIVERED': return theme.colors.success;
     case 'FAILED': return theme.colors.error;
     case 'CANCELED': return theme.colors.neutral;
-    default: return '#6B7280';
+    default: return theme.colors.textSecondary;
   }
 };
 
@@ -92,7 +92,7 @@ const getPaymentStatusColor = (status: PaymentStatus | string) => {
     case 'PENDING_CONFIRMATION': return theme.colors.warning;
     case 'OVERDUE': return theme.colors.error;
     case 'FAILED': return theme.colors.error;
-    default: return '#6B7280';
+    default: return theme.colors.textSecondary;
   }
 };
 
@@ -171,7 +171,7 @@ export function OrderDetailsSection({
             activeOpacity={0.7}
           >
             <Text style={styles.customFieldText}>{value}</Text>
-            <Icon name="chevron-down" size={20} color="#6B7280" />
+            <Icon name="chevron-down" size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
         </View>
       ) : (
@@ -214,7 +214,7 @@ export function OrderDetailsSection({
         <Icon
           name={isExpanded ? 'chevron-up' : 'chevron-down'}
           size={24}
-          color="#6B7280"
+          color={theme.colors.textSecondary}
         />
       </TouchableOpacity>
 
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: theme.colors.borderColor,
   },
   headerToggle: {
     flexDirection: 'row',
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
+    color: theme.colors.text,
     fontFamily: 'InterCustom-SemiBold',
   },
   infoItem: {
@@ -306,13 +306,13 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 14,
     fontWeight: '400',
-    color: '#374151',
+    color: theme.colors.text,
     marginBottom: 8,
     fontFamily: 'InterCustom-SemiBold',
   },
   simpleInfoText: {
     fontSize: 16,
-    color: '#111827',
+    color: theme.colors.text,
     marginTop: 4,
     fontFamily: 'InterCustom-Regular',
   },
@@ -322,8 +322,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
+    borderColor: theme.colors.borderColor,
+    backgroundColor: theme.colors.surface,
     height: 48,
     overflow: 'hidden',
   },
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
   },
   customFieldText: {
     fontSize: 16,
-    color: '#111827',
+    color: theme.colors.text,
     fontFamily: 'InterCustom-Medium',
     flex: 1,
     marginRight: 12,

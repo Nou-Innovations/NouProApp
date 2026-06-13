@@ -111,8 +111,8 @@ export default function TasksScreen() {
       </View>
       {overdueCount > 0 && (
         <View style={[styles.statBox, { backgroundColor: '#FEE2E2' }]}>
-          <Text style={[styles.statCount, { color: '#EF4444' }]}>{overdueCount}</Text>
-          <Text style={[styles.statLabel, { color: '#EF4444' }]}>Overdue</Text>
+          <Text style={[styles.statCount, { color: appTheme.colors.error }]}>{overdueCount}</Text>
+          <Text style={[styles.statLabel, { color: appTheme.colors.error }]}>Overdue</Text>
         </View>
       )}
     </View>
@@ -199,12 +199,12 @@ const styles = StyleSheet.create({
   statCount: {
     fontSize: 20,
     fontFamily: themeConstants.fonts.primary.bold,
-    color: '#333333',
+    color: '#1C1917',
   },
   statLabel: {
     fontSize: 11,
     fontFamily: themeConstants.fonts.primary.medium,
-    color: '#666666',
+    color: '#57534E',
     marginTop: 2,
   },
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#22C55E',
+    backgroundColor: '#34A853',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',

@@ -50,24 +50,21 @@ export const generateAvatarColors = (name: string): [string, string] => {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
   
-  // Generate color pairs inspired by the button styling pattern
-  // Each pair: [lightBackground, darkText]
+  // Warm-biased, muted avatar palette (harmonized with the theme's warm avatar tones).
+  // Each pair: [lightWarmTintBackground, deepWarmText]
   const colorPairs: [string, string][] = [
-    ['#FEE2E2', '#DC2626'], // Red (like logout button)
-    ['#FED7AA', '#EA580C'], // Orange
-    ['#FEF3C7', '#D97706'], // Amber
-    ['#D1FAE5', '#059669'], // Emerald
-    ['#CFFAFE', '#0891B2'], // Cyan
-    ['#DBEAFE', '#2563EB'], // Blue
-    ['#EDE9FE', '#7C3AED'], // Violet
-    ['#FCE7F3', '#DB2777'], // Pink
-    ['#EEF2FF', '#4F46E5'], // Indigo (like help button)
-    ['#ECFDF5', '#65A30D'], // Lime
-    ['#FDF2F8', '#EC4899'], // Pink-Rose
-    ['#F3E8FF', '#8B5CF6'], // Purple
-    ['#DCFCE7', '#16A34A'], // Green
-    ['#EFF6FF', '#3B82F6'], // Light Blue
-    ['#FFFBEB', '#F59E0B'], // Yellow
+    ['#FBE7E3', '#C24A3C'], // Coral
+    ['#FAE9DF', '#C45E37'], // Terracotta
+    ['#FAF0DC', '#A9741C'], // Amber
+    ['#F4EFD7', '#8A6E15'], // Gold
+    ['#EBF0DD', '#5C7330'], // Olive
+    ['#E0EFE8', '#3C7D62'], // Sage Teal
+    ['#E1EEF2', '#3A7387'], // Muted Blue
+    ['#E5EBF8', '#3E5AA6'], // Indigo
+    ['#EBE4F7', '#5F46A6'], // Violet
+    ['#F2E4F2', '#88458E'], // Orchid
+    ['#F5E5ED', '#9C4F78'], // Rose
+    ['#F0E8E1', '#795B45'], // Clay
   ];
   
   const index = Math.abs(hash) % colorPairs.length;
@@ -88,23 +85,20 @@ export const generateAvatarGradient = (name: string): [string, string] => {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
   
-  // Generate gradient color pairs inspired by modern UI design
+  // Warm-biased, muted gradient pairs (harmonized with the theme's warm avatar tones)
   const gradients: [string, string][] = [
-    ['#EF4444', '#DC2626'], // Red gradient
-    ['#F97316', '#EA580C'], // Orange gradient
-    ['#F59E0B', '#D97706'], // Amber gradient
-    ['#10B981', '#059669'], // Emerald gradient
-    ['#06B6D4', '#0891B2'], // Cyan gradient
-    ['#3B82F6', '#2563EB'], // Blue gradient
-    ['#8B5CF6', '#7C3AED'], // Violet gradient
-    ['#EC4899', '#DB2777'], // Pink gradient
-    ['#6366F1', '#4F46E5'], // Indigo gradient
-    ['#84CC16', '#65A30D'], // Lime gradient
-    ['#F472B6', '#EC4899'], // Pink-Rose gradient
-    ['#A78BFA', '#8B5CF6'], // Purple gradient
-    ['#34D399', '#10B981'], // Green gradient
-    ['#60A5FA', '#3B82F6'], // Light Blue gradient
-    ['#FBBF24', '#F59E0B'], // Yellow gradient
+    ['#F0705F', '#D14E3D'], // Coral gradient
+    ['#ED9568', '#D9663A'], // Terracotta gradient
+    ['#EFB45A', '#CF8C28'], // Amber gradient
+    ['#D6B23E', '#AE8E1C'], // Gold gradient
+    ['#9DB35E', '#748E38'], // Olive gradient
+    ['#6FB89C', '#478B70'], // Sage Teal gradient
+    ['#62A6BC', '#407C92'], // Muted Blue gradient
+    ['#6E8DDC', '#4A69BE'], // Indigo gradient
+    ['#9B82DE', '#7457BE'], // Violet gradient
+    ['#BE7EC2', '#98599E'], // Orchid gradient
+    ['#D38BAE', '#AE6288'], // Rose gradient
+    ['#B89379', '#937053'], // Clay gradient
   ];
   
   const index = Math.abs(hash) % gradients.length;

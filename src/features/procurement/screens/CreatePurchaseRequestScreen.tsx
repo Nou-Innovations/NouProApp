@@ -42,9 +42,9 @@ interface ItemRow {
 const PRIORITIES: PurchaseRequestPriority[] = ['LOW', 'NORMAL', 'URGENT'];
 
 const PRIORITY_STYLES: Record<PurchaseRequestPriority, { bg: string; text: string }> = {
-  LOW: { bg: '#F3F4F6', text: '#6B7280' },
-  NORMAL: { bg: '#DBEAFE', text: '#0075FF' },
-  URGENT: { bg: '#FEE2E2', text: '#FF2400' },
+  LOW: { bg: '#FAF8F5', text: '#57534E' },
+  NORMAL: { bg: '#DBEAFE', text: '#2A75E6' },
+  URGENT: { bg: '#FEE2E2', text: '#D6453E' },
 };
 
 let keyCounter = 0;
@@ -212,7 +212,7 @@ export default function CreatePurchaseRequestScreen() {
                   <Text style={[styles.itemIndex, { color: appTheme.colors.textSecondary }]}>Item {index + 1}</Text>
                   {items.length > 1 && (
                     <TouchableOpacity onPress={() => removeItemRow(item.key)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                      <Icon name="close-circle" size={22} color="#FF2400" />
+                      <Icon name="close-circle" size={22} color={appTheme.colors.error} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderRadius: 8,
-    backgroundColor: '#000000',
+    backgroundColor: '#1C1917',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addToCartText: {
-    color: '#000000',
+    color: '#1C1917',
     fontSize: 16,
     fontWeight: '600',
   },

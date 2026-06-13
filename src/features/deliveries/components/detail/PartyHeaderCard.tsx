@@ -59,7 +59,7 @@ export function PartyHeaderCard({
             <Image source={{ uri: logoUri }} style={styles.logo} />
           ) : (
             <View style={styles.logoPlaceholder}>
-              <Icon name="business-outline" size={24} color="#4B5563" />
+              <Icon name="business-outline" size={24} color={theme.colors.textSecondary} />
             </View>
           )}
         </TouchableOpacity>
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: theme.colors.borderColor,
     backgroundColor: 'white',
   },
   header: {
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 30,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,

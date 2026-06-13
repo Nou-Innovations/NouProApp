@@ -83,7 +83,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
   
   // State for the different sections
   const [logoUri, setLogoUri] = useState<string | null>(null);
-  const [primaryColor, setPrimaryColor] = useState('#000000');
+  const [primaryColor, setPrimaryColor] = useState('#1C1917');
   const [isColorPickerVisible, setIsColorPickerVisible] = useState(false);
 
   // Client & Dates Section
@@ -836,9 +836,9 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
                 <Switch
                   value={isPublic}
                   onValueChange={setIsPublic}
-                  trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+                  trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.success }}
                   thumbColor="#FFFFFF"
-                  ios_backgroundColor="#E9E9EA"
+                  ios_backgroundColor={appTheme.colors.switchTrackOff}
                 />
               </View>
               
@@ -848,9 +848,9 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
                   <Switch
                     value={allowPartialPayments}
                     onValueChange={setAllowPartialPayments}
-                    trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+                    trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.success }}
                     thumbColor="#FFFFFF"
-                    ios_backgroundColor="#E9E9EA"
+                    ios_backgroundColor={appTheme.colors.switchTrackOff}
                   />
                 </View>
               )}
@@ -860,9 +860,9 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
                 <Switch
                   value={autoReminder}
                   onValueChange={setAutoReminder}
-                  trackColor={{ false: '#E9E9EA', true: '#2ACF01' }}
+                  trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.success }}
                   thumbColor="#FFFFFF"
-                  ios_backgroundColor="#E9E9EA"
+                  ios_backgroundColor={appTheme.colors.switchTrackOff}
                 />
               </View>
               
@@ -1601,7 +1601,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 8,
     marginRight: 12,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#FAF8F5',
   },
   productInfo: {
     flex: 1,

@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   timeValue: {
     fontSize: 24,
     fontWeight: '500',
-    color: '#111827',
+    color: '#1C1917',
     marginVertical: 8,
     fontFamily: 'InterCustom-Medium',
     minWidth: 36,
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   separator: {
     fontSize: 24,
     fontWeight: '500',
-    color: '#111827',
+    color: '#1C1917',
   },
   adjustButton: {
     padding: 8,
