@@ -42,7 +42,7 @@ export function ProQuickActions({ actions, isLoading }: ProQuickActionsProps) {
               style={[
                 styles.actionButton,
                 styles.actionSkeleton,
-                { backgroundColor: appTheme.colors.surface },
+                { backgroundColor: appTheme.colors.surface, borderColor: 'transparent' },
               ]}
             >
               <Skeleton width={48} height={48} borderRadius={12} />

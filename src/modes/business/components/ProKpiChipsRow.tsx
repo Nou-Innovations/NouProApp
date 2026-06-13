@@ -50,7 +50,7 @@ export function ProKpiChipsRow({ chips, isLoading, error }: ProKpiChipsRowProps)
               style={[
                 styles.chip,
                 styles.chipSkeleton,
-                { backgroundColor: appTheme.colors.surface },
+                { backgroundColor: appTheme.colors.surface, borderColor: 'transparent' },
               ]}
             >
               <Skeleton width={32} height={32} borderRadius={8} />

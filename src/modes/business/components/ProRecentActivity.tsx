@@ -68,7 +68,7 @@ export function ProRecentActivity({
         {[1, 2, 3].map((_, index) => (
           <View
             key={index}
-            style={[styles.itemContainer, { backgroundColor: appTheme.colors.surface }]}
+            style={[styles.itemContainer, { backgroundColor: appTheme.colors.surface, borderColor: 'transparent' }]}
           >
             <Skeleton width={40} height={40} borderRadius={10} />
             <SkeletonColumn gap={4} style={{ flex: 1 }}>

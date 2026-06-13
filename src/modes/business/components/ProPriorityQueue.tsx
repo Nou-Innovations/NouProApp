@@ -68,7 +68,7 @@ export function ProPriorityQueue({
   const { theme: appTheme } = useTheme();
 
   const renderSkeletonItem = () => (
-    <View style={[styles.itemContainer, { backgroundColor: appTheme.colors.surface }]}>
+    <View style={[styles.itemContainer, { backgroundColor: appTheme.colors.surface, borderColor: 'transparent' }]}>
       <Skeleton width={40} height={40} borderRadius={10} style={{ marginLeft: 12 }} />
       <SkeletonColumn gap={4} style={{ flex: 1 }}>
         <Skeleton width="60%" height={14} />
