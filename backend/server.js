@@ -202,6 +202,8 @@ const _orderDeliverySyncInProgress = new Set();
 // ---------------------------------------------------------------------------
 const deliveryStatusService = require('./src/services/deliveryStatus');
 const transferStatusService = require('./src/services/transferStatus');
+const returnService = require('./src/services/returnService');
+const recurringService = require('./src/services/recurringService');
 const { DELIVERY_STATUS_TRANSITIONS, isValidDeliveryTransition } = deliveryStatusService;
 // Named delivery-status constants — use DS.X instead of raw string literals so the
 // status-enum remodel is a single-source change.
@@ -6724,6 +6726,10 @@ app.get('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =>
 
     let items = await repos.deliveryRepo.getByBusinessId(companyId);
 
+    // Cutover (P9): transfers now live in the dedicated Transfer entity — hide any
+    // legacy type=transfer Delivery rows from the deliveries list.
+    items = items.filter(d => d.type !== 'transfer');
+
     if (locationId) items = items.filter(d => d.locationId === locationId);
     if (status && status !== 'all') items = items.filter(d => d.deliveryStatus === status);
     if (direction) items = items.filter(d => d.direction === direction);
@@ -6768,6 +6774,34 @@ app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =
     }
 
     const body = req.body;
+
+    // Cutover (P9): transfers now use the dedicated Transfer entity. Reroute any
+    // legacy type=transfer create so no new transfer-Delivery rows are produced.
+    if (body.type === 'transfer') {
+      if (!body.fromLocationId || !body.toLocationId) {
+        return res.status(400).json(errorResponse('fromLocationId and toLocationId are required for transfers'));
+      }
+      const tItems = Array.isArray(body.items) ? body.items : [];
+      const created = await repos.transferRepo.create({
+        id: uuidv4(),
+        businessId: companyId,
+        fromLocationId: body.fromLocationId,
+        toLocationId: body.toLocationId,
+        fromLocationName: body.fromLocation || null,
+        toLocationName: body.toLocation || null,
+        status: 'Requested',
+        requestedBy: req.user?.id || null,
+        items: tItems,
+        itemCount: body.itemCount != null ? body.itemCount : tItems.length,
+        totalAmount: body.totalAmount != null ? body.totalAmount : tItems.reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.quantity ?? it.quantityOrdered) || 0), 0),
+        assignedStaffId: body.assignedStaffId || null,
+        notes: body.distributorNotes || null,
+        priority: body.priority || 'normal',
+        orderTime: body.orderTime || new Date().toISOString(),
+        expectedAt: body.expectedDeliveryDateTime || null,
+      });
+      return res.status(201).json(successResponse(created));
+    }
 
     // Validate required fields
     if (!body.expectedDeliveryDateTime) {
@@ -7356,6 +7390,81 @@ app.patch('/api/companies/:companyId/transfers/:transferId/status', requireAuth,
   }
 });
 
+// Receive a transfer with per-item received quantities (partial receiving).
+// body: { items: [{ productId, quantityReceived, quantityDamaged? }] }
+app.patch('/api/companies/:companyId/transfers/:transferId/receive', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const { companyId, transferId } = req.params;
+    const transfer = await repos.transferRepo.getById(transferId);
+    if (!transfer || transfer.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Transfer not found'));
+    }
+
+    // Merge received/damaged quantities into the transfer items.
+    const received = Array.isArray(req.body.items) ? req.body.items : [];
+    const byProduct = new Map(received.map((r) => [r.productId, r]));
+    const mergedItems = (Array.isArray(transfer.items) ? transfer.items : []).map((it) => {
+      const r = byProduct.get(it.productId);
+      if (!r) return it;
+      return {
+        ...it,
+        quantityReceived: r.quantityReceived != null ? Number(r.quantityReceived) : Number(it.quantity ?? it.quantityOrdered ?? 0),
+        quantityDamaged: r.quantityDamaged != null ? Number(r.quantityDamaged) : 0,
+      };
+    });
+    await repos.transferRepo.update(transferId, { items: mergedItems });
+
+    // Move to Received (triggers the source clear + destination receive of the
+    // actual received quantities).
+    let updated;
+    try {
+      updated = await transferStatusService.changeTransferStatus({
+        transferId,
+        nextStatus: 'Received',
+        changedBy: req.user?.id || null,
+      });
+    } catch (err) {
+      if (err.code === 'INVALID_STATUS_TRANSITION' || err.code === 'INVALID_STATUS') {
+        return res.status(400).json(errorResponse(err.message, err.code));
+      }
+      throw err;
+    }
+
+    // File issues for shortfalls / damage (non-blocking).
+    for (const it of mergedItems) {
+      const shipped = Number(it.quantity ?? it.quantityOrdered) || 0;
+      const recv = Number(it.quantityReceived) || 0;
+      const dmg = Number(it.quantityDamaged) || 0;
+      try {
+        if (recv < shipped) {
+          await repos.issueRepo.create({
+            businessId: companyId, entityType: 'transfer', entityId: transferId,
+            type: 'missing', status: 'open', priority: 'normal',
+            note: `${shipped - recv} × ${it.name || it.productId} missing on receipt`,
+            reportedBy: req.user?.id || null,
+          });
+        }
+        if (dmg > 0) {
+          await repos.issueRepo.create({
+            businessId: companyId, entityType: 'transfer', entityId: transferId,
+            type: 'damaged', status: 'open', priority: 'normal',
+            note: `${dmg} × ${it.name || it.productId} received damaged`,
+            reportedBy: req.user?.id || null,
+          });
+        }
+      } catch (issueErr) {
+        logger.warn('[transfer receive] failed to create discrepancy issue:', issueErr.message);
+      }
+    }
+
+    res.json(successResponse(updated));
+  } catch (e) {
+    logger.error('Error receiving transfer:', e);
+    res.status(500).json(errorResponse('Failed to receive transfer'));
+  }
+});
+
 // Delete a transfer
 app.delete('/api/companies/:companyId/transfers/:transferId', requireAuth, async (req, res) => {
   if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
@@ -7369,6 +7478,343 @@ app.delete('/api/companies/:companyId/transfers/:transferId', requireAuth, async
   } catch (e) {
     logger.error('Error deleting transfer:', e);
     res.status(500).json(errorResponse('Failed to delete transfer'));
+  }
+});
+
+// ===========================================================================
+// Issues (Logistics v2 — P6). Problems reported against a delivery/transfer/route.
+// ===========================================================================
+app.get('/api/companies/:companyId/issues', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const rows = await repos.issueRepo.getByBusinessId(req.params.companyId, { status: req.query.status || undefined });
+    res.json(successResponse(rows));
+  } catch (e) {
+    logger.error('Error listing issues:', e);
+    res.status(500).json(errorResponse('Failed to load issues'));
+  }
+});
+
+app.get('/api/companies/:companyId/issues/:issueId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const issue = await repos.issueRepo.getById(req.params.issueId);
+    if (!issue || issue.businessId !== req.params.companyId) return res.status(404).json(errorResponse('Issue not found'));
+    res.json(successResponse(issue));
+  } catch (e) {
+    logger.error('Error fetching issue:', e);
+    res.status(500).json(errorResponse('Failed to load issue'));
+  }
+});
+
+app.post('/api/companies/:companyId/issues', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const b = req.body || {};
+    if (!b.entityType || !b.entityId || !b.type) {
+      return res.status(400).json(errorResponse('entityType, entityId and type are required'));
+    }
+    const issue = await repos.issueRepo.create({
+      businessId: req.params.companyId,
+      entityType: b.entityType,
+      entityId: b.entityId,
+      type: b.type,
+      priority: b.priority || 'normal',
+      status: 'open',
+      photoUrl: b.photoUrl || null,
+      note: b.note || null,
+      reportedBy: req.user?.id || null,
+      assignedTo: b.assignedTo || null,
+    });
+    // Notify the assignee (non-blocking)
+    if (issue.assignedTo && issue.assignedTo !== req.user?.id) {
+      pushService.sendToUsers({
+        userIds: [issue.assignedTo],
+        title: 'New issue reported',
+        body: `${(b.type || '').replace(/_/g, ' ')} on ${b.entityType} ${b.entityId}`,
+        category: 'deliveries',
+        data: { type: 'issue', issueId: issue.id },
+      }, repos).catch((err) => logger.error('[Push] Issue push error:', err));
+    }
+    res.status(201).json(successResponse(issue));
+  } catch (e) {
+    logger.error('Error creating issue:', e);
+    res.status(500).json(errorResponse('Failed to create issue'));
+  }
+});
+
+app.patch('/api/companies/:companyId/issues/:issueId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const issue = await repos.issueRepo.getById(req.params.issueId);
+    if (!issue || issue.businessId !== req.params.companyId) return res.status(404).json(errorResponse('Issue not found'));
+    const allowed = ['status', 'priority', 'assignedTo', 'note', 'resolution', 'photoUrl'];
+    const patch = {};
+    for (const k of allowed) if (req.body[k] !== undefined) patch[k] = req.body[k];
+    if (patch.status === 'resolved') patch.resolvedAt = new Date();
+    const updated = await repos.issueRepo.update(req.params.issueId, patch);
+    res.json(successResponse(updated));
+  } catch (e) {
+    logger.error('Error updating issue:', e);
+    res.status(500).json(errorResponse('Failed to update issue'));
+  }
+});
+
+app.delete('/api/companies/:companyId/issues/:issueId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const issue = await repos.issueRepo.getById(req.params.issueId);
+    if (!issue || issue.businessId !== req.params.companyId) return res.status(404).json(errorResponse('Issue not found'));
+    await repos.issueRepo.delete(req.params.issueId);
+    res.json(successResponse({ deleted: true }));
+  } catch (e) {
+    logger.error('Error deleting issue:', e);
+    res.status(500).json(errorResponse('Failed to delete issue'));
+  }
+});
+
+// ===========================================================================
+// Returns / RMA (Logistics v2 — P7).
+// ===========================================================================
+app.get('/api/companies/:companyId/returns', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const rows = await repos.returnRepo.getByBusinessId(req.params.companyId, { status: req.query.status || undefined });
+    res.json(successResponse(rows));
+  } catch (e) {
+    logger.error('Error listing returns:', e);
+    res.status(500).json(errorResponse('Failed to load returns'));
+  }
+});
+
+app.get('/api/companies/:companyId/returns/:returnId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const ret = await repos.returnRepo.getById(req.params.returnId);
+    if (!ret || ret.businessId !== req.params.companyId) return res.status(404).json(errorResponse('Return not found'));
+    res.json(successResponse(ret));
+  } catch (e) {
+    logger.error('Error fetching return:', e);
+    res.status(500).json(errorResponse('Failed to load return'));
+  }
+});
+
+app.post('/api/companies/:companyId/returns', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const b = req.body || {};
+    const ret = await repos.returnRepo.create({
+      businessId: req.params.companyId,
+      orderId: b.orderId || null,
+      customerId: b.customerId || null,
+      customerName: b.customerName || null,
+      locationId: b.locationId || null,
+      status: 'Requested',
+      reason: b.reason || null,
+      items: Array.isArray(b.items) ? b.items : [],
+    });
+    res.status(201).json(successResponse(ret));
+  } catch (e) {
+    logger.error('Error creating return:', e);
+    res.status(500).json(errorResponse('Failed to create return'));
+  }
+});
+
+app.patch('/api/companies/:companyId/returns/:returnId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const ret = await repos.returnRepo.getById(req.params.returnId);
+    if (!ret || ret.businessId !== req.params.companyId) return res.status(404).json(errorResponse('Return not found'));
+    const allowed = ['items', 'reason', 'locationId', 'customerName', 'creditNoteId'];
+    const patch = {};
+    for (const k of allowed) if (req.body[k] !== undefined) patch[k] = req.body[k];
+    const updated = await repos.returnRepo.update(req.params.returnId, patch);
+    res.json(successResponse(updated));
+  } catch (e) {
+    logger.error('Error updating return:', e);
+    res.status(500).json(errorResponse('Failed to update return'));
+  }
+});
+
+app.patch('/api/companies/:companyId/returns/:returnId/status', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const ret = await repos.returnRepo.getById(req.params.returnId);
+    if (!ret || ret.businessId !== req.params.companyId) return res.status(404).json(errorResponse('Return not found'));
+    let updated;
+    try {
+      updated = await returnService.changeReturnStatus({
+        returnId: req.params.returnId,
+        nextStatus: req.body.status,
+        changedBy: req.user?.id || null,
+        reason: req.body.reason || null,
+      });
+    } catch (err) {
+      if (err.code === 'INVALID_STATUS_TRANSITION' || err.code === 'INVALID_STATUS') {
+        return res.status(400).json(errorResponse(err.message, err.code));
+      }
+      throw err;
+    }
+    res.json(successResponse(updated));
+  } catch (e) {
+    logger.error('Error changing return status:', e);
+    res.status(500).json(errorResponse('Failed to change return status'));
+  }
+});
+
+app.delete('/api/companies/:companyId/returns/:returnId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const ret = await repos.returnRepo.getById(req.params.returnId);
+    if (!ret || ret.businessId !== req.params.companyId) return res.status(404).json(errorResponse('Return not found'));
+    await repos.returnRepo.delete(req.params.returnId);
+    res.json(successResponse({ deleted: true }));
+  } catch (e) {
+    logger.error('Error deleting return:', e);
+    res.status(500).json(errorResponse('Failed to delete return'));
+  }
+});
+
+// ===========================================================================
+// Recurring schedules (Logistics v2 — P12). Auto-mint deliveries/transfers.
+// ===========================================================================
+app.get('/api/companies/:companyId/recurring-schedules', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const rows = await repos.recurringRepo.getByBusinessId(req.params.companyId);
+    res.json(successResponse(rows));
+  } catch (e) {
+    logger.error('Error listing recurring schedules:', e);
+    res.status(500).json(errorResponse('Failed to load recurring schedules'));
+  }
+});
+
+app.post('/api/companies/:companyId/recurring-schedules', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const b = req.body || {};
+    if (!b.kind || !b.frequency || !b.template) {
+      return res.status(400).json(errorResponse('kind, frequency and template are required'));
+    }
+    const created = await repos.recurringRepo.create({
+      businessId: req.params.companyId,
+      kind: b.kind,
+      frequency: b.frequency,
+      daysOfWeek: b.daysOfWeek || null,
+      template: b.template,
+      fromLocationId: b.fromLocationId || null,
+      toLocationId: b.toLocationId || null,
+      nextRunAt: b.nextRunAt || new Date().toISOString(),
+      active: b.active !== false,
+    });
+    res.status(201).json(successResponse(created));
+  } catch (e) {
+    logger.error('Error creating recurring schedule:', e);
+    res.status(500).json(errorResponse('Failed to create recurring schedule'));
+  }
+});
+
+app.patch('/api/companies/:companyId/recurring-schedules/:scheduleId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const sched = await repos.recurringRepo.getById(req.params.scheduleId);
+    if (!sched || sched.businessId !== req.params.companyId) return res.status(404).json(errorResponse('Schedule not found'));
+    const allowed = ['frequency', 'daysOfWeek', 'template', 'fromLocationId', 'toLocationId', 'nextRunAt', 'active'];
+    const patch = {};
+    for (const k of allowed) if (req.body[k] !== undefined) patch[k] = req.body[k];
+    const updated = await repos.recurringRepo.update(req.params.scheduleId, patch);
+    res.json(successResponse(updated));
+  } catch (e) {
+    logger.error('Error updating recurring schedule:', e);
+    res.status(500).json(errorResponse('Failed to update recurring schedule'));
+  }
+});
+
+app.delete('/api/companies/:companyId/recurring-schedules/:scheduleId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const sched = await repos.recurringRepo.getById(req.params.scheduleId);
+    if (!sched || sched.businessId !== req.params.companyId) return res.status(404).json(errorResponse('Schedule not found'));
+    await repos.recurringRepo.delete(req.params.scheduleId);
+    res.json(successResponse({ deleted: true }));
+  } catch (e) {
+    logger.error('Error deleting recurring schedule:', e);
+    res.status(500).json(errorResponse('Failed to delete recurring schedule'));
+  }
+});
+
+// ===========================================================================
+// Routes / trips (Logistics v2 — P8). Driver + vehicle + ordered stops.
+// ===========================================================================
+app.get('/api/companies/:companyId/delivery-routes', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const rows = await repos.routeRepo.getByBusinessId(req.params.companyId, { status: req.query.status || undefined });
+    res.json(successResponse(rows));
+  } catch (e) {
+    logger.error('Error listing routes:', e);
+    res.status(500).json(errorResponse('Failed to load routes'));
+  }
+});
+
+app.get('/api/companies/:companyId/delivery-routes/:routeId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const route = await repos.routeRepo.getById(req.params.routeId);
+    if (!route || route.businessId !== req.params.companyId) return res.status(404).json(errorResponse('Route not found'));
+    res.json(successResponse(route));
+  } catch (e) {
+    logger.error('Error fetching route:', e);
+    res.status(500).json(errorResponse('Failed to load route'));
+  }
+});
+
+app.post('/api/companies/:companyId/delivery-routes', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const b = req.body || {};
+    const route = await repos.routeRepo.create({
+      businessId: req.params.companyId,
+      name: b.name || null,
+      date: b.date || null,
+      driverId: b.driverId || null,
+      transportId: b.transportId || null,
+      status: b.status || 'Planned',
+      stops: Array.isArray(b.stops) ? b.stops : [],
+    });
+    res.status(201).json(successResponse(route));
+  } catch (e) {
+    logger.error('Error creating route:', e);
+    res.status(500).json(errorResponse('Failed to create route'));
+  }
+});
+
+app.patch('/api/companies/:companyId/delivery-routes/:routeId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const route = await repos.routeRepo.getById(req.params.routeId);
+    if (!route || route.businessId !== req.params.companyId) return res.status(404).json(errorResponse('Route not found'));
+    const allowed = ['name', 'date', 'driverId', 'transportId', 'status', 'stops'];
+    const patch = {};
+    for (const k of allowed) if (req.body[k] !== undefined) patch[k] = req.body[k];
+    const updated = await repos.routeRepo.update(req.params.routeId, patch);
+    res.json(successResponse(updated));
+  } catch (e) {
+    logger.error('Error updating route:', e);
+    res.status(500).json(errorResponse('Failed to update route'));
+  }
+});
+
+app.delete('/api/companies/:companyId/delivery-routes/:routeId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const route = await repos.routeRepo.getById(req.params.routeId);
+    if (!route || route.businessId !== req.params.companyId) return res.status(404).json(errorResponse('Route not found'));
+    await repos.routeRepo.delete(req.params.routeId);
+    res.json(successResponse({ deleted: true }));
+  } catch (e) {
+    logger.error('Error deleting route:', e);
+    res.status(500).json(errorResponse('Failed to delete route'));
   }
 });
 
@@ -12963,6 +13409,15 @@ app.use((err, req, res, next) => {
 });
 
 // Start server (using HTTP server for Socket.IO support)
+// Recurring-schedule runner: mint due deliveries/transfers hourly.
+// (Single-instance friendly; for multi-instance, move to a dedicated cron worker.)
+if (process.env.NODE_ENV !== 'test') {
+  const RECURRING_INTERVAL_MS = 60 * 60 * 1000; // hourly
+  setInterval(() => {
+    recurringService.runDue().catch((err) => logger.error('[recurring] runDue failed:', err.message));
+  }, RECURRING_INTERVAL_MS);
+}
+
 server.listen(PORT, HOST, () => {
   const lanIP = getNetworkIP();
   logger.debug('');

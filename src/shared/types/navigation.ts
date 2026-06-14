@@ -132,6 +132,14 @@ export type RootStackParamList = {
   Deliveries: { segment?: DeliveryViewType } | undefined;
   DeliveriesAnalytics: { locationId?: string } | undefined;
   MyDeliveries: undefined;
+  LogisticsOverview: undefined;
+  Issues: undefined;
+  IssueDetail: { issueId: string };
+  Returns: undefined;
+  ReturnDetail: { returnId: string };
+  Routes: undefined;
+  RouteDetail: { routeId: string };
+  TransferDetail: { transferId: string };
   Products: undefined;
   Invoices: { initialTab?: 'invoices' | 'estimates' } | undefined;
   
@@ -193,8 +201,8 @@ export type RootStackParamList = {
   };
   
   // Delivery screens
-  // Transfers is an alias into the Deliveries hub (renders DeliveryScreen with the transfers segment)
-  Transfers: { segment?: DeliveryViewType } | undefined;
+  // Transfers is now a first-class screen on the dedicated Transfer entity
+  Transfers: { segment?: string } | undefined;
   DeliveryDetail: {
     deliveryId: string;
     /** Optional override for view type detection */

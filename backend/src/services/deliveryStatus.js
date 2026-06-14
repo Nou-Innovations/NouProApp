@@ -231,16 +231,8 @@ async function changeDeliveryStatus({ deliveryId, nextStatus, changedBy = null, 
     }
   );
 
-  // Transfer stock movement on completion (idempotent via stockAppliedAt).
-  // Never blocks the delivery on stock bookkeeping. (Superseded by the Transfer
-  // entity in P5; kept here while transfers are still Delivery rows.)
-  if (delivery.type === 'transfer' && nextStatus === DELIVERY_STATUS.DELIVERED) {
-    try {
-      await applyTransferStock(repos, delivery);
-    } catch (stockErr) {
-      console.warn('[deliveryStatus] transfer stock move failed:', stockErr.message);
-    }
-  }
+  // (Transfers moved to the dedicated Transfer entity in P5/P9 — the old
+  // type=transfer stock path has been removed from this delivery flow.)
 
   // Outgoing (non-transfer) delivery physical stock moves:
   //   InTransit  → dispatch  (reserved-, onHand-, inTransit+)

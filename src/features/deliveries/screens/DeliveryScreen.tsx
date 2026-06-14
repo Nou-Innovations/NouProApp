@@ -45,11 +45,12 @@ const DELIVERY_FILTER_TABS: DeliveryFilterTab[] = [
 ];
 
 // Top-level segments for the unified deliveries hub
+// Transfers are now a first-class screen (their own entity), so they're no
+// longer a segment here.
 const VIEW_SEGMENTS: { key: DeliveryViewType; label: string }[] = [
   { key: 'needs_attention', label: 'Needs attention' },
   { key: 'incoming', label: 'Incoming' },
   { key: 'outgoing', label: 'Outgoing' },
-  { key: 'transfers', label: 'Transfers' },
   { key: 'all', label: 'All' },
 ];
 
@@ -166,8 +167,8 @@ export default function DeliveryScreen() {
 
   const handleCreateTransfer = () => {
     setShowCreateModal(false);
-    // Navigate to CreateDelivery screen with transfer mode
-    (navigation as any).navigate('CreateDelivery', { mode: 'transfer' });
+    // Transfers are their own screen now (dedicated Transfer entity).
+    (navigation as any).navigate('Transfers');
   };
 
   return (

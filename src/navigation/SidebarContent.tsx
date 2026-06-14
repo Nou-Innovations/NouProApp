@@ -290,12 +290,16 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     activeMode === 'business' && activeBusiness
       ? [
           {
-            title: 'Deliveries',
+            title: 'Logistics',
             items: [
+              { label: 'Overview', icon: 'grid-outline', onPress: () => go('LogisticsOverview') },
               { label: 'All deliveries', icon: 'truck-outline', onPress: () => go('Deliveries'), badge: deliveriesUnreadCount },
+              { label: 'Transfers', icon: 'swap-horizontal-outline', onPress: () => go('Transfers') },
               { label: 'Orders', icon: 'cart-outline', onPress: () => go('Orders') },
-              { label: 'Transfers', icon: 'swap-horizontal-outline', onPress: () => go('Deliveries', { segment: 'transfers' }) },
               { label: 'My deliveries', icon: 'person-outline', onPress: () => go('MyDeliveries') },
+              { label: 'Routes', icon: 'map-outline', onPress: () => go('Routes') },
+              { label: 'Issues', icon: 'alert-circle-outline', onPress: () => go('Issues') },
+              { label: 'Returns', icon: 'arrow-undo-outline', onPress: () => go('Returns') },
               { label: 'Analytics', icon: 'bar-chart-outline', onPress: () => go('DeliveriesAnalytics') },
             ],
           },

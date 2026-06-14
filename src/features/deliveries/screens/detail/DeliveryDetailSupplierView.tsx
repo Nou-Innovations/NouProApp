@@ -57,6 +57,8 @@ import {
   DeliveryStatusTimeline,
 } from '../../components/detail';
 import { useDeliveryActions } from '../../hooks/useDeliveryActions';
+import { shareDeliveryNote } from '../../deliveryNote';
+import ReportIssueModal from '@/features/issues/components/ReportIssueModal';
 
 import { getTransports } from '@/features/transports/transports.service';
 import type { Transport } from '@/shared/types/transport';
@@ -175,6 +177,7 @@ export function DeliveryDetailSupplierView({
 
   // State for modals
   const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [showReportIssue, setShowReportIssue] = useState(false);
   const [showStaffModal, setShowStaffModal] = useState(false);
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [showOrderStatusModal, setShowOrderStatusModal] = useState(false);
@@ -466,13 +469,21 @@ export function DeliveryDetailSupplierView({
 
   // More options menu
   const moreOptionsItems: AppBottomSheetItem[] = [
-    { id: 'share', title: 'Share' },
+    { id: 'delivery_note', title: 'Delivery note (PDF)' },
+    { id: 'report_issue', title: 'Report an issue' },
     { id: 'delete', title: 'Delete', variant: 'destructive' },
   ];
 
   const handleMoreOptionSelect = (item: { id: string }) => {
-    if (item.id === 'share') {
-      Alert.alert('Share', `Share delivery ${delivery.id}`);
+    if (item.id === 'delivery_note') {
+      setShowMoreOptions(false);
+      shareDeliveryNote(delivery, {
+        businessName: activeBusiness?.name,
+        currencySymbol: activeBusiness?.settings?.currency || '$',
+      }).catch(() => Alert.alert('Error', 'Could not generate the delivery note.'));
+    } else if (item.id === 'report_issue') {
+      setShowMoreOptions(false);
+      setShowReportIssue(true);
     } else if (item.id === 'delete') {
       Alert.alert(
         'Delete Delivery',
@@ -1045,6 +1056,13 @@ export function DeliveryDetailSupplierView({
         items={moreOptionsItems}
         mode="buttons"
         onSelectItem={handleMoreOptionSelect}
+      />
+
+      <ReportIssueModal
+        visible={showReportIssue}
+        onClose={() => setShowReportIssue(false)}
+        entityType="delivery"
+        entityId={delivery.id}
       />
     </SafeAreaView>
   );

@@ -140,10 +140,16 @@ async function changeTransferStatus({ transferId, nextStatus, changedBy = null, 
     }
 
     if (nextStatus === TRANSFER_STATUS.RECEIVED && transfer.toLocationId) {
+      // Destination receives the ACTUAL received quantity (partial receiving):
+      // use quantityReceived when set, else the full shipped quantity.
+      const receivedItems = items.map((it) => ({
+        productId: it.productId,
+        quantity: it.quantityReceived != null ? Number(it.quantityReceived) : Number(it.quantity ?? it.quantityOrdered ?? 0),
+      }));
       await stockService.receiveGoods({
         businessId: transfer.businessId,
         locationId: transfer.toLocationId,
-        items,
+        items: receivedItems,
         refType: 'transfer',
         refId: transferId,
         phase: 'transfer_receive',
