@@ -124,7 +124,6 @@ import BrandsScreen from '@/features/brands/screens/BrandsScreen';
 import StockScreen from '@/features/products/screens/StockScreen';
 import CategoriesScreen from '@/features/products/screens/CategoriesScreen';
 import ProductVisibilityScreen from '@/features/products/screens/ProductVisibilityScreen';
-import TransfersScreen from '@/features/deliveries/screens/TransfersScreen';
 
 // Screens - Explore (Opportunities)
 import { OpportunitiesScreen, OpportunityDetailScreen, CreateOpportunityScreen } from '@/features/opportunities';
@@ -134,6 +133,8 @@ import { EventsScreen, EventDetailScreen, CreateEventScreen } from '@/features/e
 
 // Screens - Business workspace lists (moved from bottom tabs to the sidebar)
 import DeliveryScreen from '@/features/deliveries/screens/DeliveryScreen';
+import DeliveriesAnalyticsScreen from '@/features/deliveries/screens/DeliveriesAnalyticsScreen';
+import MyDeliveriesScreen from '@/features/deliveries/screens/MyDeliveriesScreen';
 import ProductsScreen from '@/features/products/screens/ProductsScreen';
 import InvoicesScreen from '@/features/invoices/screens/InvoicesScreen';
 
@@ -535,7 +536,8 @@ function AppNavigator() {
         <RootStack.Screen name="Stock" component={StockScreen} />
         <RootStack.Screen name="Categories" component={CategoriesScreen} />
         <RootStack.Screen name="ProductVisibility" component={ProductVisibilityScreen} />
-        <RootStack.Screen name="Transfers" component={TransfersScreen} />
+        {/* Transfers is now a segment of the unified Deliveries hub; this alias keeps deep-links working */}
+        <RootStack.Screen name="Transfers" component={DeliveryScreen} initialParams={{ segment: 'transfers' }} />
 
         {/* Explore — Opportunities */}
         <RootStack.Screen name="Opportunities" component={OpportunitiesScreen} />
@@ -549,6 +551,8 @@ function AppNavigator() {
 
         {/* Business workspace lists (opened from the sidebar; previously bottom tabs) */}
         <RootStack.Screen name="Deliveries" component={DeliveryScreen} />
+        <RootStack.Screen name="DeliveriesAnalytics" component={DeliveriesAnalyticsScreen} />
+        <RootStack.Screen name="MyDeliveries" component={MyDeliveriesScreen} />
         <RootStack.Screen name="Products" component={ProductsScreen} />
         <RootStack.Screen name="Invoices" component={InvoicesScreen} />
         

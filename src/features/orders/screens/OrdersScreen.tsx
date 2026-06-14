@@ -35,12 +35,29 @@ export default function OrdersScreen({ route }: Props) {
 
   const { incoming, outgoing, loading, error, refetch } = useOrders();
 
-  // Refetch on focus
+  // `refreshing` drives the pull-to-refresh spinner ONLY for a real user pull.
+  // It is intentionally kept separate from `loading`: binding the RefreshControl
+  // to `loading` makes iOS programmatically activate the spinner on every focus
+  // (useFocusEffect → refetch → loading=true), which leaves a stuck content inset
+  // (a blank gap at the top of the list) after returning from a detail screen.
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Refetch on focus (background refresh — no spinner)
   useFocusEffect(
     useCallback(() => {
       refetch();
     }, [refetch])
   );
+
+  // User-initiated pull-to-refresh
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const data = tab === 'incoming' ? incoming : outgoing;
 
@@ -99,7 +116,7 @@ export default function OrdersScreen({ route }: Props) {
             />
           )}
           refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={appTheme.colors.primary} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={appTheme.colors.primary} />
           }
           ListEmptyComponent={
             error ? (

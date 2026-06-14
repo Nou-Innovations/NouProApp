@@ -97,6 +97,11 @@ model Business {
   opportunities        Opportunity[]
   opportunityResponses OpportunityResponse[] @relation("OpportunityResponder")
   events               Event[]
+  issues               Issue[]
+  returns              Return[]
+  routes               Route[]
+  recurringSchedules   RecurringSchedule[]
+  stockMovements       StockMovement[]
 }
 
 model Location {
@@ -299,14 +304,17 @@ model LocationProduct {
 }
 
 model Stock {
-  id         String   @id
-  businessId String
-  locationId String
-  productId  String
-  qtyOnHand  Int      @default(0)
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id           String   @id
+  businessId   String
+  locationId   String
+  productId    String
+  qtyOnHand    Int      @default(0)
+  qtyReserved  Int      @default(0)
+  qtyInTransit Int      @default(0)
+  reorderLevel Int?
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([locationId, productId])
   @@index([businessId])
@@ -527,6 +535,8 @@ model Delivery {
   distributorNotes         String?
   fromLocation             String?
   toLocation               String?
+  fromLocationId           String?
+  toLocationId             String?
   orderTime                DateTime?
   expectedDeliveryDateTime DateTime?
   itemCount                Int?
@@ -537,6 +547,11 @@ model Delivery {
   assignedTo               String?
   transportMode            String?
   orderId                  String?
+  podPhotoUrl              String?
+  podSignatureUrl          String?
+  deliveredAt              DateTime?
+  deliveredBy              String?
+  stockAppliedAt           DateTime?
   createdAt                DateTime        @default(now())
   updatedAt                DateTime        @updatedAt
   deliveryStatus           DeliveryStatus? @default(NOT_ASSIGNED)
@@ -545,6 +560,7 @@ model Delivery {
   location                 Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
   order                    Order?          @relation(fields: [orderId], references: [id])
   staffAssignments         DeliveryStaff[]
+  statusHistory            DeliveryStatusHistory[]
 
   @@index([businessId])
   @@index([businessId, deliveryStatus])
@@ -569,6 +585,147 @@ model DeliveryStaff {
   @@unique([deliveryId, userId])
   @@index([deliveryId])
   @@index([userId])
+}
+
+model DeliveryStatusHistory {
+  id         String          @id @default(uuid())
+  deliveryId String
+  from       DeliveryStatus?
+  to         DeliveryStatus
+  reason     String?
+  changedBy  String?
+  createdAt  DateTime        @default(now())
+  delivery   Delivery        @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([deliveryId])
+}
+
+// ---------------------------------------------------------------------------
+// Logistics v2 — additive models (Phase 1). No behavior change until later phases.
+// ---------------------------------------------------------------------------
+
+model Issue {
+  id         String      @id @default(uuid())
+  businessId String
+  entityType String // 'delivery' | 'transfer' | 'route'
+  entityId   String
+  type       String // 'damaged' | 'missing' | 'wrong_qty' | 'customer_unavailable' | 'wrong_address' | 'vehicle' | 'late' | 'payment' | 'other'
+  priority   String      @default("normal") // 'low' | 'normal' | 'high' | 'urgent'
+  status     IssueStatus @default(open)
+  photoUrl   String?
+  note       String?
+  reportedBy String?
+  assignedTo String?
+  resolution String?
+  resolvedAt DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  business   Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([entityType, entityId])
+}
+
+model Return {
+  id             String       @id @default(uuid())
+  businessId     String
+  orderId        String?
+  customerId     String?
+  customerName   String?
+  locationId     String? // restock destination
+  status         ReturnStatus @default(Requested)
+  reason         String?
+  items          Json? // [{productId, name, quantity, condition:'resellable'|'damaged', disposition:'restock'|'writeoff'}]
+  creditNoteId   String? // -> Invoice
+  stockAppliedAt DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  business       Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([orderId])
+}
+
+model Route {
+  id          String      @id @default(uuid())
+  businessId  String
+  name        String?
+  date        DateTime?
+  driverId    String?
+  transportId String?
+  status      RouteStatus @default(Planned)
+  stops       Json? // [{seq, type:'delivery'|'transfer', refId, address, lat, lng, status, eta}]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([driverId])
+}
+
+model RecurringSchedule {
+  id             String   @id @default(uuid())
+  businessId     String
+  kind           String // 'delivery' | 'transfer'
+  frequency      String // 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  daysOfWeek     Json? // e.g. [1,3,5]
+  template       Json // delivery/transfer payload template
+  fromLocationId String?
+  toLocationId   String?
+  nextRunAt      DateTime?
+  lastRunAt      DateTime?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([active, nextRunAt])
+}
+
+model StockMovement {
+  id         String   @id @default(uuid())
+  businessId String
+  locationId String
+  productId  String
+  bucket     String // 'onHand' | 'reserved' | 'inTransit'
+  delta      Int
+  reason     String // 'order_reserve' | 'order_release' | 'delivery_dispatch' | 'delivery_deliver' | 'transfer_reserve' | 'transfer_dispatch' | 'transfer_receive' | 'goods_receipt' | 'return_restock' | 'manual_adjust'
+  refType    String? // 'order' | 'delivery' | 'transfer' | 'po' | 'return' | 'manual'
+  refId      String?
+  phase      String? // idempotency discriminator
+  createdBy  String?
+  createdAt  DateTime @default(now())
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([refType, refId, phase, productId, bucket])
+  @@index([businessId, locationId, productId])
+  @@index([refType, refId])
+}
+
+enum IssueStatus {
+  open
+  investigating
+  resolved
+}
+
+enum ReturnStatus {
+  Requested
+  Scheduled
+  PickedUp
+  Received
+  Completed
+  Rejected
+}
+
+enum RouteStatus {
+  Planned
+  Active
+  Completed
+  Canceled
 }
 
 model RoleRequest {

@@ -10,6 +10,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
+import type { DeliveryViewType } from './delivery';
 
 // ========== Delivery Detail View Types ==========
 
@@ -128,7 +129,9 @@ export type RootStackParamList = {
   Notifications: undefined;
 
   // Business workspace list screens (opened from the sidebar; previously bottom tabs)
-  Deliveries: undefined;
+  Deliveries: { segment?: DeliveryViewType } | undefined;
+  DeliveriesAnalytics: { locationId?: string } | undefined;
+  MyDeliveries: undefined;
   Products: undefined;
   Invoices: { initialTab?: 'invoices' | 'estimates' } | undefined;
   
@@ -190,7 +193,8 @@ export type RootStackParamList = {
   };
   
   // Delivery screens
-  Transfers: undefined;
+  // Transfers is an alias into the Deliveries hub (renders DeliveryScreen with the transfers segment)
+  Transfers: { segment?: DeliveryViewType } | undefined;
   DeliveryDetail: {
     deliveryId: string;
     /** Optional override for view type detection */

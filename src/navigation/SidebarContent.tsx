@@ -294,7 +294,9 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
             items: [
               { label: 'All deliveries', icon: 'truck-outline', onPress: () => go('Deliveries'), badge: deliveriesUnreadCount },
               { label: 'Orders', icon: 'cart-outline', onPress: () => go('Orders') },
-              { label: 'Transfers', icon: 'swap-horizontal-outline', onPress: () => go('Transfers') },
+              { label: 'Transfers', icon: 'swap-horizontal-outline', onPress: () => go('Deliveries', { segment: 'transfers' }) },
+              { label: 'My deliveries', icon: 'person-outline', onPress: () => go('MyDeliveries') },
+              { label: 'Analytics', icon: 'bar-chart-outline', onPress: () => go('DeliveriesAnalytics') },
             ],
           },
           {

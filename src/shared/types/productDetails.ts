@@ -144,6 +144,7 @@ export interface ProductCore {
   sku?: string;
   barcode?: string;
   brand?: string;
+  brandId?: string;
   brandLogo?: string;
   category?: string;
   tags?: string[];

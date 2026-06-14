@@ -1,19 +1,22 @@
 /**
  * ProductDetailScreen - Unified product detail view
- * 
+ *
  * THREE viewing modes based on app mode and product ownership:
- * 
+ *
  * 1. PERSONAL MODE: Browsing only, NO action buttons
  *    - Shows product info, description, related products sections
  *    - Users can browse but CANNOT order (per app-logic.json)
- * 
+ *
  * 2. BUSINESS MODE - OWNER: When viewing your own company's products
  *    - Shows Edit button
  *    - Shows owner details (SKU, Barcode, Stock, Tax, Supplier)
- * 
+ *
  * 3. BUSINESS MODE - BUYER: When viewing other company's products
  *    - Shows Order button with quantity selector
- *    - Shows related products sections (More from brand, From company, Explore more)
+ *    - Shows related products sections (More from distributor / brand / category)
+ *
+ * Layout: a parallax hero image with a swipeable thumbnail strip; the info sheet
+ * scrolls up and over the pinned image. See src/features/products/components/productDetail/.
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -24,21 +27,29 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   Dimensions,
   ActivityIndicator,
   Share,
   Alert,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  interpolate,
+  Extrapolation,
+  runOnJS,
+} from 'react-native-reanimated';
+import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from 'App';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsPersonalMode, useIsBusinessMode, useProfileStore } from '@/shared/store/profileStore';
 import { useOrderStore } from '@/shared/store/orderStore';
-import { get as apiGet, ApiError } from '@/shared/services/api';
+import { get as apiGet } from '@/shared/services/api';
 import {
   ProductDetailsDTO,
   ProductCore,
@@ -54,10 +65,24 @@ import {
 import { getSuppliersForProduct, type ProductSupplierPricing } from '@/features/procurement/services/procurement.service';
 import SupplierPickerModal from '@/features/procurement/components/SupplierPickerModal';
 import type { Supplier } from '@/shared/types/procurement';
+import ProductHero from '../components/productDetail/ProductHero';
+import PriceBlock from '../components/productDetail/PriceBlock';
+import SellerCard from '../components/productDetail/SellerCard';
+import OwnerDetailRows from '../components/productDetail/OwnerDetailRows';
+import RelatedRow from '../components/productDetail/RelatedRow';
+import FloatingHeader from '../components/productDetail/FloatingHeader';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Image must be 3:4 ratio (width:height = 3:4)
 const IMAGE_HEIGHT = SCREEN_WIDTH * (4 / 3);
+
+// Parallax-sheet layout: the hero drifts at PARALLAX_FACTOR while the info sheet
+// (which paints on top) scrolls up and covers it. The solid header bar fades in
+// between HEADER_FADE_START and HEADER_FADE_END of scroll.
+const SHEET_OVERLAP = 24;
+const PARALLAX_FACTOR = 0.5;
+const HEADER_FADE_START = IMAGE_HEIGHT * 0.45;
+const HEADER_FADE_END = IMAGE_HEIGHT * 0.78;
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProductDetail'>;
 
@@ -74,12 +99,13 @@ function transformToDTO(
     id: apiProduct.id,
     name: apiProduct.name,
     description: apiProduct.description,
-    images: apiProduct.image ? [apiProduct.image] : 
-            apiProduct.images ? apiProduct.images : 
+    images: apiProduct.image ? [apiProduct.image] :
+            apiProduct.images ? apiProduct.images :
             apiProduct.productPicture ? [apiProduct.productPicture] : [],
     sku: apiProduct.sku,
     barcode: apiProduct.barcode,
     brand: apiProduct.brand || apiProduct.brandName,
+    brandId: apiProduct.brand_id ?? apiProduct.brandId ?? undefined,
     brandLogo: apiProduct.brandLogo,
     category: apiProduct.category,
     tags: apiProduct.tags,
@@ -126,7 +152,7 @@ function transformToDTO(
   const stockQty = apiProduct.stockQuantity ?? apiProduct.stock_quantity ?? apiProduct.stock;
   const minAlert = apiProduct.min_stock_alert ?? apiProduct.minThreshold ?? 5;
   const rawStatus = apiProduct.status || 'Available';
-  
+
   // Map to UIProductStatus format
   const statusMap: Record<string, string> = {
     'available': 'Available',
@@ -137,7 +163,7 @@ function transformToDTO(
     'low_stock': 'Available', // Treat low stock as available
   };
   const status = statusMap[rawStatus.toLowerCase()] || rawStatus;
-  
+
   const availability: ProductAvailability = {
     status: status as any,
     stockQuantity: stockQty,
@@ -171,7 +197,7 @@ function transformToDTO(
 
   // Viewer context
   const viewerContext = computeViewerContext(seller.companyId, activeCompanyId);
-  
+
   // Adjust buyer capabilities based on availability
   if (viewerContext.buyerCapabilities) {
     viewerContext.buyerCapabilities = adjustBuyerCapabilitiesForAvailability(
@@ -195,11 +221,12 @@ function transformToDTO(
 
 const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { productId } = route.params;
-  const { theme: appTheme } = useTheme();
+  const { theme: appTheme, isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
   const { activeBusiness } = useProfileStore();
   const activeCompanyId = activeBusiness?.id || null;
   const { addToCart } = useOrderStore();
-  
+
   // App mode detection
   const isPersonalMode = useIsPersonalMode();
   const isBusinessMode = useIsBusinessMode();
@@ -211,11 +238,11 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  
+
   // Order flow state (buyer mode)
   const [isOrdering, setIsOrdering] = useState(false);
   const [quantity, setQuantity] = useState(1);
-  
+
   // Related products (buyer mode only)
   const [sameBrandProducts, setSameBrandProducts] = useState<RelatedProduct[]>([]);
   const [sameCompanyProducts, setSameCompanyProducts] = useState<RelatedProduct[]>([]);
@@ -225,13 +252,32 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [supplierPricingData, setSupplierPricingData] = useState<ProductSupplierPricing[]>([]);
   const [showSupplierPicker, setShowSupplierPicker] = useState(false);
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<any>(null);
   const imageScrollRef = useRef<ScrollView>(null);
 
-  // Fetch product data
-  useEffect(() => {
-    fetchProduct();
-  }, [fetchProduct]);
+  // ---- Parallax-sheet animation ----
+  const scrollY = useSharedValue(0);
+  const [headerSolid, setHeaderSolid] = useState(false);
+  const updateHeaderSolid = useCallback((v: boolean) => {
+    setHeaderSolid((prev) => (prev === v ? prev : v));
+  }, []);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+      runOnJS(updateHeaderSolid)(event.contentOffset.y > HEADER_FADE_END);
+    },
+  });
+  const heroAnimatedStyle = useAnimatedStyle(() => {
+    const y = scrollY.value;
+    // Drift the hero up at PARALLAX_FACTOR (translate down to slow it vs the 1:1 scroll).
+    const translateY = interpolate(y, [0, IMAGE_HEIGHT], [0, IMAGE_HEIGHT * PARALLAX_FACTOR], Extrapolation.CLAMP);
+    // Zoom slightly on pull-down so the top never reveals a gap during the bounce.
+    const scale = y < 0 ? 1 + (-y / IMAGE_HEIGHT) * 1.6 : 1;
+    return { transform: [{ translateY }, { scale }] };
+  });
+  const headerBarStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [HEADER_FADE_START, HEADER_FADE_END], [0, 1], Extrapolation.CLAMP),
+  }));
 
   // Fetch supplier pricing for owner's products
   useEffect(() => {
@@ -341,18 +387,29 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [productId, activeCompanyId]);
 
+  // Fetch product data on mount / when the product changes
+  useEffect(() => {
+    fetchProduct();
+  }, [fetchProduct]);
+
   // Image carousel scroll handler
   const handleImageScroll = (event: any) => {
     const contentOffset = event.nativeEvent.contentOffset;
     const viewSize = event.nativeEvent.layoutMeasurement;
-    const pageNum = Math.floor(contentOffset.x / viewSize.width);
+    const pageNum = Math.round(contentOffset.x / viewSize.width);
     setCurrentImageIndex(pageNum);
+  };
+
+  // Thumbnail tapped → jump the carousel to that image
+  const handleThumbPress = (index: number) => {
+    imageScrollRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
+    setCurrentImageIndex(index);
   };
 
   // Actions
   const handleShare = async () => {
     if (!dto) return;
-    
+
     try {
       const priceText = dto.pricing.priceHidden ? '' : ` - ${formatPrice(dto.pricing.basePrice, dto.pricing.currency)}`;
       await Share.share({
@@ -372,6 +429,16 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (dto?.seller.companyId) {
       navigation.navigate('ViewBusinessProfile', { businessId: dto.seller.companyId });
     }
+  };
+
+  // "More from {brand}" → distributor profile with that brand's section expanded.
+  // Falls back to the company's products tab when no brandId is available.
+  const handleBrandPress = () => {
+    if (!dto?.seller.companyId) return;
+    navigation.navigate('ViewBusinessProfile', {
+      businessId: dto.seller.companyId,
+      expandBrandId: dto.product.brandId,
+    });
   };
 
   // Owner action - Navigate to CreateProduct screen with product data for editing
@@ -484,10 +551,10 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     const moq = dto?.availability.moq || 1;
     const maxQty = dto?.availability.maxOrderQuantity || 99;
     let newQuantity = quantity + delta;
-    
+
     if (newQuantity < moq) newQuantity = moq;
     if (newQuantity > maxQty) newQuantity = maxQty;
-    
+
     setQuantity(newQuantity);
   };
 
@@ -545,439 +612,189 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { product, pricing, availability, seller, viewerContext } = dto;
   const images = product.images.length > 0 ? product.images : [''];
   const unitDisplay = formatUnitDisplay(product.unit, product.unitQuantity);
-  const hasOriginalPrice = (pricing as any).originalPrice && (pricing as any).originalPrice > pricing.basePrice;
   const totalPrice = pricing.basePrice * quantity;
 
-  // ============================================================================
-  // THREE-MODE LOGIC (per app-logic.json)
-  // ============================================================================
-  // 1. Personal Mode: Browse only, NO action buttons, show related products
-  // 2. Business Mode Owner: Edit button, show owner details
-  // 3. Business Mode Buyer: Order button, show related products
-  
+  // THREE-MODE LOGIC: Personal (browse) / Business owner (edit) / Business buyer (order)
   const isProductOwner = isBusinessMode && viewerContext.isOwner;
   const canOrder = isBusinessMode && !viewerContext.isOwner;
-  const showRelatedProducts = isPersonalMode || canOrder; // Personal & Business Buyer modes
+  const showRelatedProducts = isPersonalMode || canOrder; // Personal & Business Buyer
   const showOwnerDetails = isProductOwner;
-  const showActionBar = isBusinessMode; // Only Business mode has action buttons
+  const showActionBar = isBusinessMode;
+  const showSellerCard = showRelatedProducts && !!seller.companyName;
+  const showSave = isPersonalMode || canOrder;
+  const hasCartonInfo = !!(product.hasCarton && pricing.unitsPerCarton && !pricing.priceHidden);
+  const statusBarStyle = isDarkMode ? 'light' : headerSolid ? 'dark' : 'light';
 
   return (
     <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
-      {/* Sticky Header Controls */}
-      <SafeAreaView style={styles.stickyControls}>
-        <View style={styles.controlsRow}>
-          <TouchableOpacity
-            style={[styles.controlButton, { backgroundColor: 'rgba(0,0,0,0.3)' }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Icon name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
-          
-          <View style={styles.rightControls}>
-            {/* Save button (Personal mode and Business Buyer mode) */}
-            {(isPersonalMode || canOrder) && (
-              <TouchableOpacity
-                style={[styles.controlButton, { backgroundColor: 'rgba(0,0,0,0.3)' }]}
-                onPress={handleSave}
-              >
-                <Icon 
-                  name={isSaved ? 'bookmark' : 'bookmark-outline'} 
-                  size={24} 
-                  color="white" 
-                />
-              </TouchableOpacity>
-            )}
-            
-            {/* Share button */}
-            <TouchableOpacity
-              style={[styles.controlButton, { backgroundColor: 'rgba(0,0,0,0.3)' }]}
-              onPress={handleShare}
-            >
-              <Icon name="share-outline" size={24} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </SafeAreaView>
+      <StatusBar style={statusBarStyle} animated />
 
-      {/* Scrollable Content */}
-      <ScrollView 
+      <Animated.ScrollView
         ref={scrollViewRef}
-        style={styles.scrollContent} 
+        style={styles.scroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContentContainer}
+        contentContainerStyle={{ paddingBottom: showActionBar ? 140 : 48 }}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
       >
-        {/* Image Carousel - 3/4 screen height */}
-        <View style={[styles.carouselContainer, { height: IMAGE_HEIGHT }]}>
-          {images.length > 0 && images[0] ? (
-            <ScrollView
-              ref={imageScrollRef}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onScroll={handleImageScroll}
-              scrollEventThrottle={16}
+        {/* Parallax hero — drifts slowly while the info sheet scrolls over it */}
+        <Animated.View style={[styles.heroWrap, heroAnimatedStyle]}>
+          <ProductHero
+            images={images}
+            heroHeight={IMAGE_HEIGHT}
+            screenWidth={SCREEN_WIDTH}
+            sheetOverlap={SHEET_OVERLAP}
+            topInset={insets.top}
+            currentImageIndex={currentImageIndex}
+            imageScrollRef={imageScrollRef}
+            onImageScroll={handleImageScroll}
+            onThumbPress={handleThumbPress}
+            availability={availability}
+          />
+        </Animated.View>
+
+        {/* Info sheet (scrolls up over the hero) */}
+        <View style={[styles.sheet, { backgroundColor: appTheme.colors.cardBackground }]}>
+          <View style={[styles.grabber, { backgroundColor: appTheme.colors.borderColor }]} />
+
+          {/* Brand row */}
+          {!!product.brand && (
+            <TouchableOpacity
+              style={styles.brandRow}
+              activeOpacity={0.6}
+              disabled={!showRelatedProducts}
+              onPress={handleBrandPress}
             >
-              {images.map((uri, index) => (
-                <Image
-                  key={index}
-                  source={{ uri }}
-                  style={[styles.carouselImage, { width: SCREEN_WIDTH }]}
-                  resizeMode="cover"
-                />
-              ))}
-            </ScrollView>
-          ) : (
-            <View style={[styles.imagePlaceholder, { backgroundColor: appTheme.colors.surface }]}>
-              <Icon name="cube-outline" size={80} color={appTheme.colors.textMuted} />
-            </View>
-          )}
-          
-          {/* Dot Indicators */}
-          {images.length > 1 && (
-            <View style={styles.dotContainer}>
-              {images.map((_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.dot,
-                    {
-                      backgroundColor: index === currentImageIndex 
-                        ? appTheme.colors.primary 
-                        : 'rgba(255,255,255,0.5)'
-                    }
-                  ]}
-                />
-              ))}
-            </View>
-          )}
-
-          {/* Status Badges */}
-          <View style={styles.badgeContainer}>
-            {availability.isOutOfStock && (
-              <View style={[styles.badge, { backgroundColor: appTheme.colors.error }]}>
-                <Text style={styles.badgeText}>Out of Stock</Text>
-              </View>
-            )}
-            {availability.isLowStock && !availability.isOutOfStock && (
-              <View style={[styles.badge, { backgroundColor: appTheme.colors.warning }]}>
-                <Text style={styles.badgeText}>Low Stock</Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Product Info Section */}
-        <View style={[styles.infoContainer, { backgroundColor: appTheme.colors.cardBackground }]}>
-          {/* Product Name - 24px semibold primary */}
-          <Text style={[styles.productName, { color: appTheme.colors.text }]}>
-            {product.name}
-          </Text>
-
-          {/* Unit + Quantity - 16px medium secondary */}
-          {unitDisplay && (
-            <View style={[styles.unitBox, { backgroundColor: appTheme.colors.surface }]}>
-              <Text style={[styles.unitText, { color: appTheme.colors.textSecondary }]}>
-                {unitDisplay}
+              {!!product.brandLogo && (
+                <Image source={{ uri: product.brandLogo }} style={styles.brandLogo} />
+              )}
+              <Text style={[styles.brandName, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
+                {product.brand}
               </Text>
-            </View>
+              {showRelatedProducts && (
+                <Icon name="chevron-forward" size={14} color={appTheme.colors.textMuted} />
+              )}
+            </TouchableOpacity>
           )}
 
-          {/* Price Block - 20px medium primary, sale price handling */}
-          {pricing.priceHidden ? (
-            <View style={[styles.priceBlock, { flexDirection: 'row', alignItems: 'center' }]}>
-              <Icon name="lock-closed-outline" size={18} color={appTheme.colors.textMuted} />
-              <Text style={[styles.currentPrice, { color: appTheme.colors.textMuted, marginLeft: 6, fontSize: 16 }]}>
-                Connect to see price
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.priceBlock}>
-              {hasOriginalPrice && (
-                <View style={styles.originalPriceContainer}>
-                  <Text style={[styles.originalPrice, { color: appTheme.colors.textSecondary }]}>
-                    {formatPrice((pricing as any).originalPrice, pricing.currency)}
-                  </Text>
-                  <View style={[styles.strikethrough, { backgroundColor: appTheme.colors.error }]} />
+          {/* Product name */}
+          <Text style={[styles.name, { color: appTheme.colors.text }]}>{product.name}</Text>
+
+          {/* Price */}
+          <PriceBlock pricing={pricing} />
+
+          {/* Unit + carton chips */}
+          {(!!unitDisplay || hasCartonInfo) && (
+            <View style={styles.chipsRow}>
+              {!!unitDisplay && (
+                <View style={[styles.chip, { backgroundColor: appTheme.colors.surface }]}>
+                  <Text style={[styles.chipText, { color: appTheme.colors.textSecondary }]}>{unitDisplay}</Text>
                 </View>
               )}
-              <Text style={[styles.currentPrice, { color: appTheme.colors.text }]}>
-                {formatPrice(pricing.basePrice, pricing.currency)}
-              </Text>
+              {hasCartonInfo && (
+                <View style={[styles.chip, { backgroundColor: appTheme.colors.surface }]}>
+                  <Text style={[styles.chipText, { color: appTheme.colors.textSecondary }]}>
+                    {pricing.unitsPerCarton} / carton
+                    {pricing.pricePerCarton ? ` · ${formatPrice(pricing.pricePerCarton, pricing.currency)}` : ''}
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
-          {/* Carton Pricing (visible when product has carton pricing and price is not hidden) */}
-          {product.hasCarton && pricing.unitsPerCarton && !pricing.priceHidden && (
-            <View style={{ marginTop: 4, marginBottom: 8 }}>
-              <Text style={[styles.unitText, { color: appTheme.colors.textSecondary }]}>
-                {pricing.unitsPerCarton} units per carton
-                {pricing.pricePerCarton ? ` \u2022 ${formatPrice(pricing.pricePerCarton, pricing.currency)} / carton` : ''}
-              </Text>
-            </View>
-          )}
-
-          {/* Availability badge for non-owner views (buyers and personal mode) */}
+          {/* Availability (non-owner views) */}
           {!showOwnerDetails && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, marginBottom: 4 }}>
-              <View style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: availability.isOutOfStock ? appTheme.colors.error : appTheme.colors.success,
-                marginRight: 6,
-              }} />
-              <Text style={{
-                fontSize: 14,
-                fontFamily: theme.fonts.primary.medium,
-                color: availability.isOutOfStock ? appTheme.colors.error : appTheme.colors.text,
-              }}>
-                {availability.isOutOfStock ? 'Out of Stock' : 'Available'}
+            <View style={[styles.availabilityPill, { backgroundColor: appTheme.colors.surface }]}>
+              <View
+                style={[
+                  styles.availabilityDot,
+                  { backgroundColor: availability.isOutOfStock ? appTheme.colors.error : appTheme.colors.success },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.availabilityText,
+                  { color: availability.isOutOfStock ? appTheme.colors.error : appTheme.colors.text },
+                ]}
+              >
+                {availability.isOutOfStock ? 'Out of stock' : 'In stock'}
               </Text>
             </View>
           )}
 
-          {/* Description - 14px medium primary, 2 lines then expand */}
-          {product.description && (
-            <TouchableWithoutFeedback onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
-              <View style={styles.descriptionSection}>
-                <Text
-                  style={[styles.descriptionText, { color: appTheme.colors.text }]}
-                  numberOfLines={isDescriptionExpanded ? undefined : 2}
-                >
-                  {product.description}
+          {/* Description */}
+          {!!product.description && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.description}
+              onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+            >
+              <Text
+                style={[styles.descriptionText, { color: appTheme.colors.textSecondary }]}
+                numberOfLines={isDescriptionExpanded ? undefined : 3}
+              >
+                {product.description}
+              </Text>
+              {product.description.length > 120 && (
+                <Text style={[styles.readMore, { color: appTheme.colors.accent }]}>
+                  {isDescriptionExpanded ? 'Read less' : 'Read more'}
                 </Text>
-                {product.description.length > 100 && (
-                  <Text style={[styles.seeMoreText, { color: appTheme.colors.primary }]}>
-                    {isDescriptionExpanded ? 'See less' : 'See more'}
-                  </Text>
-                )}
-              </View>
-            </TouchableWithoutFeedback>
+              )}
+            </TouchableOpacity>
           )}
 
-          {/* Business Owner Mode: Product Details (SKU, Barcode, Stock, Tax, Supplier) */}
+          {/* Distributor card (buyer + personal) */}
+          {showSellerCard && <SellerCard seller={seller} onPress={handleBusinessPress} />}
+
+          {/* Owner details (owner) */}
           {showOwnerDetails && (
-            <View style={styles.ownerDetailsSection}>
-              {product.sku && (
-                <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { color: appTheme.colors.textSecondary }]}>SKU</Text>
-                  <Text style={[styles.detailValue, { color: appTheme.colors.text }]}>{product.sku}</Text>
-                </View>
-              )}
-              
-              {product.barcode && (
-                <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { color: appTheme.colors.textSecondary }]}>Barcode</Text>
-                  <View style={styles.barcodeContainer}>
-                    <Icon name="barcode-outline" size={16} color={appTheme.colors.text} style={{ marginRight: 6 }} />
-                    <Text style={[styles.detailValue, { color: appTheme.colors.text }]}>{product.barcode}</Text>
-                  </View>
-                </View>
-              )}
-              
-              {availability.stockQuantity !== undefined && (
-                <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { color: appTheme.colors.textSecondary }]}>In Stock</Text>
-                  <Text style={[
-                    styles.detailValue,
-                    { color: availability.isLowStock ? appTheme.colors.warning : appTheme.colors.text }
-                  ]}>
-                    {availability.stockQuantity} in stock
-                    {availability.isLowStock && ' (Low)'}
-                  </Text>
-                </View>
-              )}
-
-              {product.hasRetailPriceLimit && pricing.retailPriceLimit !== undefined && (
-                <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { color: appTheme.colors.textSecondary }]}>RRP Limit</Text>
-                  <Text style={[styles.detailValue, { color: appTheme.colors.text }]}>
-                    {formatPrice(pricing.retailPriceLimit, pricing.currency)}
-                  </Text>
-                </View>
-              )}
-
-              {pricing.taxRate !== undefined && (
-                <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { color: appTheme.colors.textSecondary }]}>Tax</Text>
-                  <Text style={[styles.detailValue, { color: appTheme.colors.text }]}>{pricing.taxRate}%</Text>
-                </View>
-              )}
-              
-              {product.supplier && (
-                <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { color: appTheme.colors.textSecondary }]}>Supplier</Text>
-                  <Text style={[styles.detailValue, { color: appTheme.colors.text }]}>{product.supplier}</Text>
-                </View>
-              )}
-
-              {/* Supplier Pricing Section */}
-              {supplierPricingData.length > 0 && (
-                <View style={styles.supplierPricingSection}>
-                  <Text style={[styles.supplierPricingSectionTitle, { color: appTheme.colors.text }]}>
-                    Supplier Pricing
-                  </Text>
-                  {supplierPricingData.map((sp, index) => (
-                    <View
-                      key={sp.supplierId}
-                      style={[
-                        styles.supplierPricingCard,
-                        {
-                          backgroundColor: appTheme.colors.surface,
-                          borderBottomColor: index < supplierPricingData.length - 1 ? appTheme.colors.borderColor : 'transparent',
-                          borderBottomWidth: index < supplierPricingData.length - 1 ? 1 : 0,
-                        },
-                      ]}
-                    >
-                      <View style={styles.supplierPricingCardHeader}>
-                        <Text style={[styles.supplierPricingName, { color: appTheme.colors.text }]}>
-                          {sp.supplierName}
-                        </Text>
-                        <Text style={[styles.supplierPricingPrice, { color: appTheme.colors.success }]}>
-                          {formatPrice(sp.supplierPrice, pricing.currency)}/unit
-                        </Text>
-                      </View>
-                      <View style={styles.supplierPricingMeta}>
-                        {sp.minOrderQty && (
-                          <Text style={[styles.supplierPricingMetaText, { color: appTheme.colors.textSecondary }]}>
-                            Min: {sp.minOrderQty}
-                          </Text>
-                        )}
-                        {sp.leadTimeDays && (
-                          <Text style={[styles.supplierPricingMetaText, { color: appTheme.colors.textSecondary }]}>
-                            Lead: {sp.leadTimeDays} days
-                          </Text>
-                        )}
-                        {sp.supplierSKU && (
-                          <Text style={[styles.supplierPricingMetaText, { color: appTheme.colors.textSecondary }]}>
-                            SKU: {sp.supplierSKU}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
+            <OwnerDetailRows
+              product={product}
+              pricing={pricing}
+              availability={availability}
+              supplierPricing={supplierPricingData}
+            />
           )}
 
-          {/* Related Products Sections (Personal mode and Business Buyer mode) */}
+          {/* More sections (buyer + personal) */}
           {showRelatedProducts && (
             <>
-              {/* More from Brand */}
-              {sameBrandProducts.length > 0 && product.brand && (
-                <View style={styles.relatedSection}>
-                  <Text style={[styles.relatedTitle, { color: appTheme.colors.text }]}>
-                    More from {product.brand}
-                  </Text>
-                  <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.relatedScrollContent}
-                  >
-                    {sameBrandProducts.map((item) => (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={styles.relatedCard}
-                        onPress={() => handleRelatedProductPress(item.id)}
-                      >
-                        {item.image ? (
-                          <Image source={{ uri: item.image }} style={styles.relatedImage} />
-                        ) : (
-                          <View style={[styles.relatedImagePlaceholder, { backgroundColor: appTheme.colors.surface }]}>
-                            <Icon name="cube-outline" size={24} color={appTheme.colors.textMuted} />
-                          </View>
-                        )}
-                        <Text style={[styles.relatedName, { color: appTheme.colors.text }]} numberOfLines={2}>
-                          {item.name}
-                        </Text>
-                        <Text style={[styles.relatedPrice, { color: item.priceHidden ? appTheme.colors.textMuted : appTheme.colors.textSecondary }]}>
-                          {item.priceHidden ? 'Price on request' : formatPrice(item.price, item.currency)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* From Company */}
-              {sameCompanyProducts.length > 0 && seller.companyName && (
-                <View style={styles.relatedSection}>
-                  <Text style={[styles.relatedTitle, { color: appTheme.colors.text }]}>
-                    From {seller.companyName}
-                  </Text>
-                  <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.relatedScrollContent}
-                  >
-                    {sameCompanyProducts.map((item) => (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={styles.relatedCard}
-                        onPress={() => handleRelatedProductPress(item.id)}
-                      >
-                        {item.image ? (
-                          <Image source={{ uri: item.image }} style={styles.relatedImage} />
-                        ) : (
-                          <View style={[styles.relatedImagePlaceholder, { backgroundColor: appTheme.colors.surface }]}>
-                            <Icon name="cube-outline" size={24} color={appTheme.colors.textMuted} />
-                          </View>
-                        )}
-                        <Text style={[styles.relatedName, { color: appTheme.colors.text }]} numberOfLines={2}>
-                          {item.name}
-                        </Text>
-                        <Text style={[styles.relatedPrice, { color: item.priceHidden ? appTheme.colors.textMuted : appTheme.colors.textSecondary }]}>
-                          {item.priceHidden ? 'Price on request' : formatPrice(item.price, item.currency)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* Explore More (same category) */}
-              {sameCategoryProducts.length > 0 && (
-                <View style={[styles.relatedSection, styles.lastRelatedSection]}>
-                  <Text style={[styles.relatedTitle, { color: appTheme.colors.text }]}>
-                    Explore more
-                  </Text>
-                  <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.relatedScrollContent}
-                  >
-                    {sameCategoryProducts.map((item) => (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={styles.relatedCard}
-                        onPress={() => handleRelatedProductPress(item.id)}
-                      >
-                        {item.image ? (
-                          <Image source={{ uri: item.image }} style={styles.relatedImage} />
-                        ) : (
-                          <View style={[styles.relatedImagePlaceholder, { backgroundColor: appTheme.colors.surface }]}>
-                            <Icon name="cube-outline" size={24} color={appTheme.colors.textMuted} />
-                          </View>
-                        )}
-                        <Text style={[styles.relatedName, { color: appTheme.colors.text }]} numberOfLines={2}>
-                          {item.name}
-                        </Text>
-                        <Text style={[styles.relatedPrice, { color: item.priceHidden ? appTheme.colors.textMuted : appTheme.colors.textSecondary }]}>
-                          {item.priceHidden ? 'Price on request' : formatPrice(item.price, item.currency)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
+              <RelatedRow
+                title={`More from ${seller.companyName}`}
+                products={sameCompanyProducts}
+                onProductPress={handleRelatedProductPress}
+                onHeaderPress={handleBusinessPress}
+              />
+              <RelatedRow
+                title={`More from ${product.brand}`}
+                products={sameBrandProducts}
+                onProductPress={handleRelatedProductPress}
+                onHeaderPress={handleBrandPress}
+              />
+              <RelatedRow
+                title="You might also like"
+                products={sameCategoryProducts}
+                onProductPress={handleRelatedProductPress}
+                isLast
+              />
             </>
           )}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
-      {/* Bottom Action Bar - BUSINESS MODE ONLY */}
-      {/* Personal Mode: No action bar (browse only per app-logic.json) */}
+      {/* Floating header — controls always visible; solid bar + title fade in on scroll */}
+      <FloatingHeader
+        title={product.name}
+        headerBarStyle={headerBarStyle}
+        topInset={insets.top}
+        showSave={showSave}
+        isSaved={isSaved}
+        onBack={() => navigation.goBack()}
+        onSave={handleSave}
+        onShare={handleShare}
+      />
+
+      {/* Bottom Action Bar - BUSINESS MODE ONLY (Personal mode = browse only) */}
       {showActionBar && (
         <View style={[styles.bottomBar, { backgroundColor: appTheme.colors.cardBackground, borderTopColor: appTheme.colors.borderColor }]}>
           {isProductOwner ? (
@@ -1021,12 +838,12 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Icon name="add" size={20} color={appTheme.colors.text} />
                 </TouchableOpacity>
               </View>
-              
+
               {/* Total amount */}
               <Text style={[styles.totalAmount, { color: appTheme.colors.text }]}>
                 {formatPrice(totalPrice, pricing.currency)}
               </Text>
-              
+
               {/* Buttons with 0px gap */}
               <View style={styles.orderButtonsContainer}>
                 <TouchableOpacity
@@ -1049,7 +866,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             /* Business Buyer Mode: Order button */
             <TouchableOpacity
               style={[
-                styles.orderButton, 
+                styles.orderButton,
                 { backgroundColor: availability.isOutOfStock ? appTheme.colors.surface : appTheme.colors.primary }
               ]}
               onPress={handleOrderPress}
@@ -1066,6 +883,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           )}
         </View>
       )}
+
       {/* Supplier Picker Modal for Reorder (when multiple suppliers) */}
       <SupplierPickerModal
         visible={showSupplierPicker}
@@ -1090,11 +908,11 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 function createMockProduct(productId: string, activeCompanyId: string | null): ProductDetailsDTO {
   // DETERMINE OWNERSHIP based on productId pattern:
   // - 'PRD-xxx' = Products from Business's own catalog (Products tab) → OWNER MODE
-  // - 'own-xxx' = Explicitly marked as owned → OWNER MODE  
+  // - 'own-xxx' = Explicitly marked as owned → OWNER MODE
   // - 'prod-xxx', 'new-xxx', 'brand-xxx' = Feed products from other companies → BUYER MODE
   // - Everything else = Assume feed/other company → BUYER MODE
   const isOwnerProduct = productId.startsWith('PRD-') || productId.startsWith('own-');
-  
+
   const product: ProductCore = {
     id: productId,
     name: 'Premium Wireless Headphones',
@@ -1107,6 +925,7 @@ function createMockProduct(productId: string, activeCompanyId: string | null): P
     sku: isOwnerProduct ? 'WH-PRE-001' : undefined,
     barcode: isOwnerProduct ? '1234567890123' : undefined,
     brand: 'AudioPro',
+    brandId: 'brand-audiopro',
     brandLogo: 'https://picsum.photos/seed/audiopro/100/100',
     category: 'Electronics',
     unit: '0.5L',
@@ -1137,15 +956,19 @@ function createMockProduct(productId: string, activeCompanyId: string | null): P
   // CRITICAL: For non-owner products, use a company ID that is GUARANTEED to be different
   // Use a fixed "other-company" ID to ensure it never matches the user's company
   const sellerCompanyId = isOwnerProduct ? (activeCompanyId || 'my-company') : 'other-company-xyz';
-  
+
   const seller: SellerInfo = {
     companyId: sellerCompanyId,
     companyName: isOwnerProduct ? 'My Company' : 'TechCorp Industries',
     companyLogo: 'https://picsum.photos/seed/techcorp/100/100',
+    location: isOwnerProduct ? undefined : 'Port Louis',
+    isVerified: !isOwnerProduct,
+    rating: isOwnerProduct ? undefined : 4.7,
+    responseTime: isOwnerProduct ? undefined : 'Replies within 1h',
   };
 
   const viewerContext = computeViewerContext(seller.companyId, activeCompanyId);
-  
+
   if (viewerContext.buyerCapabilities) {
     viewerContext.buyerCapabilities = adjustBuyerCapabilitiesForAvailability(
       viewerContext.buyerCapabilities,
@@ -1168,6 +991,9 @@ function createMockProduct(productId: string, activeCompanyId: string | null): P
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  scroll: {
     flex: 1,
   },
   loadingContainer: {
@@ -1207,215 +1033,114 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: theme.fonts.primary.medium,
   },
-  stickyControls: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
+
+  // Hero + sheet
+  heroWrap: {
+    zIndex: 0,
   },
-  controlsRow: {
+  sheet: {
+    marginTop: -SHEET_OVERLAP,
+    zIndex: 1,
+    minHeight: 400,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 8,
+  },
+  grabber: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 999,
+    marginBottom: 16,
+  },
+
+  // Brand row
+  brandRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  controlButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rightControls: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  scrollContent: {
-    flex: 1,
-  },
-  scrollContentContainer: {
-    paddingBottom: 120,
-  },
-  carouselContainer: {
-    position: 'relative',
-  },
-  carouselImage: {
-    height: '100%',
-  },
-  imagePlaceholder: {
-    width: SCREEN_WIDTH,
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dotContainer: {
-    position: 'absolute',
-    bottom: 24,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 8,
   },
-  dot: {
+  brandLogo: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+  },
+  brandName: {
+    flexShrink: 1,
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.medium,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+
+  // Name
+  name: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontFamily: theme.fonts.primary.semiBold,
+    marginBottom: 12,
+  },
+
+  // Chips
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  chip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  chipText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.medium,
+  },
+
+  // Availability
+  availabilityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    marginBottom: 16,
+  },
+  availabilityDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
   },
-  badgeContainer: {
-    position: 'absolute',
-    top: 60,
-    left: 16,
-    gap: 8,
+  availabilityText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.medium,
   },
-  badge: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontFamily: theme.fonts.primary.bold,
-    color: '#FFFFFF',
-  },
-  infoContainer: {
-    padding: 16,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -16,
-  },
-  // Product Name - 24px semibold primary
-  productName: {
-    fontSize: 24,
-    fontFamily: theme.fonts.primary.semiBold,
-    lineHeight: 30,
+
+  // Description
+  description: {
     marginBottom: 8,
-  },
-  // Unit Box - 16px medium secondary
-  unitBox: {
-    alignSelf: 'flex-start',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  unitText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.medium,
-  },
-  // Price Block
-  priceBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  originalPriceContainer: {
-    position: 'relative',
-  },
-  originalPrice: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.medium,
-  },
-  strikethrough: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '50%',
-    height: 1,
-  },
-  currentPrice: {
-    fontSize: 20,
-    fontFamily: theme.fonts.primary.medium,
-  },
-  // Description - 14px medium primary, 2 lines
-  descriptionSection: {
-    marginBottom: 16,
   },
   descriptionText: {
     fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
-    lineHeight: 20,
-  },
-  seeMoreText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.semiBold,
-    marginTop: 4,
-  },
-  // Owner Details Section
-  ownerDetailsSection: {
-    marginTop: 8,
-    paddingTop: 16,
-    borderTopWidth: 0.5,
-    borderTopColor: 'rgba(0,0,0,0.08)',
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  detailLabel: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
-    width: 80,
-  },
-  detailValue: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
-    flex: 1,
-  },
-  barcodeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  // Related Products Sections
-  relatedSection: {
-    marginTop: 24,
-    paddingTop: 16,
-    borderTopWidth: 0.5,
-    borderTopColor: 'rgba(0,0,0,0.08)',
-  },
-  lastRelatedSection: {
-    marginBottom: 16,
-  },
-  relatedTitle: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-    marginBottom: 12,
-  },
-  relatedScrollContent: {
-    gap: 12,
-  },
-  relatedCard: {
-    width: 120,
-  },
-  relatedImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 10,
-    marginBottom: 8,
-  },
-  relatedImagePlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 10,
-    marginBottom: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  relatedName: {
-    fontSize: 13,
-    fontFamily: theme.fonts.primary.medium,
-    marginBottom: 4,
-  },
-  relatedPrice: {
-    fontSize: 12,
+    lineHeight: 21,
     fontFamily: theme.fonts.primary.regular,
   },
+  readMore: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.semiBold,
+    marginTop: 6,
+  },
+
   // Bottom Bar
   bottomBar: {
     position: 'absolute',
@@ -1425,20 +1150,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 32,
-    borderTopWidth: 0.5,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  // Owner Buttons Row
   ownerButtonsRow: {
     flexDirection: 'row',
     gap: 12,
   },
-  // Owner Edit Button
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     gap: 8,
   },
   editButtonText: {
@@ -1452,61 +1175,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     gap: 8,
   },
-  // Supplier Pricing Section (owner detail)
-  supplierPricingSection: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 0.5,
-    borderTopColor: 'rgba(0,0,0,0.08)',
-  },
-  supplierPricingSectionTitle: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-    marginBottom: 12,
-  },
-  supplierPricingCard: {
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 2,
-  },
-  supplierPricingCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  supplierPricingName: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
-    flex: 1,
-  },
-  supplierPricingPrice: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.semiBold,
-  },
-  supplierPricingMeta: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  supplierPricingMetaText: {
-    fontSize: 12,
-    fontFamily: theme.fonts.primary.regular,
-  },
-  // Buyer Order Button
   orderButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 16,
+    borderRadius: 14,
   },
   orderButtonText: {
     fontSize: 16,
     fontFamily: theme.fonts.primary.semiBold,
   },
-  // Order Flow Container
   orderFlowContainer: {
     alignItems: 'center',
   },
@@ -1518,7 +1199,7 @@ const styles = StyleSheet.create({
   quantityButton: {
     width: 40,
     height: 40,
-    borderRadius: 8,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1542,8 +1223,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
   },
@@ -1558,8 +1239,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
   },
   removeButtonText: {
     fontSize: 16,

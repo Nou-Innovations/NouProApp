@@ -33,6 +33,7 @@ import {
   ProductListSection,
   NotesSection,
   OrderUpdatesTimeline,
+  DeliveryStatusTimeline,
 } from '../../components/detail';
 import { useDeliveryActions } from '../../hooks/useDeliveryActions';
 
@@ -235,6 +236,12 @@ export function DeliveryDetailClientView({
           delivery={delivery}
           deliveryStatus={delivery.deliveryStatus}
           paymentStatus={delivery.paymentStatus}
+        />
+
+        <DeliveryStatusTimeline
+          companyId={delivery.businessId}
+          deliveryId={delivery.id}
+          refreshKey={delivery.deliveryStatus}
         />
       </ScrollView>
 

@@ -23,6 +23,7 @@ import {
   UpdateDeliveryData,
   DeliveryStaffAssignment,
   DeliveryStaffRole,
+  DeliveryStatusHistoryEntry,
 } from '@/shared/types/delivery';
 
 // ============================================================================
@@ -66,6 +67,25 @@ export async function getDeliveries(params: GetDeliveriesParams): Promise<Delive
  */
 export async function getDelivery(companyId: string, deliveryId: string): Promise<Delivery> {
   return get<Delivery>(`/companies/${companyId}/deliveries/${deliveryId}`);
+}
+
+/**
+ * Get deliveries assigned to the current user (driver "My deliveries" view)
+ */
+export async function getMyDeliveries(companyId: string): Promise<Delivery[]> {
+  return get<Delivery[]>(`/companies/${companyId}/my-deliveries`);
+}
+
+/**
+ * Get the status-change audit trail for a delivery (newest first)
+ */
+export async function getDeliveryHistory(
+  companyId: string,
+  deliveryId: string
+): Promise<DeliveryStatusHistoryEntry[]> {
+  return get<DeliveryStatusHistoryEntry[]>(
+    `/companies/${companyId}/deliveries/${deliveryId}/history`
+  );
 }
 
 /**
@@ -198,6 +218,8 @@ export async function deleteDelivery(
 const deliveriesService = {
   getDeliveries,
   getDelivery,
+  getMyDeliveries,
+  getDeliveryHistory,
   createDelivery,
   updateDelivery,
   updateDeliveryStatus,

@@ -3,8 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+import type { DeliveryViewType } from '@/shared/types/delivery';
 
-export type DeliveryViewType = 'all' | 'outgoing' | 'incoming' | 'transfers';
+export type { DeliveryViewType };
 
 interface DeliveryActionsModalProps {
   visible: boolean;

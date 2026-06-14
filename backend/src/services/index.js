@@ -10,6 +10,7 @@ const orderAutomation = require('./orderAutomation');
 const eventMessages = require('./eventMessages');
 const pushService = require('./pushService');
 const storageService = require('./storageService');
+const stockService = require('./stockService');
 
 module.exports = {
   orderStatus,
@@ -17,4 +18,5 @@ module.exports = {
   eventMessages,
   pushService,
   storageService,
+  stockService,
 };

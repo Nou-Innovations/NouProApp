@@ -6,6 +6,7 @@ import Pill from '@/shared/components/ui/Pill';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
+import { getDeliverySlaBadge } from '@/shared/utils/deliverySla';
 
 interface DeliveryCardProps {
   delivery: Delivery;
@@ -60,6 +61,8 @@ const DeliveryCard: React.FC<DeliveryCardProps> = ({ delivery, isUserAdmin = fal
   // Check if this is a new delivery (NOT_ASSIGNED status) and hasn't been viewed
   const isNewDelivery = delivery.deliveryStatus === 'NOT_ASSIGNED' && !isItemViewed(delivery.id);
   const isTransfer = delivery.type === 'transfer';
+  // Derived SLA badge (Late / Delivered late / On time) — null when nothing to flag
+  const slaBadge = getDeliverySlaBadge(delivery);
   
   return (
     <TouchableOpacity 
@@ -155,8 +158,14 @@ const DeliveryCard: React.FC<DeliveryCardProps> = ({ delivery, isUserAdmin = fal
 
         <View style={styles.footerStatusContainer}>
           <View style={styles.statusContainer}>
+            {slaBadge && (
+              <Pill
+                text={slaBadge.label}
+                color={slaBadge.color}
+              />
+            )}
             {delivery.deliveryStatus && (
-              <Pill 
+              <Pill
                 text={DELIVERY_STATUS_LABELS[delivery.deliveryStatus] || delivery.deliveryStatus}
                 color={getDeliveryStatusColorFromTheme(delivery.deliveryStatus, appTheme.colors)}
               />

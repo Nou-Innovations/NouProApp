@@ -197,24 +197,15 @@ const _orderDeliverySyncInProgress = new Set();
 
 // ---------------------------------------------------------------------------
 // Delivery Status State Machine
-// Defines valid transitions for delivery statuses.
-// Terminal states (DELIVERED, CANCELED) have no outgoing transitions.
+// Now lives in ./src/services/deliveryStatus (single source of truth).
+// Re-bound here so existing references keep working.
 // ---------------------------------------------------------------------------
-const DELIVERY_STATUS_TRANSITIONS = {
-  NOT_ASSIGNED: ['ASSIGNED', 'CANCELED'],
-  ASSIGNED:     ['PACKED', 'OUT_FOR_DELIVERY', 'NOT_ASSIGNED', 'CANCELED'],
-  PACKED:       ['OUT_FOR_DELIVERY', 'CANCELED'],
-  OUT_FOR_DELIVERY: ['DELIVERED', 'FAILED'],
-  DELIVERED:    [], // terminal
-  FAILED:       ['NOT_ASSIGNED', 'CANCELED'],
-  CANCELED:     [], // terminal
-};
-
-function isValidDeliveryTransition(currentStatus, nextStatus) {
-  const allowed = DELIVERY_STATUS_TRANSITIONS[currentStatus];
-  if (!allowed) return false; // unknown current status
-  return allowed.includes(nextStatus);
-}
+const deliveryStatusService = require('./src/services/deliveryStatus');
+const { DELIVERY_STATUS_TRANSITIONS, isValidDeliveryTransition } = deliveryStatusService;
+// Named delivery-status constants — use DS.X instead of raw string literals so the
+// status-enum remodel is a single-source change.
+const DS = deliveryStatusService.DELIVERY_STATUS;
+const ACTIVE_DELIVERY_STATUSES = [DS.NOT_ASSIGNED, DS.ASSIGNED, DS.PACKED, DS.OUT_FOR_DELIVERY];
 
 const app = express();
 const server = http.createServer(app);
@@ -5060,8 +5051,8 @@ app.post('/api/companies/:companyId/orders/:orderId/assign', requireAuth, async 
       _orderDeliverySyncInProgress.add(req.params.orderId);
       try {
         const linkedDelivery = await repos.deliveryRepo.getByOrderId(req.params.orderId);
-        if (linkedDelivery && linkedDelivery.deliveryStatus === 'NOT_ASSIGNED') {
-          await repos.deliveryRepo.update(linkedDelivery.id, { deliveryStatus: 'ASSIGNED' });
+        if (linkedDelivery && linkedDelivery.deliveryStatus === DS.NOT_ASSIGNED) {
+          await repos.deliveryRepo.update(linkedDelivery.id, { deliveryStatus: DS.ASSIGNED });
         }
       } catch (syncErr) {
         logger.warn('Failed to sync order assign to delivery:', syncErr.message);
@@ -5200,7 +5191,7 @@ app.patch('/api/companies/:companyId/orders/:orderId/status', requireAuth, async
       try {
         const linkedDelivery = await repos.deliveryRepo.getByOrderId(req.params.orderId);
         if (linkedDelivery) {
-          const deliveryStatus = status === 'DONE' ? 'DELIVERED' : 'CANCELED';
+          const deliveryStatus = status === 'DONE' ? DS.DELIVERED : DS.CANCELED;
           await repos.deliveryRepo.update(linkedDelivery.id, { deliveryStatus });
         }
       } catch (syncErr) {
@@ -5281,15 +5272,7 @@ app.patch('/api/companies/:companyId/orders/:orderId/delivery-status', requireAu
     }
 
     // Validate delivery status enum
-    const allowedStatuses = new Set([
-      'NOT_ASSIGNED',
-      'ASSIGNED',
-      'PACKED',
-      'OUT_FOR_DELIVERY',
-      'DELIVERED',
-      'FAILED',
-      'CANCELED',
-    ]);
+    const allowedStatuses = new Set(Object.values(DS));
 
     if (!allowedStatuses.has(deliveryStatus)) {
       return res.status(400).json(errorResponse(
@@ -5299,7 +5282,7 @@ app.patch('/api/companies/:companyId/orders/:orderId/delivery-status', requireAu
     }
 
     // Validate state machine transition
-    const currentDeliveryStatus = order.deliveryStatus || 'NOT_ASSIGNED';
+    const currentDeliveryStatus = order.deliveryStatus || DS.NOT_ASSIGNED;
     if (!isValidDeliveryTransition(currentDeliveryStatus, deliveryStatus)) {
       return res.status(400).json(errorResponse(
         `Invalid delivery status transition from ${currentDeliveryStatus} to ${deliveryStatus}`,
@@ -5630,7 +5613,7 @@ app.patch('/api/locations/:locationId/orders/:orderId', requireAuth, async (req,
         try {
           const linkedDelivery = await repos.deliveryRepo.getByOrderId(req.params.orderId);
           if (linkedDelivery) {
-            const deliveryStatus = newStatus === 'DONE' ? 'DELIVERED' : 'CANCELED';
+            const deliveryStatus = newStatus === 'DONE' ? DS.DELIVERED : DS.CANCELED;
             await repos.deliveryRepo.update(linkedDelivery.id, { deliveryStatus });
           }
         } catch (syncErr) {
@@ -6521,7 +6504,7 @@ app.patch('/api/companies/:companyId/purchase-orders/:poId/status', requireAuth,
             itemCount: deliveryItems.length,
             totalAmount: fullPO.totalAmount || 0,
             orderId: fullPO.id,
-            deliveryStatus: 'NOT_ASSIGNED',
+            deliveryStatus: DS.NOT_ASSIGNED,
             paymentStatus: fullPO.paymentStatus || 'UNPAID',
           });
         }
@@ -6853,6 +6836,8 @@ app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =
       distributorNotes: body.distributorNotes || null,
       fromLocation: body.fromLocation || null,
       toLocation: body.toLocation || null,
+      fromLocationId: body.fromLocationId || null,
+      toLocationId: body.toLocationId || null,
       orderTime: body.orderTime || new Date().toISOString(),
       expectedDeliveryDateTime: body.expectedDeliveryDateTime,
       itemCount,
@@ -6863,7 +6848,7 @@ app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =
       assignedTo: body.assignedTo || null,
       transportMode: body.transportMode || null,
       // SECURITY: Always default — caller cannot skip lifecycle by setting status at creation
-      deliveryStatus: 'NOT_ASSIGNED',
+      deliveryStatus: DS.NOT_ASSIGNED,
       paymentStatus: 'UNPAID',
       orderId: body.orderId || null,
     });
@@ -6896,6 +6881,159 @@ app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =
   }
 });
 
+// Deliveries assigned to the current user (driver "My deliveries" view)
+// GET /api/companies/:companyId/my-deliveries
+app.get('/api/companies/:companyId/my-deliveries', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const { companyId } = req.params;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json(errorResponse('Not authenticated'));
+
+    const rows = await repos.deliveryRepo.getByBusinessIdAndStaffId(companyId, userId);
+    res.json(successResponse(rows));
+  } catch (e) {
+    logger.error('Error fetching my deliveries:', e);
+    res.status(500).json(errorResponse('Failed to load your deliveries'));
+  }
+});
+
+// Deliveries analytics — KPIs, status breakdown, weekly trend, per-driver, per-location.
+// NOTE: must be registered BEFORE GET /deliveries/:deliveryId so "analytics" isn't
+// captured as a delivery id.
+// GET /api/companies/:companyId/deliveries/analytics?locationId=&from=&to=
+app.get('/api/companies/:companyId/deliveries/analytics', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const { companyId } = req.params;
+    const { locationId, from, to } = req.query;
+
+    const now = new Date();
+    const DAY_MS = 1000 * 60 * 60 * 24;
+    const fromDate = from ? new Date(from) : new Date(now.getTime() - 90 * DAY_MS);
+    const toDate = to ? new Date(to) : now;
+    const locWhere = locationId ? { locationId } : {};
+    const baseWhere = { businessId: companyId, ...locWhere, createdAt: { gte: fromDate, lte: toDate } };
+
+    const ACTIVE = ACTIVE_DELIVERY_STATUSES;
+
+    const settle = async (fn, fallback) => {
+      try { return await fn(); } catch (e) { logger.error('[DeliveryAnalytics] sub-query failed:', e?.message); return fallback; }
+    };
+
+    const [statusGroups, locationGroups, deliveredRows, createdRows, totalCount, lateActiveCount] = await Promise.all([
+      settle(() => prisma.delivery.groupBy({ by: ['deliveryStatus'], where: baseWhere, _count: { _all: true } }), []),
+      settle(() => prisma.delivery.groupBy({ by: ['locationId'], where: baseWhere, _count: { _all: true } }), []),
+      settle(() => prisma.delivery.findMany({
+        where: { ...baseWhere, deliveryStatus: DS.DELIVERED },
+        select: { id: true, deliveredAt: true, expectedDeliveryDateTime: true, orderTime: true, createdAt: true, assignedStaffId: true },
+      }), []),
+      settle(() => prisma.delivery.findMany({ where: baseWhere, select: { createdAt: true, deliveredAt: true } }), []),
+      settle(() => prisma.delivery.count({ where: baseWhere }), 0),
+      settle(() => prisma.delivery.count({ where: { ...baseWhere, deliveryStatus: { in: ACTIVE }, expectedDeliveryDateTime: { lt: now } } }), 0),
+    ]);
+
+    // Status breakdown
+    const statusBreakdown = statusGroups.map((g) => ({ status: g.deliveryStatus, count: g._count._all }));
+    const countOf = (s) => statusBreakdown.filter((x) => x.status === s).reduce((a, b) => a + b.count, 0);
+    const delivered = countOf(DS.DELIVERED);
+    const failed = countOf(DS.FAILED);
+    const canceled = countOf(DS.CANCELED);
+    const active = statusBreakdown.filter((x) => ACTIVE.includes(x.status)).reduce((a, b) => a + b.count, 0);
+
+    // On-time rate + average delivery duration (over delivered rows)
+    let onTimeCount = 0;
+    let durationSumMs = 0;
+    let durationN = 0;
+    const driverMap = {};
+    for (const d of deliveredRows) {
+      const eta = d.expectedDeliveryDateTime ? new Date(d.expectedDeliveryDateTime).getTime() : null;
+      const del = d.deliveredAt ? new Date(d.deliveredAt).getTime() : null;
+      const onTime = eta != null && del != null && del <= eta;
+      if (onTime) onTimeCount++;
+      const start = d.orderTime ? new Date(d.orderTime).getTime() : (d.createdAt ? new Date(d.createdAt).getTime() : null);
+      if (del != null && start != null && del >= start) { durationSumMs += del - start; durationN++; }
+      if (d.assignedStaffId) {
+        const m = driverMap[d.assignedStaffId] || (driverMap[d.assignedStaffId] = { delivered: 0, onTime: 0 });
+        m.delivered++;
+        if (onTime) m.onTime++;
+      }
+    }
+    const onTimeRate = deliveredRows.length ? Math.round((onTimeCount / deliveredRows.length) * 100) : 0;
+    const avgDeliveryHours = durationN ? Math.round((durationSumMs / durationN / (1000 * 60 * 60)) * 10) / 10 : 0;
+
+    // Per-driver (resolve names)
+    const driverIds = Object.keys(driverMap);
+    let perDriver = [];
+    if (driverIds.length) {
+      const users = await settle(() => repos.userRepo.getByIds(driverIds), []);
+      const nameById = {};
+      (users || []).forEach((u) => { if (u) nameById[u.id] = u.name; });
+      perDriver = driverIds
+        .map((id) => ({
+          userId: id,
+          name: nameById[id] || 'Unknown',
+          delivered: driverMap[id].delivered,
+          onTimeRate: driverMap[id].delivered ? Math.round((driverMap[id].onTime / driverMap[id].delivered) * 100) : 0,
+        }))
+        .sort((a, b) => b.delivered - a.delivered);
+    }
+
+    // Per-location (resolve names)
+    let perLocation = [];
+    if (locationGroups.length) {
+      const locs = await settle(() => repos.locationRepo.getByBusinessId(companyId), []);
+      const locName = {};
+      (locs || []).forEach((l) => { locName[l.id] = l.name; });
+      perLocation = locationGroups
+        .map((g) => ({
+          locationId: g.locationId,
+          name: g.locationId ? (locName[g.locationId] || 'Unknown') : 'Unassigned',
+          total: g._count._all,
+        }))
+        .sort((a, b) => b.total - a.total);
+    }
+
+    // Weekly trend — bucket created/delivered counts by ISO week (Monday start), last 12 weeks
+    const weekKey = (ts) => {
+      const d = new Date(ts);
+      const dow = (d.getDay() + 6) % 7; // Monday = 0
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - dow);
+      return d.getTime();
+    };
+    const trendMap = {};
+    for (const r of createdRows) {
+      if (r.createdAt) {
+        const k = weekKey(r.createdAt);
+        (trendMap[k] || (trendMap[k] = { created: 0, delivered: 0 })).created++;
+      }
+      if (r.deliveredAt) {
+        const k = weekKey(r.deliveredAt);
+        (trendMap[k] || (trendMap[k] = { created: 0, delivered: 0 })).delivered++;
+      }
+    }
+    const weeklyTrend = Object.keys(trendMap)
+      .map((k) => ({ weekStart: new Date(Number(k)).toISOString(), created: trendMap[k].created, delivered: trendMap[k].delivered }))
+      .sort((a, b) => new Date(a.weekStart).getTime() - new Date(b.weekStart).getTime())
+      .slice(-12);
+
+    res.json(successResponse({
+      range: { from: fromDate.toISOString(), to: toDate.toISOString() },
+      summary: { total: totalCount, delivered, active, failed, canceled, onTimeRate, avgDeliveryHours, lateActiveCount },
+      statusBreakdown,
+      weeklyTrend,
+      perDriver,
+      perLocation,
+    }));
+  } catch (e) {
+    logger.error('Error building delivery analytics:', e);
+    res.status(500).json(errorResponse('Failed to load delivery analytics'));
+  }
+});
+
 // Get single delivery
 // GET /api/companies/:companyId/deliveries/:deliveryId
 app.get('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, async (req, res) => {
@@ -6916,6 +7054,27 @@ app.get('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, async (
   }
 });
 
+// Delivery status-change audit trail (newest first)
+// GET /api/companies/:companyId/deliveries/:deliveryId/history
+app.get('/api/companies/:companyId/deliveries/:deliveryId/history', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
+  try {
+    const { companyId, deliveryId } = req.params;
+    const delivery = await repos.deliveryRepo.getById(deliveryId);
+
+    if (!delivery || delivery.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Delivery not found'));
+    }
+
+    const history = await deliveryStatusService.getDeliveryStatusHistory(deliveryId);
+    res.json(successResponse(history));
+  } catch (e) {
+    logger.error('Error fetching delivery history:', e);
+    res.status(500).json(errorResponse('Failed to load delivery history'));
+  }
+});
+
 // Update delivery
 // PATCH /api/companies/:companyId/deliveries/:deliveryId
 app.patch('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, async (req, res) => {
@@ -6929,39 +7088,60 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, async
       return res.status(404).json(errorResponse('Delivery not found'));
     }
 
-    // Whitelist allowed update fields to prevent overwriting protected fields
-    const allowedDeliveryFields = ['deliveryStatus', 'paymentStatus', 'assignedStaffId',
+    // Whitelist allowed NON-STATUS update fields. Status changes are routed
+    // through deliveryStatusService (validation + audit history + DELIVERED
+    // side-effects). POD fields ride along on the DELIVERED status change.
+    const allowedDeliveryFields = ['paymentStatus', 'assignedStaffId',
       'assignedTo', 'transportMode', 'distributorNotes', 'clientNotes',
       'trackingNumber', 'expectedDeliveryDateTime', 'items',
-      'clientCompanyName', 'clientAddress', 'clientEmail', 'clientPhone'];
+      'clientCompanyName', 'clientAddress', 'clientEmail', 'clientPhone',
+      'fromLocationId', 'toLocationId'];
     const updateData = {};
     for (const key of allowedDeliveryFields) {
       if (req.body[key] !== undefined) updateData[key] = req.body[key];
     }
 
-    // Validate delivery status transition if status is being changed
-    if (updateData.deliveryStatus && updateData.deliveryStatus !== delivery.deliveryStatus) {
-      if (!isValidDeliveryTransition(delivery.deliveryStatus, updateData.deliveryStatus)) {
-        return res.status(400).json(errorResponse(
-          `Invalid delivery status transition from ${delivery.deliveryStatus} to ${updateData.deliveryStatus}`,
-          'INVALID_STATUS_TRANSITION'
-        ));
-      }
-    }
+    const nextStatus = req.body.deliveryStatus;
+    const isStatusChange = !!nextStatus && nextStatus !== delivery.deliveryStatus;
 
-    const updated = await repos.deliveryRepo.update(deliveryId, updateData);
+    let updated;
+    try {
+      // Apply non-status field updates first (so a stock-moving transfer sees
+      // the latest items/locations when its status flips to DELIVERED).
+      if (Object.keys(updateData).length > 0) {
+        updated = await repos.deliveryRepo.update(deliveryId, updateData);
+      }
+
+      // Route status changes through the service (validation + history + stock).
+      if (isStatusChange) {
+        updated = await deliveryStatusService.changeDeliveryStatus({
+          deliveryId,
+          nextStatus,
+          changedBy: req.user?.id || null,
+          reason: req.body.statusReason || null,
+          pod: { podPhotoUrl: req.body.podPhotoUrl, podSignatureUrl: req.body.podSignatureUrl },
+        });
+      } else if (!updated) {
+        updated = await repos.deliveryRepo.getById(deliveryId);
+      }
+    } catch (err) {
+      if (err.code === 'INVALID_STATUS_TRANSITION' || err.code === 'INVALID_STATUS') {
+        return res.status(400).json(errorResponse(err.message, err.code));
+      }
+      throw err;
+    }
 
     // Sync delivery changes to linked order (with loop guard)
     if (delivery.orderId && !_orderDeliverySyncInProgress.has(delivery.orderId)) {
       _orderDeliverySyncInProgress.add(delivery.orderId);
       try {
         // Sync deliveryStatus to order
-        if (updateData.deliveryStatus) {
-          await repos.orderRepo.update(delivery.orderId, { deliveryStatus: updateData.deliveryStatus });
+        if (isStatusChange) {
+          await repos.orderRepo.update(delivery.orderId, { deliveryStatus: nextStatus });
         }
 
         // If delivery becomes DELIVERED, move order to DONE
-        if (updateData.deliveryStatus === 'DELIVERED') {
+        if (isStatusChange && nextStatus === DS.DELIVERED) {
           try {
             await orderStatusService.changeOrderStatus({
               orderId: delivery.orderId,
@@ -6986,13 +7166,13 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, async
     }
 
     // Push notification for delivery status change (non-blocking)
-    if (updateData.deliveryStatus && delivery.assignedStaffId && delivery.assignedStaffId !== req.user?.id) {
+    if (isStatusChange && delivery.assignedStaffId && delivery.assignedStaffId !== req.user?.id) {
       pushService.sendToUsers({
         userIds: [delivery.assignedStaffId],
         title: 'Delivery Update',
-        body: `Delivery status changed to ${updateData.deliveryStatus.replace(/_/g, ' ')}`,
+        body: `Delivery status changed to ${nextStatus.replace(/_/g, ' ')}`,
         category: 'deliveries',
-        data: { type: 'delivery_status', deliveryId: delivery.id, status: updateData.deliveryStatus },
+        data: { type: 'delivery_status', deliveryId: delivery.id, status: nextStatus },
       }, repos).catch((err) => logger.error('[Push] Delivery status push error:', err));
     }
 
@@ -7070,7 +7250,7 @@ app.post('/api/companies/:companyId/orders/:orderId/create-delivery', requireAut
       items: order.items || [],
       itemCount: Array.isArray(order.items) ? order.items.length : 0,
       totalAmount: order.totalAmount || 0,
-      deliveryStatus: 'NOT_ASSIGNED',
+      deliveryStatus: DS.NOT_ASSIGNED,
       paymentStatus: order.paymentStatus || 'UNPAID',
     });
 
@@ -7078,7 +7258,7 @@ app.post('/api/companies/:companyId/orders/:orderId/create-delivery', requireAut
     if (!_orderDeliverySyncInProgress.has(orderId)) {
       _orderDeliverySyncInProgress.add(orderId);
       try {
-        await repos.orderRepo.update(orderId, { deliveryStatus: 'NOT_ASSIGNED' });
+        await repos.orderRepo.update(orderId, { deliveryStatus: DS.NOT_ASSIGNED });
       } catch (syncErr) {
         logger.warn('Failed to sync order deliveryStatus:', syncErr.message);
       } finally {
@@ -10468,8 +10648,8 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/assign', requireAuth
     };
 
     // Only auto-advance status if currently NOT_ASSIGNED
-    if (delivery.deliveryStatus === 'NOT_ASSIGNED') {
-      patch.deliveryStatus = 'ASSIGNED';
+    if (delivery.deliveryStatus === DS.NOT_ASSIGNED) {
+      patch.deliveryStatus = DS.ASSIGNED;
     }
 
     const updated = await repos.deliveryRepo.update(deliveryId, patch);
@@ -10525,8 +10705,8 @@ app.patch('/api/companies/:companyId/deliveries/:deliveryId/unassign', requireAu
     };
 
     // Only revert status if currently ASSIGNED
-    if (delivery.deliveryStatus === 'ASSIGNED') {
-      patch.deliveryStatus = 'NOT_ASSIGNED';
+    if (delivery.deliveryStatus === DS.ASSIGNED) {
+      patch.deliveryStatus = DS.NOT_ASSIGNED;
     }
 
     const updated = await repos.deliveryRepo.update(deliveryId, patch);
@@ -10618,8 +10798,8 @@ app.post('/api/companies/:companyId/deliveries/:deliveryId/staff', requireAuth, 
       assignedStaffId: primaryDriver?.userId || null,
       assignedTo: primaryDriver?.user?.name || null,
     };
-    if (delivery.deliveryStatus === 'NOT_ASSIGNED') {
-      backwardPatch.deliveryStatus = 'ASSIGNED';
+    if (delivery.deliveryStatus === DS.NOT_ASSIGNED) {
+      backwardPatch.deliveryStatus = DS.ASSIGNED;
     }
     await repos.deliveryRepo.update(deliveryId, backwardPatch);
 
@@ -10661,8 +10841,8 @@ app.delete('/api/companies/:companyId/deliveries/:deliveryId/staff/:userId', req
       assignedStaffId: primaryDriver?.userId || null,
       assignedTo: primaryDriver?.user?.name || null,
     };
-    if (remainingStaff.length === 0 && delivery.deliveryStatus === 'ASSIGNED') {
-      backwardPatch.deliveryStatus = 'NOT_ASSIGNED';
+    if (remainingStaff.length === 0 && delivery.deliveryStatus === DS.ASSIGNED) {
+      backwardPatch.deliveryStatus = DS.NOT_ASSIGNED;
     }
     await repos.deliveryRepo.update(deliveryId, backwardPatch);
 
@@ -10966,10 +11146,9 @@ async function buildActivityFeed(companyId, locationId, maxLimit) {
   const recentDeliveries = businessDeliveries
     .map(del => {
       const statusMap = {
-        'PENDING': 'delivery_pending',
-        'IN_TRANSIT': 'delivery_started',
-        'DELIVERED': 'delivery_completed',
-        'CANCELED': 'delivery_canceled',
+        [DS.OUT_FOR_DELIVERY]: 'delivery_started',
+        [DS.DELIVERED]: 'delivery_completed',
+        [DS.CANCELED]: 'delivery_canceled',
       };
       const activityType = statusMap[del.deliveryStatus] || 'delivery_started';
 
@@ -11122,7 +11301,7 @@ app.get('/api/companies/:companyId/dashboard', requireAuth, async (req, res) => 
     const taskLoc = locationId ? { locationId } : {};
 
     // Deliveries that still need action (anything not delivered / failed / canceled)
-    const ACTIVE_DELIVERY = ['NOT_ASSIGNED', 'ASSIGNED', 'PACKED', 'OUT_FOR_DELIVERY'];
+    const ACTIVE_DELIVERY = ACTIVE_DELIVERY_STATUSES;
     // Invoices that are still owed money
     const UNPAID_INVOICE = ['SENT', 'PARTIALLY_PAID', 'OVERDUE'];
     // Tasks not yet finished
@@ -11152,7 +11331,7 @@ app.get('/api/companies/:companyId/dashboard', requireAuth, async (req, res) => 
       settle(() => prisma.task.count({ where: { businessId: companyId, status: { in: OPEN_TASK }, ...taskLoc } }), 0),
       // --- priority queue source rows ---
       settle(() => prisma.order.findMany({ where: { businessId: companyId, status: 'NEW', ...orderLoc }, orderBy: { createdAt: 'desc' }, take: 10 }), []),
-      settle(() => prisma.delivery.findMany({ where: { businessId: companyId, deliveryStatus: 'NOT_ASSIGNED', ...deliveryLoc }, orderBy: { createdAt: 'desc' }, take: 10 }), []),
+      settle(() => prisma.delivery.findMany({ where: { businessId: companyId, deliveryStatus: DS.NOT_ASSIGNED, ...deliveryLoc }, orderBy: { createdAt: 'desc' }, take: 10 }), []),
       settle(() => prisma.invoice.findMany({ where: { businessId: companyId, OR: [{ status: 'OVERDUE' }, { status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: now } }], ...invoiceLoc }, orderBy: { dueDate: 'asc' }, take: 10 }), []),
       settle(() => prisma.stock.findMany({ where: { businessId: companyId, qtyOnHand: { lte: LOW_STOCK_THRESHOLD }, ...(locationId ? { locationId } : {}) }, orderBy: { qtyOnHand: 'asc' }, take: 10, include: { product: { select: { name: true } } } }), []),
       // --- recent activity preview ---
@@ -11326,7 +11505,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
       // 7. Completed deliveries — DB-filtered
       allBusinessIds.length > 0
         ? prisma.delivery.findMany({
-            where: { businessId: { in: allBusinessIds }, deliveryStatus: 'DELIVERED' },
+            where: { businessId: { in: allBusinessIds }, deliveryStatus: DS.DELIVERED },
             orderBy: { updatedAt: 'desc' },
             select: { id: true, clientCompanyName: true, businessId: true, updatedAt: true, createdAt: true },
             take: 10,

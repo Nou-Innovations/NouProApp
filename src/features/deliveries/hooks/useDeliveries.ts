@@ -14,6 +14,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Delivery, DeliveryStatus, DeliveryViewType, DeliveryFilterTab, DELIVERY_FILTER_TAB_STATUSES } from '@/shared/types/delivery';
 import { getDeliveries, updateDeliveryStatus, assignDelivery } from '../deliveries.service';
+import { needsAttention } from '@/shared/utils/deliverySla';
 import { ApiError } from '@/shared/services/api';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
@@ -45,6 +46,8 @@ interface UseDeliveriesResult {
   selectedLocationId: string | null;
   /** Count of new deliveries */
   newDeliveriesCount: number;
+  /** Count of deliveries needing attention (unassigned, failed, late, overdue) */
+  needsAttentionCount: number;
   /** Set the status filter tab */
   setStatusFilter: (tab: DeliveryFilterTab) => void;
   /** Set the view type */
@@ -135,6 +138,9 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
     
     // Filter by view type
     switch (viewType) {
+      case 'needs_attention':
+        result = result.filter(d => needsAttention(d));
+        break;
       case 'outgoing':
         result = result.filter(d => d.direction === 'outgoing');
         break;
@@ -169,6 +175,11 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
   // Count new deliveries (NOT_ASSIGNED status) -- uses unfiltered list for accurate badge
   const newDeliveriesCount = useMemo(() => {
     return deliveries.filter(d => d.deliveryStatus === 'NOT_ASSIGNED').length;
+  }, [deliveries]);
+
+  // Count of deliveries needing attention (unassigned, failed, late, overdue) -- for the hub segment badge
+  const needsAttentionCount = useMemo(() => {
+    return deliveries.filter(d => needsAttention(d)).length;
   }, [deliveries]);
   
   // Update delivery status
@@ -218,6 +229,7 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
     search,
     selectedLocationId,
     newDeliveriesCount,
+    needsAttentionCount,
     setStatusFilter,
     setViewType,
     setSearch,

@@ -111,10 +111,33 @@ export interface Delivery {
   // For transfers - location information
   fromLocation?: string;
   toLocation?: string;
+  fromLocationId?: string;
+  toLocationId?: string;
+  // Proof of delivery + SLA (set when marked DELIVERED)
+  podPhotoUrl?: string | null;
+  podSignatureUrl?: string | null;
+  deliveredAt?: string | null;
+  deliveredBy?: string | null;
+  // Transfer stock-move idempotency guard (set once stock has been applied)
+  stockAppliedAt?: string | null;
   // Order linkage
   orderId?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * A single entry in a delivery's status-change audit trail.
+ * Matches the backend DeliveryStatusHistory model.
+ */
+export interface DeliveryStatusHistoryEntry {
+  id: string;
+  deliveryId: string;
+  from?: DeliveryStatus | null;
+  to: DeliveryStatus;
+  reason?: string | null;
+  changedBy?: string | null;
+  createdAt: string;
 }
 
 export interface Staff {
@@ -162,6 +185,52 @@ export interface DeliveryResponse {
   message: string;
 }
 
+// ============================================================================
+// Analytics
+// ============================================================================
+
+export interface DeliveryStatusBreakdownEntry {
+  status: DeliveryStatus;
+  count: number;
+}
+
+export interface DeliveryWeeklyTrendPoint {
+  weekStart: string;
+  created: number;
+  delivered: number;
+}
+
+export interface DeliveryDriverBreakdown {
+  userId: string;
+  name: string;
+  delivered: number;
+  onTimeRate: number;
+}
+
+export interface DeliveryLocationBreakdown {
+  locationId: string | null;
+  name: string;
+  total: number;
+}
+
+export interface DeliveriesAnalytics {
+  range: { from: string; to: string };
+  summary: {
+    total: number;
+    delivered: number;
+    active: number;
+    failed: number;
+    canceled: number;
+    onTimeRate: number;
+    avgDeliveryHours: number;
+    lateActiveCount: number;
+  };
+  statusBreakdown: DeliveryStatusBreakdownEntry[];
+  weeklyTrend: DeliveryWeeklyTrendPoint[];
+  perDriver: DeliveryDriverBreakdown[];
+  perLocation: DeliveryLocationBreakdown[];
+}
+
 export interface DeliveryFilters {
   status?: DeliveryStatus | 'all';
   locationId?: string;
@@ -171,7 +240,7 @@ export interface DeliveryFilters {
   search?: string;
 }
 
-export type DeliveryViewType = 'all' | 'outgoing' | 'incoming' | 'transfers';
+export type DeliveryViewType = 'all' | 'needs_attention' | 'outgoing' | 'incoming' | 'transfers';
 
 /**
  * Grouped delivery filter tabs for the UI.
@@ -215,6 +284,8 @@ export interface CreateDeliveryData {
   // Transfer-specific
   fromLocation?: string;
   toLocation?: string;
+  fromLocationId?: string;
+  toLocationId?: string;
   orderId?: string;
 }
 
@@ -229,5 +300,12 @@ export interface UpdateDeliveryData {
   trackingNumber?: string;
   expectedDeliveryDateTime?: string;
   items?: DeliveryItem[];
+  // Proof of delivery (sent alongside a DELIVERED status change)
+  podPhotoUrl?: string | null;
+  podSignatureUrl?: string | null;
+  statusReason?: string;
+  // Transfer destination/source location FKs
+  fromLocationId?: string;
+  toLocationId?: string;
 }
 

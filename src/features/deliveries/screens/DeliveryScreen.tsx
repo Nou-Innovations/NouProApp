@@ -5,24 +5,22 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
   RefreshControl,
   FlatList,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/shared/components/ui/FilterBar';
 import DeliveryCard from '@/features/deliveries/components/DeliveryCard';
 import LocationDropdown from '@/shared/components/ui/LocationDropdown';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
-import DeliveryActionsModal from '@/features/deliveries/components/DeliveryActionsModal';
 import DeliveryCreateModal from '@/features/deliveries/components/DeliveryCreateModal';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { Icon } from '@/shared/utils/icons';
 import { EmptyState, Skeleton, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
 import {
   canViewDeliveries,
@@ -46,9 +44,19 @@ const DELIVERY_FILTER_TABS: DeliveryFilterTab[] = [
   'canceled',
 ];
 
+// Top-level segments for the unified deliveries hub
+const VIEW_SEGMENTS: { key: DeliveryViewType; label: string }[] = [
+  { key: 'needs_attention', label: 'Needs attention' },
+  { key: 'incoming', label: 'Incoming' },
+  { key: 'outgoing', label: 'Outgoing' },
+  { key: 'transfers', label: 'Transfers' },
+  { key: 'all', label: 'All' },
+];
+
 export default function DeliveryScreen() {
   const navigation = useNavigation();
-  const [showViewDropdown, setShowViewDropdown] = useState<boolean>(false);
+  const route = useRoute();
+  const initialSegment = (route.params as { segment?: DeliveryViewType } | undefined)?.segment;
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const [paywallCheckResult, setPaywallCheckResult] = useState<PaywallCheck | null>(null);
@@ -84,12 +92,20 @@ export default function DeliveryScreen() {
     viewType: activeTab,
     search,
     selectedLocationId,
+    needsAttentionCount,
     setStatusFilter,
     setViewType: setActiveTab,
     setSearch,
     setSelectedLocationId,
     refresh,
   } = useDeliveries();
+
+  // Apply the initial segment from navigation params (deep-link / sidebar);
+  // default the hub to "Needs attention" when no segment is provided.
+  useEffect(() => {
+    setActiveTab(initialSegment || 'needs_attention');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSegment]);
 
   // Alias for filter state
   const filter = statusFilter;
@@ -154,33 +170,65 @@ export default function DeliveryScreen() {
     (navigation as any).navigate('CreateDelivery', { mode: 'transfer' });
   };
 
-  const getTabTitle = () => {
-    switch (activeTab) {
-      case 'all': return 'All';
-      case 'outgoing': return 'Outgoing';
-      case 'incoming': return 'Incoming';
-      case 'transfers': return 'Transfers';
-      default: return 'All';
-    }
-  };
-
-  const toggleViewDropdown = () => {
-    setShowViewDropdown(!showViewDropdown);
-  };
-
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       {/* Primary Header */}
       <PrimaryHeader
-        title={getTabTitle()}
-        onTitlePress={toggleViewDropdown}
+        title="Deliveries"
         leftAction={navigation.canGoBack() ? { icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' } : undefined}
         actions={[
-          { icon: 'checkbox-outline', onPress: () => (navigation as any).navigate('Tasks'), accessibilityLabel: 'Tasks' },
+          { icon: 'bar-chart-outline', onPress: () => (navigation as any).navigate('DeliveriesAnalytics'), accessibilityLabel: 'Delivery analytics' },
           { icon: 'shopping-cart', onPress: handleOpenProcurement, badge: pendingProcurementCount, accessibilityLabel: 'Procurement' },
           { icon: 'plus', onPress: handleCreateNew, accessibilityLabel: 'Create delivery' },
         ]}
       />
+
+      {/* Segmented view selector */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.segmentBar}
+        style={{ flexGrow: 0 }}
+      >
+        {VIEW_SEGMENTS.map((segment) => {
+          const isActive = activeTab === segment.key;
+          const badge = segment.key === 'needs_attention' ? needsAttentionCount : 0;
+          return (
+            <TouchableOpacity
+              key={segment.key}
+              onPress={() => handleSelectView(segment.key)}
+              style={[
+                styles.segmentChip,
+                {
+                  backgroundColor: isActive ? appTheme.colors.accent : appTheme.colors.inputBackground,
+                  borderColor: isActive ? appTheme.colors.accent : appTheme.colors.borderColor,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
+            >
+              <Text
+                style={[
+                  styles.segmentChipText,
+                  { color: isActive ? '#FFFFFF' : appTheme.colors.textSecondary },
+                ]}
+              >
+                {segment.label}
+              </Text>
+              {badge > 0 && (
+                <View
+                  style={[
+                    styles.segmentBadge,
+                    { backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : appTheme.colors.error },
+                  ]}
+                >
+                  <Text style={styles.segmentBadgeText}>{badge > 99 ? '99+' : badge}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
       {/* Location Selector */}
       <View style={styles.locationSection}>
@@ -277,6 +325,13 @@ export default function DeliveryScreen() {
           // Determine empty state content based on active tab
           const getEmptyStateContent = () => {
             switch (activeTab) {
+              case 'needs_attention':
+                return {
+                  icon: 'checkmark-circle-outline',
+                  title: 'Nothing needs attention',
+                  subtitle: 'Unassigned, late, failed, or overdue deliveries show up here.',
+                  ctaLabel: undefined,
+                };
               case 'outgoing':
                 return {
                   icon: 'arrow-up-circle-outline',
@@ -329,14 +384,6 @@ export default function DeliveryScreen() {
         initialNumToRender={10}
       />
 
-      {/* Delivery Type Selection Modal (View Dropdown) */}
-      <DeliveryActionsModal
-        visible={showViewDropdown}
-        onClose={() => setShowViewDropdown(false)}
-        selectedView={activeTab}
-        onSelectView={handleSelectView}
-      />
-
       {/* Create Actions Bottom Sheet Modal (+ button) */}
       <DeliveryCreateModal
         visible={showCreateModal}
@@ -365,6 +412,39 @@ export default function DeliveryScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+  },
+  segmentBar: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  segmentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  segmentChipText: {
+    fontSize: 14,
+    fontFamily: 'InterCustom-SemiBold',
+  },
+  segmentBadge: {
+    marginLeft: 6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: 'InterCustom-SemiBold',
   },
   locationSection: {
     flexDirection: 'row',

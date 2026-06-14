@@ -439,9 +439,12 @@ export default function CreateDeliveryScreen() {
                   ? selectedStaffList.map(s => ({ userId: s.id, role: (s.assignedRole || 'driver') as DeliveryStaffRole }))
                   : undefined,
                 clientNotes: notes || undefined,
-                // Transfer-specific fields
+                // Transfer-specific fields — keep the display names AND the FK ids
+                // so completing a transfer can move stock between locations.
                 fromLocation: isTransfer ? (currentLocation?.name || 'Current Location') : undefined,
                 toLocation: isTransfer ? selectedLocation?.name : undefined,
+                fromLocationId: isTransfer ? currentLocation?.id : undefined,
+                toLocationId: isTransfer ? selectedLocation?.id : undefined,
               });
               // Add new delivery to the store so it appears immediately in the list
               if (newDelivery) {

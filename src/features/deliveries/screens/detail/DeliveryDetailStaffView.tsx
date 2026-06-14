@@ -48,6 +48,7 @@ import {
   ProductListSection,
   NotesSection,
   OrderUpdatesTimeline,
+  DeliveryStatusTimeline,
 } from '../../components/detail';
 import { useDeliveryActions } from '../../hooks/useDeliveryActions';
 
@@ -318,6 +319,12 @@ export function DeliveryDetailStaffView({ delivery }: DeliveryDetailStaffViewPro
           delivery={delivery}
           deliveryStatus={deliveryStatus}
           paymentStatus={delivery.paymentStatus}
+        />
+
+        <DeliveryStatusTimeline
+          companyId={delivery.businessId}
+          deliveryId={delivery.id}
+          refreshKey={deliveryStatus}
         />
       </ScrollView>
 
