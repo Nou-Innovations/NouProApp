@@ -11,6 +11,7 @@ const eventMessages = require('./eventMessages');
 const pushService = require('./pushService');
 const storageService = require('./storageService');
 const stockService = require('./stockService');
+const transferStatus = require('./transferStatus');
 
 module.exports = {
   orderStatus,
@@ -19,4 +20,5 @@ module.exports = {
   pushService,
   storageService,
   stockService,
+  transferStatus,
 };

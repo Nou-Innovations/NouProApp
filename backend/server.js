@@ -201,6 +201,7 @@ const _orderDeliverySyncInProgress = new Set();
 // Re-bound here so existing references keep working.
 // ---------------------------------------------------------------------------
 const deliveryStatusService = require('./src/services/deliveryStatus');
+const transferStatusService = require('./src/services/transferStatus');
 const { DELIVERY_STATUS_TRANSITIONS, isValidDeliveryTransition } = deliveryStatusService;
 // Named delivery-status constants — use DS.X instead of raw string literals so the
 // status-enum remodel is a single-source change.
@@ -7216,6 +7217,161 @@ app.delete('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, asyn
 
 // Create delivery from an order (order-to-delivery linkage)
 // POST /api/companies/:companyId/orders/:orderId/create-delivery
+// ===========================================================================
+// Transfers (Logistics v2 — dedicated Transfer entity, P5).
+// Internal stock movement between the business's own locations, with an
+// approval lifecycle. Additive: the frontend switches to these in P9.
+// ===========================================================================
+
+// List transfers
+app.get('/api/companies/:companyId/transfers', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const { status } = req.query;
+    const rows = await repos.transferRepo.getByBusinessId(req.params.companyId, { status: status || undefined });
+    res.json(successResponse(rows));
+  } catch (e) {
+    logger.error('Error listing transfers:', e);
+    res.status(500).json(errorResponse('Failed to load transfers'));
+  }
+});
+
+// Get single transfer
+app.get('/api/companies/:companyId/transfers/:transferId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const transfer = await repos.transferRepo.getById(req.params.transferId);
+    if (!transfer || transfer.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Transfer not found'));
+    }
+    res.json(successResponse(transfer));
+  } catch (e) {
+    logger.error('Error fetching transfer:', e);
+    res.status(500).json(errorResponse('Failed to load transfer'));
+  }
+});
+
+// Transfer status-change history
+app.get('/api/companies/:companyId/transfers/:transferId/history', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const transfer = await repos.transferRepo.getById(req.params.transferId);
+    if (!transfer || transfer.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Transfer not found'));
+    }
+    const history = await transferStatusService.getTransferStatusHistory(req.params.transferId);
+    res.json(successResponse(history));
+  } catch (e) {
+    logger.error('Error fetching transfer history:', e);
+    res.status(500).json(errorResponse('Failed to load transfer history'));
+  }
+});
+
+// Create a transfer (starts in Requested)
+app.post('/api/companies/:companyId/transfers', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const b = req.body || {};
+    if (!b.fromLocationId || !b.toLocationId) {
+      return res.status(400).json(errorResponse('fromLocationId and toLocationId are required'));
+    }
+    const items = Array.isArray(b.items) ? b.items : [];
+    const itemCount = b.itemCount != null ? b.itemCount : items.length;
+    const totalAmount = b.totalAmount != null
+      ? b.totalAmount
+      : items.reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity ?? it.quantityOrdered) || 0), 0);
+
+    const created = await repos.transferRepo.create({
+      id: uuidv4(),
+      businessId: req.params.companyId,
+      fromLocationId: b.fromLocationId,
+      toLocationId: b.toLocationId,
+      fromLocationName: b.fromLocationName || null,
+      toLocationName: b.toLocationName || null,
+      status: 'Requested',
+      requestedBy: req.user?.id || null,
+      items,
+      itemCount,
+      totalAmount,
+      assignedStaffId: b.assignedStaffId || null,
+      transportId: b.transportId || null,
+      notes: b.notes || null,
+      priority: b.priority || 'normal',
+      orderTime: b.orderTime || new Date().toISOString(),
+      expectedAt: b.expectedAt || null,
+    });
+    res.status(201).json(successResponse(created));
+  } catch (e) {
+    logger.error('Error creating transfer:', e);
+    res.status(500).json(errorResponse('Failed to create transfer'));
+  }
+});
+
+// Update non-status transfer fields
+app.patch('/api/companies/:companyId/transfers/:transferId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const transfer = await repos.transferRepo.getById(req.params.transferId);
+    if (!transfer || transfer.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Transfer not found'));
+    }
+    const allowed = ['items', 'itemCount', 'totalAmount', 'assignedStaffId', 'transportId',
+      'trackingNumber', 'notes', 'priority', 'expectedAt', 'fromLocationName', 'toLocationName'];
+    const updateData = {};
+    for (const k of allowed) if (req.body[k] !== undefined) updateData[k] = req.body[k];
+    const updated = await repos.transferRepo.update(req.params.transferId, updateData);
+    res.json(successResponse(updated));
+  } catch (e) {
+    logger.error('Error updating transfer:', e);
+    res.status(500).json(errorResponse('Failed to update transfer'));
+  }
+});
+
+// Change transfer status (approval lifecycle + stock moves)
+app.patch('/api/companies/:companyId/transfers/:transferId/status', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const transfer = await repos.transferRepo.getById(req.params.transferId);
+    if (!transfer || transfer.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Transfer not found'));
+    }
+    let updated;
+    try {
+      updated = await transferStatusService.changeTransferStatus({
+        transferId: req.params.transferId,
+        nextStatus: req.body.status,
+        changedBy: req.user?.id || null,
+        reason: req.body.reason || null,
+      });
+    } catch (err) {
+      if (err.code === 'INVALID_STATUS_TRANSITION' || err.code === 'INVALID_STATUS') {
+        return res.status(400).json(errorResponse(err.message, err.code));
+      }
+      throw err;
+    }
+    res.json(successResponse(updated));
+  } catch (e) {
+    logger.error('Error changing transfer status:', e);
+    res.status(500).json(errorResponse('Failed to change transfer status'));
+  }
+});
+
+// Delete a transfer
+app.delete('/api/companies/:companyId/transfers/:transferId', requireAuth, async (req, res) => {
+  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+  try {
+    const transfer = await repos.transferRepo.getById(req.params.transferId);
+    if (!transfer || transfer.businessId !== req.params.companyId) {
+      return res.status(404).json(errorResponse('Transfer not found'));
+    }
+    await repos.transferRepo.delete(req.params.transferId);
+    res.json(successResponse({ deleted: true }));
+  } catch (e) {
+    logger.error('Error deleting transfer:', e);
+    res.status(500).json(errorResponse('Failed to delete transfer'));
+  }
+});
+
 app.post('/api/companies/:companyId/orders/:orderId/create-delivery', requireAuth, async (req, res) => {
   if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
 

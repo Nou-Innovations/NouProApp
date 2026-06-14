@@ -145,6 +145,16 @@ const transferClearInTransit = (args) =>
   runOperation({ ...args, reason: 'transfer_dispatch', phase: 'transfer_clear', refType: 'transfer' },
     (q) => [{ bucket: BUCKET.IN_TRANSIT, delta: -q }]);
 
+/** Cancel a not-yet-dispatched transfer: free the source reservation. */
+const transferRelease = (args) =>
+  runOperation({ ...args, reason: 'transfer_release', phase: 'transfer_release', refType: 'transfer' },
+    (q) => [{ bucket: BUCKET.RESERVED, delta: -q }]);
+
+/** Cancel a dispatched (in-transit) transfer: bring the goods back to source on-hand. */
+const transferCancelInTransit = (args) =>
+  runOperation({ ...args, reason: 'transfer_cancel', phase: 'transfer_cancel', refType: 'transfer' },
+    (q) => [{ bucket: BUCKET.IN_TRANSIT, delta: -q }, { bucket: BUCKET.ON_HAND, delta: +q }]);
+
 // ── Receiving (destination location) ─────────────────────────────────────
 const receiveGoods = (args) =>
   runOperation({ ...args, reason: args.reason || 'goods_receipt', phase: args.phase || 'receive', refType: args.refType || 'po' },
@@ -236,6 +246,8 @@ module.exports = {
   transferReserve,
   transferDispatch,
   transferClearInTransit,
+  transferRelease,
+  transferCancelInTransit,
   receiveGoods,
   restock,
   manualAdjust,

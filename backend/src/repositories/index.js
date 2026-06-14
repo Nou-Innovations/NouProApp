@@ -51,6 +51,7 @@ function getRepos() {
     routeRepo: require('./prisma/routeRepo.prisma'),
     recurringRepo: require('./prisma/recurringRepo.prisma'),
     stockMovementRepo: require('./prisma/stockMovementRepo.prisma'),
+    transferRepo: require('./prisma/transferRepo.prisma'),
   };
 
   return cachedRepos;
