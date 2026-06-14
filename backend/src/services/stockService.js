@@ -24,7 +24,7 @@ const BUCKET = { ON_HAND: 'onHand', RESERVED: 'reserved', IN_TRANSIT: 'inTransit
 const BUCKET_COLUMN = { onHand: 'qtyOnHand', reserved: 'qtyReserved', inTransit: 'qtyInTransit' };
 const DEFAULT_REORDER_LEVEL = 10;
 
-const itemQty = (it) => Number(it.quantity ?? it.quantityReceived ?? it.quantityDelivered ?? it.quantityOrdered ?? 0) || 0;
+const itemQty = (it) => Number(it.quantity ?? it.receivedQty ?? it.quantityReceived ?? it.quantityDelivered ?? it.quantityOrdered ?? 0) || 0;
 
 /** Has this exact operation already been applied? (manual ops w/o a ref are never deduped) */
 async function alreadyApplied(tx, refType, refId, phase) {
@@ -97,18 +97,35 @@ async function runOperation({ businessId, locationId, items, reason, refType, re
 }
 
 // ── Order flow ───────────────────────────────────────────────────────────
+// reserve/release use phase=null (NOT ledger-guarded) so an order can cycle
+// accept→cancel→accept. The order status machine guarantees one call per
+// transition, so there's no double-apply risk.
 const reserve = (args) =>
-  runOperation({ ...args, reason: 'order_reserve', phase: 'reserve', refType: args.refType || 'order' },
+  runOperation({ ...args, reason: 'order_reserve', phase: null, refType: args.refType || 'order' },
     (q) => [{ bucket: BUCKET.RESERVED, delta: +q }]);
 
 const release = (args) =>
-  runOperation({ ...args, reason: 'order_release', phase: 'release', refType: args.refType || 'order' },
+  runOperation({ ...args, reason: 'order_release', phase: null, refType: args.refType || 'order' },
     (q) => [{ bucket: BUCKET.RESERVED, delta: -q }]);
+
+/**
+ * Fulfill an order that completes WITHOUT a delivery handling the physical move
+ * (reserved -> gone, onHand -> gone). Guarded (terminal, once per order).
+ */
+const fulfillDirect = (args) =>
+  runOperation({ ...args, reason: 'order_fulfill', phase: 'fulfill', refType: 'order' },
+    (q) => [{ bucket: BUCKET.RESERVED, delta: -q }, { bucket: BUCKET.ON_HAND, delta: -q }]);
 
 // ── Outgoing delivery flow ───────────────────────────────────────────────
 const dispatch = (args) =>
   runOperation({ ...args, reason: 'delivery_dispatch', phase: 'dispatch', refType: args.refType || 'delivery' },
     (q) => [{ bucket: BUCKET.RESERVED, delta: -q }, { bucket: BUCKET.ON_HAND, delta: -q }, { bucket: BUCKET.IN_TRANSIT, delta: +q }]);
+
+// Legacy-order dispatch: a pre-reservation-model order already decremented onHand
+// at accept-time, so only track in-transit (don't decrement onHand again).
+const dispatchVisibility = (args) =>
+  runOperation({ ...args, reason: 'delivery_dispatch', phase: 'dispatch', refType: args.refType || 'delivery' },
+    (q) => [{ bucket: BUCKET.IN_TRANSIT, delta: +q }]);
 
 const deliver = (args) =>
   runOperation({ ...args, reason: 'delivery_deliver', phase: 'deliver', refType: args.refType || 'delivery' },
@@ -148,9 +165,9 @@ async function manualAdjust({ businessId, locationId, productId, delta, createdB
   );
 }
 
-/** Set an absolute on-hand value (used by the legacy manual stock PATCH). */
+/** Set an absolute on-hand value (manual stock edit). Returns the full Stock row. */
 async function setOnHand({ businessId, locationId, productId, qtyOnHand, createdBy }) {
-  return prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     const stock = await tx.stock.findUnique({ where: { locationId_productId: { locationId, productId } } });
     const current = stock?.qtyOnHand || 0;
     const delta = qtyOnHand - current;
@@ -160,6 +177,7 @@ async function setOnHand({ businessId, locationId, productId, qtyOnHand, created
       reason: 'manual_adjust', refType: 'manual', refId: `set-${Date.now()}`, phase: null, createdBy,
     });
   });
+  return prisma.stock.findUnique({ where: { locationId_productId: { locationId, productId } } });
 }
 
 // ── Reads ────────────────────────────────────────────────────────────────
@@ -211,7 +229,9 @@ module.exports = {
   getAvailable,
   reserve,
   release,
+  fulfillDirect,
   dispatch,
+  dispatchVisibility,
   deliver,
   transferReserve,
   transferDispatch,

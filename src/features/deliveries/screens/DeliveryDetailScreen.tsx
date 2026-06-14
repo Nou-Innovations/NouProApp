@@ -96,11 +96,11 @@ export default function DeliveryDetailScreen() {
 
   // Accept/Reject callbacks
   const handleAccept = useCallback(async () => {
-    await actions.updateStatus('ASSIGNED');
+    await actions.updateStatus('Scheduled');
   }, [actions]);
 
   const handleReject = useCallback(async () => {
-    await actions.updateStatus('CANCELED');
+    await actions.updateStatus('Canceled');
   }, [actions]);
 
   // Determine view type

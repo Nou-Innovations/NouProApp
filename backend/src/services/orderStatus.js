@@ -235,33 +235,50 @@ function getStatusMeta(status) {
 const LOW_STOCK_THRESHOLD = 10;
 
 /**
- * Adjust stock levels for all items in an order.
- * Called automatically when an order transitions to ACCEPTED (decrement)
- * or when a previously-accepted order is CANCELED (increment / restore).
+ * Order stock handling (Logistics v2, multi-stage inventory).
  *
- * @param {Object} repos - Repository instances
- * @param {Object} order - The order object (must include items, fulfillmentLocationId, businessId)
- * @param {'decrement'|'increment'} direction
+ * New model: ACCEPTED reserves (available drops, onHand unchanged); the physical
+ * onHand decrement happens at delivery dispatch, or — for orders completed with
+ * NO delivery — at order DONE (fulfillDirect). All mutations go through
+ * stockService (transactional + ledgered).
+ *
+ * Forward-only safety: orders ACCEPTED under the OLD model already had onHand
+ * decremented at accept-time and have no `order_reserve` ledger entry. We detect
+ * that via the ledger and fall back to legacy behavior so we never double-count.
  */
-async function adjustStockForOrder(repos, order, direction) {
-  const items = order.items || [];
-  const locationId = order.fulfillmentLocationId;
-  if (!locationId || items.length === 0) return;
+async function orderWasReserved(repos, orderId) {
+  try {
+    const moves = await repos.stockMovementRepo.getByRef('order', orderId);
+    return moves.some((m) => m.reason === 'order_reserve');
+  } catch {
+    return false;
+  }
+}
 
-  for (const item of items) {
+/** Legacy restore: directly add onHand back for a pre-reservation-model order on cancel. */
+async function legacyRestoreOnHand(repos, order) {
+  const stockService = require('./stockService');
+  const locationId = order.fulfillmentLocationId;
+  if (!locationId) return;
+  for (const item of order.items || []) {
+    const productId = item.productId || item.product?.id;
+    const qty = Number(item.quantity) || 0;
+    if (!productId || qty <= 0) continue;
+    await stockService.manualAdjust({ businessId: order.businessId, locationId, productId, delta: +qty, createdBy: 'system-legacy-cancel' });
+  }
+}
+
+/** Emit low-stock alerts based on AVAILABLE (onHand - reserved) after a change. */
+async function emitLowStockAlerts(repos, order) {
+  const stockService = require('./stockService');
+  const locationId = order.fulfillmentLocationId;
+  if (!locationId) return;
+  for (const item of order.items || []) {
     const productId = item.productId || item.product?.id;
     if (!productId) continue;
-
-    const stock = await repos.stockRepo.getByLocationAndProduct(locationId, productId);
-    const currentQty = stock?.qtyOnHand || 0;
-    const delta = direction === 'decrement' ? -item.quantity : item.quantity;
-    const newQty = Math.max(0, currentQty + delta);
-
-    await repos.stockRepo.upsert(locationId, productId, newQty, order.businessId);
-
-    // Create low-stock alert when stock drops below threshold
-    if (direction === 'decrement' && newQty <= LOW_STOCK_THRESHOLD) {
-      try {
+    try {
+      const available = await stockService.getAvailable(locationId, productId);
+      if (available <= LOW_STOCK_THRESHOLD) {
         const eventMessages = require('./eventMessages');
         const product = await repos.productRepo.getById(productId);
         await eventMessages.createEventMessage({
@@ -271,15 +288,11 @@ async function adjustStockForOrder(repos, order, direction) {
           entityId: productId,
           actorId: 'system',
           actorName: 'System',
-          metadata: {
-            productName: product?.name,
-            currentStock: newQty,
-            locationId,
-          },
+          metadata: { productName: product?.name, currentStock: available, locationId },
         });
-      } catch (err) {
-        logger.error('[orderStatus] Failed to create low-stock alert:', err.message);
       }
+    } catch (err) {
+      logger.error('[orderStatus] Failed to create low-stock alert:', err.message);
     }
   }
 }
@@ -366,17 +379,45 @@ async function changeOrderStatus({ orderId, nextStatus, reason, userId }) {
     }
   );
 
-  // Auto-decrement stock when order is accepted
-  if (nextStatus === ORDER_STATUS.ACCEPTED) {
-    await adjustStockForOrder(repos, order, 'decrement');
-  }
+  // Inventory side-effects (multi-stage). Wrapped so a stock hiccup never blocks
+  // a status change. The order object has items/fulfillmentLocationId/businessId.
+  try {
+    const stockService = require('./stockService');
+    const stockArgs = {
+      businessId: order.businessId,
+      locationId: order.fulfillmentLocationId,
+      items: order.items || [],
+      refId: order.id,
+      createdBy: userId || null,
+    };
 
-  // Restore stock when order is canceled (if it was previously in an accepted/active state)
-  if (
-    nextStatus === ORDER_STATUS.CANCELED &&
-    [ORDER_STATUS.ACCEPTED, ORDER_STATUS.ONGOING, ORDER_STATUS.PENDING, ORDER_STATUS.IN_REVIEW].includes(fromStatus)
-  ) {
-    await adjustStockForOrder(repos, order, 'increment');
+    if (nextStatus === ORDER_STATUS.ACCEPTED) {
+      // Reserve (available drops; onHand untouched).
+      await stockService.reserve(stockArgs);
+      await emitLowStockAlerts(repos, order);
+    } else if (
+      nextStatus === ORDER_STATUS.CANCELED &&
+      [ORDER_STATUS.ACCEPTED, ORDER_STATUS.ONGOING, ORDER_STATUS.PENDING, ORDER_STATUS.IN_REVIEW].includes(fromStatus)
+    ) {
+      // New-model orders: release the reservation. Legacy (pre-reservation)
+      // orders had onHand decremented at accept → restore it instead.
+      if (await orderWasReserved(repos, order.id)) {
+        await stockService.release(stockArgs);
+      } else {
+        await legacyRestoreOnHand(repos, order);
+      }
+    } else if (nextStatus === ORDER_STATUS.DONE) {
+      // If a delivery handles the physical move, it owns the onHand decrement.
+      // Otherwise consume the reservation directly — but only for new-model
+      // orders (legacy orders already decremented onHand at accept-time).
+      const existingDelivery = await repos.deliveryRepo.getByOrderId(order.id);
+      if (!existingDelivery && (await orderWasReserved(repos, order.id))) {
+        await stockService.fulfillDirect(stockArgs);
+        await emitLowStockAlerts(repos, order);
+      }
+    }
+  } catch (stockErr) {
+    logger.error('[orderStatus] stock side-effect failed:', stockErr.message);
   }
 
   return updatedOrder;

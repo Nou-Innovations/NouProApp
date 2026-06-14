@@ -19,13 +19,13 @@ interface DeliveryCardProps {
 const getDeliveryStatusColorFromTheme = (status: DeliveryStatus | undefined, colors: typeof theme.colors) => {
   if (!status) return colors.neutral;
   switch (status) {
-    case 'NOT_ASSIGNED': return colors.error;
-    case 'ASSIGNED': return colors.warning;
-    case 'PACKED': return colors.info;
-    case 'OUT_FOR_DELIVERY': return colors.info;
-    case 'DELIVERED': return colors.success;
-    case 'FAILED': return colors.error;
-    case 'CANCELED': return colors.neutral;
+    case 'Draft': return colors.error;
+    case 'Scheduled': return colors.warning;
+    case 'Ready': return colors.info;
+    case 'InTransit': return colors.info;
+    case 'Delivered': return colors.success;
+    case 'Issue': return colors.error;
+    case 'Canceled': return colors.neutral;
     default: return colors.neutral;
   }
 };
@@ -59,7 +59,7 @@ const DeliveryCard: React.FC<DeliveryCardProps> = ({ delivery, isUserAdmin = fal
   const { isItemViewed } = useNotifications();
   
   // Check if this is a new delivery (NOT_ASSIGNED status) and hasn't been viewed
-  const isNewDelivery = delivery.deliveryStatus === 'NOT_ASSIGNED' && !isItemViewed(delivery.id);
+  const isNewDelivery = delivery.deliveryStatus === 'Draft' && !isItemViewed(delivery.id);
   const isTransfer = delivery.type === 'transfer';
   // Derived SLA badge (Late / Delivered late / On time) — null when nothing to flag
   const slaBadge = getDeliverySlaBadge(delivery);

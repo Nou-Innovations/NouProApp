@@ -172,9 +172,9 @@ export function useDeliveries(options: UseDeliveriesOptions = {}): UseDeliveries
     return result;
   }, [deliveries, viewType, statusFilter, search]);
   
-  // Count new deliveries (NOT_ASSIGNED status) -- uses unfiltered list for accurate badge
+  // Count new deliveries (Draft status) -- uses unfiltered list for accurate badge
   const newDeliveriesCount = useMemo(() => {
-    return deliveries.filter(d => d.deliveryStatus === 'NOT_ASSIGNED').length;
+    return deliveries.filter(d => d.deliveryStatus === 'Draft').length;
   }, [deliveries]);
 
   // Count of deliveries needing attention (unassigned, failed, late, overdue) -- for the hub segment badge

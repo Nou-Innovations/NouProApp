@@ -29,14 +29,14 @@ import { useMyDeliveries } from '../hooks/useMyDeliveries';
 
 // The next status + button label a driver can advance to, per current status.
 const NEXT_ACTION: Partial<Record<DeliveryStatus, { next: DeliveryStatus; label: string }>> = {
-  NOT_ASSIGNED: { next: 'ASSIGNED', label: 'Accept' },
-  ASSIGNED: { next: 'PACKED', label: 'Mark packed' },
-  PACKED: { next: 'OUT_FOR_DELIVERY', label: 'Start delivery' },
-  OUT_FOR_DELIVERY: { next: 'DELIVERED', label: 'Mark delivered' },
+  Draft: { next: 'Scheduled', label: 'Accept' },
+  Scheduled: { next: 'Ready', label: 'Mark packed' },
+  Ready: { next: 'InTransit', label: 'Start delivery' },
+  InTransit: { next: 'Delivered', label: 'Mark delivered' },
 };
 
-const ACTIVE_TODO: DeliveryStatus[] = ['NOT_ASSIGNED', 'ASSIGNED', 'PACKED'];
-const COMPLETED: DeliveryStatus[] = ['DELIVERED', 'FAILED', 'CANCELED'];
+const ACTIVE_TODO: DeliveryStatus[] = ['Draft', 'Scheduled', 'Ready'];
+const COMPLETED: DeliveryStatus[] = ['Delivered', 'Issue', 'Canceled'];
 
 export default function MyDeliveriesScreen() {
   const navigation = useNavigation();
@@ -48,7 +48,7 @@ export default function MyDeliveriesScreen() {
 
   const sections = useMemo(() => {
     const todo = deliveries.filter((d) => d.deliveryStatus && ACTIVE_TODO.includes(d.deliveryStatus));
-    const outForDelivery = deliveries.filter((d) => d.deliveryStatus === 'OUT_FOR_DELIVERY');
+    const outForDelivery = deliveries.filter((d) => d.deliveryStatus === 'InTransit');
     const completed = deliveries.filter((d) => d.deliveryStatus && COMPLETED.includes(d.deliveryStatus));
     return [
       { title: 'To do', data: todo },
@@ -61,7 +61,7 @@ export default function MyDeliveriesScreen() {
     const action = delivery.deliveryStatus ? NEXT_ACTION[delivery.deliveryStatus] : undefined;
     if (!action) return;
 
-    if (action.next === 'DELIVERED') {
+    if (action.next === 'Delivered') {
       setPodTarget(delivery.id);
       return;
     }
@@ -76,7 +76,7 @@ export default function MyDeliveriesScreen() {
     if (!podTarget) return;
     setSubmitting(true);
     try {
-      await advance(podTarget, 'DELIVERED', pod);
+      await advance(podTarget, 'Delivered', pod);
       setPodTarget(null);
     } catch {
       Alert.alert('Could not complete', 'Please try again.');

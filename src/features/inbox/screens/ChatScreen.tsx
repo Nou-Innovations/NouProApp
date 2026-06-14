@@ -755,14 +755,14 @@ export default function ChatScreen() {
       if (type === 'delivery') {
         const status = msg.orderStatus?.toUpperCase?.() || '';
         if (status === 'ONGOING' || status === 'NEW' || status === 'ACCEPTED') {
-          // Update delivery status to OUT_FOR_DELIVERY
-          await import('@/shared/services/orders').then(m => 
-            m.updateOrderDeliveryStatus(businessId, msg.orderId, 'OUT_FOR_DELIVERY')
+          // Update delivery status to InTransit
+          await import('@/shared/services/orders').then(m =>
+            m.updateOrderDeliveryStatus(businessId, msg.orderId, 'InTransit')
           );
-          updateOrderMessage(msg.id, { orderStatus: 'OUT_FOR_DELIVERY' });
-        } else if (status === 'OUT_FOR_DELIVERY' || status === 'DELIVERY PENDING CONFIRMATION') {
-          await import('@/shared/services/orders').then(m => 
-            m.updateOrderDeliveryStatus(businessId, msg.orderId, 'DELIVERED')
+          updateOrderMessage(msg.id, { orderStatus: 'InTransit' });
+        } else if (status === 'INTRANSIT' || status === 'DELIVERY PENDING CONFIRMATION') {
+          await import('@/shared/services/orders').then(m =>
+            m.updateOrderDeliveryStatus(businessId, msg.orderId, 'Delivered')
           );
           updateOrderMessage(msg.id, { orderStatus: 'DONE' });
           const importExportLabel = msg.isOutgoing ? 'Export' : 'Import';
@@ -1061,12 +1061,12 @@ export default function ChatScreen() {
     try {
       if (actionId === 'confirm_delivery') {
         await import('@/shared/services/orders').then(m =>
-          m.updateOrderDeliveryStatus(businessId, orderId, 'DELIVERED')
+          m.updateOrderDeliveryStatus(businessId, orderId, 'Delivered')
         );
         // Update local message state to reflect the delivery confirmation
         setMessages(prev => prev.map(msg => {
           if (msg.type === 'order_event' && msg.payload?.orderId === orderId) {
-            return { ...msg, payload: { ...msg.payload, status: 'DELIVERED' } } as OrderEventMessage;
+            return { ...msg, payload: { ...msg.payload, status: 'Delivered' } } as OrderEventMessage;
           }
           if (msg.type === 'order' && (msg as OrderMessage).orderId === orderId) {
             return { ...msg, orderStatus: 'DONE' } as OrderMessage;

@@ -6,7 +6,7 @@
  * 
  * Usage:
  *   const actions = useDeliveryActions(delivery.id);
- *   await actions.updateStatus('ASSIGNED');
+ *   await actions.updateStatus('Scheduled');
  *   await actions.updatePayment('PAID');
  */
 

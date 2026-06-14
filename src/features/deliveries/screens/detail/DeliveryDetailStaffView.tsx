@@ -8,7 +8,7 @@
  * - View order: Yes
  * - Edit schedule/transport/staff: No
  * - Edit order status: Limited (only super_admin/admin/teamLeader)
- *   - Limited options: OUT_FOR_DELIVERY, DELIVERED, FAILED
+ *   - Limited options: InTransit, Delivered, Issue
  * - Edit payment status: No
  * - Warehouse selector: No
  * - Stock warnings: No
@@ -189,9 +189,9 @@ export function DeliveryDetailStaffView({ delivery }: DeliveryDetailStaffViewPro
 
   // Limited status options for staff
   const staffStatusOptions = [
-    { id: 'OUT_FOR_DELIVERY', name: 'Out for Delivery', value: 'OUT_FOR_DELIVERY', icon: 'bicycle-outline', color: theme.colors.info },
-    { id: 'DELIVERED', name: 'Delivered', value: 'DELIVERED', icon: 'checkmark-circle-outline', color: theme.colors.success },
-    { id: 'FAILED', name: 'Failed / Issue', value: 'FAILED', icon: 'alert-circle-outline', color: theme.colors.error },
+    { id: 'InTransit', name: 'In transit', value: 'InTransit', icon: 'bicycle-outline', color: theme.colors.info },
+    { id: 'Delivered', name: 'Delivered', value: 'Delivered', icon: 'checkmark-circle-outline', color: theme.colors.success },
+    { id: 'Issue', name: 'Failed / Issue', value: 'Issue', icon: 'alert-circle-outline', color: theme.colors.error },
   ];
 
   // More options menu (limited for staff)
@@ -222,9 +222,9 @@ export function DeliveryDetailStaffView({ delivery }: DeliveryDetailStaffViewPro
           style: 'destructive',
           onPress: async () => {
             await actions.addNote(noteText);
-            const result = await actions.updateStatus('FAILED');
+            const result = await actions.updateStatus('Issue');
             if (result) {
-              setDeliveryStatus('FAILED');
+              setDeliveryStatus('Issue');
             }
           },
         },

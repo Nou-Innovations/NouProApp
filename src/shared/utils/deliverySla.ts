@@ -11,10 +11,10 @@ import { theme } from '@/shared/theme';
 
 /** Statuses that represent an in-flight delivery (not yet finished/canceled). */
 export const ACTIVE_DELIVERY_STATUSES: DeliveryStatus[] = [
-  'NOT_ASSIGNED',
-  'ASSIGNED',
-  'PACKED',
-  'OUT_FOR_DELIVERY',
+  'Draft',
+  'Scheduled',
+  'Ready',
+  'InTransit',
 ];
 
 const parseTime = (value?: string | null): number | null => {
@@ -36,7 +36,7 @@ export function isDeliveryLate(d: Delivery, now: number = Date.now()): boolean {
 
 /** Delivered on or before its ETA. */
 export function isDeliveryOnTime(d: Delivery): boolean {
-  if (d.deliveryStatus !== 'DELIVERED') return false;
+  if (d.deliveryStatus !== 'Delivered') return false;
   const eta = parseTime(d.expectedDeliveryDateTime);
   const delivered = parseTime(d.deliveredAt);
   if (eta == null || delivered == null) return false;
@@ -45,7 +45,7 @@ export function isDeliveryOnTime(d: Delivery): boolean {
 
 /** Delivered, but after its ETA. */
 export function isDeliveredLate(d: Delivery): boolean {
-  if (d.deliveryStatus !== 'DELIVERED') return false;
+  if (d.deliveryStatus !== 'Delivered') return false;
   const eta = parseTime(d.expectedDeliveryDateTime);
   const delivered = parseTime(d.deliveredAt);
   if (eta == null || delivered == null) return false;
@@ -57,7 +57,7 @@ export function isDeliveredLate(d: Delivery): boolean {
  * problematic payment status. Powers the hub's "Needs attention" segment.
  */
 export function needsAttention(d: Delivery, now: number = Date.now()): boolean {
-  if (d.deliveryStatus === 'NOT_ASSIGNED' || d.deliveryStatus === 'FAILED') return true;
+  if (d.deliveryStatus === 'Draft' || d.deliveryStatus === 'Issue') return true;
   if (isDeliveryLate(d, now)) return true;
   if (d.paymentStatus === 'OVERDUE' || d.paymentStatus === 'DUE_TODAY') return true;
   return false;

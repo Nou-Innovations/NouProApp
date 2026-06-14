@@ -115,10 +115,10 @@ export default function OrderDetailsScreen({ route }: Props) {
   const paymentColor = PAYMENT_STATUS_COLORS[paymentStatus] || appTheme.colors.neutral;
   const isPaid = order.paymentStatus === 'PAID';
 
-  const deliveryStatus = (order.deliveryStatus as DeliveryStatus) || 'NOT_ASSIGNED';
+  const deliveryStatus = (order.deliveryStatus as DeliveryStatus) || 'Draft';
   const deliveryLabel = DELIVERY_STATUS_LABELS[deliveryStatus] || deliveryStatus;
   const deliveryColor = DELIVERY_STATUS_COLORS[deliveryStatus] || appTheme.colors.neutral;
-  const hasDelivery = deliveryStatus !== 'NOT_ASSIGNED';
+  const hasDelivery = deliveryStatus !== 'Draft';
 
   const isNew = order.status === 'NEW';
   const isFinal = isFinalStatus(order.status as OrderStatus);

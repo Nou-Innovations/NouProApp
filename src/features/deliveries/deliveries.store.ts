@@ -130,7 +130,7 @@ export const useDeliveriesStore = create<DeliveriesState & DeliveriesActions>((s
             ...d,
             assignedStaffId: staffId,
             assignedTo: staffName,
-            deliveryStatus: d.deliveryStatus === 'NOT_ASSIGNED' ? 'ASSIGNED' : d.deliveryStatus,
+            deliveryStatus: d.deliveryStatus === 'Draft' ? 'Scheduled' : d.deliveryStatus,
           }
         : d
     ),
@@ -142,7 +142,7 @@ export const useDeliveriesStore = create<DeliveriesState & DeliveriesActions>((s
         ? {
             ...d,
             staffAssignments: [...(d.staffAssignments || []), assignment],
-            deliveryStatus: d.deliveryStatus === 'NOT_ASSIGNED' ? 'ASSIGNED' : d.deliveryStatus,
+            deliveryStatus: d.deliveryStatus === 'Draft' ? 'Scheduled' : d.deliveryStatus,
           }
         : d
     ),
@@ -155,7 +155,7 @@ export const useDeliveriesStore = create<DeliveriesState & DeliveriesActions>((s
       return {
         ...d,
         staffAssignments: remaining,
-        deliveryStatus: remaining.length === 0 && d.deliveryStatus === 'ASSIGNED' ? 'NOT_ASSIGNED' : d.deliveryStatus,
+        deliveryStatus: remaining.length === 0 && d.deliveryStatus === 'Scheduled' ? 'Draft' : d.deliveryStatus,
       };
     }),
   })),
@@ -219,20 +219,20 @@ export const selectDeliveriesByStatus = (status: DeliveryStatus) => (state: Deli
   state.deliveries.filter((d) => d.deliveryStatus === status);
 
 /**
- * Get new deliveries count (for badge) - NOT_ASSIGNED status
+ * Get new deliveries count (for badge) - Draft status
  */
 export const selectNewDeliveriesCount = (state: DeliveriesState) =>
-  state.deliveries.filter((d) => d.deliveryStatus === 'NOT_ASSIGNED').length;
+  state.deliveries.filter((d) => d.deliveryStatus === 'Draft').length;
 
 /**
- * Get pending deliveries count (NOT_ASSIGNED + ASSIGNED + PACKED + OUT_FOR_DELIVERY)
+ * Get pending deliveries count (Draft + Scheduled + Ready + InTransit)
  */
 export const selectPendingDeliveriesCount = (state: DeliveriesState) =>
-  state.deliveries.filter((d) => 
-    d.deliveryStatus === 'NOT_ASSIGNED' || 
-    d.deliveryStatus === 'ASSIGNED' ||
-    d.deliveryStatus === 'PACKED' ||
-    d.deliveryStatus === 'OUT_FOR_DELIVERY'
+  state.deliveries.filter((d) =>
+    d.deliveryStatus === 'Draft' ||
+    d.deliveryStatus === 'Scheduled' ||
+    d.deliveryStatus === 'Ready' ||
+    d.deliveryStatus === 'InTransit'
   ).length;
 
 /**

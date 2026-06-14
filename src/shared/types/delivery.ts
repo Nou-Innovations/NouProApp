@@ -16,13 +16,13 @@ import { theme } from '@/shared/theme';
  * Used for tracking order fulfillment logistics
  */
 export type DeliveryStatus =
-  | 'NOT_ASSIGNED'
-  | 'ASSIGNED'
-  | 'PACKED'
-  | 'OUT_FOR_DELIVERY'
-  | 'DELIVERED'
-  | 'FAILED'
-  | 'CANCELED';
+  | 'Draft'
+  | 'Scheduled'
+  | 'Ready'
+  | 'InTransit'
+  | 'Delivered'
+  | 'Issue'
+  | 'Canceled';
 
 /**
  * PaymentStatus, PAYMENT_STATUS_COLORS, and PAYMENT_STATUS_LABELS are
@@ -41,23 +41,23 @@ export type DeliveryDirection = 'incoming' | 'outgoing';
 // ============================================================================
 
 export const DELIVERY_STATUS_COLORS: Record<DeliveryStatus, string> = {
-  NOT_ASSIGNED: theme.colors.neutral,       // gray
-  ASSIGNED: theme.colors.info,              // blue
-  PACKED: theme.colors.statusInReview,      // purple
-  OUT_FOR_DELIVERY: theme.colors.info,      // blue
-  DELIVERED: theme.colors.success,          // green
-  FAILED: theme.colors.error,               // red
-  CANCELED: theme.colors.neutral,           // gray
+  Draft: theme.colors.neutral,          // gray
+  Scheduled: theme.colors.info,         // blue
+  Ready: theme.colors.statusInReview,   // purple
+  InTransit: theme.colors.info,         // blue
+  Delivered: theme.colors.success,      // green
+  Issue: theme.colors.error,            // red
+  Canceled: theme.colors.neutral,       // gray
 };
 
 export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
-  NOT_ASSIGNED: 'Not assigned',
-  ASSIGNED: 'Assigned',
-  PACKED: 'Packed',
-  OUT_FOR_DELIVERY: 'Out for delivery',
-  DELIVERED: 'Delivered',
-  FAILED: 'Failed',
-  CANCELED: 'Canceled',
+  Draft: 'Draft',
+  Scheduled: 'Scheduled',
+  Ready: 'Ready',
+  InTransit: 'In transit',
+  Delivered: 'Delivered',
+  Issue: 'Issue',
+  Canceled: 'Canceled',
 };
 
 // ============================================================================
@@ -256,11 +256,11 @@ export type DeliveryFilterTab = 'all' | 'new' | 'pending' | 'in_transit' | 'done
 
 /** Maps each filter tab to the DeliveryStatus values it includes */
 export const DELIVERY_FILTER_TAB_STATUSES: Record<Exclude<DeliveryFilterTab, 'all'>, DeliveryStatus[]> = {
-  new: ['NOT_ASSIGNED'],
-  pending: ['ASSIGNED', 'PACKED'],
-  in_transit: ['OUT_FOR_DELIVERY'],
-  done: ['DELIVERED'],
-  canceled: ['CANCELED', 'FAILED'],
+  new: ['Draft'],
+  pending: ['Scheduled', 'Ready'],
+  in_transit: ['InTransit'],
+  done: ['Delivered'],
+  canceled: ['Canceled', 'Issue'],
 };
 
 export interface CreateDeliveryData {

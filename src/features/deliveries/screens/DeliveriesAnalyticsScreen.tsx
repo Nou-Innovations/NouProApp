@@ -37,13 +37,13 @@ import {
 } from '../components/charts';
 
 const STATUS_ORDER: DeliveryStatus[] = [
-  'NOT_ASSIGNED',
-  'ASSIGNED',
-  'PACKED',
-  'OUT_FOR_DELIVERY',
-  'DELIVERED',
-  'FAILED',
-  'CANCELED',
+  'Draft',
+  'Scheduled',
+  'Ready',
+  'InTransit',
+  'Delivered',
+  'Issue',
+  'Canceled',
 ];
 
 export default function DeliveriesAnalyticsScreen() {

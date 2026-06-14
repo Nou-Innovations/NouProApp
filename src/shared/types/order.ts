@@ -35,38 +35,38 @@ export {
  * Used for tracking order fulfillment logistics
  */
 export type DeliveryStatus =
-  | 'NOT_ASSIGNED'
-  | 'ASSIGNED'
-  | 'PACKED'
-  | 'OUT_FOR_DELIVERY'
-  | 'DELIVERED'
-  | 'FAILED'
-  | 'CANCELED';
+  | 'Draft'
+  | 'Scheduled'
+  | 'Ready'
+  | 'InTransit'
+  | 'Delivered'
+  | 'Issue'
+  | 'Canceled';
 
 /**
  * Delivery status colors for UI
  */
 export const DELIVERY_STATUS_COLORS: Record<DeliveryStatus, string> = {
-  NOT_ASSIGNED: theme.colors.neutral,       // gray
-  ASSIGNED: theme.colors.info,              // blue
-  PACKED: theme.colors.statusInReview,      // purple
-  OUT_FOR_DELIVERY: theme.colors.info,      // blue
-  DELIVERED: theme.colors.success,          // green
-  FAILED: theme.colors.error,               // red
-  CANCELED: theme.colors.neutral,           // gray
+  Draft: theme.colors.neutral,           // gray
+  Scheduled: theme.colors.info,          // blue
+  Ready: theme.colors.statusInReview,    // purple
+  InTransit: theme.colors.info,          // blue
+  Delivered: theme.colors.success,       // green
+  Issue: theme.colors.error,             // red
+  Canceled: theme.colors.neutral,        // gray
 };
 
 /**
  * Delivery status labels for display
  */
 export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
-  NOT_ASSIGNED: 'Not assigned',
-  ASSIGNED: 'Assigned',
-  PACKED: 'Packed',
-  OUT_FOR_DELIVERY: 'Out for delivery',
-  DELIVERED: 'Delivered',
-  FAILED: 'Failed',
-  CANCELED: 'Canceled',
+  Draft: 'Draft',
+  Scheduled: 'Scheduled',
+  Ready: 'Ready',
+  InTransit: 'In transit',
+  Delivered: 'Delivered',
+  Issue: 'Issue',
+  Canceled: 'Canceled',
 };
 
 /**

@@ -71,13 +71,13 @@ const formatDateTime = (date: Date) => {
 // Get color for delivery status
 const getDeliveryStatusColor = (status: DeliveryStatus) => {
   switch (status) {
-    case 'NOT_ASSIGNED': return theme.colors.error;
-    case 'ASSIGNED': return theme.colors.warning;
-    case 'PACKED': return theme.colors.info;
-    case 'OUT_FOR_DELIVERY': return theme.colors.info;
-    case 'DELIVERED': return theme.colors.success;
-    case 'FAILED': return theme.colors.error;
-    case 'CANCELED': return theme.colors.neutral;
+    case 'Draft': return theme.colors.error;
+    case 'Scheduled': return theme.colors.warning;
+    case 'Ready': return theme.colors.info;
+    case 'InTransit': return theme.colors.info;
+    case 'Delivered': return theme.colors.success;
+    case 'Issue': return theme.colors.error;
+    case 'Canceled': return theme.colors.neutral;
     default: return theme.colors.textSecondary;
   }
 };
@@ -98,13 +98,13 @@ const getPaymentStatusColor = (status: PaymentStatus | string) => {
 
 // Status labels for display
 const STATUS_LABELS: Record<DeliveryStatus, string> = {
-  NOT_ASSIGNED: 'Not Assigned',
-  ASSIGNED: 'Assigned',
-  PACKED: 'Packed',
-  OUT_FOR_DELIVERY: 'Out for Delivery',
-  DELIVERED: 'Delivered',
-  FAILED: 'Failed',
-  CANCELED: 'Canceled',
+  Draft: 'Draft',
+  Scheduled: 'Scheduled',
+  Ready: 'Ready',
+  InTransit: 'In transit',
+  Delivered: 'Delivered',
+  Issue: 'Issue',
+  Canceled: 'Canceled',
 };
 
 export function OrderDetailsSection({

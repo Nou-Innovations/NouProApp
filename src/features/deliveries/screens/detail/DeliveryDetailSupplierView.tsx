@@ -12,7 +12,7 @@
  * - Toggle loaded: Yes
  * - Item status menu: Yes
  * - Add notes: Yes
- * - Accept/Reject: If delivery is NOT_ASSIGNED
+ * - Accept/Reject: If delivery is Draft
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -305,9 +305,9 @@ export function DeliveryDetailSupplierView({
 
   // Handle accept order
   const handleAccept = async () => {
-    const result = await actions.updateStatus('ASSIGNED');
+    const result = await actions.updateStatus('Scheduled');
     if (result) {
-      setDeliveryStatus('ASSIGNED');
+      setDeliveryStatus('Scheduled');
       if (onAccept) {
         onAccept();
       } else {
@@ -327,9 +327,9 @@ export function DeliveryDetailSupplierView({
           text: 'Reject',
           style: 'destructive',
           onPress: async () => {
-            const result = await actions.updateStatus('CANCELED');
+            const result = await actions.updateStatus('Canceled');
             if (result) {
-              setDeliveryStatus('CANCELED');
+              setDeliveryStatus('Canceled');
               if (onReject) {
                 onReject();
               } else {
@@ -499,13 +499,13 @@ export function DeliveryDetailSupplierView({
 
   // Status options
   const orderStatusOptions = [
-    { id: 'NOT_ASSIGNED', name: 'Not Assigned', value: 'NOT_ASSIGNED', icon: 'add-circle-outline', color: theme.colors.error },
-    { id: 'ASSIGNED', name: 'Assigned', value: 'ASSIGNED', icon: 'person-outline', color: theme.colors.warning },
-    { id: 'PACKED', name: 'Packed', value: 'PACKED', icon: 'cube-outline', color: theme.colors.info },
-    { id: 'OUT_FOR_DELIVERY', name: 'Out for Delivery', value: 'OUT_FOR_DELIVERY', icon: 'bicycle-outline', color: theme.colors.info },
-    { id: 'DELIVERED', name: 'Delivered', value: 'DELIVERED', icon: 'checkmark-circle-outline', color: theme.colors.success },
-    { id: 'FAILED', name: 'Failed', value: 'FAILED', icon: 'alert-circle-outline', color: theme.colors.error },
-    { id: 'CANCELED', name: 'Canceled', value: 'CANCELED', icon: 'close-circle-outline', color: theme.colors.neutral },
+    { id: 'Draft', name: 'Draft', value: 'Draft', icon: 'add-circle-outline', color: theme.colors.error },
+    { id: 'Scheduled', name: 'Scheduled', value: 'Scheduled', icon: 'person-outline', color: theme.colors.warning },
+    { id: 'Ready', name: 'Ready', value: 'Ready', icon: 'cube-outline', color: theme.colors.info },
+    { id: 'InTransit', name: 'In transit', value: 'InTransit', icon: 'bicycle-outline', color: theme.colors.info },
+    { id: 'Delivered', name: 'Delivered', value: 'Delivered', icon: 'checkmark-circle-outline', color: theme.colors.success },
+    { id: 'Issue', name: 'Issue', value: 'Issue', icon: 'alert-circle-outline', color: theme.colors.error },
+    { id: 'Canceled', name: 'Canceled', value: 'Canceled', icon: 'close-circle-outline', color: theme.colors.neutral },
   ];
 
   const paymentStatusOptions = [
@@ -515,7 +515,7 @@ export function DeliveryDetailSupplierView({
   ];
 
   // Determine if acceptance is needed
-  const showAcceptance = requireAccept || delivery.deliveryStatus === 'NOT_ASSIGNED';
+  const showAcceptance = requireAccept || delivery.deliveryStatus === 'Draft';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
@@ -527,7 +527,7 @@ export function DeliveryDetailSupplierView({
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Accept/Reject for incoming requests */}
-        {showAcceptance && deliveryStatus === 'NOT_ASSIGNED' && (
+        {showAcceptance && deliveryStatus === 'Draft' && (
           <View style={styles.acceptSection}>
             <AppButton
               title="Accept Order"

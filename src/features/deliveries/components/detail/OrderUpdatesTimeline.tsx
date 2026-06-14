@@ -38,10 +38,10 @@ export function OrderUpdatesTimeline({
 
   // Generate timeline updates based on current status
   const orderUpdates = useMemo(() => {
-    const isDelivered = deliveryStatus === 'DELIVERED';
-    const isOutForDelivery = deliveryStatus === 'OUT_FOR_DELIVERY' || isDelivered;
-    const isPacked = deliveryStatus === 'PACKED' || isOutForDelivery;
-    const isAssigned = deliveryStatus === 'ASSIGNED' || isPacked;
+    const isDelivered = deliveryStatus === 'Delivered';
+    const isOutForDelivery = deliveryStatus === 'InTransit' || isDelivered;
+    const isPacked = deliveryStatus === 'Ready' || isOutForDelivery;
+    const isAssigned = deliveryStatus === 'Scheduled' || isPacked;
 
     // Derive stable timestamps proportionally from orderTime to now
     // This avoids fabricated Date.now()-X values that change every render

@@ -23,49 +23,60 @@ const { getRepos } = require('../repositories');
 // DELIVERY STATUS - SINGLE SOURCE OF TRUTH
 // ============================================================================
 
+// Logistics v2 remodel (P3): a faithful 1:1 rename of the old enum.
+//   NOT_ASSIGNED→Draft  ASSIGNED→Scheduled  PACKED→Ready
+//   OUT_FOR_DELIVERY→InTransit  DELIVERED→Delivered  FAILED→Issue  CANCELED→Canceled
+// New-named keys (DRAFT/SCHEDULED/...) are the canonical ones for new code.
+// The old key names are kept as DEPRECATED aliases pointing at the new values so
+// every existing `DS.NOT_ASSIGNED`-style reference in server.js keeps working
+// without edits (the P0 prep means these are the only references).
 const DELIVERY_STATUS = {
-  NOT_ASSIGNED: 'NOT_ASSIGNED',
-  ASSIGNED: 'ASSIGNED',
-  PACKED: 'PACKED',
-  OUT_FOR_DELIVERY: 'OUT_FOR_DELIVERY',
-  DELIVERED: 'DELIVERED',
-  FAILED: 'FAILED',
-  CANCELED: 'CANCELED',
+  DRAFT: 'Draft',
+  SCHEDULED: 'Scheduled',
+  READY: 'Ready',
+  IN_TRANSIT: 'InTransit',
+  DELIVERED: 'Delivered',
+  ISSUE: 'Issue',
+  CANCELED: 'Canceled',
+  // Deprecated aliases (old key names → new values):
+  NOT_ASSIGNED: 'Draft',
+  ASSIGNED: 'Scheduled',
+  PACKED: 'Ready',
+  OUT_FOR_DELIVERY: 'InTransit',
+  FAILED: 'Issue',
 };
 
+// Canonical set of status values (deduped — aliases share values).
+const DELIVERY_STATUS_VALUES = ['Draft', 'Scheduled', 'Ready', 'InTransit', 'Delivered', 'Issue', 'Canceled'];
+
 const DELIVERY_STATUS_META = {
-  [DELIVERY_STATUS.NOT_ASSIGNED]: { label: 'Not assigned', isFinal: false, sortRank: 10 },
-  [DELIVERY_STATUS.ASSIGNED]: { label: 'Assigned', isFinal: false, sortRank: 20 },
-  [DELIVERY_STATUS.PACKED]: { label: 'Packed', isFinal: false, sortRank: 30 },
-  [DELIVERY_STATUS.OUT_FOR_DELIVERY]: { label: 'Out for delivery', isFinal: false, sortRank: 40 },
-  [DELIVERY_STATUS.DELIVERED]: { label: 'Delivered', isFinal: true, sortRank: 50 },
-  [DELIVERY_STATUS.FAILED]: { label: 'Failed', isFinal: false, sortRank: 60 },
-  [DELIVERY_STATUS.CANCELED]: { label: 'Canceled', isFinal: true, sortRank: 70 },
+  Draft: { label: 'Draft', isFinal: false, sortRank: 10 },
+  Scheduled: { label: 'Scheduled', isFinal: false, sortRank: 20 },
+  Ready: { label: 'Ready', isFinal: false, sortRank: 30 },
+  InTransit: { label: 'In transit', isFinal: false, sortRank: 40 },
+  Delivered: { label: 'Delivered', isFinal: true, sortRank: 50 },
+  Issue: { label: 'Issue', isFinal: false, sortRank: 60 },
+  Canceled: { label: 'Canceled', isFinal: true, sortRank: 70 },
 };
 
 /**
- * Delivery Status Transitions:
- *   NOT_ASSIGNED     → ASSIGNED, CANCELED
- *   ASSIGNED         → PACKED, OUT_FOR_DELIVERY, NOT_ASSIGNED, CANCELED
- *   PACKED           → OUT_FOR_DELIVERY, CANCELED
- *   OUT_FOR_DELIVERY → DELIVERED, FAILED
- *   DELIVERED        → [] (terminal)
- *   FAILED           → NOT_ASSIGNED, CANCELED
- *   CANCELED         → [] (terminal)
+ * Delivery Status Transitions (same graph as before, renamed nodes):
+ *   Draft     → Scheduled, Canceled
+ *   Scheduled → Ready, InTransit, Draft, Canceled
+ *   Ready     → InTransit, Canceled
+ *   InTransit → Delivered, Issue
+ *   Delivered → [] (terminal)
+ *   Issue     → Draft, Canceled
+ *   Canceled  → [] (terminal)
  */
 const ALLOWED_TRANSITIONS = {
-  [DELIVERY_STATUS.NOT_ASSIGNED]: [DELIVERY_STATUS.ASSIGNED, DELIVERY_STATUS.CANCELED],
-  [DELIVERY_STATUS.ASSIGNED]: [
-    DELIVERY_STATUS.PACKED,
-    DELIVERY_STATUS.OUT_FOR_DELIVERY,
-    DELIVERY_STATUS.NOT_ASSIGNED,
-    DELIVERY_STATUS.CANCELED,
-  ],
-  [DELIVERY_STATUS.PACKED]: [DELIVERY_STATUS.OUT_FOR_DELIVERY, DELIVERY_STATUS.CANCELED],
-  [DELIVERY_STATUS.OUT_FOR_DELIVERY]: [DELIVERY_STATUS.DELIVERED, DELIVERY_STATUS.FAILED],
-  [DELIVERY_STATUS.DELIVERED]: [],
-  [DELIVERY_STATUS.FAILED]: [DELIVERY_STATUS.NOT_ASSIGNED, DELIVERY_STATUS.CANCELED],
-  [DELIVERY_STATUS.CANCELED]: [],
+  Draft: ['Scheduled', 'Canceled'],
+  Scheduled: ['Ready', 'InTransit', 'Draft', 'Canceled'],
+  Ready: ['InTransit', 'Canceled'],
+  InTransit: ['Delivered', 'Issue'],
+  Delivered: [],
+  Issue: ['Draft', 'Canceled'],
+  Canceled: [],
 };
 
 // Back-compat alias for the name server.js historically used.
@@ -162,7 +173,7 @@ async function applyTransferStock(repos, delivery) {
  * @throws {Error} with `.code` INVALID_STATUS | DELIVERY_NOT_FOUND | INVALID_STATUS_TRANSITION
  */
 async function changeDeliveryStatus({ deliveryId, nextStatus, changedBy = null, reason = null, pod = null }) {
-  if (!Object.values(DELIVERY_STATUS).includes(nextStatus)) {
+  if (!DELIVERY_STATUS_VALUES.includes(nextStatus)) {
     const error = new Error(`Invalid delivery status: ${nextStatus}`);
     error.code = 'INVALID_STATUS';
     throw error;
@@ -221,7 +232,8 @@ async function changeDeliveryStatus({ deliveryId, nextStatus, changedBy = null, 
   );
 
   // Transfer stock movement on completion (idempotent via stockAppliedAt).
-  // Never blocks the delivery on stock bookkeeping.
+  // Never blocks the delivery on stock bookkeeping. (Superseded by the Transfer
+  // entity in P5; kept here while transfers are still Delivery rows.)
   if (delivery.type === 'transfer' && nextStatus === DELIVERY_STATUS.DELIVERED) {
     try {
       await applyTransferStock(repos, delivery);
@@ -230,7 +242,49 @@ async function changeDeliveryStatus({ deliveryId, nextStatus, changedBy = null, 
     }
   }
 
+  // Outgoing (non-transfer) delivery physical stock moves:
+  //   InTransit  → dispatch  (reserved-, onHand-, inTransit+)
+  //   Delivered  → deliver   (inTransit-)
+  // Idempotent via the StockMovement ledger. Incoming deliveries don't move our
+  // stock here (their goods are received via the PO goods-receipt flow).
+  if (delivery.type !== 'transfer' && delivery.direction === 'outgoing' && delivery.locationId) {
+    try {
+      const stockService = require('./stockService');
+      const stockArgs = {
+        businessId: delivery.businessId,
+        locationId: delivery.locationId,
+        items: Array.isArray(delivery.items) ? delivery.items : [],
+        refId: delivery.id,
+        createdBy: changedBy || null,
+      };
+      if (nextStatus === DELIVERY_STATUS.IN_TRANSIT) {
+        // Legacy order (accepted under the old model, no reservation) already
+        // decremented onHand at accept — only track in-transit for it.
+        const legacy = delivery.orderId && !(await orderHasReserveLedger(repos, delivery.orderId));
+        if (legacy) {
+          await stockService.dispatchVisibility(stockArgs);
+        } else {
+          await stockService.dispatch(stockArgs);
+        }
+      } else if (nextStatus === DELIVERY_STATUS.DELIVERED) {
+        await stockService.deliver(stockArgs);
+      }
+    } catch (stockErr) {
+      console.warn('[deliveryStatus] delivery stock move failed:', stockErr.message);
+    }
+  }
+
   return repos.deliveryRepo.getById(deliveryId);
+}
+
+/** True if the order was reserved under the new inventory model (has a reserve ledger row). */
+async function orderHasReserveLedger(repos, orderId) {
+  try {
+    const moves = await repos.stockMovementRepo.getByRef('order', orderId);
+    return moves.some((m) => m.reason === 'order_reserve');
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -247,6 +301,7 @@ async function getDeliveryStatusHistory(deliveryId) {
 
 module.exports = {
   DELIVERY_STATUS,
+  DELIVERY_STATUS_VALUES,
   DELIVERY_STATUS_META,
   ALLOWED_TRANSITIONS,
   DELIVERY_STATUS_TRANSITIONS,

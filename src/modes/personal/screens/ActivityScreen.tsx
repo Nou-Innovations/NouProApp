@@ -110,13 +110,13 @@ export default function ActivityScreen() {
   // Calculate stats from real data using correct enum values
   const stats = useMemo(() => ({
     pending: activities.filter((a) =>
-      ['NOT_ASSIGNED', 'ASSIGNED', 'PACKED'].includes(a.delivery.deliveryStatus)
+      ['Draft', 'Scheduled', 'Ready'].includes(a.delivery.deliveryStatus)
     ).length,
     ongoing: activities.filter((a) =>
-      a.delivery.deliveryStatus === 'OUT_FOR_DELIVERY'
+      a.delivery.deliveryStatus === 'InTransit'
     ).length,
     delivered: activities.filter((a) =>
-      a.delivery.deliveryStatus === 'DELIVERED'
+      a.delivery.deliveryStatus === 'Delivered'
     ).length,
   }), [activities]);
 
@@ -137,13 +137,13 @@ export default function ActivityScreen() {
   // Map delivery status to TaskCard status
   const mapDeliveryStatusToTaskStatus = (deliveryStatus: DeliveryStatus): TaskStatus => {
     const statusMap: Record<DeliveryStatus, TaskStatus> = {
-      NOT_ASSIGNED: 'pending',
-      ASSIGNED: 'pending',
-      PACKED: 'in_progress',
-      OUT_FOR_DELIVERY: 'in_progress',
-      DELIVERED: 'completed',
-      FAILED: 'cancelled',
-      CANCELED: 'cancelled',
+      Draft: 'pending',
+      Scheduled: 'pending',
+      Ready: 'in_progress',
+      InTransit: 'in_progress',
+      Delivered: 'completed',
+      Issue: 'cancelled',
+      Canceled: 'cancelled',
     };
     return statusMap[deliveryStatus] || 'pending';
   };

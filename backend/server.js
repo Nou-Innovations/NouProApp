@@ -149,7 +149,7 @@ const repos = getRepos();
 const { prisma } = require('./src/db/prisma');
 
 // Services
-const { orderStatus: orderStatusService, eventMessages, pushService, storageService } = require('./src/services');
+const { orderStatus: orderStatusService, eventMessages, pushService, storageService, stockService } = require('./src/services');
 
 // Authentication middleware
 const { requireAuth, optionalAuth, generateToken, verifyToken } = require('./src/middleware/auth');
@@ -5705,12 +5705,15 @@ app.patch('/api/locations/:locationId/stock/:productId', requireAuth, async (req
 
     const locationBusinessId = location.businessId || location.companyId;
 
-    const updated = await repos.stockRepo.upsert(
+    // Set absolute on-hand via stockService so the change is ledgered
+    // (records the delta as a manual_adjust movement).
+    const updated = await stockService.setOnHand({
+      businessId: locationBusinessId,
       locationId,
       productId,
       qtyOnHand,
-      locationBusinessId
-    );
+      createdBy: req.user?.id || null,
+    });
 
     res.json(successResponse(updated));
   } catch (e) {
@@ -6585,11 +6588,18 @@ app.post('/api/companies/:companyId/purchase-orders/:poId/receive', requireAuth,
       notes: notes || null,
     });
 
-    // Increment stock for received items
+    // Increment stock for received items (via stockService — ledgered + idempotent
+    // per goods-receipt id, so a retried receipt never double-counts).
     if (receivingLocationId) {
-      await purchaseOrderStatusService.incrementStockForReceivedItems(
-        repos, req.params.companyId, receivingLocationId, items
-      );
+      await stockService.receiveGoods({
+        businessId: req.params.companyId,
+        locationId: receivingLocationId,
+        items,
+        refType: 'po',
+        refId: grn.id,
+        phase: 'receive',
+        createdBy: req.user?.id || null,
+      });
     }
 
     // Determine if all items are fully received → RECEIVED, or partial → PARTIALLY_RECEIVED

@@ -93,7 +93,7 @@ export function DeliveryDetailClientView({
 
   // Handle accept order -- call API then notify parent
   const handleAccept = async () => {
-    await actions.updateStatus('ASSIGNED');
+    await actions.updateStatus('Scheduled');
     if (onAccept) onAccept();
   };
 
@@ -108,7 +108,7 @@ export function DeliveryDetailClientView({
           text: 'Reject',
           style: 'destructive',
           onPress: async () => {
-            await actions.updateStatus('CANCELED');
+            await actions.updateStatus('Canceled');
             if (onReject) onReject();
           },
         },
@@ -120,7 +120,7 @@ export function DeliveryDetailClientView({
   const moreOptionsItems: AppBottomSheetItem[] = [
     { id: 'share', title: 'Share' },
     // Client can cancel if not yet processed
-    ...(delivery.deliveryStatus === 'NOT_ASSIGNED'
+    ...(delivery.deliveryStatus === 'Draft'
       ? [{ id: 'cancel', title: 'Cancel Request', variant: 'destructive' as const }]
       : []),
   ];
@@ -138,7 +138,7 @@ export function DeliveryDetailClientView({
             text: 'Yes, Cancel',
             style: 'destructive',
             onPress: async () => {
-              await actions.updateStatus('CANCELED');
+              await actions.updateStatus('Canceled');
               navigation.goBack();
             },
           },
