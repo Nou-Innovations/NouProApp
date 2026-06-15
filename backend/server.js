@@ -11919,6 +11919,14 @@ app.get('/api/companies/:companyId/dashboard', requireAuth, async (req, res) => 
     // Tasks not yet finished
     const OPEN_TASK = ['TODO', 'IN_PROGRESS'];
     const LOW_STOCK_THRESHOLD = 5;
+    // Orders that count as "active" (not finished / not killed) and revenue-eligible
+    const ACTIVE_ORDER_STATUSES = ['NEW', 'ACCEPTED', 'ONGOING', 'PENDING', 'IN_REVIEW'];
+    const SALES_EXCLUDED_STATUSES = ['CANCELED', 'REJECTED'];
+
+    // Date windows for "today" / "yesterday" sales (server local time)
+    const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart); tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1);
 
     // Run a sub-query but never let one failure take down the whole dashboard
     const settle = async (fn, fallback) => {
@@ -11935,6 +11943,15 @@ app.get('/api/companies/:companyId/dashboard', requireAuth, async (req, res) => 
       overdueInvoiceRows,
       lowStockRows,
       recentActivity,
+      salesTodayAgg,
+      salesYesterdayAgg,
+      activeOrders,
+      deliveriesToday,
+      deliveriesInTransit,
+      overdueInvoiceCount,
+      lowStockCount,
+      outOfStockCount,
+      unpaidInvoiceAgg,
     ] = await Promise.all([
       // --- summary counts (KPI chips) ---
       settle(() => prisma.order.count({ where: { businessId: companyId, status: 'NEW', ...orderLoc } }), 0),
@@ -11948,6 +11965,18 @@ app.get('/api/companies/:companyId/dashboard', requireAuth, async (req, res) => 
       settle(() => prisma.stock.findMany({ where: { businessId: companyId, qtyOnHand: { lte: LOW_STOCK_THRESHOLD }, ...(locationId ? { locationId } : {}) }, orderBy: { qtyOnHand: 'asc' }, take: 10, include: { product: { select: { name: true } } } }), []),
       // --- recent activity preview ---
       settle(() => buildActivityFeed(companyId, locationId, 8), []),
+      // --- KPI cards: today's sales, vs yesterday, active orders, today's deliveries ---
+      settle(() => prisma.order.aggregate({ _sum: { totalAmount: true }, where: { businessId: companyId, createdAt: { gte: todayStart, lt: tomorrowStart }, status: { notIn: SALES_EXCLUDED_STATUSES }, ...orderLoc } }), { _sum: { totalAmount: 0 } }),
+      settle(() => prisma.order.aggregate({ _sum: { totalAmount: true }, where: { businessId: companyId, createdAt: { gte: yesterdayStart, lt: todayStart }, status: { notIn: SALES_EXCLUDED_STATUSES }, ...orderLoc } }), { _sum: { totalAmount: 0 } }),
+      settle(() => prisma.order.count({ where: { businessId: companyId, status: { in: ACTIVE_ORDER_STATUSES }, ...orderLoc } }), 0),
+      settle(() => prisma.delivery.count({ where: { businessId: companyId, expectedDeliveryDateTime: { gte: todayStart, lt: tomorrowStart }, ...deliveryLoc } }), 0),
+      settle(() => prisma.delivery.count({ where: { businessId: companyId, deliveryStatus: DS.OUT_FOR_DELIVERY, ...deliveryLoc } }), 0),
+      // --- accurate counts for health + KPI deltas (not capped by take:10) ---
+      settle(() => prisma.invoice.count({ where: { businessId: companyId, OR: [{ status: 'OVERDUE' }, { status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: now } }], ...invoiceLoc } }), 0),
+      settle(() => prisma.stock.count({ where: { businessId: companyId, qtyOnHand: { gt: 0, lte: LOW_STOCK_THRESHOLD }, ...(locationId ? { locationId } : {}) } }), 0),
+      settle(() => prisma.stock.count({ where: { businessId: companyId, qtyOnHand: { lte: 0 }, ...(locationId ? { locationId } : {}) } }), 0),
+      // Outstanding unpaid amount (Σ totalAmount − Σ paidAmount on unpaid invoices)
+      settle(() => prisma.invoice.aggregate({ _sum: { totalAmount: true, paidAmount: true }, where: { businessId: companyId, status: { in: UNPAID_INVOICE }, ...invoiceLoc } }), { _sum: { totalAmount: 0, paidAmount: 0 } }),
     ]);
 
     // Build the priority queue. Backend supplies the data; the app attaches handlers.
@@ -12013,14 +12042,172 @@ app.get('/api/companies/:companyId/dashboard', requireAuth, async (req, res) => 
       return new Date(b.timestamp) - new Date(a.timestamp);
     });
 
+    const salesToday = salesTodayAgg?._sum?.totalAmount || 0;
+    const salesYesterday = salesYesterdayAgg?._sum?.totalAmount || 0;
+    const unpaidInvoiceAmount = Math.max(
+      0,
+      (unpaidInvoiceAgg?._sum?.totalAmount || 0) - (unpaidInvoiceAgg?._sum?.paidAmount || 0)
+    );
+
+    // Business health summary (critical > attention > good), with a plain-language reason
+    const plural = (n, s, p) => `${n} ${n === 1 ? s : (p || `${s}s`)}`;
+    const humanJoin = (arr) =>
+      arr.length <= 1 ? (arr[0] || '') : `${arr.slice(0, -1).join(', ')} and ${arr[arr.length - 1]}`;
+    let health;
+    if (outOfStockCount > 0 || overdueInvoiceCount >= 3) {
+      const bits = [];
+      if (outOfStockCount > 0) bits.push(`${plural(outOfStockCount, 'product')} out of stock`);
+      if (overdueInvoiceCount > 0) bits.push(`${plural(overdueInvoiceCount, 'invoice')} overdue`);
+      health = { status: 'critical', reason: `${humanJoin(bits)}.` };
+    } else if (newOrders > 0 || lowStockCount > 0 || unpaidInvoices > 0 || pendingDeliveries > 0) {
+      const bits = [];
+      if (newOrders > 0) bits.push(`${plural(newOrders, 'new order')} to review`);
+      if (lowStockCount > 0) bits.push(`${plural(lowStockCount, 'product')} low in stock`);
+      if (overdueInvoiceCount > 0) bits.push(`${plural(overdueInvoiceCount, 'invoice')} overdue`);
+      else if (unpaidInvoices > 0) bits.push(`${plural(unpaidInvoices, 'unpaid invoice')}`);
+      if (pendingDeliveries > 0) bits.push(`${plural(pendingDeliveries, 'delivery', 'deliveries')} pending`);
+      health = { status: 'attention', reason: `${humanJoin(bits.slice(0, 2))}.` };
+    } else {
+      health = { status: 'good', reason: 'Everything looks good. No urgent action needed.' };
+    }
+
     return res.json(successResponse({
-      summary: { newOrders, pendingDeliveries, unpaidInvoices, openTasks },
+      summary: {
+        newOrders,
+        pendingDeliveries,
+        unpaidInvoices,
+        unpaidInvoiceAmount,
+        openTasks,
+        salesToday,
+        salesYesterday,
+        activeOrders,
+        deliveriesToday,
+        deliveriesInTransit,
+        overdueInvoiceCount,
+        lowStockCount,
+        outOfStockCount,
+      },
+      health,
       priorityItems: priorityItems.slice(0, 10),
       recentActivity,
     }));
   } catch (err) {
     logger.error('Error fetching business dashboard:', err);
     return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch dashboard'));
+  }
+});
+
+// GET /api/companies/:companyId/dashboard/overview?range=7d|30d&locationId=...
+// Business Overview analytics block: revenue trend, orders-by-status, invoice collection.
+// Gated server-side: Business+ only; 30d range is Enterprise-only (else clamped to 7d).
+app.get('/api/companies/:companyId/dashboard/overview', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { locationId } = req.query;
+
+    const userId = req.user?.id;
+    if (!userId || !(await isBusinessMember(companyId, userId))) {
+      return res.status(403).json(errorResponse('ACCESS_DENIED', 'You do not have access to this business'));
+    }
+
+    // Entitlement: analytics is Business+ ; full (30d) history is Enterprise-only
+    const business = await prisma.business.findUnique({
+      where: { id: companyId },
+      select: { subscriptionTier: true },
+    });
+    const tier = business?.subscriptionTier || 'FREE';
+    const hasAnalytics = tier === 'BUSINESS' || tier === 'ENTERPRISE';
+    if (!hasAnalytics) {
+      return res.status(403).json(errorResponse('UPGRADE_REQUIRED', 'Analytics is available on the Business plan and above'));
+    }
+    const allow30d = tier === 'ENTERPRISE';
+    const range = (req.query.range === '30d' && allow30d) ? '30d' : '7d';
+    const days = range === '30d' ? 30 : 7;
+
+    const now = new Date();
+    const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart); tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    const rangeStart = new Date(todayStart); rangeStart.setDate(rangeStart.getDate() - (days - 1));
+    const SALES_EXCLUDED_STATUSES = ['CANCELED', 'REJECTED'];
+
+    const orderLoc = locationId ? { soldByLocationId: locationId } : {};
+    const invoiceLoc = locationId ? { issuedByLocationId: locationId } : {};
+
+    const dayKey = (d) => {
+      const x = new Date(d);
+      return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+    };
+
+    const [revenueRows, ordersGrouped, invoiceRows] = await Promise.all([
+      // Daily revenue (orders created in range, excluding canceled/rejected)
+      prisma.order.findMany({
+        where: { businessId: companyId, createdAt: { gte: rangeStart, lt: tomorrowStart }, status: { notIn: SALES_EXCLUDED_STATUSES }, ...orderLoc },
+        select: { createdAt: true, totalAmount: true },
+      }),
+      // Orders by status over the range
+      prisma.order.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+        where: { businessId: companyId, createdAt: { gte: rangeStart, lt: tomorrowStart }, ...orderLoc },
+      }),
+      // Invoice collection over the range
+      prisma.invoice.findMany({
+        where: { businessId: companyId, createdAt: { gte: rangeStart, lt: tomorrowStart }, ...invoiceLoc },
+        select: { totalAmount: true, paidAmount: true, status: true, dueDate: true },
+      }),
+    ]);
+
+    // --- revenueTrend: one bucket per day from rangeStart..today ---
+    const buckets = {};
+    for (const o of revenueRows) {
+      const k = dayKey(o.createdAt);
+      buckets[k] = (buckets[k] || 0) + (o.totalAmount || 0);
+    }
+    const revenueTrend = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date(rangeStart); d.setDate(d.getDate() + i);
+      const k = dayKey(d);
+      revenueTrend.push({ date: k, amount: buckets[k] || 0 });
+    }
+    const revenueTotal = revenueTrend.reduce((sum, p) => sum + p.amount, 0);
+
+    // --- ordersByStatus: simplified buckets ---
+    const ordersByStatus = { New: 0, Active: 0, Pending: 0, Completed: 0, Canceled: 0 };
+    for (const g of ordersGrouped) {
+      const c = g._count?._all || 0;
+      switch (g.status) {
+        case 'NEW': ordersByStatus.New += c; break;
+        case 'ACCEPTED': case 'ONGOING': ordersByStatus.Active += c; break;
+        case 'PENDING': case 'IN_REVIEW': ordersByStatus.Pending += c; break;
+        case 'DONE': ordersByStatus.Completed += c; break;
+        case 'CANCELED': case 'REJECTED': ordersByStatus.Canceled += c; break;
+      }
+    }
+
+    // --- invoiceCollection: paid / unpaid / overdue (outstanding amounts) ---
+    let paid = 0, unpaid = 0, overdue = 0;
+    for (const inv of invoiceRows) {
+      const total = inv.totalAmount || 0;
+      const paidAmt = inv.paidAmount || 0;
+      paid += paidAmt;
+      const outstanding = Math.max(0, total - paidAmt);
+      const isUnpaid = ['SENT', 'PARTIALLY_PAID', 'OVERDUE'].includes(inv.status);
+      if (isUnpaid) unpaid += outstanding;
+      const isOverdue = inv.status === 'OVERDUE'
+        || (['SENT', 'PARTIALLY_PAID'].includes(inv.status) && inv.dueDate && new Date(inv.dueDate) < now);
+      if (isOverdue) overdue += outstanding;
+    }
+
+    return res.json(successResponse({
+      range,
+      revenueTrend,
+      revenueTotal,
+      ordersByStatus,
+      invoiceCollection: { paid, unpaid, overdue },
+    }));
+  } catch (err) {
+    logger.error('Error fetching dashboard overview:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch overview'));
   }
 });
 

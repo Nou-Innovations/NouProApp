@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   businessAvatarPlaceholder: {
-    backgroundColor: '#E0E7FF',
+    backgroundColor: '#EDE9FE',
   },
   info: {
     flex: 1,

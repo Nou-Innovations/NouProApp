@@ -1,18 +1,22 @@
 /**
- * BusinessHomeScreen - Pro Mode Home / Dashboard
+ * BusinessHomeScreen - Business Mode Home / Command Center
  *
- * The Business mode landing screen. Mirrors the Personal HomeScreen pattern
- * (drawer menu + notifications header, time-of-day greeting) and composes the
- * Pro dashboard components:
- * - KPI chips (new orders, pending deliveries, unpaid invoices, open tasks)
- * - Priority Queue (needs-attention items)
+ * The Business mode landing screen. Answers, at a glance: how is the business
+ * doing, what needs attention, how is it performing, and what to do next.
+ * Composes:
+ * - Header: business name + date + location selector + notifications
+ * - Business Health card (Good / Needs attention / Critical)
+ * - KPI grid (Sales Today, Active Orders, Deliveries Today, Unpaid Invoices)
+ * - Needs Attention (priority queue)
+ * - Business Overview analytics (revenue, orders, invoice collection) — Business+
  * - Quick Actions (permission-gated create flows)
  * - Recent Activity preview ("See all" → Activities log)
  *
- * Data comes from the useBusinessDashboard hook (API → service → hook → screen).
+ * Data comes from useBusinessDashboard (always) and useBusinessOverview (lazy,
+ * Business+ only). Location scoping flows through the shared businessStore.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -20,41 +24,67 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Icon } from '@/shared/utils/icons';
 import AnimatedMenuIcon from '@/shared/components/ui/AnimatedMenuIcon';
+import { EmptyState } from '@/shared/components/ui';
+import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useNotifications } from '@/shared/context/NotificationContext';
+import { usePermissions } from '@/shared/hooks/usePermissions';
 import { RootStackParamList } from '@/shared/types/navigation';
 import {
-  ProKpiChipsRow,
+  BusinessHealthCard,
+  KpiGrid,
   ProPriorityQueue,
   ProQuickActions,
   ProRecentActivity,
+  BusinessOverviewSection,
+  LocationSelectorPill,
 } from '../components';
 import { useBusinessDashboard } from '../hooks/useBusinessDashboard';
+import { useBusinessOverview } from '../hooks/useBusinessOverview';
+
+const CHART_WIDTH = Dimensions.get('window').width - theme.spacing.md * 4;
 
 export default function BusinessHomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { theme: appTheme } = useTheme();
   const activeBusiness = useProfileStore((s) => s.activeBusiness);
   const { unreadCount } = useNotifications();
+  const { analyticsType } = usePermissions();
 
   const {
-    kpiChips,
+    health,
+    kpiCards,
     priorityItems,
     quickActions,
     recentActivity,
+    summary,
     loading,
     refreshing,
     error,
     refresh,
   } = useBusinessDashboard();
+
+  // Analytics block is Business+; Enterprise ("full") may extend to 30 days.
+  const analyticsLocked = analyticsType === 'none';
+  const canExtendRange = analyticsType === 'full';
+  const {
+    overview,
+    range,
+    setRange,
+    loading: overviewLoading,
+    error: overviewError,
+  } = useBusinessOverview({ enabled: !analyticsLocked });
+
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const openDrawer = useCallback(() => {
     navigation.dispatch(DrawerActions.toggleDrawer());
@@ -68,17 +98,29 @@ export default function BusinessHomeScreen() {
     navigation.navigate('AllActivity');
   }, [navigation]);
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) return 'Good morning';
-    if (hour >= 12 && hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  };
+  const todayLabel = useMemo(
+    () =>
+      `Today · ${new Date().toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })}`,
+    []
+  );
 
-  const getGreetingEmoji = () => {
-    const hour = new Date().getHours();
-    return hour >= 5 && hour < 17 ? '☀️' : '👋';
-  };
+  // A brand-new business: no activity at all → show a setup prompt instead of
+  // an empty (and misleadingly "healthy") dashboard.
+  const isNewBusiness =
+    !loading &&
+    !error &&
+    summary != null &&
+    summary.activeOrders === 0 &&
+    summary.newOrders === 0 &&
+    summary.deliveriesToday === 0 &&
+    summary.unpaidInvoices === 0 &&
+    Math.round(summary.salesToday) === 0 &&
+    recentActivity.length === 0 &&
+    priorityItems.length === 0;
 
   const renderBadge = (count: number) => {
     if (count <= 0) return null;
@@ -106,6 +148,7 @@ export default function BusinessHomeScreen() {
           <AnimatedMenuIcon size={30} color={appTheme.colors.text} />
         </TouchableOpacity>
         <View style={styles.headerActions}>
+          <LocationSelectorPill />
           <TouchableOpacity
             style={styles.iconButton}
             onPress={goToNotifications}
@@ -129,20 +172,17 @@ export default function BusinessHomeScreen() {
           />
         }
       >
-        {/* Greeting */}
+        {/* Business name + date */}
         <View style={styles.greetingSection}>
-          <Text style={[styles.greeting, { color: appTheme.colors.textSecondary }]}>
-            {getGreeting()}
+          <Text style={[styles.dateLabel, { color: appTheme.colors.textSecondary }]}>
+            {todayLabel}
           </Text>
-          <View style={styles.businessNameRow}>
-            <Text
-              style={[styles.businessName, { color: appTheme.colors.text }]}
-              numberOfLines={1}
-            >
-              {activeBusiness?.name || 'Your business'}
-            </Text>
-            <Text style={styles.greetingEmoji}>{getGreetingEmoji()}</Text>
-          </View>
+          <Text
+            style={[styles.businessName, { color: appTheme.colors.text }]}
+            numberOfLines={1}
+          >
+            {activeBusiness?.name || 'Your business'}
+          </Text>
         </View>
 
         {/* Error banner with retry */}
@@ -157,18 +197,63 @@ export default function BusinessHomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* KPI chips */}
-        <ProKpiChipsRow chips={kpiChips} isLoading={loading} error={error} />
+        {isNewBusiness ? (
+          <EmptyState
+            title="Set up your business"
+            subtitle="Add your first product to start receiving orders, creating invoices and tracking performance."
+            iconName="cube-outline"
+            ctaLabel="Add your first product"
+            onCtaPress={() => navigation.navigate('CreateProduct', {})}
+          />
+        ) : (
+          <>
+            {/* Business health */}
+            <BusinessHealthCard health={health} isLoading={loading} />
 
-        {/* Priority queue */}
-        <ProPriorityQueue items={priorityItems} isLoading={loading} onSeeAll={goToActivities} />
+            {/* KPI grid */}
+            <KpiGrid cards={kpiCards} isLoading={loading} />
 
-        {/* Quick actions */}
-        <ProQuickActions actions={quickActions} isLoading={loading} />
+            {/* Needs attention */}
+            <ProPriorityQueue items={priorityItems} isLoading={loading} onSeeAll={goToActivities} />
 
-        {/* Recent activity preview */}
-        <ProRecentActivity items={recentActivity} isLoading={loading} onSeeAll={goToActivities} />
+            {/* Business overview analytics (Business+ / locked teaser for Free·Pro) */}
+            <BusinessOverviewSection
+              overview={overview}
+              range={range}
+              onRangeChange={setRange}
+              loading={overviewLoading}
+              error={overviewError}
+              locked={analyticsLocked}
+              canExtend={canExtendRange}
+              onUpgrade={() => setShowPaywall(true)}
+              chartWidth={CHART_WIDTH}
+            />
+
+            {/* Quick actions */}
+            <ProQuickActions actions={quickActions} isLoading={loading} />
+
+            {/* Recent activity preview */}
+            <ProRecentActivity
+              items={recentActivity}
+              isLoading={loading}
+              onSeeAll={goToActivities}
+            />
+          </>
+        )}
       </ScrollView>
+
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onUpgrade={() => {
+          setShowPaywall(false);
+          navigation.navigate('SubscriptionPlans');
+        }}
+        requiredPlan="business"
+        modalType="feature_gate"
+        title="Unlock analytics"
+        description="See revenue trends, order breakdowns and cash flow with the Business plan."
+      />
     </SafeAreaView>
   );
 }
@@ -222,24 +307,15 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.xs,
     paddingBottom: theme.spacing.md,
   },
-  greeting: {
-    fontSize: 18,
+  dateLabel: {
+    fontSize: 14,
     fontFamily: theme.fonts.primary.medium,
-    marginTop: 12,
-  },
-  businessNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
+    marginTop: 8,
   },
   businessName: {
-    fontSize: 32,
+    fontSize: 30,
     fontFamily: theme.fonts.primary.bold,
-    flexShrink: 1,
-  },
-  greetingEmoji: {
-    fontSize: 28,
-    marginLeft: 8,
+    marginTop: 2,
   },
   errorBanner: {
     flexDirection: 'row',

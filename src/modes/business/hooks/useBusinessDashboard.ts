@@ -25,17 +25,21 @@ import {
   canCreateProcurementOrders,
   canEditProducts,
 } from '@/shared/utils/permissions';
+import { formatCurrency } from '@/shared/utils/format';
 import {
   getBusinessDashboard,
   formatActivityTime,
   type BusinessDashboard,
+  type BusinessHealth,
   type DashboardPriorityItem,
   type DashboardSummary,
   type ActivityItem,
 } from '@/features/business';
 import type { KpiChip } from '../components/ProKpiChipsRow';
+import type { KpiCardData } from '../components/KpiCard';
 import type { PriorityItem, PriorityItemType } from '../components/ProPriorityQueue';
 import type { QuickAction } from '../components/ProQuickActions';
+import { MOCK_DASHBOARD, USE_MOCK_DASHBOARD_FALLBACK } from './mockDashboard';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -66,7 +70,9 @@ function openEntity(navigation: Nav, item: DashboardPriorityItem) {
 
 export interface UseBusinessDashboardResult {
   summary: DashboardSummary | null;
+  health: BusinessHealth | null;
   kpiChips: KpiChip[];
+  kpiCards: KpiCardData[];
   priorityItems: PriorityItem[];
   quickActions: QuickAction[];
   recentActivity: ActivityItem[];
@@ -128,6 +134,13 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
 
   const refresh = useCallback(() => fetchData({ initial: false }), [fetchData]);
 
+  // Preview fallback: until the backend that serves the new dashboard fields is
+  // deployed, `salesToday` is absent → use mock data so the screen previews
+  // cleanly. Once the backend returns the new fields, this switches to real data.
+  const backendHasNewFields = data?.summary?.salesToday !== undefined;
+  const useMock = USE_MOCK_DASHBOARD_FALLBACK && !backendHasNewFields;
+  const effectiveData = useMock ? MOCK_DASHBOARD : data;
+
   const kpiChips = useMemo<KpiChip[]>(() => {
     if (!data?.summary) return [];
     const s = data.summary;
@@ -167,9 +180,71 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
     ];
   }, [data?.summary, navigation]);
 
+  const kpiCards = useMemo<KpiCardData[]>(() => {
+    if (!effectiveData?.summary) return [];
+    const s = effectiveData.summary;
+
+    // Sales Today delta vs yesterday
+    let salesDelta: KpiCardData['delta'];
+    if (s.salesYesterday > 0) {
+      const pct = Math.round(((s.salesToday - s.salesYesterday) / s.salesYesterday) * 100);
+      salesDelta = {
+        text: `${pct >= 0 ? '+' : ''}${pct}% vs yesterday`,
+        tone: pct > 0 ? 'up' : pct < 0 ? 'down' : 'neutral',
+      };
+    } else if (s.salesToday > 0) {
+      salesDelta = { text: 'New sales today', tone: 'up' };
+    }
+
+    return [
+      {
+        id: 'sales',
+        label: 'Sales Today',
+        value: formatCurrency(Math.round(s.salesToday)),
+        delta: salesDelta,
+        icon: 'cash-outline',
+        color: theme.colors.success,
+        onPress: () => navigation.navigate('Orders', { initialTab: 'incoming' }),
+      },
+      {
+        id: 'activeOrders',
+        label: 'Active Orders',
+        value: String(s.activeOrders),
+        delta: s.newOrders > 0 ? { text: `${s.newOrders} new`, tone: 'neutral' } : undefined,
+        icon: 'cart-outline',
+        color: theme.colors.info,
+        onPress: () => navigation.navigate('Orders', { initialTab: 'incoming' }),
+      },
+      {
+        id: 'deliveriesToday',
+        label: 'Deliveries Today',
+        value: String(s.deliveriesToday),
+        delta:
+          s.deliveriesInTransit > 0
+            ? { text: `${s.deliveriesInTransit} in transit`, tone: 'neutral' }
+            : undefined,
+        icon: 'car-outline',
+        color: theme.colors.warning,
+        onPress: () => navigation.navigate('Deliveries'),
+      },
+      {
+        id: 'unpaid',
+        label: 'Unpaid Invoices',
+        value: formatCurrency(Math.round(s.unpaidInvoiceAmount)),
+        delta:
+          s.overdueInvoiceCount > 0
+            ? { text: `${s.overdueInvoiceCount} overdue`, tone: 'down' }
+            : undefined,
+        icon: 'receipt-text-outline',
+        color: theme.colors.error,
+        onPress: () => navigation.navigate('Invoices'),
+      },
+    ];
+  }, [effectiveData?.summary, navigation]);
+
   const priorityItems = useMemo<PriorityItem[]>(() => {
-    if (!data?.priorityItems) return [];
-    return data.priorityItems.map((it) => ({
+    if (!effectiveData?.priorityItems) return [];
+    return effectiveData.priorityItems.map((it) => ({
       id: it.id,
       type: it.type as PriorityItemType,
       title: it.title,
@@ -180,7 +255,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
       onAction: () => openEntity(navigation, it),
       onPress: () => openEntity(navigation, it),
     }));
-  }, [data?.priorityItems, navigation]);
+  }, [effectiveData?.priorityItems, navigation]);
 
   const quickActions = useMemo<QuickAction[]>(() => {
     const candidates: QuickAction[] = [];
@@ -233,14 +308,17 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
   }, [role, plan, isAdmin, activeBusinessId, navigation]);
 
   return {
-    summary: data?.summary ?? null,
+    summary: effectiveData?.summary ?? null,
+    health: effectiveData?.health ?? null,
     kpiChips,
+    kpiCards,
     priorityItems,
     quickActions,
-    recentActivity: data?.recentActivity ?? [],
+    recentActivity: effectiveData?.recentActivity ?? [],
+    // When previewing with mock data, never surface the (real) load error.
     loading,
     refreshing,
-    error,
+    error: useMock ? null : error,
     refresh,
   };
 }

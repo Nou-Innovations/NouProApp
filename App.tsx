@@ -209,7 +209,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 // ========== Constants ==========
 
 /** Launch screen background color - must match app.json splash backgroundColor */
-const LAUNCH_BACKGROUND = '#000000';
+const LAUNCH_BACKGROUND = '#1A1714';
 
 // ========== Stack Navigators ==========
 
@@ -221,12 +221,12 @@ const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const navigationTheme: Theme = {
   dark: true,
   colors: {
-    primary: '#D23030',
-    background: '#000000',
-    card: '#000000',
+    primary: '#FF7A00',
+    background: '#1A1714',
+    card: '#1A1714',
     text: '#FFFFFF',
-    border: '#1E1E1E',
-    notification: '#D23030',
+    border: '#332E2A',
+    notification: '#FF7A00',
   },
 };
 
@@ -277,7 +277,7 @@ function AnimatedTabs() {
 
   return (
     // Surface-colored backdrop sits behind the card so the gaps revealed as it scales match the sidebar.
-    <View style={{ flex: 1, backgroundColor: '#F6F7F9' }}>
+    <View style={{ flex: 1, backgroundColor: appTheme.colors.surface }}>
       <Animated.View
         style={[
           {
@@ -312,7 +312,7 @@ function MainDrawerNavigator() {
         drawerPosition: 'left',
         swipeEnabled: true,
         swipeEdgeWidth: 60, // edge-swipe only — avoids conflicts with horizontal content
-        drawerStyle: { width: '80%', backgroundColor: '#F6F7F9' },
+        drawerStyle: { width: '80%', backgroundColor: '#FAF8F5' },
         overlayColor: 'transparent', // don't darken the home screen as the drawer opens
       }}
     >

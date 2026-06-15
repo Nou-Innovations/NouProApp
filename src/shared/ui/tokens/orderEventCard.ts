@@ -211,7 +211,7 @@ export interface StatusBadgeConfig {
 export const ORDER_EVENT_STATUS_CONFIG: Record<OrderEventStatus, StatusBadgeConfig> = {
   NEW: {
     label: 'New',
-    backgroundColor: '#EAF1FB',
+    backgroundColor: '#DBEAFE',
     textColor: '#2A75E6',
     icon: 'plus-circle',
     title: 'New Order Placed',
