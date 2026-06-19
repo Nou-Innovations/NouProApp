@@ -30,6 +30,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
+import { SectionTitle } from '@/shared/components/ui';
 import { getLocation, updateLocation } from '@/features/locations/locations.service';
 import type { BusinessLocation } from '@/shared/types/business';
 import type { RootStackParamList } from '@/shared/types/navigation';
@@ -531,9 +532,9 @@ export default function EditLocationScreen() {
             {/* Operating Mode (Enterprise only) */}
             {isEnterprise && (
               <View style={[styles.fieldContainer, styles.settingSection]}>
-                <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+                <SectionTitle style={{ marginBottom: 8 }}>
                   Advanced Settings
-                </Text>
+                </SectionTitle>
 
                 <View style={[styles.settingRow, { borderColor: appTheme.colors.borderColor }]}>
                   <View style={styles.settingInfo}>
@@ -850,11 +851,6 @@ const styles = StyleSheet.create({
   },
   settingSection: {
     marginTop: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.bold,
-    marginBottom: 8,
   },
   settingRow: {
     flexDirection: 'row',

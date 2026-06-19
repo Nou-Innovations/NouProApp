@@ -29,6 +29,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
+import { SectionTitle } from '@/shared/components/ui';
 import { createLocation } from '@/features/locations/locations.service';
 import { canUseIndependentLocations } from '@/shared/utils/permissions';
 
@@ -466,9 +467,9 @@ export default function AddLocationScreen() {
             {/* Operating Mode (Enterprise only) */}
             {isEnterprise && (
               <View style={styles.fieldContainer}>
-                <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+                <SectionTitle style={{ marginBottom: 8 }}>
                   Advanced Settings
-                </Text>
+                </SectionTitle>
 
                 <View style={[styles.settingRow, { borderColor: appTheme.colors.borderColor }]}>
                   <View style={styles.settingInfo}>
@@ -930,11 +931,6 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     fontSize: 16,
     fontFamily: theme.fonts.primary.semiBold,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.bold,
-    marginBottom: 8,
   },
   settingRow: {
     flexDirection: 'row',

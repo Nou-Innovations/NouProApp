@@ -18,7 +18,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
 import Avatar from '@/shared/components/ui/Avatar';
-import { AppModal } from '@/shared/components/ui';
+import { AppModal, SectionTitle } from '@/shared/components/ui';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import ImageUploadField from '@/shared/components/ui/ImageUploadField';
@@ -327,9 +327,9 @@ export default function EditPersonalProfileScreen() {
 
   const renderBasicSection = () => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+      <SectionTitle style={styles.sectionTitle}>
         Basic
-      </Text>
+      </SectionTitle>
 
       <AppTextField
         label="First Name"
@@ -410,9 +410,9 @@ export default function EditPersonalProfileScreen() {
 
   const renderPersonalInfoSection = () => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+      <SectionTitle style={styles.sectionTitle}>
         Personal Information
-      </Text>
+      </SectionTitle>
 
       {/* Phone Number */}
       <View style={styles.fieldSpacing}>
@@ -470,9 +470,9 @@ export default function EditPersonalProfileScreen() {
 
   const renderWorkExperiencesSection = () => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+      <SectionTitle style={styles.sectionTitle}>
         Work Experiences
-      </Text>
+      </SectionTitle>
 
       {userBusinesses.length === 0 ? (
         <Text style={[styles.emptyText, { color: appTheme.colors.textMuted }]}>
@@ -585,9 +585,9 @@ export default function EditPersonalProfileScreen() {
 
   const renderAccountSection = () => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+      <SectionTitle style={styles.sectionTitle}>
         Account
-      </Text>
+      </SectionTitle>
 
       <TouchableOpacity
         style={[styles.accountOption, { borderBottomColor: appTheme.colors.borderColor }]}
@@ -749,8 +749,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontFamily: theme.fonts.primary.bold,
     marginBottom: 20,
   },
   fieldSpacing: {

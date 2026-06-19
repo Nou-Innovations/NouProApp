@@ -45,6 +45,7 @@ export { DemoModeBadge } from './DemoModeBadge';
 
 // Typography
 export { Text, H1, H2, H3, H4, Caption, ButtonText, Label, BodyBold, BodyMedium } from './Typography';
+export { default as SectionTitle } from './SectionTitle';
 
 // Date & Time Selectors
 export { default as TimeSelector } from './TimeSelector';

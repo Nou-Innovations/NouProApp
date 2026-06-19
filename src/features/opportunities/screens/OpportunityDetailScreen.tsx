@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { EmptyState, ListItemCard } from '@/shared/components/ui';
+import { EmptyState, ListItemCard, SectionTitle } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -87,7 +87,7 @@ export default function OpportunityDetailScreen({ navigation, route }: Props) {
 
         {isOwner ? (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Responses ({responses.length})</Text>
+            <SectionTitle style={{ marginBottom: 10 }}>Responses ({responses.length})</SectionTitle>
             {responses.length === 0 ? (
               <Text style={[styles.meta, { color: appTheme.colors.textMuted }]}>No responses yet.</Text>
             ) : (
@@ -110,7 +110,7 @@ export default function OpportunityDetailScreen({ navigation, route }: Props) {
           </View>
         ) : (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Respond</Text>
+            <SectionTitle style={{ marginBottom: 10 }}>Respond</SectionTitle>
             <TextInput
               style={[
                 styles.input,
@@ -140,7 +140,6 @@ const styles = StyleSheet.create({
   bizName: { fontSize: 15, fontWeight: '600' },
   desc: { fontSize: 15, lineHeight: 22, marginTop: 16 },
   section: { marginTop: 24 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', marginBottom: 10 },
   input: { minHeight: 90, borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 15, textAlignVertical: 'top' },
   sendBtn: { marginTop: 12 },
 });

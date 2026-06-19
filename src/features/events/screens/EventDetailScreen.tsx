@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { EmptyState } from '@/shared/components/ui';
+import { EmptyState, SectionTitle } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -86,7 +86,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
 
         {isOrganizer ? (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Attendees</Text>
+            <SectionTitle style={{ marginBottom: 10 }}>Attendees</SectionTitle>
             <Text style={[styles.meta, { color: appTheme.colors.textMuted }]}>
               {counts.going} going · {counts.interested} interested
             </Text>
@@ -114,7 +114,6 @@ const styles = StyleSheet.create({
   bizName: { fontSize: 15, fontWeight: '600' },
   desc: { fontSize: 15, lineHeight: 22, marginTop: 16 },
   section: { marginTop: 24 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', marginBottom: 10 },
   interested: { marginTop: 14, alignItems: 'center' },
   interestedText: { fontSize: 15, fontWeight: '600' },
 });

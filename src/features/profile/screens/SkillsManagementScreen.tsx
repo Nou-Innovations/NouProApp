@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
+import { SectionTitle } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useProfileStore } from '@/shared/store/profileStore';
 import {
@@ -176,9 +177,9 @@ export default function SkillsManagementScreen() {
 
         {/* My Skills */}
         <View style={styles.mySkillsSection}>
-          <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+          <SectionTitle style={styles.sectionTitle}>
             My Skills ({mySkills.length}/50)
-          </Text>
+          </SectionTitle>
           {isLoading ? (
             <ActivityIndicator size="small" color={appTheme.colors.text} style={{ marginTop: 20 }} />
           ) : mySkills.length === 0 ? (
@@ -258,8 +259,6 @@ const styles = StyleSheet.create({
   },
   mySkillsSection: { marginTop: 24 },
   sectionTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.primary.bold,
     marginBottom: 12,
   },
   emptyText: {

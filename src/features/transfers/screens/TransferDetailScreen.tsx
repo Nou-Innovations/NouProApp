@@ -8,6 +8,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import Pill from '@/shared/components/ui/Pill';
+import { SectionTitle } from '@/shared/components/ui';
 import { Icon } from '@/shared/utils/icons';
 import { useProfileStore } from '@/shared/store/profileStore';
 import {
@@ -165,7 +166,7 @@ export default function TransferDetailScreen() {
 
         {/* Items */}
         <View style={[styles.card, { backgroundColor: appTheme.colors.cardBackground, borderColor: appTheme.colors.borderColor }]}>
-          <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Items ({items.length})</Text>
+          <SectionTitle style={{ marginBottom: 4 }}>Items ({items.length})</SectionTitle>
           {items.length === 0 ? (
             <Text style={[styles.meta, { color: appTheme.colors.textSecondary }]}>No items.</Text>
           ) : (
@@ -182,7 +183,7 @@ export default function TransferDetailScreen() {
         {/* Notes */}
         {!!transfer.notes && (
           <View style={[styles.card, { backgroundColor: appTheme.colors.cardBackground, borderColor: appTheme.colors.borderColor }]}>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Notes</Text>
+            <SectionTitle style={{ marginBottom: 4 }}>Notes</SectionTitle>
             <Text style={[styles.body, { color: appTheme.colors.textSecondary }]}>{transfer.notes}</Text>
           </View>
         )}
@@ -190,7 +191,7 @@ export default function TransferDetailScreen() {
         {/* Status history timeline */}
         {history.length > 0 && (
           <View style={[styles.card, { backgroundColor: appTheme.colors.cardBackground, borderColor: appTheme.colors.borderColor }]}>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>History</Text>
+            <SectionTitle style={{ marginBottom: 4 }}>History</SectionTitle>
             {history.map((h) => (
               <View key={h.id} style={styles.historyRow}>
                 <Icon name="checkmark-circle-outline" size={16} color={TRANSFER_STATUS_COLORS[h.to]} />
@@ -269,7 +270,6 @@ const styles = StyleSheet.create({
   locationText: { fontSize: 15, fontFamily: 'InterCustom-SemiBold', flexShrink: 1 },
   arrow: { marginHorizontal: 6 },
   meta: { fontSize: 14, fontFamily: 'InterCustom-Medium' },
-  sectionTitle: { fontSize: 16, fontFamily: 'InterCustom-SemiBold', marginBottom: 4 },
   body: { fontSize: 15, fontFamily: 'InterCustom-Regular', lineHeight: 21 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   itemName: { flex: 1, fontSize: 15, fontFamily: 'InterCustom-Medium' },

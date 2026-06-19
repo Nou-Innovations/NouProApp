@@ -47,6 +47,7 @@ const styles = StyleSheet.create({
   h2: { ...theme.typography.h2 },
   h3: { ...theme.typography.h3 },
   h4: { ...theme.typography.h4 },
+  sectionTitle: { ...theme.typography.sectionTitle },
   body: { ...theme.typography.body },
   bodyBold: { ...theme.typography.bodyBold },
   bodyMedium: { ...theme.typography.bodyMedium },

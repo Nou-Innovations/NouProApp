@@ -89,6 +89,8 @@ TypeScript and Babel are configured with:
 ### Styling
 NativeWind v4 (TailwindCSS for React Native). Dark theme is the default (`userInterfaceStyle: 'dark'`). Inter font family. `ThemeProvider` wraps the app for theme context.
 
+**Section titles** — Every section heading (the label above a content block or list section) MUST use the shared `SectionTitle` component (`src/shared/components/ui/SectionTitle.tsx`, exported from `@/shared/components/ui`) — Inter Bold, 18px, `colors.text`. Do not hand-roll a local `sectionTitle` style. Pass spacing (margins/padding) via the `style` prop; override color with the `color` prop. The underlying preset is `theme.typography.sectionTitle`.
+
 ### Environment Configuration
 Set via `EXPO_PUBLIC_APP_ENV` (dev/demo/prod). Frontend reads `EXPO_PUBLIC_API_URL` for the backend base URL. Backend requires `.env` with `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, email config, `CORS_ORIGIN`. See `backend/.env.example` for full list.
 

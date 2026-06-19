@@ -10,6 +10,7 @@ import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Icon } from '@/shared/utils/icons';
+import { SectionTitle } from '@/shared/components/ui';
 import { useDeliveries } from '@/features/deliveries/hooks/useDeliveries';
 import { useTransfers } from '@/features/transfers/hooks/useTransfers';
 import { useIssues } from '@/features/issues/hooks/useIssues';
@@ -62,7 +63,7 @@ export default function LogisticsOverviewScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={appTheme.colors.primary} />}
       >
-        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Overview</Text>
+        <SectionTitle style={{ marginTop: 12, marginBottom: 8 }}>Overview</SectionTitle>
         <View style={styles.kpiGrid}>
           {kpis.map((kpi) => (
             <TouchableOpacity
@@ -76,7 +77,7 @@ export default function LogisticsOverviewScreen() {
           ))}
         </View>
 
-        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Quick actions</Text>
+        <SectionTitle style={{ marginTop: 12, marginBottom: 8 }}>Quick actions</SectionTitle>
         <View style={styles.actionsRow}>
           {quickActions.map((a) => (
             <TouchableOpacity
@@ -90,7 +91,7 @@ export default function LogisticsOverviewScreen() {
           ))}
         </View>
 
-        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Jump to</Text>
+        <SectionTitle style={{ marginTop: 12, marginBottom: 8 }}>Jump to</SectionTitle>
         <View style={[styles.linkCard, { backgroundColor: appTheme.colors.cardBackground, borderColor: appTheme.colors.borderColor }]}>
           {[
             { label: 'All deliveries', icon: 'truck-outline', route: 'Deliveries' },
@@ -119,7 +120,6 @@ export default function LogisticsOverviewScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   content: { padding: 16, gap: 8 },
-  sectionTitle: { fontSize: 18, fontFamily: 'InterCustom-SemiBold', marginTop: 12, marginBottom: 8 },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   kpiCard: { flexBasis: '47%', flexGrow: 1, borderRadius: 14, borderWidth: 1, paddingVertical: 16, paddingHorizontal: 16 },
   kpiValue: { fontSize: 26, fontFamily: 'InterCustom-Bold' },

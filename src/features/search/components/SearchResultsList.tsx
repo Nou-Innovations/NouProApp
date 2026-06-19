@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
+import { SectionTitle } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 import { searchCompanies, searchUsers, CompanySearchResult, UserSearchResult } from '../search.service';
 
@@ -121,7 +122,7 @@ const SearchResultsList: React.FC<SearchResultsListProps> = ({
       {/* Messages Section */}
       {filteredChats.length > 0 && (
         <View>
-          <Text style={styles.sectionTitle}>Messages</Text>
+          <SectionTitle style={styles.sectionTitle}>Messages</SectionTitle>
           {filteredChats.map((item) => {
             const messageMatch = item.lastMessage.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -169,7 +170,7 @@ const SearchResultsList: React.FC<SearchResultsListProps> = ({
       {/* Companies Section */}
       {visibleCompanies.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Companies</Text>
+          <SectionTitle style={styles.sectionTitle}>Companies</SectionTitle>
           {visibleCompanies.map((company) => (
             <TouchableOpacity
               key={company.id}
@@ -197,7 +198,7 @@ const SearchResultsList: React.FC<SearchResultsListProps> = ({
       {/* Users Section */}
       {visibleUsers.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Users</Text>
+          <SectionTitle style={styles.sectionTitle}>Users</SectionTitle>
           {visibleUsers.map((user) => (
             <TouchableOpacity
               key={user.id}
@@ -234,9 +235,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1C1917',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#FAF8F5',

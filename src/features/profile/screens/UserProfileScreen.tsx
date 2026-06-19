@@ -11,7 +11,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { userAvatarService } from '@/shared/services/userAvatarService';
 import Avatar from '@/shared/components/ui/Avatar';
-import { AppBottomSheet, type AppBottomSheetItem } from '@/shared/components/ui';
+import { AppBottomSheet, SectionTitle, type AppBottomSheetItem } from '@/shared/components/ui';
 import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
 import { ProfileViewType, getProfileAdditionalOptions, getRelationshipAction } from '@/shared/types/profile';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -406,9 +406,9 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
 
     return (
       <View style={[styles.section, { backgroundColor: appTheme.colors.cardBackground }]}>
-        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+        <SectionTitle style={styles.sectionTitle}>
           Experience
-        </Text>
+        </SectionTitle>
 
         {user.experiences.map((exp, index) => (
           <TouchableOpacity
@@ -447,9 +447,9 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
 
     return (
       <View style={[styles.section, { backgroundColor: appTheme.colors.cardBackground }]}>
-        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+        <SectionTitle style={styles.sectionTitle}>
           About
-        </Text>
+        </SectionTitle>
 
         {user.email && (
           <View style={styles.aboutItem}>
@@ -490,9 +490,9 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
 
     return (
       <View style={[styles.section, { backgroundColor: appTheme.colors.cardBackground }]}>
-        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+        <SectionTitle style={styles.sectionTitle}>
           Other Details
-        </Text>
+        </SectionTitle>
         <View style={styles.aboutItem}>
           <Icon name="calendar-outline" size={20} color={appTheme.colors.textSecondary} />
           <View style={styles.aboutItemContent}>
@@ -683,8 +683,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   sectionTitle: {
-    fontSize: theme.fontSize.md,
-    fontFamily: theme.fonts.primary.bold,
     marginBottom: theme.spacing.sm,
   },
   // Experience section - matching PersonalProfileScreen

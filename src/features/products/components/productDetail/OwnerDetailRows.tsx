@@ -5,6 +5,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
+import { SectionTitle } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import {
@@ -34,7 +35,7 @@ const OwnerDetailRows: React.FC<Props> = ({ product, pricing, availability, supp
 
   return (
     <View style={[styles.section, { borderTopColor: appTheme.colors.borderColor }]}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Details</Text>
+      <SectionTitle style={styles.sectionTitle}>Details</SectionTitle>
 
       {product.sku && (
         <Row label="SKU">
@@ -139,8 +140,6 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   sectionTitle: {
-    fontSize: 17,
-    fontFamily: theme.fonts.primary.semiBold,
     marginBottom: 14,
   },
   row: {

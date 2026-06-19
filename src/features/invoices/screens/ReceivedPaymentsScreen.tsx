@@ -16,7 +16,7 @@ import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { Icon } from '@/shared/utils/icons';
 import { format } from 'date-fns';
 import AppButton from '@/shared/components/ui/AppButton';
-import { DateSelector } from '@/shared/components/ui';
+import { DateSelector, SectionTitle } from '@/shared/components/ui';
 import { recordInvoicePayments } from '../invoices.service';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { formatInvoiceCurrency } from '@/shared/types/invoice';
@@ -165,7 +165,7 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
         {/* Payments List */}
         {payments.length > 0 && (
           <View style={[styles.paymentsSection, { backgroundColor: theme.colors.cardBackground }]}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Payment History</Text>
+            <SectionTitle style={{ marginBottom: 12 }}>Payment History</SectionTitle>
             {payments.map((payment, index) => (
               <View 
                 key={payment.id} 
@@ -341,11 +341,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 12,
     padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
   },
   paymentItem: {
     flexDirection: 'row',

@@ -13,7 +13,7 @@ import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { AppSearchBar, StaffCard, StaffMember, StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard, EmptyState } from '@/shared/components/ui';
+import { AppSearchBar, StaffCard, StaffMember, StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard, EmptyState, SectionTitle } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import LocationDropdown from '@/shared/components/ui/LocationDropdown';
 import theme from '@/shared/theme';
@@ -526,9 +526,9 @@ export default function TeamManagementScreen() {
               {(activeTab === 'all' || activeTab === 'pending') && joinRequests.length > 0 && (
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+                    <SectionTitle>
                       Join Requests
-                    </Text>
+                    </SectionTitle>
                   </View>
                   
                   <View style={styles.sectionContent}>
@@ -577,9 +577,9 @@ export default function TeamManagementScreen() {
               {(activeTab === 'all' || activeTab === 'pending') && pendingInvites.length > 0 && (
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+                    <SectionTitle>
                       Pending Invites
-                    </Text>
+                    </SectionTitle>
                   </View>
                   
                   <View style={styles.sectionContent}>
@@ -618,9 +618,9 @@ export default function TeamManagementScreen() {
               {(activeTab === 'all' || activeTab === 'staff') && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+                  <SectionTitle>
                     Staff List
-                  </Text>
+                  </SectionTitle>
                 </View>
                 
                 <View style={styles.sectionContent}>
@@ -802,10 +802,6 @@ const styles = StyleSheet.create({
     paddingBottom: 16, // 16px gap before first card
     paddingHorizontal: 12,
     gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: 'InterCustom-Bold',
   },
   sectionContent: {
     width: '100%',

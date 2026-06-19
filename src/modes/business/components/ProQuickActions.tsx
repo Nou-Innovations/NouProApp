@@ -14,7 +14,7 @@ import {
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { Skeleton } from '@/shared/components/ui';
+import { Skeleton, SectionTitle } from '@/shared/components/ui';
 
 export interface QuickAction {
   id: string;
@@ -34,7 +34,7 @@ export function ProQuickActions({ actions, isLoading }: ProQuickActionsProps) {
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Quick actions</Text>
+      <SectionTitle style={styles.sectionTitle}>Quick actions</SectionTitle>
       <View style={styles.row}>
         {isLoading
           ? [0, 1, 2, 3].map((i) => (
@@ -69,8 +69,6 @@ export function ProQuickActions({ actions, isLoading }: ProQuickActionsProps) {
 const styles = StyleSheet.create({
   container: {},
   sectionTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.primary.bold,
     marginBottom: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
   },

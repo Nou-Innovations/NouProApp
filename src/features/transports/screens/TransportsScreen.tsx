@@ -22,7 +22,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { AppSearchBar, Avatar, AppButton, EmptyState } from '@/shared/components/ui';
+import { AppSearchBar, Avatar, AppButton, EmptyState, SectionTitle } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
@@ -510,9 +510,9 @@ export default function TransportsScreen() {
               {activeTransports.length > 0 && (
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+                    <SectionTitle>
                       Active Fleet ({activeTransports.length})
-                    </Text>
+                    </SectionTitle>
                   </View>
                   <View style={styles.sectionContent}>
                     {activeTransports.map((transport, index) => (
@@ -533,9 +533,9 @@ export default function TransportsScreen() {
               {maintenanceTransports.length > 0 && (
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+                    <SectionTitle>
                       In Maintenance ({maintenanceTransports.length})
-                    </Text>
+                    </SectionTitle>
                   </View>
                   <View style={styles.sectionContent}>
                     {maintenanceTransports.map((transport, index) => (
@@ -556,9 +556,9 @@ export default function TransportsScreen() {
               {inactiveTransports.length > 0 && (
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: appTheme.colors.textMuted }]}>
+                    <SectionTitle color={appTheme.colors.textMuted}>
                       Inactive ({inactiveTransports.length})
-                    </Text>
+                    </SectionTitle>
                   </View>
                   <View style={styles.sectionContent}>
                     {inactiveTransports.map((transport, index) => (
@@ -1029,10 +1029,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 16,
     gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.primary.bold,
   },
   sectionContent: {},
   // Transport Card Styles

@@ -24,9 +24,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+import theme from '@/shared/theme';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { EmptyState, ExploreChips } from '@/shared/components/ui';
+import { EmptyState, ExploreChips, SectionTitle } from '@/shared/components/ui';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import BusinessListCard from '@/features/profile/components/BusinessListCard';
 import { useExploreDiscovery } from '@/features/explore';
@@ -84,7 +85,7 @@ export default function BusinessExploreScreen() {
   // ---- renderers ----
   const SectionHeader = ({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) => (
     <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>{title}</Text>
+      <SectionTitle>{title}</SectionTitle>
       {onSeeAll && (
         <TouchableOpacity onPress={onSeeAll} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={[styles.seeAll, { color: appTheme.colors.primary }]}>See all</Text>
@@ -110,11 +111,14 @@ export default function BusinessExploreScreen() {
 
   const renderProductCard = ({ item }: { item: UIProduct }) => (
     <TouchableOpacity
-      style={[styles.productCard, { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.borderColor }]}
+      style={styles.productCard}
       onPress={() => goProduct(item.id)}
       activeOpacity={0.85}
     >
-      <Image source={{ uri: item.productPicture || 'https://via.placeholder.com/140' }} style={styles.productImg} />
+      <Image
+        source={{ uri: item.productPicture || 'https://via.placeholder.com/140' }}
+        style={[styles.productImg, { backgroundColor: appTheme.colors.imagePlaceholder }]}
+      />
       <Text numberOfLines={1} style={[styles.productName, { color: appTheme.colors.text }]}>{item.name}</Text>
       <Text numberOfLines={1} style={[styles.productMeta, { color: appTheme.colors.textMuted }]}>{item.brand || ''}</Text>
       <Text numberOfLines={1} style={[styles.productPrice, { color: appTheme.colors.primary }]}>
@@ -373,16 +377,12 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginBottom: 6,
   },
-  sectionTitle: { fontSize: 17, fontWeight: '700' },
   seeAll: { fontSize: 14, fontWeight: '600' },
   hList: { paddingHorizontal: 12, gap: 12, paddingVertical: 4 },
   productCard: {
     width: 150,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 10,
   },
-  productImg: { width: '100%', height: 110, borderRadius: 8, marginBottom: 8, backgroundColor: '#FAF8F5' },
+  productImg: { width: '100%', aspectRatio: 3 / 4, borderRadius: 12, marginBottom: 8 },
   productRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -391,8 +391,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   productRowImg: { width: 56, height: 56, borderRadius: 8, backgroundColor: '#FAF8F5' },
-  productName: { fontSize: 14, fontWeight: '600' },
-  productMeta: { fontSize: 12, marginTop: 2 },
-  productPrice: { fontSize: 13, fontWeight: '700', marginTop: 4 },
+  productName: { fontFamily: theme.fonts.primary.semiBold, fontSize: 14 },
+  productMeta: { fontFamily: theme.fonts.primary.regular, fontSize: 12, marginTop: 2 },
+  productPrice: { fontFamily: theme.fonts.primary.semiBold, fontSize: 14, marginTop: 4 },
   comingSoon: { paddingVertical: 8 },
 });

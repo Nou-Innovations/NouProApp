@@ -23,7 +23,7 @@ import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNotifications } from '@/shared/context/NotificationContext';
-import { AppModal } from '@/shared/components/ui';
+import { AppModal, SectionTitle } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import invoicesService, { Invoice, convertEstimateToInvoice, deleteInvoice } from '../invoices.service';
 import { formatInvoiceCurrency, InvoiceStatus } from '@/shared/types/invoice';
@@ -757,9 +757,9 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
           <View style={[styles.section, { backgroundColor: theme.colors.cardBackground }]}>
             {notes && (
               <View style={styles.notesSection}>
-                <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>
+                <SectionTitle style={{ marginBottom: 8 }}>
                   Notes
-                </Text>
+                </SectionTitle>
                 <Text style={[styles.sectionContent, { color: theme.colors.secondary }]}>
                   {notes}
                 </Text>
@@ -767,9 +767,9 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
             )}
             {terms && (
               <View style={styles.termsSection}>
-                <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>
+                <SectionTitle style={{ marginBottom: 8 }}>
                   Terms & Conditions
-                </Text>
+                </SectionTitle>
                 <Text style={[styles.sectionContent, { color: theme.colors.secondary }]}>
                   {terms}
                 </Text>
@@ -781,9 +781,9 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
         {/* 6. Activity Log */}
         {activityLog.length > 0 && (
           <View style={[styles.section, { backgroundColor: theme.colors.cardBackground }]}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>
+            <SectionTitle style={{ marginBottom: 8 }}>
               Activity
-            </Text>
+            </SectionTitle>
             {activityLog.map((entry, i) => (
               <View key={i} style={styles.activityEntry}>
                 <Text style={[styles.activityTimestamp, { color: theme.colors.secondary }]}>
@@ -1296,11 +1296,6 @@ const styles = StyleSheet.create({
   },
   termsSection: {
     marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
   },
   sectionContent: {
     fontSize: 14,

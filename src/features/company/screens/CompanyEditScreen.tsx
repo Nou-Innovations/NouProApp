@@ -20,7 +20,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AppButton from '@/shared/components/ui/AppButton';
-import { AppBottomSheet, AppModal, ListItemCard } from '@/shared/components/ui';
+import { AppBottomSheet, AppModal, ListItemCard, SectionTitle } from '@/shared/components/ui';
 import ImageUploadField from '@/shared/components/ui/ImageUploadField';
 import { imageService, uploadImage } from '@/shared/services/imageService';
 import { BUSINESS_CATEGORIES, getCategoryLabel, getCategoryById } from '@/shared/constants/categories';
@@ -571,9 +571,9 @@ export default function CompanyEditScreen() {
 
   const renderBasicSection = () => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+      <SectionTitle style={{ marginBottom: 20 }}>
         Basic Information
-      </Text>
+      </SectionTitle>
 
       <View style={styles.infoItem}>
         <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Business Name</Text>
@@ -691,9 +691,9 @@ export default function CompanyEditScreen() {
 
   const renderContactSection = () => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+      <SectionTitle style={{ marginBottom: 20 }}>
         Contact Information
-      </Text>
+      </SectionTitle>
 
       <View style={styles.infoItem}>
         <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Email</Text>
@@ -775,9 +775,9 @@ export default function CompanyEditScreen() {
 
   const renderBusinessHoursSection = () => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+      <SectionTitle style={{ marginBottom: 20 }}>
         Business Hours
-      </Text>
+      </SectionTitle>
       
       {businessHours.map((hour, dayIndex) => (
         <View key={hour.day} style={[styles.hourRow, { borderBottomColor: appTheme.colors.borderColor }]}>
@@ -842,9 +842,9 @@ export default function CompanyEditScreen() {
 
   const renderInvoiceSettingsSection = () => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+      <SectionTitle style={{ marginBottom: 20 }}>
         Invoice Settings
-      </Text>
+      </SectionTitle>
 
       <View style={styles.infoItem}>
         <Text style={[styles.infoLabel, { color: appTheme.colors.textSecondary }]}>Currency</Text>
@@ -1245,11 +1245,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 8,
     marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontFamily: theme.fonts.primary.bold,
-    marginBottom: 20,
   },
   infoItem: {
     marginBottom: 16,

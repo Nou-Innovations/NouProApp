@@ -23,6 +23,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { SectionTitle } from '@/shared/components/ui';
 import ProcurementStatusBadge from '../components/ProcurementStatusBadge';
 import type {
   PurchaseOrder,
@@ -197,7 +198,7 @@ export default function PurchaseOrderDetailScreen() {
         </TouchableOpacity>
 
         {/* Items list */}
-        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Items</Text>
+        <SectionTitle style={{ marginBottom: 8 }}>Items</SectionTitle>
         <View style={[styles.card, { backgroundColor: appTheme.colors.cardBackground, borderColor: appTheme.colors.borderColor }]}>
           {po.items.map((item, idx) => (
             <View key={idx} style={[styles.itemRow, idx < po.items.length - 1 && { borderBottomWidth: 1, borderBottomColor: appTheme.colors.borderColor }]}>
@@ -224,7 +225,7 @@ export default function PurchaseOrderDetailScreen() {
         {/* Notes */}
         {!!po.notes && (
           <>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Notes</Text>
+            <SectionTitle style={{ marginBottom: 8 }}>Notes</SectionTitle>
             <View style={[styles.card, { backgroundColor: appTheme.colors.cardBackground, borderColor: appTheme.colors.borderColor }]}>
               <Text style={[styles.notesText, { color: appTheme.colors.text }]}>{po.notes}</Text>
             </View>
@@ -294,7 +295,7 @@ export default function PurchaseOrderDetailScreen() {
         {/* Status history timeline */}
         {history.length > 0 && (
           <>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.text, marginTop: 8 }]}>Status History</Text>
+            <SectionTitle style={{ marginBottom: 8, marginTop: 8 }}>Status History</SectionTitle>
             <View style={[styles.card, { backgroundColor: appTheme.colors.cardBackground, borderColor: appTheme.colors.borderColor }]}>
               {history.map((entry, idx) => (
                 <View key={entry.id} style={styles.timelineEntry}>
@@ -361,8 +362,6 @@ const styles = StyleSheet.create({
 
   supplierRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   supplierName: { fontSize: 16, fontWeight: '600' },
-
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
 
   itemRow: {
     flexDirection: 'row',

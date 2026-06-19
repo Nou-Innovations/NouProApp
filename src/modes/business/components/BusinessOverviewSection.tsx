@@ -14,7 +14,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { Skeleton } from '@/shared/components/ui';
+import { Skeleton, SectionTitle } from '@/shared/components/ui';
 import { formatCurrency } from '@/shared/utils/format';
 import { StatusDonut, type DonutSegment } from '@/features/deliveries/components/charts';
 import type { BusinessOverview, OverviewRange } from '@/features/business';
@@ -68,7 +68,7 @@ export function BusinessOverviewSection({
   return (
     <View style={styles.section}>
       <View style={styles.headerRow}>
-        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Business Overview</Text>
+        <SectionTitle>Business Overview</SectionTitle>
         <RangeControl range={range} onChange={onRangeChange} canExtend={canExtend} onLockedPress={onUpgrade} />
       </View>
 
@@ -201,9 +201,9 @@ function BusinessOverviewLocked({ onUpgrade }: { onUpgrade: () => void }) {
   const { theme: appTheme } = useTheme();
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, styles.lockedSectionTitle, { color: appTheme.colors.text }]}>
+      <SectionTitle style={styles.lockedSectionTitle}>
         Business Overview
-      </Text>
+      </SectionTitle>
       <View
         style={[styles.lockedCard, { backgroundColor: appTheme.colors.surface }]}
       >
@@ -235,10 +235,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.primary.bold,
   },
   lockedSectionTitle: {
     paddingHorizontal: theme.spacing.md,

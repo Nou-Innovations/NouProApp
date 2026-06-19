@@ -91,6 +91,13 @@ export const typography = {
     fontSize: fontSize.md,
     lineHeight: lineHeight.md,
   },
+  // Section title — the label above a content block or list section.
+  // Single source of truth for section headings across the whole app.
+  sectionTitle: {
+    fontFamily: fonts.primary.bold,
+    fontSize: fontSize.md,      // 18
+    lineHeight: lineHeight.md,  // 28
+  },
   body: {
     fontFamily: fonts.primary.regular,
     fontSize: fontSize.base,

@@ -22,7 +22,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { Icon } from '@/shared/utils/icons';
-import { Skeleton, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
+import { Skeleton, SkeletonRow, SkeletonColumn, SectionTitle } from '@/shared/components/ui';
 import { canCreateProcurementOrders, checkPaywall, PaywallCheck } from '@/shared/utils/permissions';
 import { usePurchaseOrders } from '../hooks/usePurchaseOrders';
 import { usePurchaseRequests } from '../hooks/usePurchaseRequests';
@@ -187,9 +187,9 @@ export default function ProcurementDashboardScreen() {
         {/* ── Recent Purchase Orders ── */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+            <SectionTitle>
               Recent Purchase Orders
-            </Text>
+            </SectionTitle>
             <TouchableOpacity onPress={() => (navigation as any).navigate('PurchaseOrders')}>
               <Text style={[styles.viewAllText, { color: appTheme.colors.info }]}>View All</Text>
             </TouchableOpacity>
@@ -242,9 +242,9 @@ export default function ProcurementDashboardScreen() {
         {/* ── Pending Requests ── */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+            <SectionTitle>
               Pending Requests
-            </Text>
+            </SectionTitle>
             <TouchableOpacity onPress={() => (navigation as any).navigate('PurchaseRequests')}>
               <Text style={[styles.viewAllText, { color: appTheme.colors.info }]}>View All</Text>
             </TouchableOpacity>
@@ -298,9 +298,9 @@ export default function ProcurementDashboardScreen() {
         {/* ── Suppliers ── */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+            <SectionTitle>
               Suppliers
-            </Text>
+            </SectionTitle>
             <TouchableOpacity onPress={() => (navigation as any).navigate('Suppliers')}>
               <Text style={[styles.viewAllText, { color: appTheme.colors.info }]}>View All</Text>
             </TouchableOpacity>
@@ -422,10 +422,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
   },
   viewAllText: {
     fontSize: 14,

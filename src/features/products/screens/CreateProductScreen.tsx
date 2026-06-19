@@ -13,6 +13,7 @@ import { RootStackParamList } from 'App';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppButton from '@/shared/components/ui/AppButton';
 import AppTextField from '@/shared/components/ui/AppTextField';
+import { SectionTitle } from '@/shared/components/ui';
 import { UIProductStatus as ProductStatus } from '@/shared/types/product';
 import ImagePlaceholder from '@/shared/components/ui/ImagePlaceholder';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -416,7 +417,7 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
           />
 
           {/* Additional Product Details Section */}
-          <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Additional Details (Optional)</Text>
+          <SectionTitle style={styles.sectionTitle}>Additional Details (Optional)</SectionTitle>
 
           <AppTextField
             label="SKU"
@@ -586,8 +587,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
     marginTop: 8,
     marginBottom: 16,
   },

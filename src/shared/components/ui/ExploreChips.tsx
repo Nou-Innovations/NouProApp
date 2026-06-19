@@ -53,7 +53,7 @@ export default function ExploreChips({ chips, selected, onSelect, style }: Explo
 
 const styles = StyleSheet.create({
   container: { flexGrow: 0 },
-  content: { paddingHorizontal: 12, gap: 8, paddingVertical: 6 },
+  content: { paddingHorizontal: 12, gap: 8, paddingVertical: 8, alignItems: 'center' },
   chip: {
     height: 34,
     paddingHorizontal: 14,

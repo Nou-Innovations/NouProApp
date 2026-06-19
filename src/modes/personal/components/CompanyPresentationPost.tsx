@@ -16,6 +16,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import Avatar from '@/shared/components/ui/Avatar';
+import { SectionTitle } from '@/shared/components/ui';
 import { timeAgo } from '@/shared/utils/timeAgo';
 
 const BRAND_CARD_WIDTH = 160;
@@ -165,10 +166,10 @@ export function CompanyPresentationPost({
         {createdAt ? timeAgo(createdAt) : timestamp}
       </Text>
 
-      {/* Section Title - 14px Medium primary */}
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+      {/* Section Title */}
+      <SectionTitle style={styles.sectionTitle}>
         Brands in Store
-      </Text>
+      </SectionTitle>
 
       {/* Brands Carousel */}
       <ScrollView
@@ -243,10 +244,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.xs,
   },
-  // Section Title - 14px Medium primary
+  // Section Title spacing
   sectionTitle: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
     paddingHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.sm,
   },

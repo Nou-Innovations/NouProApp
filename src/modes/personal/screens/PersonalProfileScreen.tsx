@@ -27,7 +27,7 @@ import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import Avatar from '@/shared/components/ui/Avatar';
-import { AppModal } from '@/shared/components/ui';
+import { AppModal, SectionTitle } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { imageService } from '@/shared/services/imageService';
 
@@ -388,9 +388,9 @@ export default function PersonalProfileScreen() {
 
     return (
       <View style={[styles.section, { backgroundColor: appTheme.colors.cardBackground }]}>
-        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+        <SectionTitle style={styles.sectionTitle}>
           Experience
-        </Text>
+        </SectionTitle>
 
         {userBusinesses.map((ub, index) => (
           <TouchableOpacity
@@ -439,9 +439,9 @@ export default function PersonalProfileScreen() {
 
     return (
       <View style={[styles.section, { backgroundColor: appTheme.colors.cardBackground }]}>
-        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+        <SectionTitle style={styles.sectionTitle}>
           About
-        </Text>
+        </SectionTitle>
 
         {currentUser?.email && (
           <View style={styles.aboutItem}>
@@ -925,8 +925,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   sectionTitle: {
-    fontSize: theme.fontSize.md,
-    fontFamily: theme.fonts.primary.bold,
     marginBottom: theme.spacing.sm,
   },
   experienceCard: {

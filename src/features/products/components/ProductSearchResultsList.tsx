@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
+import { SectionTitle } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 import type { UIProduct } from '@/shared/types/product';
 
@@ -117,7 +118,7 @@ const ProductSearchResultsList: React.FC<ProductSearchResultsListProps> = ({
       {/* My Products Section */}
       {filteredMyProducts.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My Products</Text>
+          <SectionTitle style={styles.sectionTitle}>My Products</SectionTitle>
           {filteredMyProducts.map((product) => (
             <TouchableOpacity
               key={product.id}
@@ -154,7 +155,7 @@ const ProductSearchResultsList: React.FC<ProductSearchResultsListProps> = ({
       {/* My Brands Section */}
       {filteredMyBrands.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My Brands</Text>
+          <SectionTitle style={styles.sectionTitle}>My Brands</SectionTitle>
           {filteredMyBrands.map((brand) => (
             <TouchableOpacity
               key={brand.name}
@@ -186,7 +187,7 @@ const ProductSearchResultsList: React.FC<ProductSearchResultsListProps> = ({
       {/* All Products Section */}
       {filteredAllProducts.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>All Products</Text>
+          <SectionTitle style={styles.sectionTitle}>All Products</SectionTitle>
           {filteredAllProducts.map((product) => (
             <TouchableOpacity
               key={product.id}
@@ -223,7 +224,7 @@ const ProductSearchResultsList: React.FC<ProductSearchResultsListProps> = ({
       {/* All Brands Section */}
       {filteredAllBrands.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>All Brands</Text>
+          <SectionTitle style={styles.sectionTitle}>All Brands</SectionTitle>
           {filteredAllBrands.map((brand) => (
             <TouchableOpacity
               key={brand.name}
@@ -264,9 +265,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1C1917',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#FAF8F5',

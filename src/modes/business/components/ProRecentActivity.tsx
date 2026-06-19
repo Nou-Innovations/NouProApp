@@ -12,7 +12,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { Skeleton, SkeletonColumn } from '@/shared/components/ui';
+import { Skeleton, SkeletonColumn, SectionTitle } from '@/shared/components/ui';
 import { RootStackParamList } from '@/shared/types/navigation';
 import { formatActivityTime, type ActivityItem } from '@/features/business';
 
@@ -68,7 +68,7 @@ export function ProRecentActivity({
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Recent Activities</Text>
+      <SectionTitle>Recent Activities</SectionTitle>
       {onSeeAll && (
         <TouchableOpacity onPress={onSeeAll} activeOpacity={0.7} style={styles.seeAllRow}>
           <Text style={[styles.seeAllText, { color: appTheme.colors.primary }]}>See all</Text>
@@ -174,10 +174,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.primary.bold,
   },
   seeAllRow: {
     flexDirection: 'row',

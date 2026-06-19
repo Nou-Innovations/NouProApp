@@ -23,6 +23,7 @@ import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { get } from '@/shared/services/api';
 import Avatar from '@/shared/components/ui/Avatar';
+import { SectionTitle } from '@/shared/components/ui';
 import type { RootStackParamList } from '@/shared/types/navigation';
 import {
   type Delivery,
@@ -237,9 +238,9 @@ export default function PersonalDeliveryDetailScreen() {
 
         {/* Delivery Information */}
         <View style={[styles.section, { backgroundColor: appTheme.colors.cardBackground }]}>
-          <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+          <SectionTitle style={styles.sectionTitle}>
             Delivery Information
-          </Text>
+          </SectionTitle>
 
           <View style={[styles.infoRow, { borderBottomColor: appTheme.colors.borderColor }]}>
             <View style={[styles.infoIcon, { backgroundColor: appTheme.colors.inputBackground }]}>
@@ -307,9 +308,9 @@ export default function PersonalDeliveryDetailScreen() {
         {/* Products */}
         {items.length > 0 && (
           <View style={[styles.section, { backgroundColor: appTheme.colors.cardBackground }]}>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+            <SectionTitle style={styles.sectionTitle}>
               Products ({items.length})
-            </Text>
+            </SectionTitle>
 
             {items.map((product, index) => (
               <View
@@ -434,8 +435,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.medium,
   },
   sectionTitle: {
-    fontSize: theme.fontSize.md,
-    fontFamily: theme.fonts.primary.bold,
     marginBottom: theme.spacing.md,
   },
   infoRow: {

@@ -21,7 +21,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { AppSearchBar, AppButton, ListItemCard } from '@/shared/components/ui';
+import { AppSearchBar, AppButton, ListItemCard, SectionTitle } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import { deleteLocation, getLocations } from '@/features/locations/locations.service';
@@ -314,9 +314,9 @@ export default function LocationsScreen() {
                   {primaryLocation && (
                     <View style={styles.section}>
                       <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+                        <SectionTitle>
                           Primary Location
-                        </Text>
+                        </SectionTitle>
                       </View>
                       <View style={styles.sectionContent}>
                         <LocationCard
@@ -335,9 +335,9 @@ export default function LocationsScreen() {
                   {otherLocations.length > 0 && (
                     <View style={styles.section}>
                       <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
+                        <SectionTitle>
                           Other Locations ({otherLocations.length})
-                        </Text>
+                        </SectionTitle>
                       </View>
                       <View style={styles.sectionContent}>
                         {otherLocations.map((location, index) => (
@@ -490,10 +490,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 16,
     gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.primary.bold,
   },
   sectionContent: {},
   // Bottom Sheet Styles - matching About section from UserProfileScreen

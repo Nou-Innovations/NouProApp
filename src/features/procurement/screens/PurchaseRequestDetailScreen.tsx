@@ -22,6 +22,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { SectionTitle } from '@/shared/components/ui';
 import ProcurementStatusBadge from '../components/ProcurementStatusBadge';
 import type { PurchaseRequest } from '@/shared/types/procurement';
 import * as procurementService from '../services/procurement.service';
@@ -168,7 +169,7 @@ export default function PurchaseRequestDetailScreen() {
         </View>
 
         {/* Items list */}
-        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Items</Text>
+        <SectionTitle style={{ marginBottom: 8 }}>Items</SectionTitle>
         <View style={[styles.card, { backgroundColor: appTheme.colors.cardBackground, borderColor: appTheme.colors.borderColor }]}>
           {pr.items.map((item, idx) => (
             <View key={idx} style={[styles.itemRow, idx < pr.items.length - 1 && { borderBottomWidth: 1, borderBottomColor: appTheme.colors.borderColor }]}>
@@ -194,7 +195,7 @@ export default function PurchaseRequestDetailScreen() {
         {/* Notes */}
         {!!pr.notes && (
           <>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Notes</Text>
+            <SectionTitle style={{ marginBottom: 8 }}>Notes</SectionTitle>
             <View style={[styles.card, { backgroundColor: appTheme.colors.cardBackground, borderColor: appTheme.colors.borderColor }]}>
               <Text style={[styles.notesText, { color: appTheme.colors.text }]}>{pr.notes}</Text>
             </View>
@@ -204,7 +205,7 @@ export default function PurchaseRequestDetailScreen() {
         {/* Rejection reason */}
         {pr.status === 'REJECTED' && !!pr.rejectionReason && (
           <>
-            <Text style={[styles.sectionTitle, { color: appTheme.colors.error }]}>Rejection Reason</Text>
+            <SectionTitle style={{ marginBottom: 8 }} color={appTheme.colors.error}>Rejection Reason</SectionTitle>
             <View style={[styles.card, { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}>
               <Text style={[styles.notesText, { color: appTheme.colors.error }]}>{pr.rejectionReason}</Text>
             </View>
@@ -281,8 +282,6 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 16,
   },
-
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
 
   itemRow: {
     flexDirection: 'row',
