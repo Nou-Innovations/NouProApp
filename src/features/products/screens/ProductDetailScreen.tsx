@@ -43,6 +43,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from 'App';
 import { Icon } from '@/shared/utils/icons';
+import { AppButton } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -920,23 +921,13 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               </View>
             </View>
           ) : (
-            /* Business Buyer Mode: Order button (client-stocked → "Reorder") */
-            <TouchableOpacity
-              style={[
-                styles.orderButton,
-                { backgroundColor: availability.isOutOfStock ? appTheme.colors.surface : appTheme.colors.primary }
-              ]}
+            /* Business Buyer Mode: primary Order / Reorder button */
+            <AppButton
+              title={availability.isOutOfStock ? 'Out of Stock' : isClientStocked ? 'Reorder' : 'Order'}
+              variant="primary"
               onPress={handleOrderPress}
-              activeOpacity={0.8}
               disabled={availability.isOutOfStock}
-            >
-              <Text style={[
-                styles.orderButtonText,
-                { color: availability.isOutOfStock ? appTheme.colors.textMuted : '#FFFFFF' }
-              ]}>
-                {availability.isOutOfStock ? 'Out of Stock' : isClientStocked ? 'Reorder' : 'Order'}
-              </Text>
-            </TouchableOpacity>
+            />
           )}
         </View>
       )}
@@ -1241,16 +1232,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
     gap: 8,
-  },
-  orderButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 14,
-  },
-  orderButtonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
   },
   orderFlowContainer: {
     alignItems: 'center',

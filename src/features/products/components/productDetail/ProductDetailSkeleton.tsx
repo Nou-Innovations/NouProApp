@@ -17,7 +17,8 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_HEIGHT = SCREEN_WIDTH * (4 / 3);
 const SHEET_OVERLAP = 24;
-const MINI_CARD = 132;
+const MINI_CARD = 160;
+const MINI_IMG_H = 180;
 
 /** One "More from…" section as a skeleton: title bar + a row of card skeletons. */
 export function RelatedRowSkeleton({ isLast }: { isLast?: boolean }) {
@@ -34,9 +35,10 @@ export function RelatedRowSkeleton({ isLast }: { isLast?: boolean }) {
       <View style={styles.cardRow}>
         {[0, 1, 2].map((i) => (
           <View key={i} style={styles.card}>
-            <Skeleton width={MINI_CARD} height={MINI_CARD} borderRadius={16} style={{ marginBottom: 10 }} />
-            <Skeleton width="90%" height={13} style={{ marginBottom: 6 }} />
-            <Skeleton width={60} height={13} />
+            <Skeleton width={MINI_CARD} height={MINI_IMG_H} borderRadius={12} style={{ marginBottom: 8 }} />
+            <Skeleton width="90%" height={16} style={{ marginBottom: 6 }} />
+            <Skeleton width="50%" height={13} style={{ marginBottom: 6 }} />
+            <Skeleton width={60} height={16} />
           </View>
         ))}
       </View>
