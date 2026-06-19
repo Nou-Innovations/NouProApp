@@ -174,6 +174,10 @@ export interface ViewerStockInfo {
   alreadyStocked: boolean;
   /** The viewer's own remaining stock of the product. */
   stockQuantity?: number;
+  /** ISO date of the viewer's most recent order containing this product. */
+  lastOrderedAt?: string;
+  /** Total quantity the viewer has ordered of this product. */
+  totalOrdered?: number;
   /** Whether the viewer lists this product in their own store. */
   isListed?: boolean;
   /** The viewer's own product id (their copy), used to toggle listing / reorder. */

@@ -215,6 +215,8 @@ function transformToDTO(
     ? {
         alreadyStocked: !!apiProduct.viewerStock.alreadyStocked,
         stockQuantity: apiProduct.viewerStock.stockQuantity,
+        lastOrderedAt: apiProduct.viewerStock.lastOrderedAt,
+        totalOrdered: apiProduct.viewerStock.totalOrdered,
         isListed: apiProduct.viewerStock.isListed,
         clientProductId: apiProduct.viewerStock.clientProductId,
       }
@@ -782,6 +784,8 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 dto.viewerStock.stockQuantity <= (availability.minStockAlert ?? 5) &&
                 dto.viewerStock.stockQuantity > 0
               }
+              lastOrderedAt={dto.viewerStock?.lastOrderedAt}
+              totalOrdered={dto.viewerStock?.totalOrdered}
               isListed={dto.viewerStock?.isListed}
               canManage={!!dto.viewerStock?.clientProductId}
               onToggleListing={handleToggleListing}
@@ -1030,7 +1034,14 @@ function createMockProduct(productId: string, activeCompanyId: string | null): P
     seller,
     viewerContext,
     viewerStock: isStockedClient
-      ? { alreadyStocked: true, stockQuantity: 8, isListed: true, clientProductId: 'stk-client-copy' }
+      ? {
+          alreadyStocked: true,
+          stockQuantity: 8,
+          lastOrderedAt: '2026-06-12T10:00:00.000Z',
+          totalOrdered: 24,
+          isListed: true,
+          clientProductId: 'stk-client-copy',
+        }
       : undefined,
   };
 }

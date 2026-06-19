@@ -12873,9 +12873,67 @@ app.get('/api/products', async (req, res) => {
 });
 
 // Get single product by ID (public view)
-app.get('/api/products/:productId', async (req, res) => {
+/**
+ * Compute the viewer business's own relationship to a product they don't own:
+ * whether they've ordered it before (→ the "client-stocked" product-detail view)
+ * plus their own stock and last-ordered stats. Returns null when there's no
+ * relationship. Reveals only the viewer's OWN data, so it's safe once the caller
+ * has validated business membership.
+ *
+ * NOTE: store-listing management (isListed / clientProductId) needs a client-side
+ * product copy, which doesn't exist in the data model yet — left undefined for a
+ * future increment. See ~/.claude/plans/rework-on-the-product-wondrous-frost.md.
+ */
+async function computeViewerStock(productId, viewerBusinessId) {
+  if (!viewerBusinessId) return null;
+
+  // The viewer's own stock for this product (summed across their locations).
+  let stockQuantity;
+  try {
+    const stockRows = (await repos.stockRepo.getByBusinessId(viewerBusinessId)) || [];
+    const mine = stockRows.filter((s) => s.productId === productId);
+    if (mine.length > 0) {
+      stockQuantity = mine.reduce((sum, s) => sum + (s.qtyOnHand || 0), 0);
+    }
+  } catch (e) {
+    logger.warn('[viewerStock] stock lookup failed:', e?.message || e);
+  }
+
+  // Has the viewer's business ordered this product before? Scan recent orders'
+  // denormalized items (order items are stored as JSON, not a relational table).
+  let alreadyOrdered = false;
+  let totalOrdered = 0;
+  let lastOrderedAt;
+  try {
+    const orders = (await repos.orderRepo.getByBuyerBusinessId(viewerBusinessId, { limit: 200 })) || [];
+    for (const order of orders) {
+      const items = Array.isArray(order.items) ? order.items : [];
+      const match = items.find((it) => (it?.productId || it?.product_id) === productId);
+      if (!match) continue;
+      alreadyOrdered = true;
+      totalOrdered += Number(match.quantity) || 0;
+      if (!lastOrderedAt && order.createdAt) lastOrderedAt = order.createdAt;
+    }
+  } catch (e) {
+    logger.warn('[viewerStock] order history lookup failed:', e?.message || e);
+  }
+
+  const alreadyStocked = alreadyOrdered || (stockQuantity != null && stockQuantity > 0);
+  if (!alreadyStocked) return null;
+
+  return {
+    alreadyStocked: true,
+    stockQuantity,
+    lastOrderedAt: lastOrderedAt || undefined,
+    totalOrdered: totalOrdered || undefined,
+    // isListed / clientProductId: require a client product copy (future increment)
+  };
+}
+
+app.get('/api/products/:productId', optionalAuth, async (req, res) => {
   const { productId } = req.params;
-  // SECURITY: Public endpoint — do not trust viewerBusinessId from query params
+  // SECURITY: never trust viewerBusinessId from the query for PRICE privacy —
+  // price visibility stays public/default on this endpoint.
   const viewerBusinessId = null;
 
   try {
@@ -12893,6 +12951,21 @@ app.get('/api/products/:productId', async (req, res) => {
 
     // Apply price privacy
     const result = await applyPricePrivacy(foundProduct, viewerBusinessId || null);
+
+    // Viewer relationship: attach `viewerStock` only for an AUTHENTICATED member
+    // of the claimed business who is NOT the product's owner. Membership is
+    // validated, and the payload contains only the viewer's own data — safe.
+    const claimedBizId = req.query.viewerBusinessId;
+    if (
+      claimedBizId &&
+      req.user?.id &&
+      claimedBizId !== foundProduct.businessId &&
+      (await isBusinessMember(claimedBizId, req.user.id))
+    ) {
+      const viewerStock = await computeViewerStock(productId, claimedBizId);
+      if (viewerStock) result.viewerStock = viewerStock;
+    }
+
     return res.json(successResponse(result));
   } catch (e) {
     logger.error('Error fetching product:', e);
