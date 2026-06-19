@@ -161,6 +161,26 @@ export interface ProductCore {
 }
 
 // ============================================================================
+// Viewer stock relationship (client who already carries the product)
+// ============================================================================
+
+/**
+ * The active business's own relationship to this product when they are NOT the
+ * owner — i.e. a client that already stocks/resells it. Populated by the backend
+ * (follow-up); when absent the viewer is treated as a first-time buyer.
+ */
+export interface ViewerStockInfo {
+  /** The viewer's business already carries this product (e.g. has ordered it before). */
+  alreadyStocked: boolean;
+  /** The viewer's own remaining stock of the product. */
+  stockQuantity?: number;
+  /** Whether the viewer lists this product in their own store. */
+  isListed?: boolean;
+  /** The viewer's own product id (their copy), used to toggle listing / reorder. */
+  clientProductId?: string;
+}
+
+// ============================================================================
 // Full DTO
 // ============================================================================
 
@@ -174,6 +194,8 @@ export interface ProductDetailsDTO {
   availability: ProductAvailability;
   seller: SellerInfo;
   viewerContext: ViewerContext;
+  /** Present only for non-owner business viewers who already stock the product. */
+  viewerStock?: ViewerStockInfo;
 }
 
 // ============================================================================
@@ -274,6 +296,28 @@ export function adjustBuyerCapabilitiesForAvailability(
     canOrder: !availability.isOutOfStock && !isDiscontinued,
     canAddToCart: !availability.isOutOfStock && !isDiscontinued,
   };
+}
+
+/**
+ * The four product-detail viewer modes.
+ */
+export type ProductViewerMode = 'distributor' | 'client-stocked' | 'client-new' | 'personal';
+
+/**
+ * Resolve which of the four viewer modes applies, given the DTO and the active app mode.
+ * - distributor    → business mode, viewer owns the product (full info + edit)
+ * - client-stocked → business mode, not owner, already carries it (viewerStock.alreadyStocked)
+ * - client-new     → business mode, not owner, hasn't ordered it (default when no signal → no regression)
+ * - personal       → personal mode (browse only, cannot order)
+ */
+export function resolveViewerMode(
+  dto: ProductDetailsDTO,
+  ctx: { isBusinessMode: boolean; isPersonalMode: boolean }
+): ProductViewerMode {
+  if (ctx.isBusinessMode && dto.viewerContext.isOwner) return 'distributor';
+  if (ctx.isBusinessMode && dto.viewerStock?.alreadyStocked) return 'client-stocked';
+  if (ctx.isBusinessMode) return 'client-new';
+  return 'personal';
 }
 
 /**

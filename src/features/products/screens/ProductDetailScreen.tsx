@@ -58,17 +58,20 @@ import {
   SellerInfo,
   computeViewerContext,
   adjustBuyerCapabilitiesForAvailability,
+  resolveViewerMode,
   formatPrice,
   DEFAULT_CURRENCY,
   RelatedProduct,
 } from '@/shared/types/productDetails';
 import { getSuppliersForProduct, type ProductSupplierPricing } from '@/features/procurement/services/procurement.service';
+import { toggleProductListed } from '@/features/products/products.service';
 import SupplierPickerModal from '@/features/procurement/components/SupplierPickerModal';
 import type { Supplier } from '@/shared/types/procurement';
 import ProductHero from '../components/productDetail/ProductHero';
 import PriceBlock from '../components/productDetail/PriceBlock';
 import SellerCard from '../components/productDetail/SellerCard';
 import OwnerDetailRows from '../components/productDetail/OwnerDetailRows';
+import ClientStoreCard from '../components/productDetail/ClientStoreCard';
 import RelatedRow from '../components/productDetail/RelatedRow';
 import FloatingHeader from '../components/productDetail/FloatingHeader';
 
@@ -206,12 +209,24 @@ function transformToDTO(
     );
   }
 
+  // Viewer's own stock relationship (client who already carries this product).
+  // Backend supplies `viewerStock` (follow-up); absent → treated as a first-time buyer.
+  const viewerStock = apiProduct.viewerStock
+    ? {
+        alreadyStocked: !!apiProduct.viewerStock.alreadyStocked,
+        stockQuantity: apiProduct.viewerStock.stockQuantity,
+        isListed: apiProduct.viewerStock.isListed,
+        clientProductId: apiProduct.viewerStock.clientProductId,
+      }
+    : undefined;
+
   return {
     product,
     pricing,
     availability,
     seller,
     viewerContext,
+    viewerStock,
   };
 }
 
@@ -441,6 +456,18 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     });
   };
 
+  // Client-stocked: toggle whether this product is listed in the viewer's OWN store.
+  // Acts on the client's own product copy (viewerStock.clientProductId).
+  const handleToggleListing = async (next: boolean) => {
+    const clientProductId = dto?.viewerStock?.clientProductId;
+    if (!activeCompanyId || !clientProductId) return;
+    try {
+      await toggleProductListed(activeCompanyId, clientProductId, next);
+    } catch {
+      Alert.alert('Could not update', 'Failed to update your store listing. Please try again.');
+    }
+  };
+
   // Owner action - Navigate to CreateProduct screen with product data for editing
   const handleEdit = () => {
     if (!dto) {
@@ -609,15 +636,18 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   }
 
-  const { product, pricing, availability, seller, viewerContext } = dto;
+  const { product, pricing, availability, seller } = dto;
   const images = product.images.length > 0 ? product.images : [''];
   const unitDisplay = formatUnitDisplay(product.unit, product.unitQuantity);
   const totalPrice = pricing.basePrice * quantity;
 
-  // THREE-MODE LOGIC: Personal (browse) / Business owner (edit) / Business buyer (order)
-  const isProductOwner = isBusinessMode && viewerContext.isOwner;
-  const canOrder = isBusinessMode && !viewerContext.isOwner;
-  const showRelatedProducts = isPersonalMode || canOrder; // Personal & Business Buyer
+  // FOUR-MODE LOGIC (see resolveViewerMode): distributor (owner) / client-stocked
+  // (already carries it) / client-new (first-time buyer) / personal (browse only).
+  const viewerMode = resolveViewerMode(dto, { isBusinessMode, isPersonalMode });
+  const isProductOwner = viewerMode === 'distributor';
+  const isClientStocked = viewerMode === 'client-stocked';
+  const canOrder = viewerMode === 'client-stocked' || viewerMode === 'client-new';
+  const showRelatedProducts = isPersonalMode || canOrder; // Personal & both client modes
   const showOwnerDetails = isProductOwner;
   const showActionBar = isBusinessMode;
   const showSellerCard = showRelatedProducts && !!seller.companyName;
@@ -743,6 +773,21 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </TouchableOpacity>
           )}
 
+          {/* Your-store panel (client who already stocks this product) */}
+          {isClientStocked && (
+            <ClientStoreCard
+              stockQuantity={dto.viewerStock?.stockQuantity}
+              isLowStock={
+                dto.viewerStock?.stockQuantity != null &&
+                dto.viewerStock.stockQuantity <= (availability.minStockAlert ?? 5) &&
+                dto.viewerStock.stockQuantity > 0
+              }
+              isListed={dto.viewerStock?.isListed}
+              canManage={!!dto.viewerStock?.clientProductId}
+              onToggleListing={handleToggleListing}
+            />
+          )}
+
           {/* Distributor card (buyer + personal) */}
           {showSellerCard && <SellerCard seller={seller} onPress={handleBusinessPress} />}
 
@@ -863,7 +908,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               </View>
             </View>
           ) : (
-            /* Business Buyer Mode: Order button */
+            /* Business Buyer Mode: Order button (client-stocked → "Reorder") */
             <TouchableOpacity
               style={[
                 styles.orderButton,
@@ -877,7 +922,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 styles.orderButtonText,
                 { color: availability.isOutOfStock ? appTheme.colors.textMuted : '#FFFFFF' }
               ]}>
-                {availability.isOutOfStock ? 'Out of Stock' : 'Order'}
+                {availability.isOutOfStock ? 'Out of Stock' : isClientStocked ? 'Reorder' : 'Order'}
               </Text>
             </TouchableOpacity>
           )}
@@ -910,8 +955,10 @@ function createMockProduct(productId: string, activeCompanyId: string | null): P
   // - 'PRD-xxx' = Products from Business's own catalog (Products tab) → OWNER MODE
   // - 'own-xxx' = Explicitly marked as owned → OWNER MODE
   // - 'prod-xxx', 'new-xxx', 'brand-xxx' = Feed products from other companies → BUYER MODE
-  // - Everything else = Assume feed/other company → BUYER MODE
+  // - 'stk-xxx' = Feed product this client ALREADY stocks → CLIENT-STOCKED MODE
+  // - Everything else = Assume feed/other company → BUYER MODE (client-new)
   const isOwnerProduct = productId.startsWith('PRD-') || productId.startsWith('own-');
+  const isStockedClient = productId.startsWith('stk-');
 
   const product: ProductCore = {
     id: productId,
@@ -982,6 +1029,9 @@ function createMockProduct(productId: string, activeCompanyId: string | null): P
     availability,
     seller,
     viewerContext,
+    viewerStock: isStockedClient
+      ? { alreadyStocked: true, stockQuantity: 8, isListed: true, clientProductId: 'stk-client-copy' }
+      : undefined,
   };
 }
 
