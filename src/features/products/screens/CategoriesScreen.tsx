@@ -9,7 +9,7 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { ListItemCard, EmptyState } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -60,7 +60,7 @@ export default function CategoriesScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <SecondaryHeader
         title="Categories"
-        leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
       />
       {loading ? (
         <View style={styles.center}>

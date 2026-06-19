@@ -8,7 +8,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, DrawerActions } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { ListItemCard, EmptyState } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -91,7 +91,7 @@ export default function BrandsScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <SecondaryHeader
         title="Brands"
-        leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
         rightActions={[{ icon: 'add', onPress: openCreate, accessibilityLabel: 'Create brand' }]}
       />
       {loading ? (

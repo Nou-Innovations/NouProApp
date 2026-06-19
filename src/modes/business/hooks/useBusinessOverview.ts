@@ -35,6 +35,9 @@ export function useBusinessOverview(opts?: { enabled?: boolean }): UseBusinessOv
 
   const activeBusinessId = useProfileStore((s) => s.activeBusinessId);
   const currentLocationId = useBusinessStore((s) => s.currentLocationId);
+  const locationCount = useBusinessStore((s) => s.locations.length);
+  // Single-location businesses always view business-wide (see useBusinessDashboard).
+  const effectiveLocationId = locationCount >= 2 ? currentLocationId : null;
 
   const [range, setRangeState] = useState<OverviewRange>('7d');
   const [overview, setOverview] = useState<BusinessOverview | null>(null);
@@ -48,7 +51,7 @@ export function useBusinessOverview(opts?: { enabled?: boolean }): UseBusinessOv
     try {
       const result = await getBusinessOverview(activeBusinessId, {
         range,
-        locationId: currentLocationId ?? undefined,
+        locationId: effectiveLocationId ?? undefined,
       });
       setOverview(result);
     } catch (e) {
@@ -56,7 +59,7 @@ export function useBusinessOverview(opts?: { enabled?: boolean }): UseBusinessOv
     } finally {
       setLoading(false);
     }
-  }, [enabled, activeBusinessId, currentLocationId, range]);
+  }, [enabled, activeBusinessId, effectiveLocationId, range]);
 
   // Refetch on focus and whenever business/location/range change (only when enabled).
   useFocusEffect(

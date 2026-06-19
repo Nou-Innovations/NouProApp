@@ -1,26 +1,22 @@
 /**
  * ProPriorityQueue - Business Mode Priority Items
- * A stacked list showing "needs attention" items with status pills
- * Orders awaiting confirmation, pending deliveries, stock alerts, overdue invoices
+ * A "needs attention" list: orders awaiting confirmation, pending deliveries,
+ * stock alerts, overdue invoices. Rendered as a borderless divided list — each
+ * row is tappable (opens the related entity), with the timestamp above a type
+ * pill on the right and a chevron to signal it's clickable.
  */
 
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { Skeleton, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
+import { Skeleton, SkeletonColumn } from '@/shared/components/ui';
 
-export type PriorityItemType = 
-  | 'order_pending' 
-  | 'delivery_pending' 
-  | 'stock_alert' 
+export type PriorityItemType =
+  | 'order_pending'
+  | 'delivery_pending'
+  | 'stock_alert'
   | 'invoice_overdue'
   | 'message_urgent';
 
@@ -44,7 +40,7 @@ interface ProPriorityQueueProps {
   onSeeAll?: () => void;
 }
 
-const TYPE_CONFIG: Record<PriorityItemType, { icon: keyof typeof Icon.glyphMap; color: string; label: string }> = {
+const TYPE_CONFIG: Record<PriorityItemType, { icon: string; color: string; label: string }> = {
   order_pending: { icon: 'cart-outline', color: theme.colors.info, label: 'Order' },
   delivery_pending: { icon: 'car-outline', color: theme.colors.warning, label: 'Delivery' },
   stock_alert: { icon: 'cube-outline', color: theme.colors.accent, label: 'Stock' },
@@ -52,43 +48,52 @@ const TYPE_CONFIG: Record<PriorityItemType, { icon: keyof typeof Icon.glyphMap; 
   message_urgent: { icon: 'mail-outline', color: theme.colors.statusInReview, label: 'Message' },
 };
 
-const URGENCY_COLORS = {
-  high: theme.colors.error,
-  medium: theme.colors.warning,
-  low: theme.colors.info,
-};
-
-export function ProPriorityQueue({ 
-  items, 
-  isLoading, 
-  error, 
+export function ProPriorityQueue({
+  items,
+  isLoading,
+  error,
   maxItems = 5,
   onSeeAll,
 }: ProPriorityQueueProps) {
   const { theme: appTheme } = useTheme();
 
-  const renderSkeletonItem = () => (
-    <View style={[styles.itemContainer, { backgroundColor: appTheme.colors.surface, borderColor: 'transparent' }]}>
-      <Skeleton width={40} height={40} borderRadius={10} style={{ marginLeft: 12 }} />
-      <SkeletonColumn gap={4} style={{ flex: 1 }}>
-        <Skeleton width="60%" height={14} />
-        <Skeleton width="80%" height={12} />
-      </SkeletonColumn>
-      <Skeleton width={60} height={28} borderRadius={6} />
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Priority Queue</Text>
+      {items.length > 0 && (
+        <View style={[styles.countBadge, { backgroundColor: appTheme.colors.accent }]}>
+          <Text style={styles.countText}>{items.length}</Text>
+        </View>
+      )}
     </View>
+  );
+
+  const renderSeparator = () => (
+    <View style={[styles.separator, { backgroundColor: appTheme.colors.borderColor }]} />
   );
 
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
-            Priority Queue
-          </Text>
+        {renderHeader()}
+        <View style={styles.listContent}>
+          {[0, 1, 2].map((i) => (
+            <React.Fragment key={i}>
+              {i > 0 && renderSeparator()}
+              <View style={styles.row}>
+                <Skeleton width={40} height={40} borderRadius={10} />
+                <SkeletonColumn gap={6} style={{ flex: 1 }}>
+                  <Skeleton width="55%" height={14} />
+                  <Skeleton width="75%" height={12} />
+                </SkeletonColumn>
+                <SkeletonColumn gap={6} style={{ alignItems: 'flex-end' }}>
+                  <Skeleton width={38} height={11} />
+                  <Skeleton width={52} height={20} borderRadius={6} />
+                </SkeletonColumn>
+              </View>
+            </React.Fragment>
+          ))}
         </View>
-        {[1, 2, 3].map((_, index) => (
-          <React.Fragment key={index}>{renderSkeletonItem()}</React.Fragment>
-        ))}
       </View>
     );
   }
@@ -96,12 +101,8 @@ export function ProPriorityQueue({
   if (error) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
-            Priority Queue
-          </Text>
-        </View>
-        <View style={[styles.errorContainer, { backgroundColor: appTheme.colors.surface }]}>
+        {renderHeader()}
+        <View style={[styles.stateCard, { backgroundColor: appTheme.colors.surface }]}>
           <Icon name="alert-circle-outline" size={24} color={appTheme.colors.error} />
           <Text style={[styles.errorText, { color: appTheme.colors.error }]}>
             Unable to load priority items
@@ -117,16 +118,10 @@ export function ProPriorityQueue({
   if (displayItems.length === 0) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
-            Priority Queue
-          </Text>
-        </View>
-        <View style={[styles.emptyContainer, { backgroundColor: appTheme.colors.surface }]}>
+        {renderHeader()}
+        <View style={[styles.stateCard, { backgroundColor: appTheme.colors.surface }]}>
           <Icon name="checkmark-circle-outline" size={40} color={appTheme.colors.success} />
-          <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>
-            All caught up!
-          </Text>
+          <Text style={[styles.emptyTitle, { color: appTheme.colors.text }]}>All caught up!</Text>
           <Text style={[styles.emptySubtitle, { color: appTheme.colors.textSecondary }]}>
             No urgent items need your attention
           </Text>
@@ -137,91 +132,51 @@ export function ProPriorityQueue({
 
   const renderItem = ({ item }: { item: PriorityItem }) => {
     const config = TYPE_CONFIG[item.type];
-    const urgencyColor = URGENCY_COLORS[item.urgency];
-
     return (
-      <TouchableOpacity
-        style={[
-          styles.itemContainer,
-          { 
-            backgroundColor: appTheme.colors.surface,
-            borderColor: appTheme.colors.borderColor,
-          },
-        ]}
-        onPress={item.onPress}
-        activeOpacity={0.7}
-      >
-        {/* Left urgency indicator */}
-        <View style={[styles.urgencyBar, { backgroundColor: urgencyColor }]} />
-        
-        {/* Icon */}
+      <TouchableOpacity style={styles.row} onPress={item.onPress} activeOpacity={0.6}>
         <View style={[styles.iconContainer, { backgroundColor: `${config.color}15` }]}>
           <Icon name={config.icon} size={20} color={config.color} />
         </View>
-        
-        {/* Content */}
+
         <View style={styles.itemContent}>
-          <View style={styles.titleRow}>
-            <Text style={[styles.itemTitle, { color: appTheme.colors.text }]} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <View style={[styles.typePill, { backgroundColor: `${config.color}15` }]}>
-              <Text style={[styles.typeText, { color: config.color }]}>
-                {config.label}
-              </Text>
-            </View>
-          </View>
-          <Text style={[styles.itemSubtitle, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
+          <Text style={[styles.itemTitle, { color: appTheme.colors.text }]} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text
+            style={[styles.itemSubtitle, { color: appTheme.colors.textSecondary }]}
+            numberOfLines={1}
+          >
             {item.subtitle}
           </Text>
+        </View>
+
+        <View style={styles.rightCol}>
           <Text style={[styles.timestamp, { color: appTheme.colors.textMuted }]}>
             {item.timestamp}
           </Text>
+          <View style={[styles.typePill, { backgroundColor: `${config.color}15` }]}>
+            <Text style={[styles.typeText, { color: config.color }]}>{config.label}</Text>
+          </View>
         </View>
-        
-        {/* Action button */}
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: appTheme.colors.primary }]}
-          onPress={(e) => {
-            e.stopPropagation();
-            item.onAction();
-          }}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.actionText, { color: appTheme.colors.textInverse }]}>
-            {item.actionLabel}
-          </Text>
-        </TouchableOpacity>
+
+        <Icon name="chevron-forward" size={18} color={appTheme.colors.textMuted} />
       </TouchableOpacity>
     );
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>
-          Priority Queue
-        </Text>
-        <View style={[styles.countBadge, { backgroundColor: appTheme.colors.accent }]}>
-          <Text style={styles.countText}>{items.length}</Text>
-        </View>
-      </View>
-      
+      {renderHeader()}
       <FlatList
         data={displayItems}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         scrollEnabled={false}
-        ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+        ItemSeparatorComponent={renderSeparator}
         contentContainerStyle={styles.listContent}
       />
-      
       {(hasMore || onSeeAll) && (
-        <TouchableOpacity
-          style={[styles.seeAllButton, { borderColor: appTheme.colors.borderColor }]}
-          onPress={onSeeAll}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.seeAllButton} onPress={onSeeAll} activeOpacity={0.7}>
           <Text style={[styles.seeAllText, { color: appTheme.colors.primary }]}>
             See all ({items.length})
           </Text>
@@ -233,9 +188,7 @@ export function ProPriorityQueue({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: theme.spacing.sm,
-  },
+  container: {},
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -260,28 +213,16 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.bold,
   },
   listContent: {
-    paddingHorizontal: theme.spacing.md,
+    paddingHorizontal: theme.spacing.sm,
   },
-  itemContainer: {
+  separator: {
+    height: StyleSheet.hairlineWidth,
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingRight: 12,
-    paddingLeft: 0,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingVertical: 14,
     gap: 10,
-    overflow: 'hidden',
-  },
-  urgencyBar: {
-    width: 4,
-    height: '100%',
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
   },
   iconContainer: {
     width: 40,
@@ -289,21 +230,26 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 12,
   },
   itemContent: {
     flex: 1,
     gap: 2,
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   itemTitle: {
     fontSize: 15,
     fontFamily: theme.fonts.primary.semiBold,
-    flex: 1,
+  },
+  itemSubtitle: {
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.regular,
+  },
+  rightCol: {
+    alignItems: 'flex-end',
+    gap: 5,
+  },
+  timestamp: {
+    fontSize: 11,
+    fontFamily: theme.fonts.primary.regular,
   },
   typePill: {
     paddingHorizontal: 8,
@@ -314,57 +260,31 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.fonts.primary.medium,
   },
-  itemSubtitle: {
-    fontSize: 13,
-    fontFamily: theme.fonts.primary.regular,
-  },
-  timestamp: {
-    fontSize: 11,
-    fontFamily: theme.fonts.primary.regular,
-  },
-  actionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  actionText: {
-    fontSize: 12,
-    fontFamily: theme.fonts.primary.semiBold,
-  },
   seeAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: theme.spacing.md,
+    marginHorizontal: theme.spacing.sm,
     marginTop: theme.spacing.sm,
     paddingVertical: 12,
     borderRadius: 10,
-    borderWidth: 1,
     gap: 4,
   },
   seeAllText: {
     fontSize: 14,
     fontFamily: theme.fonts.primary.semiBold,
   },
-  errorContainer: {
+  stateCard: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: theme.spacing.lg,
-    marginHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xl,
+    marginHorizontal: theme.spacing.sm,
     borderRadius: 12,
     gap: 8,
   },
   errorText: {
     fontSize: 14,
     fontFamily: theme.fonts.primary.medium,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.xl,
-    marginHorizontal: theme.spacing.md,
-    borderRadius: 12,
-    gap: 8,
   },
   emptyTitle: {
     fontSize: 16,
@@ -376,29 +296,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.regular,
     textAlign: 'center',
   },
-  skeletonIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    marginLeft: 12,
-  },
-  skeletonTitle: {
-    width: '60%',
-    height: 14,
-    borderRadius: 4,
-  },
-  skeletonSubtitle: {
-    width: '80%',
-    height: 12,
-    borderRadius: 4,
-    marginTop: 4,
-  },
-  skeletonButton: {
-    width: 60,
-    height: 28,
-    borderRadius: 6,
-  },
 });
 
 export default ProPriorityQueue;
-

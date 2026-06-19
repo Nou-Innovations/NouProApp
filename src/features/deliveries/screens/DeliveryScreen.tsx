@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, DrawerActions } from '@react-navigation/native';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/shared/components/ui/FilterBar';
 import DeliveryCard from '@/features/deliveries/components/DeliveryCard';
@@ -101,12 +101,26 @@ export default function DeliveryScreen() {
     refresh,
   } = useDeliveries();
 
-  // Apply the initial segment from navigation params (deep-link / sidebar);
-  // default the hub to "Needs attention" when no segment is provided.
+  // First mount: default the hub view to "Needs attention" (or an initial segment param).
   useEffect(() => {
     setActiveTab(initialSegment || 'needs_attention');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSegment]);
+  }, []);
+
+  // DeliveryScreen is now a persistent hidden tab, so a segment passed on a *later*
+  // navigation (e.g. a LogisticsOverview tile) must be applied on focus and then cleared —
+  // otherwise the stale param lingers and a later param-less open stays stuck on it.
+  // (No segment on focus — e.g. returning from a detail — leaves the current view intact.)
+  useFocusEffect(
+    useCallback(() => {
+      const seg = (route.params as { segment?: DeliveryViewType } | undefined)?.segment;
+      if (seg) {
+        setActiveTab(seg);
+        navigation.setParams({ segment: undefined } as never);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [route.params, navigation])
+  );
 
   // Alias for filter state
   const filter = statusFilter;
@@ -176,7 +190,7 @@ export default function DeliveryScreen() {
       {/* Primary Header */}
       <PrimaryHeader
         title="Deliveries"
-        leftAction={navigation.canGoBack() ? { icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' } : undefined}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
         actions={[
           { icon: 'bar-chart-outline', onPress: () => (navigation as any).navigate('DeliveriesAnalytics'), accessibilityLabel: 'Delivery analytics' },
           { icon: 'shopping-cart', onPress: handleOpenProcurement, badge: pendingProcurementCount, accessibilityLabel: 'Procurement' },

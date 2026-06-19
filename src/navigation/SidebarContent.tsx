@@ -133,10 +133,24 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
 
   const closeDrawer = () => props.navigation.closeDrawer();
 
-  // Navigate to a parent RootStack route, closing the drawer first.
+  // Routes that now live as hidden tabs inside BusinessTabNavigator. Navigating to one
+  // must target the tab navigator (nested under the drawer's "Tabs" screen) so the page
+  // keeps the bottom nav bar and shows the hamburger (not a back button) at its root.
+  const TAB_ROUTES = new Set([
+    'LogisticsOverview', 'Deliveries', 'Transfers', 'Orders', 'MyDeliveries', 'Routes',
+    'Issues', 'Returns', 'DeliveriesAnalytics', 'Products', 'Categories', 'Brands', 'Stock',
+    'ProductVisibility', 'Invoices', 'TeamManagement', 'Locations', 'CompanySettings', 'SubscriptionHub',
+  ]);
+
+  // Navigate from the sidebar, closing the drawer first. Workspace pages route into the
+  // business tab navigator (in-shell, hamburger); everything else is a plain RootStack push.
   const go = (routeName: string, params?: object) => {
     closeDrawer();
-    nav.navigate(routeName, params);
+    if (TAB_ROUTES.has(routeName)) {
+      nav.navigate('Tabs', { screen: routeName, params });
+    } else {
+      nav.navigate(routeName, params);
+    }
   };
 
   // Open the reusable "Coming soon" placeholder for not-yet-built features.
@@ -269,8 +283,19 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
       icon: activeMode === 'business' ? 'business-outline' : 'person-outline',
       onPress: handleOpenProfile,
     },
-    { key: 'settings', label: 'Settings', icon: 'settings-outline', onPress: () => go('Settings') },
-    { key: 'subscription', label: 'Subscription', icon: 'card-outline', onPress: () => go('Subscription') },
+    {
+      key: 'settings',
+      label: 'Settings',
+      icon: 'settings-outline',
+      onPress: () => go(activeMode === 'business' ? 'ProfileSettings' : 'PersonalProfileSettings'),
+    },
+    {
+      key: 'subscription',
+      label: 'Subscription',
+      icon: 'card-outline',
+      // Business: in-shell SubscriptionHub tab. Personal: plain RootStack SubscriptionPlans (back button).
+      onPress: () => go(activeMode === 'business' ? 'SubscriptionHub' : 'SubscriptionPlans'),
+    },
   ];
 
   if (activeMode === 'business' && activeBusiness) {
@@ -334,7 +359,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
               { label: 'Locations', icon: 'location-outline', onPress: () => go('Locations') },
               { label: 'Analytics', icon: 'bar-chart-outline', onPress: () => comingSoon('Analytics') },
               { label: 'Variance', icon: 'pie-chart-outline', onPress: () => comingSoon('Variance') },
-              { label: 'Subscription', icon: 'card-outline', onPress: () => go('Subscription') },
+              { label: 'Subscription', icon: 'card-outline', onPress: () => go('SubscriptionHub') },
               { label: 'Settings', icon: 'settings-outline', onPress: () => go('CompanySettings') },
             ],
           },

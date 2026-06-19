@@ -52,10 +52,7 @@ export function BusinessOverviewSection({
     return <BusinessOverviewLocked onUpgrade={onUpgrade} />;
   }
 
-  const cardStyle = [
-    styles.card,
-    { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.borderColor },
-  ];
+  const cardStyle = [styles.card, { backgroundColor: appTheme.colors.surface }];
 
   const orderSegments: DonutSegment[] = overview
     ? [
@@ -167,7 +164,7 @@ function RangeControl({
     { key: '30d', label: '30 Days' },
   ];
   return (
-    <View style={[styles.segment, { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.borderColor }]}>
+    <View style={[styles.segment, { backgroundColor: appTheme.colors.surface }]}>
       {options.map((opt) => {
         const active = range === opt.key;
         const isLocked = opt.key === '30d' && !canExtend;
@@ -204,12 +201,11 @@ function BusinessOverviewLocked({ onUpgrade }: { onUpgrade: () => void }) {
   const { theme: appTheme } = useTheme();
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Business Overview</Text>
+      <Text style={[styles.sectionTitle, styles.lockedSectionTitle, { color: appTheme.colors.text }]}>
+        Business Overview
+      </Text>
       <View
-        style={[
-          styles.lockedCard,
-          { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.borderColor },
-        ]}
+        style={[styles.lockedCard, { backgroundColor: appTheme.colors.surface }]}
       >
         <View style={[styles.lockedIcon, { backgroundColor: `${appTheme.colors.accent}15` }]}>
           <Icon name="bar-chart" size={22} color={appTheme.colors.accent} />
@@ -232,10 +228,7 @@ function BusinessOverviewLocked({ onUpgrade }: { onUpgrade: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  section: {
-    marginTop: theme.spacing.sm,
-    marginBottom: theme.spacing.sm,
-  },
+  section: {},
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -246,16 +239,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontFamily: theme.fonts.primary.bold,
+  },
+  lockedSectionTitle: {
     paddingHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.sm,
   },
   card: {
-    marginHorizontal: theme.spacing.md,
+    marginHorizontal: theme.spacing.sm,
     marginBottom: 10,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.md,
     borderRadius: 14,
-    borderWidth: 1,
     gap: 4,
   },
   cardLabel: {
@@ -302,7 +296,6 @@ const styles = StyleSheet.create({
   segment: {
     flexDirection: 'row',
     borderRadius: 10,
-    borderWidth: 1,
     padding: 2,
     gap: 2,
   },
@@ -320,11 +313,10 @@ const styles = StyleSheet.create({
   },
   // Locked teaser
   lockedCard: {
-    marginHorizontal: theme.spacing.md,
+    marginHorizontal: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.lg,
     borderRadius: 14,
-    borderWidth: 1,
     alignItems: 'center',
     gap: 8,
   },

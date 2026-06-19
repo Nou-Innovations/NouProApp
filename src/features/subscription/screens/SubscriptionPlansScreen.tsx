@@ -16,7 +16,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, DrawerActions } from '@react-navigation/native';
 import { Check, Crown, Zap, Building2, Rocket, Users, MapPin, X } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -240,6 +240,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, isCurrentPlan, on
 
 export default function SubscriptionPlansScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
   const { theme: appTheme } = useTheme();
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>('business');
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('YEARLY'); // Default to yearly
@@ -323,7 +324,11 @@ export default function SubscriptionPlansScreen() {
     >
       <SecondaryHeader
         title="Subscription"
-        leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+        leftAction={
+          route.name === 'SubscriptionHub'
+            ? { icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }
+            : { icon: 'chevron-left', onPress: () => navigation.goBack() }
+        }
       />
 
       <ScrollView 

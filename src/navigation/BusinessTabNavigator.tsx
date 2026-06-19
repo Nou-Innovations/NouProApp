@@ -31,7 +31,35 @@ import { BusinessHomeScreen, BusinessExploreScreen } from '@/modes/business/scre
 import BusinessProfileOwnScreen from '@/modes/business/screens/BusinessProfileOwnScreen';
 import BusinessInboxScreen from '@/modes/business/screens/BusinessInboxScreen';
 
+// Workspace pages opened from the sidebar. Registered here as hidden tabs (no button
+// in the bottom bar via `tabBarButton: () => null`) so they keep the bottom nav bar
+// visible and show the hamburger at their tab root. Their detail/create screens stay
+// in the RootStack (App.tsx) and still push over everything with a back button.
+import DeliveryScreen from '@/features/deliveries/screens/DeliveryScreen';
+import DeliveriesAnalyticsScreen from '@/features/deliveries/screens/DeliveriesAnalyticsScreen';
+import MyDeliveriesScreen from '@/features/deliveries/screens/MyDeliveriesScreen';
+import LogisticsOverviewScreen from '@/features/logistics/screens/LogisticsOverviewScreen';
+import IssuesScreen from '@/features/issues/screens/IssuesScreen';
+import ReturnsScreen from '@/features/returns/screens/ReturnsScreen';
+import RoutesScreen from '@/features/routes/screens/RoutesScreen';
+import TransfersScreen from '@/features/transfers/screens/TransfersScreen';
+import ProductsScreen from '@/features/products/screens/ProductsScreen';
+import CategoriesScreen from '@/features/products/screens/CategoriesScreen';
+import BrandsScreen from '@/features/brands/screens/BrandsScreen';
+import StockScreen from '@/features/products/screens/StockScreen';
+import ProductVisibilityScreen from '@/features/products/screens/ProductVisibilityScreen';
+import InvoicesScreen from '@/features/invoices/screens/InvoicesScreen';
+import OrdersScreen from '@/features/orders/screens/OrdersScreen';
+import TeamManagementScreen from '@/features/team/screens/TeamManagementScreen';
+import LocationsScreen from '@/features/locations/screens/LocationsScreen';
+import CompanySettingsScreen from '@/features/company/screens/CompanySettingsScreen';
+import { SubscriptionPlansScreen } from '@/features/subscription';
+
 const Tab = createBottomTabNavigator<BusinessTabParamList>();
+
+// Hide a tab's button from the bottom bar while keeping it as a real tab route
+// (so the bottom nav bar stays visible and `canGoBack()` is false at its root).
+const hiddenTabOptions = { tabBarButton: () => null } as const;
 
 /**
  * Business Tab Navigator Component
@@ -156,6 +184,36 @@ export function BusinessTabNavigator() {
           tabBarIcon: ({ color, focused }) => renderBusinessIcon(color, focused),
         }}
       />
+
+      {/* ===== Hidden workspace tabs (opened from the sidebar; no bottom-bar button) ===== */}
+      {/* Logistics */}
+      <Tab.Screen name="LogisticsOverview" component={LogisticsOverviewScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="Deliveries" component={DeliveryScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="Transfers" component={TransfersScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="Orders" component={OrdersScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="MyDeliveries" component={MyDeliveriesScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="Routes" component={RoutesScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="Issues" component={IssuesScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="Returns" component={ReturnsScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="DeliveriesAnalytics" component={DeliveriesAnalyticsScreen} options={hiddenTabOptions} />
+
+      {/* Products */}
+      <Tab.Screen name="Products" component={ProductsScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="Categories" component={CategoriesScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="Brands" component={BrandsScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="Stock" component={StockScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="ProductVisibility" component={ProductVisibilityScreen} options={hiddenTabOptions} />
+
+      {/* Accounting */}
+      <Tab.Screen name="Invoices" component={InvoicesScreen} options={hiddenTabOptions} />
+
+      {/* Business settings */}
+      <Tab.Screen name="TeamManagement" component={TeamManagementScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="Locations" component={LocationsScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="CompanySettings" component={CompanySettingsScreen} options={hiddenTabOptions} />
+      {/* Sidebar-only alias of SubscriptionPlansScreen (shell version with hamburger).
+          The RootStack `SubscriptionPlans` route stays for the in-app "Upgrade" buttons. */}
+      <Tab.Screen name="SubscriptionHub" component={SubscriptionPlansScreen} options={hiddenTabOptions} />
     </Tab.Navigator>
   );
 }

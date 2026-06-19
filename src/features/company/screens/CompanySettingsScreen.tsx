@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import {
   ChevronRight,
   Lock,
@@ -198,7 +198,7 @@ export default function CompanySettingsScreen() {
       <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
         <SecondaryHeader
           title="Settings"
-          leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+          leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
         />
 
       <ScrollView 

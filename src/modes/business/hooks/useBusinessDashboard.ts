@@ -89,6 +89,11 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
   const activeBusiness = useProfileStore((s) => s.activeBusiness);
   const role = useProfileStore((s) => s.currentUserRole);
   const currentLocationId = useBusinessStore((s) => s.currentLocationId);
+  const locationCount = useBusinessStore((s) => s.locations.length);
+  // Location filtering only applies to multi-location businesses. A single-location
+  // business always views business-wide (its data may live at the parent level, and
+  // the app globally force-selects the sole location — which we ignore here).
+  const effectiveLocationId = locationCount >= 2 ? currentLocationId : null;
 
   const plan = (activeBusiness?.plan ?? null) as SubscriptionPlan | null;
   const isAdmin = role === 'admin' || role === 'super_admin';
@@ -110,7 +115,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
       setError(null);
       try {
         const result = await getBusinessDashboard(activeBusinessId, {
-          locationId: currentLocationId ?? undefined,
+          locationId: effectiveLocationId ?? undefined,
         });
         setData(result);
         hasLoaded.current = true;
@@ -121,7 +126,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
         setRefreshing(false);
       }
     },
-    [activeBusinessId, currentLocationId]
+    [activeBusinessId, effectiveLocationId]
   );
 
   // Refetch on focus and whenever the business/location changes. The first
@@ -262,7 +267,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
     if (canViewInvoices(role, plan)) {
       candidates.push({
         id: 'invoice',
-        label: 'New Invoice',
+        label: 'Invoice',
         icon: 'document-text-outline',
         color: theme.colors.error,
         onPress: () => navigation.navigate('CreateInvoice', { type: 'invoice' }),
@@ -271,7 +276,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
     if (isAdmin && canCreateDeliveries(plan)) {
       candidates.push({
         id: 'delivery',
-        label: 'New Delivery',
+        label: 'Delivery',
         icon: 'car-outline',
         color: theme.colors.warning,
         onPress: () => navigation.navigate('CreateDelivery', {}),
@@ -280,7 +285,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
     if (canViewProcurement(role) && canCreateProcurementOrders(plan)) {
       candidates.push({
         id: 'po',
-        label: 'New Purchase Order',
+        label: 'Order',
         icon: 'cart-outline',
         color: theme.colors.info,
         onPress: () => navigation.navigate('CreatePurchaseOrder', {}),
@@ -289,7 +294,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
     if (canEditProducts(role)) {
       candidates.push({
         id: 'product',
-        label: 'New Product',
+        label: 'Product',
         icon: 'cube-outline',
         color: theme.colors.success,
         onPress: () => navigation.navigate('CreateProduct', {}),
@@ -298,7 +303,7 @@ export function useBusinessDashboard(): UseBusinessDashboardResult {
     if (isAdmin && activeBusinessId) {
       candidates.push({
         id: 'task',
-        label: 'New Task',
+        label: 'Task',
         icon: 'checkbox-outline',
         color: theme.colors.statusInReview,
         onPress: () => navigation.navigate('CreateTask', { businessId: activeBusinessId }),

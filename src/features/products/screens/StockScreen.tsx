@@ -11,7 +11,7 @@ import {
   View, Text, StyleSheet, FlatList, Modal, TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { ListItemCard, EmptyState } from '@/shared/components/ui';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
@@ -117,7 +117,7 @@ export default function StockScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <SecondaryHeader
         title="Stock"
-        leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
       />
       <View style={styles.locationRow}>
         <LocationDropdown style={{ flex: 1 }} />

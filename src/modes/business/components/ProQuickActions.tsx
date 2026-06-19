@@ -1,7 +1,7 @@
 /**
- * ProQuickActions - Business Mode Quick Actions Grid
- * Primary conversion actions for business operations
- * Each action opens a focused flow and returns to Home
+ * ProQuickActions - Business Mode Quick Actions
+ * A single borderless row of icon-tile buttons (create flows). Each opens a
+ * focused flow and returns to Home.
  */
 
 import React from 'react';
@@ -19,7 +19,7 @@ import { Skeleton } from '@/shared/components/ui';
 export interface QuickAction {
   id: string;
   label: string;
-  icon: keyof typeof Icon.glyphMap;
+  icon: string;
   color: string;
   onPress: () => void;
 }
@@ -32,110 +32,69 @@ interface ProQuickActionsProps {
 export function ProQuickActions({ actions, isLoading }: ProQuickActionsProps) {
   const { theme: appTheme } = useTheme();
 
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.grid}>
-          {[1, 2, 3, 4].map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.actionButton,
-                styles.actionSkeleton,
-                { backgroundColor: appTheme.colors.surface, borderColor: 'transparent' },
-              ]}
-            >
-              <Skeleton width={48} height={48} borderRadius={12} />
-              <Skeleton width={60} height={14} />
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  }
-
-  // Limit to 4 actions max for the grid
-  const displayActions = actions.slice(0, 4);
-
   return (
     <View style={styles.container}>
-      <View style={styles.grid}>
-        {displayActions.map((action) => (
-          <TouchableOpacity
-            key={action.id}
-            style={[
-              styles.actionButton,
-              { 
-                backgroundColor: appTheme.colors.surface,
-                borderColor: appTheme.colors.borderColor,
-              },
-            ]}
-            onPress={action.onPress}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.iconWrapper, { backgroundColor: `${action.color}15` }]}>
-              <Icon name={action.icon} size={24} color={action.color} />
-            </View>
-            <Text
-              style={[styles.actionLabel, { color: appTheme.colors.text }]}
-              numberOfLines={2}
-            >
-              {action.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <Text style={[styles.sectionTitle, { color: appTheme.colors.text }]}>Quick actions</Text>
+      <View style={styles.row}>
+        {isLoading
+          ? [0, 1, 2, 3].map((i) => (
+              <View key={i} style={styles.item}>
+                <Skeleton width={50} height={50} borderRadius={15} />
+                <Skeleton width={48} height={12} />
+              </View>
+            ))
+          : actions.slice(0, 4).map((action) => (
+              <TouchableOpacity
+                key={action.id}
+                style={styles.item}
+                onPress={action.onPress}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.tile, { backgroundColor: `${action.color}1F` }]}>
+                  <Icon name={action.icon} size={22} color={action.color} />
+                </View>
+                <Text
+                  style={[styles.label, { color: appTheme.colors.text }]}
+                  numberOfLines={1}
+                >
+                  {action.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: {},
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: theme.fonts.primary.bold,
+    marginBottom: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
-    marginVertical: theme.spacing.sm,
   },
-  grid: {
+  row: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.sm,
   },
-  actionButton: {
-    flex: 1,
-    minWidth: '45%',
-    maxWidth: '48%',
-    paddingVertical: 16,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    borderWidth: 1,
+  item: {
     alignItems: 'center',
-    gap: 10,
+    gap: 6,
+    flex: 1,
   },
-  actionSkeleton: {
-    height: 100,
-  },
-  iconWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+  tile: {
+    width: 50,
+    height: 50,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  actionLabel: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.semiBold,
-    textAlign: 'center',
-  },
-  skeletonIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-  },
-  skeletonText: {
-    width: 60,
-    height: 14,
-    borderRadius: 4,
+  label: {
+    fontSize: 12,
+    fontFamily: theme.fonts.primary.medium,
   },
 });
 
 export default ProQuickActions;
-

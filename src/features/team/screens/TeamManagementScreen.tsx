@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -440,7 +440,7 @@ export default function TeamManagementScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <SecondaryHeader
         title="Staffs"
-        leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
         rightActions={[
           { icon: 'shield-outline', onPress: () => navigation.navigate('RoleRequests' as never) },
           { icon: 'user-plus', onPress: () => navigation.navigate('InviteStaff' as never) },

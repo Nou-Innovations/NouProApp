@@ -9,7 +9,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Switch, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { ListItemCard, EmptyState } from '@/shared/components/ui';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
@@ -74,7 +74,7 @@ export default function ProductVisibilityScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <SecondaryHeader
         title="Visibility"
-        leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
       />
       <Text style={[styles.summary, { color: appTheme.colors.textMuted }]}>
         {listedCount} listed · {products.length} total

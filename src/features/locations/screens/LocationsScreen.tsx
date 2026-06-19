@@ -16,7 +16,7 @@ import {
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useIsFocused } from '@react-navigation/native';
+import { useNavigation, useIsFocused, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
@@ -219,7 +219,7 @@ export default function LocationsScreen() {
       <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
         <SecondaryHeader
           title="Locations"
-          leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+          leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
         />
         <View style={styles.accessDeniedContainer}>
           <Icon name="location" size={60} color={appTheme.colors.textLight} />
@@ -244,7 +244,7 @@ export default function LocationsScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <SecondaryHeader
         title="Locations"
-        leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
         rightActions={[{ icon: 'plus', onPress: handleAddLocation }]}
       />
 

@@ -109,6 +109,37 @@ export type BusinessTabParamList = {
   BusinessExplore: undefined; // Feed / discovery, with notifications bell in header
   BusinessInbox: undefined; // Business inbox with activity timeline and chats
   BusinessProfile: undefined;
+
+  // Workspace pages opened from the sidebar — registered here as hidden tabs
+  // (no button in the bottom bar) so they keep the bottom nav bar visible and
+  // show the hamburger (not a back button) at their tab root. Their detail/create
+  // screens stay in RootStackParamList. These route names are intentionally also
+  // present in RootStackParamList so existing `navigate('X')` call sites keep
+  // type-checking against the global RootParamList.
+  Deliveries: { segment?: DeliveryViewType } | undefined;
+  DeliveriesAnalytics: { locationId?: string } | undefined;
+  MyDeliveries: undefined;
+  LogisticsOverview: undefined;
+  Issues: undefined;
+  Returns: undefined;
+  Routes: undefined;
+  Transfers: { segment?: string } | undefined;
+  Products: undefined;
+  Categories: undefined;
+  Brands: undefined;
+  Stock: undefined;
+  ProductVisibility: undefined;
+  Invoices: { initialTab?: 'invoices' | 'estimates' } | undefined;
+  Orders: { initialTab?: 'incoming' | 'outgoing' } | undefined;
+
+  // Settings pages that also live in the shell (sidebar → hamburger + bottom bar)
+  TeamManagement: { businessId: string } | undefined;
+  Locations: undefined;
+  CompanySettings: undefined;
+  // Sidebar-only alias of SubscriptionPlansScreen so the page shows the shell
+  // (bottom bar + hamburger) when opened from the sidebar, while the RootStack
+  // `SubscriptionPlans` route keeps a back button for the in-app "Upgrade" buttons.
+  SubscriptionHub: undefined;
 };
 
 // ========== Root Stack Navigator ==========

@@ -6,7 +6,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Icon } from '@/shared/utils/icons';
@@ -56,7 +56,7 @@ export default function LogisticsOverviewScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <PrimaryHeader
         title="Logistics"
-        leftAction={navigation.canGoBack() ? { icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' } : undefined}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
       />
       <ScrollView
         contentContainerStyle={styles.content}

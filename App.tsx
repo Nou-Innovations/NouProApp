@@ -69,8 +69,7 @@ import CreateInvoiceScreen from '@/features/invoices/screens/CreateInvoiceScreen
 import InvoiceDetailsScreen from '@/features/invoices/screens/InvoiceDetailsScreen';
 import ReceivedPaymentsScreen from '@/features/invoices/screens/ReceivedPaymentsScreen';
 
-// Screens - Orders & Cart
-import OrdersScreen from '@/features/orders/screens/OrdersScreen';
+// Screens - Orders & Cart (OrdersScreen is a hidden tab in BusinessTabNavigator)
 import OrderDetailsScreen from '@/features/orders/screens/OrderDetailsScreen';
 import CartScreen from '@/features/orders/screens/CartScreen';
 import PlaceOrderScreen from '@/features/orders/screens/PlaceOrderScreen';
@@ -92,7 +91,6 @@ import ProductsSearchScreen from '@/features/products/screens/ProductsSearchScre
 // Screens - Company & Search
 import CompanySearchScreen from '@/features/company/screens/CompanySearchScreen';
 import UserSearchScreen from '@/features/search/screens/UserSearchScreen';
-import CompanySettingsScreen from '@/features/company/screens/CompanySettingsScreen';
 import CompanyEditScreen from '@/features/company/screens/CompanyEditScreen';
 
 // Screens - Deliveries
@@ -119,33 +117,18 @@ import NotificationsScreen from '@/features/notifications/screens/NotificationsS
 // Screens - Shared
 import ComingSoonScreen from '@/shared/screens/ComingSoonScreen';
 
-// Screens - Quick-win features (formerly "Coming soon")
-import BrandsScreen from '@/features/brands/screens/BrandsScreen';
-import StockScreen from '@/features/products/screens/StockScreen';
-import CategoriesScreen from '@/features/products/screens/CategoriesScreen';
-import ProductVisibilityScreen from '@/features/products/screens/ProductVisibilityScreen';
-
 // Screens - Explore (Opportunities)
 import { OpportunitiesScreen, OpportunityDetailScreen, CreateOpportunityScreen } from '@/features/opportunities';
 
 // Screens - Explore (Events)
 import { EventsScreen, EventDetailScreen, CreateEventScreen } from '@/features/events';
 
-// Screens - Business workspace lists (moved from bottom tabs to the sidebar)
-import DeliveryScreen from '@/features/deliveries/screens/DeliveryScreen';
-import DeliveriesAnalyticsScreen from '@/features/deliveries/screens/DeliveriesAnalyticsScreen';
-import MyDeliveriesScreen from '@/features/deliveries/screens/MyDeliveriesScreen';
-import IssuesScreen from '@/features/issues/screens/IssuesScreen';
+// Screens - Business workspace detail screens (the list pages are now hidden tabs in
+// BusinessTabNavigator; only their push-over detail screens remain in the RootStack).
 import IssueDetailScreen from '@/features/issues/screens/IssueDetailScreen';
-import ReturnsScreen from '@/features/returns/screens/ReturnsScreen';
 import ReturnDetailScreen from '@/features/returns/screens/ReturnDetailScreen';
-import RoutesScreen from '@/features/routes/screens/RoutesScreen';
 import RouteDetailScreen from '@/features/routes/screens/RouteDetailScreen';
-import TransfersScreen from '@/features/transfers/screens/TransfersScreen';
 import TransferDetailScreen from '@/features/transfers/screens/TransferDetailScreen';
-import LogisticsOverviewScreen from '@/features/logistics/screens/LogisticsOverviewScreen';
-import ProductsScreen from '@/features/products/screens/ProductsScreen';
-import InvoicesScreen from '@/features/invoices/screens/InvoicesScreen';
 
 // Screens - Personal (from modes)
 import EditPersonalProfileScreen from '@/modes/personal/screens/EditPersonalProfileScreen';
@@ -183,13 +166,11 @@ import { CheckoutScreen, PaymentHistoryScreen } from '@/features/payments';
 // Screens - Feedback
 import { FeedbackCategoriesScreen, FeedbackListScreen, AddSuggestionScreen } from '@/features/feedback';
 
-// Screens - Business/Team
-import TeamManagementScreen from '@/features/team/screens/TeamManagementScreen';
+// Screens - Business/Team (TeamManagement is a hidden tab in BusinessTabNavigator)
 import InviteStaffScreen from '@/features/team/screens/InviteStaffScreen';
 import RoleRequestsScreen from '@/features/team/screens/RoleRequestsScreen';
 
-// Screens - Locations & Transports
-import LocationsScreen from '@/features/locations/screens/LocationsScreen';
+// Screens - Locations & Transports (Locations is a hidden tab in BusinessTabNavigator)
 import AddLocationScreen from '@/features/locations/screens/AddLocationScreen';
 import EditLocationScreen from '@/features/locations/screens/EditLocationScreen';
 import TransportsScreen from '@/features/transports/screens/TransportsScreen';
@@ -467,8 +448,7 @@ function AppNavigator() {
         <RootStack.Screen name="InvoiceDetails" component={InvoiceDetailsScreen} />
         <RootStack.Screen name="ReceivedPayments" component={ReceivedPaymentsScreen} />
 
-        {/* Orders & Cart Screens */}
-        <RootStack.Screen name="Orders" component={OrdersScreen} />
+        {/* Orders & Cart Screens (Orders list is a hidden tab in BusinessTabNavigator) */}
         <RootStack.Screen name="OrderDetails" component={OrderDetailsScreen} />
         <RootStack.Screen name="Cart" component={CartScreen} />
         <RootStack.Screen name="PlaceOrder" component={PlaceOrderScreen} />
@@ -516,16 +496,14 @@ function AppNavigator() {
         <RootStack.Screen name="PersonalProfileSettings" component={PersonalProfileSettingsScreen} />
         <RootStack.Screen name="PersonalSettings" component={PersonalSettingsScreen} />
         <RootStack.Screen name="PersonalDeliveryDetail" component={PersonalDeliveryDetailScreen} />
-        <RootStack.Screen name="CompanySettings" component={CompanySettingsScreen} />
+        {/* CompanySettings is a hidden tab in BusinessTabNavigator (sidebar shell) */}
         <RootStack.Screen name="EditBusiness" component={CompanyEditScreen} />
         
-        {/* Team Management */}
-        <RootStack.Screen name="TeamManagement" component={TeamManagementScreen} />
+        {/* Team Management (TeamManagement list is a hidden tab in BusinessTabNavigator) */}
         <RootStack.Screen name="InviteStaff" component={InviteStaffScreen} />
         <RootStack.Screen name="RoleRequests" component={RoleRequestsScreen} />
         
-        {/* Locations & Transports */}
-        <RootStack.Screen name="Locations" component={LocationsScreen} />
+        {/* Locations & Transports (Locations list is a hidden tab in BusinessTabNavigator) */}
         <RootStack.Screen name="AddLocation" component={AddLocationScreen} />
         <RootStack.Screen name="EditLocation" component={EditLocationScreen} />
         <RootStack.Screen name="Transports" component={TransportsScreen} />
@@ -540,13 +518,6 @@ function AppNavigator() {
         {/* Coming soon placeholder (not-yet-built features) */}
         <RootStack.Screen name="ComingSoon" component={ComingSoonScreen} />
 
-        {/* Quick-win feature screens (formerly "Coming soon") */}
-        <RootStack.Screen name="Brands" component={BrandsScreen} />
-        <RootStack.Screen name="Stock" component={StockScreen} />
-        <RootStack.Screen name="Categories" component={CategoriesScreen} />
-        <RootStack.Screen name="ProductVisibility" component={ProductVisibilityScreen} />
-        <RootStack.Screen name="Transfers" component={TransfersScreen} />
-
         {/* Explore — Opportunities */}
         <RootStack.Screen name="Opportunities" component={OpportunitiesScreen} />
         <RootStack.Screen name="OpportunityDetail" component={OpportunityDetailScreen} />
@@ -557,21 +528,14 @@ function AppNavigator() {
         <RootStack.Screen name="EventDetail" component={EventDetailScreen} />
         <RootStack.Screen name="CreateEvent" component={CreateEventScreen} />
 
-        {/* Business workspace lists (opened from the sidebar; previously bottom tabs) */}
-        <RootStack.Screen name="Deliveries" component={DeliveryScreen} />
-        <RootStack.Screen name="DeliveriesAnalytics" component={DeliveriesAnalyticsScreen} />
-        <RootStack.Screen name="MyDeliveries" component={MyDeliveriesScreen} />
-        <RootStack.Screen name="Issues" component={IssuesScreen} />
+        {/* Logistics / Products / Accounting list pages now live as hidden tabs in
+            BusinessTabNavigator (opened from the sidebar with the bottom bar + hamburger).
+            Their detail screens stay here as RootStack push screens (back button). */}
         <RootStack.Screen name="IssueDetail" component={IssueDetailScreen} />
-        <RootStack.Screen name="Returns" component={ReturnsScreen} />
         <RootStack.Screen name="ReturnDetail" component={ReturnDetailScreen} />
-        <RootStack.Screen name="Routes" component={RoutesScreen} />
         <RootStack.Screen name="RouteDetail" component={RouteDetailScreen} />
         <RootStack.Screen name="TransferDetail" component={TransferDetailScreen} />
-        <RootStack.Screen name="LogisticsOverview" component={LogisticsOverviewScreen} />
-        <RootStack.Screen name="Products" component={ProductsScreen} />
-        <RootStack.Screen name="Invoices" component={InvoicesScreen} />
-        
+
         {/* Subscription */}
         <RootStack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
 

@@ -1,9 +1,10 @@
 /**
  * KpiCard / KpiGrid — the 2×2 grid of headline metrics on Business Home.
  *
- * Each card shows a big pre-formatted value, a label, an icon, and an optional
- * sub-delta line (e.g. "+12% vs yesterday", "4 new", "3 overdue"). Values are
- * formatted by the hook so this stays purely presentational.
+ * Each card shows a small icon + label on one row, a big pre-formatted value,
+ * and an optional sub-delta line (e.g. "+12% vs yesterday", "4 new", "3
+ * overdue"). Borderless with a flat surface fill. Values are formatted by the
+ * hook so this stays purely presentational.
  */
 
 import React from 'react';
@@ -39,20 +40,19 @@ function KpiCard({ card }: { card: KpiCardData }) {
 
   return (
     <TouchableOpacity
-      style={[
-        styles.card,
-        { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.borderColor },
-      ]}
+      style={[styles.card, { backgroundColor: appTheme.colors.surface }]}
       activeOpacity={card.onPress ? 0.7 : 1}
       onPress={card.onPress}
       disabled={!card.onPress}
     >
-      <View style={[styles.iconContainer, { backgroundColor: `${card.color}15` }]}>
-        <Icon name={card.icon} size={18} color={card.color} />
+      <View style={styles.labelRow}>
+        <View style={[styles.iconChip, { backgroundColor: `${card.color}1F` }]}>
+          <Icon name={card.icon} size={15} color={card.color} />
+        </View>
+        <Text style={[styles.label, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
+          {card.label}
+        </Text>
       </View>
-      <Text style={[styles.label, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
-        {card.label}
-      </Text>
       <Text style={[styles.value, { color: appTheme.colors.text }]} numberOfLines={1}>
         {card.value}
       </Text>
@@ -60,9 +60,7 @@ function KpiCard({ card }: { card: KpiCardData }) {
         <Text style={[styles.delta, { color: deltaColor }]} numberOfLines={1}>
           {card.delta.text}
         </Text>
-      ) : (
-        <View style={styles.deltaSpacer} />
-      )}
+      ) : null}
     </TouchableOpacity>
   );
 }
@@ -79,17 +77,10 @@ export function KpiGrid({ cards, isLoading }: KpiGridProps) {
     return (
       <View style={styles.grid}>
         {[0, 1, 2, 3].map((i) => (
-          <View
-            key={i}
-            style={[
-              styles.card,
-              { backgroundColor: appTheme.colors.surface, borderColor: 'transparent' },
-            ]}
-          >
-            <Skeleton width={32} height={32} borderRadius={8} />
-            <Skeleton width={70} height={12} />
-            <Skeleton width={90} height={24} />
-            <Skeleton width={60} height={12} />
+          <View key={i} style={[styles.card, { backgroundColor: appTheme.colors.surface }]}>
+            <Skeleton width={70} height={14} />
+            <Skeleton width={90} height={22} />
+            <Skeleton width={56} height={12} />
           </View>
         ))}
       </View>
@@ -109,40 +100,41 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: theme.spacing.md,
+    paddingHorizontal: theme.spacing.sm,
     gap: 10,
-    marginBottom: theme.spacing.sm,
   },
   card: {
     flexBasis: '47%',
     flexGrow: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
     borderRadius: 14,
-    borderWidth: 1,
-    gap: 6,
+    gap: 5,
   },
-  iconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  iconChip: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
     justifyContent: 'center',
     alignItems: 'center',
   },
   label: {
+    flex: 1,
     fontSize: 12,
     fontFamily: theme.fonts.primary.medium,
   },
   value: {
-    fontSize: 22,
+    fontSize: 21,
     fontFamily: theme.fonts.primary.bold,
   },
   delta: {
     fontSize: 12,
     fontFamily: theme.fonts.primary.medium,
-  },
-  deltaSpacer: {
-    height: 15,
   },
 });
 

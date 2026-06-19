@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { EmptyState } from '@/shared/components/ui';
@@ -31,7 +31,7 @@ export default function ReturnsScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <PrimaryHeader
         title="Returns"
-        leftAction={navigation.canGoBack() ? { icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' } : undefined}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
         actions={[{ icon: 'add', onPress: () => setShowCreate(true), accessibilityLabel: 'New return' }]}
       />
 

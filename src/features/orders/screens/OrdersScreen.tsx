@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, DrawerActions } from '@react-navigation/native';
 import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -42,11 +42,20 @@ export default function OrdersScreen({ route }: Props) {
   // (a blank gap at the top of the list) after returning from a detail screen.
   const [refreshing, setRefreshing] = useState(false);
 
-  // Refetch on focus (background refresh — no spinner)
+  // Refetch on focus (background refresh — no spinner). Also apply a freshly-passed
+  // `initialTab` param: OrdersScreen is now a persistent hidden tab, so the mount-time
+  // initializer above only runs once — later navigations (e.g. dashboard "incoming" vs
+  // PlaceOrder "outgoing") must update the tab here, then clear the param so it doesn't
+  // re-apply on every focus.
   useFocusEffect(
     useCallback(() => {
       refetch();
-    }, [refetch])
+      const requestedTab = route.params?.initialTab;
+      if (requestedTab) {
+        setTab(requestedTab);
+        navigation.setParams({ initialTab: undefined });
+      }
+    }, [refetch, route.params?.initialTab, navigation])
   );
 
   // User-initiated pull-to-refresh
@@ -91,7 +100,7 @@ export default function OrdersScreen({ route }: Props) {
     >
       <SecondaryHeader
         title="Orders"
-        leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
       />
 
       {/* Tabs */}

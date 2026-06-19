@@ -21,7 +21,10 @@ export function LocationSelectorPill() {
   const setLocation = useBusinessStore((s) => s.setLocation);
   const [open, setOpen] = useState(false);
 
-  if (!locations || locations.length === 0) return null;
+  // Only businesses with 2+ locations get a switcher. A single-location business
+  // is always viewed business-wide (and the app force-selects its sole location
+  // globally, which would fight an "All locations" choice here).
+  if (!locations || locations.length < 2) return null;
 
   const label = currentLocation?.name ?? 'All locations';
 

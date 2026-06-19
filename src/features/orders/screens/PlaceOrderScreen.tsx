@@ -75,8 +75,13 @@ export default function PlaceOrderScreen({ route }: Props) {
         Alert.alert('Order placed', 'Your order has been sent to the supplier.', [
           {
             text: 'View orders',
+            // Orders is a hidden tab in BusinessTabNavigator — target it via the drawer's
+            // "Tabs" screen so the orders list opens in-shell (bottom bar + hamburger).
             onPress: () =>
-              navigation.navigate('Orders', { initialTab: 'outgoing' }),
+              (navigation as any).navigate('MainTabs', {
+                screen: 'Tabs',
+                params: { screen: 'Orders', params: { initialTab: 'outgoing' } },
+              }),
           },
         ]);
       } else {

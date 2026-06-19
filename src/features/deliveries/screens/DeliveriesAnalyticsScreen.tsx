@@ -18,7 +18,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { EmptyState } from '@/shared/components/ui';
@@ -77,7 +77,7 @@ export default function DeliveriesAnalyticsScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <PrimaryHeader
         title="Delivery analytics"
-        leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
       />
 
       {loading && !data ? (

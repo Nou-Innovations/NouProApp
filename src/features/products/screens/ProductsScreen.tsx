@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/shared/components/ui/FilterBar';
 import BrandCard from '@/features/brands/components/BrandCard';
@@ -288,7 +288,7 @@ const ProductsScreen: React.FC = () => {
       <PrimaryHeader
         title={currentViewTitle}
         onTitlePress={toggleViewDropdown}
-        leftAction={navigation.canGoBack() ? { icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' } : undefined}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
         actions={[
           { icon: 'plus', onPress: handleOpenCreateOptions, accessibilityLabel: 'Create product' },
           ...((isEditing || isAdmin()) ? [{

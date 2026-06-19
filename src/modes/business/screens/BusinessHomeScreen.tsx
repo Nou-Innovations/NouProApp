@@ -16,7 +16,7 @@
  * Business+ only). Location scoping flows through the shared businessStore.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -35,7 +35,7 @@ import { EmptyState } from '@/shared/components/ui';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { useProfileStore } from '@/shared/store/profileStore';
+import { useBusinessStore } from '@/shared/store/businessStore';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { RootStackParamList } from '@/shared/types/navigation';
@@ -51,12 +51,15 @@ import {
 import { useBusinessDashboard } from '../hooks/useBusinessDashboard';
 import { useBusinessOverview } from '../hooks/useBusinessOverview';
 
-const CHART_WIDTH = Dimensions.get('window').width - theme.spacing.md * 4;
+const CHART_WIDTH = Dimensions.get('window').width - (theme.spacing.sm + theme.spacing.md) * 2;
 
 export default function BusinessHomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { theme: appTheme } = useTheme();
-  const activeBusiness = useProfileStore((s) => s.activeBusiness);
+  const currentLocationId = useBusinessStore((s) => s.currentLocationId);
+  const locationCount = useBusinessStore((s) => s.locations.length);
+  // Single-location businesses are always business-wide; multi-location only when "All".
+  const isBusinessWide = locationCount < 2 || currentLocationId === null;
   const { unreadCount } = useNotifications();
   const { analyticsType } = usePermissions();
 
@@ -98,20 +101,17 @@ export default function BusinessHomeScreen() {
     navigation.navigate('AllActivity');
   }, [navigation]);
 
-  const todayLabel = useMemo(
-    () =>
-      `Today · ${new Date().toLocaleDateString(undefined, {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      })}`,
-    []
-  );
-
   // A brand-new business: no activity at all → show a setup prompt instead of
   // an empty (and misleadingly "healthy") dashboard.
+  //
+  // Only when viewing ALL locations and the data has fully settled. A single
+  // location (e.g. a dependent branch) legitimately has zero of its own
+  // activity — that must show a zeroed dashboard, NOT the setup screen, and we
+  // must not flip to it mid-refetch (which caused the dashboard→setup flicker).
   const isNewBusiness =
+    isBusinessWide &&
     !loading &&
+    !refreshing &&
     !error &&
     summary != null &&
     summary.activeOrders === 0 &&
@@ -172,19 +172,6 @@ export default function BusinessHomeScreen() {
           />
         }
       >
-        {/* Business name + date */}
-        <View style={styles.greetingSection}>
-          <Text style={[styles.dateLabel, { color: appTheme.colors.textSecondary }]}>
-            {todayLabel}
-          </Text>
-          <Text
-            style={[styles.businessName, { color: appTheme.colors.text }]}
-            numberOfLines={1}
-          >
-            {activeBusiness?.name || 'Your business'}
-          </Text>
-        </View>
-
         {/* Error banner with retry */}
         {error && !loading && (
           <TouchableOpacity
@@ -213,6 +200,9 @@ export default function BusinessHomeScreen() {
             {/* KPI grid */}
             <KpiGrid cards={kpiCards} isLoading={loading} />
 
+            {/* Quick actions */}
+            <ProQuickActions actions={quickActions} isLoading={loading} />
+
             {/* Needs attention */}
             <ProPriorityQueue items={priorityItems} isLoading={loading} onSeeAll={goToActivities} />
 
@@ -228,9 +218,6 @@ export default function BusinessHomeScreen() {
               onUpgrade={() => setShowPaywall(true)}
               chartWidth={CHART_WIDTH}
             />
-
-            {/* Quick actions */}
-            <ProQuickActions actions={quickActions} isLoading={loading} />
 
             {/* Recent activity preview */}
             <ProRecentActivity
@@ -266,7 +253,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
+    paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.sm,
   },
   headerActions: {
@@ -300,28 +287,15 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.bold,
   },
   scrollContent: {
+    paddingTop: theme.spacing.sm,
     paddingBottom: theme.spacing.xxl,
-  },
-  greetingSection: {
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.xs,
-    paddingBottom: theme.spacing.md,
-  },
-  dateLabel: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
-    marginTop: 8,
-  },
-  businessName: {
-    fontSize: 30,
-    fontFamily: theme.fonts.primary.bold,
-    marginTop: 2,
+    gap: 22,
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: theme.spacing.md,
+    marginHorizontal: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
     paddingVertical: 10,
     borderRadius: 10,

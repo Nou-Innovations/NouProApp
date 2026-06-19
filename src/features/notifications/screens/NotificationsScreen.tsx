@@ -461,9 +461,14 @@ export default function NotificationsScreen() {
         }
         break;
       case 'invite_pending':
-        // Admin sent an invite — navigate to team management to see pending invites
+        // Admin sent an invite — navigate to team management to see pending invites.
+        // TeamManagement is a hidden tab in BusinessTabNavigator, so target it via the
+        // drawer's "Tabs" screen so the bottom bar + hamburger stay visible.
         if (notification.requestData?.businessId) {
-          navigation.navigate('TeamManagement', { businessId: notification.requestData.businessId });
+          navigation.navigate('MainTabs', {
+            screen: 'Tabs',
+            params: { screen: 'TeamManagement', params: { businessId: notification.requestData.businessId } },
+          });
         }
         break;
       case 'company_request':
@@ -515,7 +520,8 @@ export default function NotificationsScreen() {
         }
         break;
       case 'invoice':
-        navigation.navigate('Invoices');
+        // Invoices is a hidden tab in BusinessTabNavigator — navigate via the drawer's "Tabs".
+        navigation.navigate('MainTabs', { screen: 'Tabs', params: { screen: 'Invoices' } });
         break;
       case 'order_update':
         // No OrderDetail screen yet — stay on notifications

@@ -9,7 +9,7 @@ import {
   FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { EmptyState, Skeleton, SkeletonRow, SkeletonColumn , AppBottomSheet } from '@/shared/components/ui';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
@@ -153,7 +153,7 @@ export default function InvoicesScreen() {
       <PrimaryHeader
         title={activeTab === 'invoices' ? 'Invoices' : 'Estimates'}
         onTitlePress={toggleViewDropdown}
-        leftAction={navigation.canGoBack() ? { icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' } : undefined}
+        leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
         actions={[
           { icon: 'plus', onPress: handleCreateNew, accessibilityLabel: 'Create invoice' },
         ]}
