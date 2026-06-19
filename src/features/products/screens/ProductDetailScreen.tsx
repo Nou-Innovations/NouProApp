@@ -64,7 +64,7 @@ import {
   RelatedProduct,
 } from '@/shared/types/productDetails';
 import { getSuppliersForProduct, type ProductSupplierPricing } from '@/features/procurement/services/procurement.service';
-import { toggleProductListed } from '@/features/products/products.service';
+import { toggleProductListed, carryProduct } from '@/features/products/products.service';
 import SupplierPickerModal from '@/features/procurement/components/SupplierPickerModal';
 import type { Supplier } from '@/shared/types/procurement';
 import ProductHero from '../components/productDetail/ProductHero';
@@ -477,6 +477,18 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
+  // Client-stocked: add this distributor's product to the viewer's own store
+  // (creates a linked copy), then refetch so the stock + listing controls appear.
+  const handleAddToStore = async () => {
+    if (!activeCompanyId || !dto) return;
+    try {
+      await carryProduct(activeCompanyId, dto.product.id);
+      fetchProduct();
+    } catch {
+      Alert.alert('Could not add', 'Failed to add this product to your store. Please try again.');
+    }
+  };
+
   // Owner action - Navigate to CreateProduct screen with product data for editing
   const handleEdit = () => {
     if (!dto) {
@@ -790,6 +802,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               isListed={dto.viewerStock?.isListed}
               canManage={!!dto.viewerStock?.clientProductId}
               onToggleListing={handleToggleListing}
+              onAddToStore={handleAddToStore}
             />
           )}
 

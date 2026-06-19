@@ -1,13 +1,13 @@
 /**
  * ClientStoreCard — "In your store" panel shown to a client who ALREADY stocks
  * this distributor's product (viewer mode: client-stocked). Shows their own stock
- * left and order history; when a manageable store copy exists (`canManage`), it
- * also exposes a Listed/Unlisted toggle. Reordering is handled by the bottom
- * action bar (the "Reorder" button).
+ * left and order history. When a manageable store copy exists (`canManage`) it
+ * exposes a Listed/Unlisted toggle; otherwise it offers "Add to my store" which
+ * creates that copy. Reordering is handled by the bottom action bar.
  */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Switch } from 'react-native';
-import { SectionTitle } from '@/shared/components/ui';
+import { SectionTitle, AppButton } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 
@@ -17,9 +17,10 @@ interface Props {
   lastOrderedAt?: string;
   totalOrdered?: number;
   isListed?: boolean;
-  /** True when the client's own product copy exists (enables the listing toggle). */
+  /** True when the client's own product copy exists (enables stock + listing). */
   canManage?: boolean;
   onToggleListing?: (next: boolean) => void;
+  onAddToStore?: () => void | Promise<void>;
 }
 
 function formatDate(iso?: string): string | null {
@@ -37,13 +38,25 @@ const ClientStoreCard: React.FC<Props> = ({
   isListed,
   canManage = false,
   onToggleListing,
+  onAddToStore,
 }) => {
   const { theme: appTheme } = useTheme();
   const [listed, setListed] = useState(!!isListed);
+  const [adding, setAdding] = useState(false);
 
   const handleToggle = (next: boolean) => {
     setListed(next);
     onToggleListing?.(next);
+  };
+
+  const handleAdd = async () => {
+    if (!onAddToStore) return;
+    setAdding(true);
+    try {
+      await onAddToStore();
+    } finally {
+      setAdding(false);
+    }
   };
 
   const lastOrdered = formatDate(lastOrderedAt);
@@ -80,8 +93,8 @@ const ClientStoreCard: React.FC<Props> = ({
           </>
         )}
 
-        {/* Listing toggle — only when a manageable store copy exists */}
-        {canManage && (
+        {canManage ? (
+          /* Manageable copy exists → listing toggle */
           <>
             <View style={[styles.divider, { backgroundColor: appTheme.colors.borderColor }]} />
             <View style={styles.row}>
@@ -95,6 +108,21 @@ const ClientStoreCard: React.FC<Props> = ({
               />
             </View>
           </>
+        ) : (
+          /* No copy yet → offer to add it to the client's store */
+          <View style={styles.addBlock}>
+            <View style={[styles.divider, { backgroundColor: appTheme.colors.borderColor }]} />
+            <Text style={[styles.addHint, { color: appTheme.colors.textMuted }]}>
+              Add it to your store to track stock and list it for your customers.
+            </Text>
+            <AppButton
+              title="Add to my store"
+              variant="primary"
+              size="small"
+              loading={adding}
+              onPress={handleAdd}
+            />
+          </View>
         )}
       </View>
     </View>
@@ -133,6 +161,15 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: StyleSheet.hairlineWidth,
+  },
+  addBlock: {
+    paddingVertical: 14,
+    gap: 12,
+  },
+  addHint: {
+    fontSize: 13,
+    fontFamily: theme.fonts.primary.regular,
+    lineHeight: 18,
   },
 });
 

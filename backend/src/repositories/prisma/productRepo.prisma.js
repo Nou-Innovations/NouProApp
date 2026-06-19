@@ -23,6 +23,13 @@ async function getByBusinessId(businessId) {
   });
 }
 
+/** The business's "carried" copy of another business's product, if any. */
+async function getCarriedCopy(businessId, sourceProductId) {
+  return prisma.product.findFirst({
+    where: { businessId, sourceProductId }
+  });
+}
+
 async function create(data) {
   return prisma.product.create({
     data: {
@@ -50,12 +57,13 @@ async function remove(id) {
   }
 }
 
-module.exports = { 
-  list, 
-  getById, 
-  getByBusinessId, 
-  create, 
-  update, 
-  delete: remove 
+module.exports = {
+  list,
+  getById,
+  getByBusinessId,
+  getCarriedCopy,
+  create,
+  update,
+  delete: remove
 };
 

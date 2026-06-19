@@ -151,6 +151,14 @@ export async function toggleProductListed(
   return patch<UIProduct>(`/companies/${companyId}/products/${productId}`, { is_listed });
 }
 
+/**
+ * Carry another business's product into your own store — creates a linked copy
+ * (the client then owns its stock + listing). Idempotent on the backend.
+ */
+export async function carryProduct(companyId: string, sourceProductId: string): Promise<UIProduct> {
+  return post<UIProduct>(`/companies/${companyId}/products/carry`, { sourceProductId });
+}
+
 // ============================================================================
 // Export as namespace
 // ============================================================================
@@ -165,6 +173,7 @@ const productsService = {
   updateProductStock,
   toggleProductDisplayable,
   toggleProductListed,
+  carryProduct,
 };
 
 export default productsService;

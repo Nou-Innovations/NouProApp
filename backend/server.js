@@ -164,6 +164,7 @@ const { requireAuth, optionalAuth, generateToken, verifyToken } = require('./src
 const { successResponse, errorResponse, paywallResponse, sendError } = require('./src/utils/response');
 const { deriveCapabilities, isLocationPublicEffective, getPublicDisabledReason, hasCapability } = require('./src/domain/capabilities');
 const { applyPricePrivacy, applyPricePrivacyBatch } = require('./src/domain/pricePrivacy')(repos, prisma);
+const { resolvePriceListForBuyer, applyPriceList, resolveUnitPrice, repriceLineItems, attachYourPrice } = require('./src/domain/priceResolution')(repos, prisma);
 const { normalizeLastMessage, otherParticipantId, applyViewerDisplay, serializeChatsForViewer, serializeChatForViewer } = require('./src/domain/chatSerializers')(repos);
 const requireAutomationAuth = require('./src/middleware/automationAuth')(errorResponse);
 
@@ -781,6 +782,18 @@ const createOrderSchema = z.object({
   buyerBusinessId: z.string().optional().nullable(),
   buyerBusinessName: z.string().max(200).optional().nullable(),
   createdBy: z.string().optional().nullable(),
+  // Optional: seller manually applies one of their price lists (manual/guest orders).
+  manualPriceListId: z.string().optional().nullable(),
+});
+
+// Price list create/update (customer-specific pricing).
+const createPriceListSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional().nullable(),
+  discountPercent: z.number().min(0).max(100).optional().nullable(),
+  currency: z.string().max(10).optional().nullable(),
+  isActive: z.boolean().optional(),
+  isDefault: z.boolean().optional(),
 });
 
 // Validates req.body against a zod schema, returns parsed data or sends 400
@@ -3532,7 +3545,14 @@ app.get('/api/companies/:companyId/products', requireAuth, async (req, res) => {
     }
     const privacyProducts = await applyPricePrivacyBatch(enrichedProducts, viewerBusinessId);
 
-    res.json(successResponse(privacyProducts));
+    // Price lists: attach the viewing buyer's effective price (yourPrice/basePrice/
+    // priceListId/priceSource) without overwriting `price`. No-op when the viewer is
+    // the owner or no list applies.
+    const withYourPrice = (viewerBusinessId && viewerBusinessId !== companyId)
+      ? await attachYourPrice(privacyProducts, companyId, viewerBusinessId)
+      : privacyProducts;
+
+    res.json(successResponse(withYourPrice));
   } catch (e) {
     logger.error('Error fetching products:', e);
     res.status(500).json(errorResponse('Failed to load products'));
@@ -3571,7 +3591,13 @@ app.get('/api/companies/:companyId/products/:productId', requireAuth, async (req
       }
     }
     const result = await applyPricePrivacy(product, viewerBusinessId);
-    res.json(successResponse(result));
+
+    // Price lists: attach the viewing buyer's effective price (no-op for owner / no list).
+    const withYourPrice = (viewerBusinessId && viewerBusinessId !== companyId)
+      ? (await attachYourPrice([result], companyId, viewerBusinessId))[0]
+      : result;
+
+    res.json(successResponse(withYourPrice));
   } catch (e) {
     logger.error('Error fetching product:', e);
     res.status(500).json(errorResponse('Failed to load product'));
@@ -3623,6 +3649,63 @@ app.post('/api/companies/:companyId/products', requireAuth, async (req, res) => 
   } catch (e) {
     logger.error('Error creating product:', e);
     res.status(500).json(errorResponse('Failed to create product'));
+  }
+});
+
+// Carry another business's product into your own store. Creates a linked copy
+// (sourceProductId → the original) that the client owns and can stock / list /
+// reorder. Idempotent: returns the existing copy if one already exists.
+app.post('/api/companies/:companyId/products/carry', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+    const sourceProductId = req.body?.sourceProductId;
+    if (!sourceProductId || typeof sourceProductId !== 'string') {
+      return res.status(400).json(errorResponse('sourceProductId is required'));
+    }
+
+    const source = await repos.productRepo.getById(sourceProductId);
+    if (!source) {
+      return res.status(404).json(errorResponse('Source product not found'));
+    }
+    if (source.businessId === companyId) {
+      return res.status(400).json(errorResponse('You already own this product'));
+    }
+
+    // Idempotent — return the existing carried copy if one exists.
+    const existing = await repos.productRepo.getCarriedCopy(companyId, sourceProductId);
+    if (existing) {
+      return res.json(successResponse(existing));
+    }
+
+    const now = new Date().toISOString();
+    const copy = await repos.productRepo.create({
+      id: uuidv4(),
+      businessId: companyId,
+      sourceProductId: source.id,
+      name: source.name,
+      brand: source.brand || null,
+      brandLogo: source.brandLogo || null,
+      productPicture: source.productPicture || null,
+      description: source.description || null,
+      unit: source.unit || null,
+      category: source.category || null,
+      barcode: source.barcode || null,
+      price: source.price ?? null,
+      stockQuantity: 0,
+      isListed: false, // unlisted by default — the client opts in
+      isImported: true,
+      isCreatedByUser: false,
+      status: 'Available',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    res.status(201).json(successResponse(copy));
+  } catch (e) {
+    logger.error('Error carrying product:', e);
+    res.status(500).json(errorResponse('Failed to add product to your store'));
   }
 });
 
@@ -3918,6 +4001,256 @@ app.delete('/api/companies/:companyId/brands/:brandId', requireAuth, async (req,
   } catch (e) {
     logger.error('Error deleting brand:', e);
     res.status(500).json(errorResponse('Failed to delete brand'));
+  }
+});
+
+// ============================================================================
+// PRICE LIST ROUTES (customer-specific pricing)
+// Gated by canUseBusinessSpecificPricing (Business+). The seller owns the lists;
+// they are applied to customer businesses via assignment or manual selection.
+// ============================================================================
+
+// Membership + Business-plan capability gate for price-list writes.
+// Returns the seller business on success, or null (response already sent) on failure.
+async function requirePricingCapability(req, res, companyId) {
+  if (!(await requireBusinessMembership(req, res, companyId))) return null;
+  const business = await repos.businessRepo.getById(companyId);
+  if (!business) {
+    res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    return null;
+  }
+  if (!deriveCapabilities(business).canUseBusinessSpecificPricing) {
+    res.status(403).json(paywallResponse(
+      'Custom price lists require a Business plan.',
+      'business_specific_pricing',
+      'business'
+    ));
+    return null;
+  }
+  return business;
+}
+
+// List all price lists for a business (with item + assignment counts).
+app.get('/api/companies/:companyId/price-lists', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+    const lists = await repos.priceListRepo.getByBusinessId(companyId);
+    res.json(successResponse(lists));
+  } catch (e) {
+    logger.error('Error fetching price lists:', e);
+    res.status(500).json(errorResponse('Failed to fetch price lists'));
+  }
+});
+
+// Resolve the effective price for a buyer/product (preview for the order/invoice UI).
+// NOTE: must be declared BEFORE '/price-lists/:listId' so it isn't captured as an id.
+app.get('/api/companies/:companyId/price-lists/resolve', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+    const { buyerBusinessId, productId, qty, unit, manualPriceListId } = req.query;
+    if (!productId) return res.status(400).json(errorResponse('productId is required'));
+    const product = await repos.productRepo.getById(productId);
+    if (!product || product.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Product not found'));
+    }
+    const list = await resolvePriceListForBuyer(companyId, buyerBusinessId || null, {
+      manualPriceListId: manualPriceListId || null,
+    });
+    const { unitPrice, source } = applyPriceList(list, product, Number(qty) || 1, { unit: unit || 'unit' });
+    res.json(successResponse({
+      priceListId: list ? list.id : null,
+      priceListName: list ? list.name : null,
+      unitPrice,
+      basePrice: ((unit === 'carton' ? product.pricePerCarton : product.price) ?? null),
+      priceSource: source,
+    }));
+  } catch (e) {
+    logger.error('Error resolving price:', e);
+    res.status(500).json(errorResponse('Failed to resolve price'));
+  }
+});
+
+// Create a price list.
+app.post('/api/companies/:companyId/price-lists', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    if (!(await requirePricingCapability(req, res, companyId))) return;
+    const data = validateBody(createPriceListSchema, req, res);
+    if (!data) return;
+    const created = await repos.priceListRepo.create({
+      id: 'plist-' + uuidv4().slice(0, 8),
+      businessId: companyId,
+      name: data.name.trim(),
+      description: data.description || null,
+      discountPercent: data.discountPercent ?? null,
+      currency: data.currency || null,
+      isActive: data.isActive ?? true,
+      isDefault: data.isDefault ?? false,
+    });
+    res.status(201).json(successResponse(created));
+  } catch (e) {
+    logger.error('Error creating price list:', e);
+    res.status(500).json(errorResponse('Failed to create price list'));
+  }
+});
+
+// Get a single price list (with items + assignments).
+app.get('/api/companies/:companyId/price-lists/:listId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, listId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+    const list = await repos.priceListRepo.getById(listId);
+    if (!list || list.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Price list not found'));
+    }
+    res.json(successResponse(list));
+  } catch (e) {
+    logger.error('Error fetching price list:', e);
+    res.status(500).json(errorResponse('Failed to fetch price list'));
+  }
+});
+
+// Update a price list.
+app.patch('/api/companies/:companyId/price-lists/:listId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, listId } = req.params;
+    if (!(await requirePricingCapability(req, res, companyId))) return;
+    const existing = await repos.priceListRepo.getById(listId);
+    if (!existing || existing.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Price list not found'));
+    }
+    const { name, description, discountPercent, currency, isActive, isDefault } = req.body;
+    const updated = await repos.priceListRepo.update(listId, {
+      ...(name !== undefined && { name: String(name).trim() }),
+      ...(description !== undefined && { description }),
+      ...(discountPercent !== undefined && { discountPercent }),
+      ...(currency !== undefined && { currency }),
+      ...(isActive !== undefined && { isActive }),
+      ...(isDefault !== undefined && { isDefault }),
+      updatedAt: new Date(),
+    });
+    res.json(successResponse(updated));
+  } catch (e) {
+    logger.error('Error updating price list:', e);
+    res.status(500).json(errorResponse('Failed to update price list'));
+  }
+});
+
+// Delete a price list (admin only).
+app.delete('/api/companies/:companyId/price-lists/:listId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, listId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
+    const existing = await repos.priceListRepo.getById(listId);
+    if (!existing || existing.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Price list not found'));
+    }
+    await repos.priceListRepo.delete(listId);
+    res.json(successResponse(null, 'Price list deleted successfully'));
+  } catch (e) {
+    logger.error('Error deleting price list:', e);
+    res.status(500).json(errorResponse('Failed to delete price list'));
+  }
+});
+
+// Add or update a per-product override (upsert on productId).
+app.post('/api/companies/:companyId/price-lists/:listId/items', requireAuth, async (req, res) => {
+  try {
+    const { companyId, listId } = req.params;
+    if (!(await requirePricingCapability(req, res, companyId))) return;
+    const existing = await repos.priceListRepo.getById(listId);
+    if (!existing || existing.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Price list not found'));
+    }
+    const { productId, fixedPrice, fixedPricePerCarton } = req.body;
+    if (!productId) return res.status(400).json(errorResponse('productId is required'));
+    if ((fixedPrice === undefined || fixedPrice === null) &&
+        (fixedPricePerCarton === undefined || fixedPricePerCarton === null)) {
+      return res.status(400).json(errorResponse('Provide fixedPrice and/or fixedPricePerCarton'));
+    }
+    const product = await repos.productRepo.getById(productId);
+    if (!product || product.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Product not found'));
+    }
+    const item = await repos.priceListRepo.upsertItem({
+      id: 'plitem-' + uuidv4().slice(0, 8),
+      priceListId: listId,
+      productId,
+      fixedPrice: fixedPrice ?? null,
+      fixedPricePerCarton: fixedPricePerCarton ?? null,
+    });
+    res.status(201).json(successResponse(item));
+  } catch (e) {
+    logger.error('Error adding price list item:', e);
+    res.status(500).json(errorResponse('Failed to add price list item'));
+  }
+});
+
+// Remove a per-product override.
+app.delete('/api/companies/:companyId/price-lists/:listId/items/:itemId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, listId, itemId } = req.params;
+    if (!(await requirePricingCapability(req, res, companyId))) return;
+    const existing = await repos.priceListRepo.getById(listId);
+    if (!existing || existing.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Price list not found'));
+    }
+    const ok = await repos.priceListRepo.removeItem(itemId);
+    if (!ok) return res.status(404).json(errorResponse('Item not found'));
+    res.json(successResponse(null, 'Item removed'));
+  } catch (e) {
+    logger.error('Error removing price list item:', e);
+    res.status(500).json(errorResponse('Failed to remove price list item'));
+  }
+});
+
+// Assign (or move) a customer business to this list. One list per customer per seller.
+app.put('/api/companies/:companyId/price-lists/:listId/assignments', requireAuth, async (req, res) => {
+  try {
+    const { companyId, listId } = req.params;
+    if (!(await requirePricingCapability(req, res, companyId))) return;
+    const existing = await repos.priceListRepo.getById(listId);
+    if (!existing || existing.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Price list not found'));
+    }
+    const { buyerBusinessId } = req.body;
+    if (!buyerBusinessId) return res.status(400).json(errorResponse('buyerBusinessId is required'));
+    if (buyerBusinessId === companyId) {
+      return res.status(400).json(errorResponse('Cannot assign a price list to your own business'));
+    }
+    const assignment = await repos.priceListRepo.upsertAssignment({
+      id: 'plasn-' + uuidv4().slice(0, 8),
+      priceListId: listId,
+      sellerBusinessId: companyId,
+      buyerBusinessId,
+    });
+    res.json(successResponse(assignment));
+  } catch (e) {
+    logger.error('Error assigning price list:', e);
+    res.status(500).json(errorResponse('Failed to assign price list'));
+  }
+});
+
+// Unassign a customer business from this list.
+app.delete('/api/companies/:companyId/price-lists/:listId/assignments/:buyerBusinessId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, listId, buyerBusinessId } = req.params;
+    if (!(await requirePricingCapability(req, res, companyId))) return;
+    const existing = await repos.priceListRepo.getById(listId);
+    if (!existing || existing.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Price list not found'));
+    }
+    const current = await repos.priceListRepo.getAssignmentForBuyer(companyId, buyerBusinessId);
+    if (!current || current.priceListId !== listId) {
+      return res.status(404).json(errorResponse('Assignment not found'));
+    }
+    await repos.priceListRepo.removeAssignment(companyId, buyerBusinessId);
+    res.json(successResponse(null, 'Assignment removed'));
+  } catch (e) {
+    logger.error('Error removing assignment:', e);
+    res.status(500).json(errorResponse('Failed to remove assignment'));
   }
 });
 
@@ -4926,7 +5259,7 @@ app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
     const {
       customerName, customerAddress, customerPhone,
       items, totalAmount, notes, fulfillmentLocationId,
-      buyerBusinessId, buyerBusinessName, createdBy
+      buyerBusinessId, buyerBusinessName, createdBy, manualPriceListId
     } = orderData;
 
     const isB2B = !!buyerBusinessId;
@@ -4959,6 +5292,22 @@ app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
       ));
     }
 
+    // PRICE AUTHORITY (price lists): resolve the buyer's effective prices server-side.
+    //  - B2B buyer-placed orders: fully authoritative — the buyer can't forge a price.
+    //    Auto-assignment governs; product lines are repriced to base when no list applies.
+    //  - Seller-created (manual/guest) orders: the seller may set custom prices, so only
+    //    a manually-selected (or default) list overrides; otherwise client prices are kept.
+    const resolvedList = await resolvePriceListForBuyer(
+      req.params.companyId,
+      isB2B ? buyerBusinessId : null,
+      { manualPriceListId: isB2B ? null : (manualPriceListId || null) }
+    );
+    const priced = await repriceLineItems(resolvedList, items, req.params.companyId, { forceBase: isB2B });
+    if (priced.changed) {
+      logger.info(`[priceList] order repriced for seller ${req.params.companyId}` +
+        `${resolvedList ? ` via list ${resolvedList.id}` : ''} (client total ${totalAmount} → ${priced.totalAmount})`);
+    }
+
     const newOrder = {
       id: 'ORD-' + uuidv4().slice(0, 8).toUpperCase(),
       businessId: req.params.companyId,
@@ -4975,8 +5324,8 @@ app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
       buyerBusinessId: buyerBusinessId || null,
       buyerBusinessName: buyerBusinessName || null,
       createdBy: createdBy || req.user?.id || null,
-      items: items || [],
-      totalAmount,
+      items: priced.items,
+      totalAmount: priced.totalAmount,
       notes: notes || null,
     };
 
@@ -8027,6 +8376,36 @@ app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => 
     }
     if (req.body.dueDate && typeof req.body.dueDate === 'string') {
       req.body.dueDate = new Date(req.body.dueDate);
+    }
+
+    // PRICE AUTHORITY (price lists): if a price list applies to this client,
+    // reprice product-backed invoice lines and recompute the money fields.
+    // Free-text lines (no productId) keep their entered price. With no applicable
+    // list this is a no-op (existing client-supplied amounts are kept).
+    try {
+      const invList = await resolvePriceListForBuyer(
+        req.params.companyId,
+        req.body.clientBusinessId || null,
+        { manualPriceListId: req.body.manualPriceListId || null }
+      );
+      const hasProductLine = Array.isArray(req.body.items) &&
+        req.body.items.some((it) => it && (it.productId || it.product_id));
+      if (invList && hasProductLine) {
+        const priced = await repriceLineItems(invList, req.body.items, req.params.companyId, { forceBase: false });
+        const newSubtotal = priced.totalAmount;
+        const tr = Number(req.body.taxRate) || 0;
+        const disc = Number(req.body.discountAmount) || 0;
+        const newTax = Math.round(newSubtotal * (tr / 100) * 100) / 100;
+        req.body.items = priced.items;
+        req.body.subtotal = newSubtotal;
+        req.body.taxAmount = newTax;
+        req.body.totalAmount = Math.round((newSubtotal + newTax - disc) * 100) / 100;
+        if (priced.changed) {
+          logger.info(`[priceList] invoice repriced for seller ${req.params.companyId} via list ${invList.id}`);
+        }
+      }
+    } catch (priceErr) {
+      logger.error('[priceList] invoice repricing failed (keeping client amounts):', priceErr.message);
     }
 
     // Generate invoice number with retry to handle concurrent requests
@@ -12887,16 +13266,35 @@ app.get('/api/products', async (req, res) => {
 async function computeViewerStock(productId, viewerBusinessId) {
   if (!viewerBusinessId) return null;
 
-  // The viewer's own stock for this product (summed across their locations).
-  let stockQuantity;
+  // The viewer's own "carried" copy of this product (if they added it to their
+  // store). The copy is a normal product they own → its stock + listing are theirs.
+  let clientProductId;
+  let isListed;
+  let copyStock;
   try {
-    const stockRows = (await repos.stockRepo.getByBusinessId(viewerBusinessId)) || [];
-    const mine = stockRows.filter((s) => s.productId === productId);
-    if (mine.length > 0) {
-      stockQuantity = mine.reduce((sum, s) => sum + (s.qtyOnHand || 0), 0);
+    const copy = await repos.productRepo.getCarriedCopy(viewerBusinessId, productId);
+    if (copy) {
+      clientProductId = copy.id;
+      isListed = copy.isListed ?? false;
+      copyStock = copy.stockQuantity ?? undefined;
     }
   } catch (e) {
-    logger.warn('[viewerStock] stock lookup failed:', e?.message || e);
+    logger.warn('[viewerStock] carried-copy lookup failed:', e?.message || e);
+  }
+
+  // Stock left: prefer the carried copy's own stock; otherwise sum the viewer's
+  // Stock rows for this product across their locations.
+  let stockQuantity = copyStock;
+  if (stockQuantity == null) {
+    try {
+      const stockRows = (await repos.stockRepo.getByBusinessId(viewerBusinessId)) || [];
+      const mine = stockRows.filter((s) => s.productId === productId);
+      if (mine.length > 0) {
+        stockQuantity = mine.reduce((sum, s) => sum + (s.qtyOnHand || 0), 0);
+      }
+    } catch (e) {
+      logger.warn('[viewerStock] stock lookup failed:', e?.message || e);
+    }
   }
 
   // Has the viewer's business ordered this product before? Scan recent orders'
@@ -12918,7 +13316,7 @@ async function computeViewerStock(productId, viewerBusinessId) {
     logger.warn('[viewerStock] order history lookup failed:', e?.message || e);
   }
 
-  const alreadyStocked = alreadyOrdered || (stockQuantity != null && stockQuantity > 0);
+  const alreadyStocked = alreadyOrdered || !!clientProductId || (stockQuantity != null && stockQuantity > 0);
   if (!alreadyStocked) return null;
 
   return {
@@ -12926,7 +13324,8 @@ async function computeViewerStock(productId, viewerBusinessId) {
     stockQuantity,
     lastOrderedAt: lastOrderedAt || undefined,
     totalOrdered: totalOrdered || undefined,
-    // isListed / clientProductId: require a client product copy (future increment)
+    isListed,
+    clientProductId,
   };
 }
 
@@ -13090,7 +13489,10 @@ app.post('/api/public/locations/:locationId/orders', async (req, res) => {
 
     // SECURITY: never trust client-supplied prices. Load each product, confirm
     // it belongs to this location's business and is publicly listed, then
-    // compute unit prices and totals from the database.
+    // compute unit prices and totals from the database. A guest has no buyer
+    // business, so only the seller's DEFAULT price list (if any) applies; with no
+    // default list this is identical to plain base pricing.
+    const defaultList = await resolvePriceListForBuyer(location.businessId, null);
     const orderItems = [];
     let totalAmount = 0;
     for (const item of rawItems) {
@@ -13103,8 +13505,8 @@ app.post('/api/public/locations/:locationId/orders', async (req, res) => {
       if (!product || product.businessId !== location.businessId || !product.isListed) {
         return res.status(400).json(errorResponse(`Product not available: ${productId}`, 'INVALID_PRODUCT'));
       }
-      const unitPrice = product.price || 0;
-      const subtotal = unitPrice * quantity;
+      const { unitPrice } = applyPriceList(defaultList, product, quantity, { unit: item?.unit });
+      const subtotal = Math.round(unitPrice * quantity * 100) / 100;
       totalAmount += subtotal;
       orderItems.push({
         productId: product.id,
@@ -13114,6 +13516,7 @@ app.post('/api/public/locations/:locationId/orders', async (req, res) => {
         subtotal,
       });
     }
+    totalAmount = Math.round(totalAmount * 100) / 100;
 
     const newOrder = {
       id: 'ORD-' + uuidv4().slice(0, 8).toUpperCase(),
