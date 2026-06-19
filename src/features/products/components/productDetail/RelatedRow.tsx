@@ -4,10 +4,10 @@
  * Renders nothing when there are no products.
  */
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
+import { SectionTitle } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import theme from '@/shared/theme';
 import { RelatedProduct } from '@/shared/types/productDetails';
 import ProductMiniCard from './ProductMiniCard';
 
@@ -26,9 +26,9 @@ const RelatedRow: React.FC<Props> = ({ title, products, onProductPress, onHeader
 
   const HeaderContent = (
     <View style={styles.headerRow}>
-      <Text style={[styles.title, { color: appTheme.colors.text }]} numberOfLines={1}>
+      <SectionTitle style={styles.title} numberOfLines={1}>
         {title}
-      </Text>
+      </SectionTitle>
       {onHeaderPress && (
         <Icon name="chevron-forward" size={20} color={appTheme.colors.textMuted} />
       )}
@@ -74,8 +74,6 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontSize: 17,
-    fontFamily: theme.fonts.primary.semiBold,
   },
   scrollContent: {
     gap: 14,

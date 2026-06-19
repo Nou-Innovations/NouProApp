@@ -1101,11 +1101,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 8,
   },
   grabber: {
     alignSelf: 'center',
