@@ -28,7 +28,6 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
-  ActivityIndicator,
   Share,
   Alert,
 } from 'react-native';
@@ -74,6 +73,7 @@ import OwnerDetailRows from '../components/productDetail/OwnerDetailRows';
 import ClientStoreCard from '../components/productDetail/ClientStoreCard';
 import RelatedRow from '../components/productDetail/RelatedRow';
 import FloatingHeader from '../components/productDetail/FloatingHeader';
+import ProductDetailSkeleton, { RelatedRowSkeleton } from '../components/productDetail/ProductDetailSkeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Image must be 3:4 ratio (width:height = 3:4)
@@ -251,6 +251,9 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   // State
   const [dto, setDto] = useState<ProductDetailsDTO | null>(null);
   const [loading, setLoading] = useState(true);
+  // Related "More from…" sections load after the main product — kept as skeletons
+  // until their fetch resolves so they don't pop into empty space.
+  const [relatedLoading, setRelatedLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -346,11 +349,14 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     } catch (err) {
       console.warn('[ProductDetail] Failed to fetch related products:', err);
       // Non-critical – just leave related sections empty
+    } finally {
+      setRelatedLoading(false);
     }
   };
 
   const fetchProduct = useCallback(async () => {
     setLoading(true);
+    setRelatedLoading(true);
     setError(null);
 
     try {
@@ -601,15 +607,9 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     return unit;
   };
 
-  // Loading state
+  // Loading state — full skeleton of the whole screen (no bare spinner)
   if (loading) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={appTheme.colors.primary} />
-        </View>
-      </SafeAreaView>
-    );
+    return <ProductDetailSkeleton onBack={() => navigation.goBack()} />;
   }
 
   // Error state
@@ -805,28 +805,36 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             />
           )}
 
-          {/* More sections (buyer + personal) */}
+          {/* More sections (buyer + personal). Stay skeletons until loaded so
+              they don't pop into empty space one by one. */}
           {showRelatedProducts && (
-            <>
-              <RelatedRow
-                title={`More from ${seller.companyName}`}
-                products={sameCompanyProducts}
-                onProductPress={handleRelatedProductPress}
-                onHeaderPress={handleBusinessPress}
-              />
-              <RelatedRow
-                title={`More from ${product.brand}`}
-                products={sameBrandProducts}
-                onProductPress={handleRelatedProductPress}
-                onHeaderPress={handleBrandPress}
-              />
-              <RelatedRow
-                title="You might also like"
-                products={sameCategoryProducts}
-                onProductPress={handleRelatedProductPress}
-                isLast
-              />
-            </>
+            relatedLoading ? (
+              <>
+                <RelatedRowSkeleton />
+                <RelatedRowSkeleton isLast />
+              </>
+            ) : (
+              <>
+                <RelatedRow
+                  title={`More from ${seller.companyName}`}
+                  products={sameCompanyProducts}
+                  onProductPress={handleRelatedProductPress}
+                  onHeaderPress={handleBusinessPress}
+                />
+                <RelatedRow
+                  title={`More from ${product.brand}`}
+                  products={sameBrandProducts}
+                  onProductPress={handleRelatedProductPress}
+                  onHeaderPress={handleBrandPress}
+                />
+                <RelatedRow
+                  title="You might also like"
+                  products={sameCategoryProducts}
+                  onProductPress={handleRelatedProductPress}
+                  isLast
+                />
+              </>
+            )
           )}
         </View>
       </Animated.ScrollView>
@@ -1056,11 +1064,6 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   errorContainer: {
     flex: 1,
