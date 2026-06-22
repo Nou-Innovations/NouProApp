@@ -16,7 +16,7 @@ import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/shared/components/ui/FilterBar';
 import InvoiceCard from '@/features/invoices/components/InvoiceCard';
 import LocationDropdown from '@/shared/components/ui/LocationDropdown';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import InvoiceActionsModal from '@/features/invoices/components/InvoiceActionsModal';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -150,11 +150,11 @@ export default function InvoicesScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       {/* Primary Header */}
-      <PrimaryHeader
+      <SecondaryHeader
         title={activeTab === 'invoices' ? 'Invoices' : 'Estimates'}
         onTitlePress={toggleViewDropdown}
         leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
-        actions={[
+        rightActions={[
           { icon: 'plus', onPress: handleCreateNew, accessibilityLabel: 'Create invoice' },
         ]}
       />

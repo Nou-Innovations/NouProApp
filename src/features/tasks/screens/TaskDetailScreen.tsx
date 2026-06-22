@@ -9,7 +9,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   Alert,
   ActivityIndicator,
 } from 'react-native';
@@ -18,7 +17,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import themeConstants from '@/shared/theme';
-import { AppModal } from '@/shared/components/ui';
+import { AppModal, AppButton } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { getTask, updateTaskStatus, deleteTask } from '../services/tasks.service';
 import { TASK_STATUS_TRANSITIONS, TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, TASK_TYPE_LABELS } from '@/shared/types/task';
@@ -209,21 +208,16 @@ export default function TaskDetailScreen() {
             {validTransitions.map((newStatus) => {
               const isPrimary = newStatus === 'COMPLETED' || newStatus === 'IN_PROGRESS';
               return (
-                <TouchableOpacity
+                <AppButton
                   key={newStatus}
-                  style={[
-                    styles.actionButton,
-                    isPrimary
-                      ? { backgroundColor: STATUS_COLORS[newStatus] }
-                      : { backgroundColor: 'transparent', borderWidth: 1, borderColor: STATUS_COLORS[newStatus] },
-                  ]}
+                  title={ACTION_LABELS[newStatus] || TASK_STATUS_LABELS[newStatus]}
                   onPress={() => handleStatusChange(newStatus)}
+                  variant={isPrimary ? 'primary' : 'outline'}
+                  loading={isUpdating}
                   disabled={isUpdating}
-                >
-                  <Text style={[styles.actionButtonText, { color: isPrimary ? '#FFFFFF' : STATUS_COLORS[newStatus] }]}>
-                    {isUpdating ? 'Updating...' : ACTION_LABELS[newStatus] || TASK_STATUS_LABELS[newStatus]}
-                  </Text>
-                </TouchableOpacity>
+                  fullWidth
+                  style={styles.actionButton}
+                />
               );
             })}
           </View>
@@ -254,6 +248,5 @@ const styles = StyleSheet.create({
   detailLabel: { fontSize: 14, fontFamily: themeConstants.fonts.primary.regular, marginLeft: 10, width: 90 },
   detailValue: { fontSize: 14, fontFamily: themeConstants.fonts.primary.medium, flex: 1 },
   actionsSection: { paddingHorizontal: 16, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#ECE6DF' },
-  actionButton: { borderRadius: 8, height: 48, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  actionButtonText: { fontSize: 16, fontFamily: themeConstants.fonts.primary.semiBold },
+  actionButton: { marginBottom: 10 },
 });

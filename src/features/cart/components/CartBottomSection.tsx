@@ -3,11 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Alert,
 } from 'react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useOrderStore } from '@/shared/store/orderStore';
+import { AppButton, TextButton } from '@/shared/components/ui';
 
 interface CartBottomSectionProps {
   businessId: string;
@@ -74,21 +74,20 @@ const CartBottomSection: React.FC<CartBottomSectionProps> = ({ businessId, onPla
           </View>
         </View>
         
-        <TouchableOpacity 
-          style={styles.placeOrderButton}
+        <AppButton
+          title="Place Order"
           onPress={handlePlaceOrder}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.placeOrderText}>Place Order</Text>
-        </TouchableOpacity>
+          variant="secondary"
+          fullWidth
+          style={styles.placeOrderButton}
+        />
 
-        <TouchableOpacity 
-          style={styles.clearCartButton}
+        <TextButton
+          title="Clear Cart"
           onPress={handleClearCart}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.clearCartText}>Clear Cart</Text>
-        </TouchableOpacity>
+          style={styles.clearCartButton}
+          textStyle={styles.clearCartText}
+        />
       </View>
     </View>
   );
@@ -149,30 +148,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   placeOrderButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    height: 48,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 8,
   },
-  placeOrderText: {
-    color: '#1C1917',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   clearCartButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignSelf: 'center',
   },
   clearCartText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
 

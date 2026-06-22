@@ -20,7 +20,6 @@ import {
   ShieldCheck,
   FileText,
   User,
-  Heart,
   Eye,
   LogOut,
   CreditCard,
@@ -188,11 +187,6 @@ export default function CompanySettingsScreen() {
     }
   };
 
-  const handleHelpCommunity = () => {
-    // @ts-ignore
-    navigation.navigate('FeedbackCategories');
-  };
-
   return (
     <BusinessAdminGuard message={`Only admins can access ${activeBusiness?.name || 'business'} settings.`}>
       <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
@@ -211,7 +205,7 @@ export default function CompanySettingsScreen() {
           <AppButton
             title="Explore plans"
             onPress={handleExplorePlans}
-            variant="alert"
+            variant="accent"
           />
         </View>
 
@@ -291,28 +285,6 @@ export default function CompanySettingsScreen() {
         </View>
       </ScrollView>
 
-      {/* Bottom Fixed Buttons */}
-      <View style={styles.bottomButtonsContainer}>
-        {/* Help Community Section */}
-        <TouchableOpacity
-          style={[styles.communityButton, { backgroundColor: '#DBEAFE' }]}
-          onPress={handleHelpCommunity}
-        >
-          <View style={styles.communityContent}>
-            <View style={[styles.communityIcon]}>
-              <Heart size={24} color={appTheme.colors.info} strokeWidth={2} />
-            </View>
-            <View style={styles.communityText}>
-              <Text style={[styles.communityTitle, { color: appTheme.colors.info, fontFamily: theme.fonts.primary.bold}]}>
-                Help the Community grow
-              </Text>
-              <Text style={[styles.communitySubtitle, { color: appTheme.colors.secondary }]}>
-                Propose features, report bugs, and share your feedback
-              </Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </View>
       {/* Leave Company Confirmation */}
       <AppModal
         visible={showLeaveDialog}
@@ -380,40 +352,6 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.base,
     fontFamily: theme.fonts.primary.semiBold,
     marginLeft: theme.spacing.md,
-  },
-  bottomButtonsContainer: {
-    paddingHorizontal: 12,
-    paddingBottom: 40,
-    gap: 8,
-  },
-  communityButton: {
-    height: 80,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: 8,
-  },
-  communityContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  communityIcon: {
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.md,
-  },
-  communityText: {
-    flex: 1,
-  },
-  communityTitle: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  communitySubtitle: {
-    fontSize: theme.fontSize.sm,
-    fontFamily: theme.fonts.primary.medium,
   },
   accessDeniedContainer: {
     flex: 1,

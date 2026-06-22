@@ -144,6 +144,10 @@ export type BusinessTabParamList = {
   SubscriptionHub: undefined;
   // Design System showroom — catalogs every modal/bottom-sheet surface (sidebar).
   BottomSheetGallery: undefined;
+  // Design System showroom — catalogs every chat message bubble type (sidebar).
+  MessageGallery: undefined;
+  // Design System showroom — live showcase of every button/control (sidebar).
+  ButtonGallery: undefined;
 };
 
 // ========== Root Stack Navigator ==========
@@ -354,8 +358,7 @@ export type RootStackParamList = {
   
   // Feedback screens
   FeedbackCategories: undefined;
-  FeedbackList: { categoryId: string; categoryTitle: string };
-  AddSuggestion: { categoryId: string; categoryTitle: string };
+  AddSuggestion: { defaultCategoryId?: string } | undefined;
   
   // Auth screens (if needed)
   Auth: undefined;

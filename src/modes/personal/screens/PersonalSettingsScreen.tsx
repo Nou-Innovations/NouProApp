@@ -110,11 +110,6 @@ export default function PersonalSettingsScreen() {
     navigation.navigate('SecuritySettings');
   };
 
-  const handleHelpCommunity = () => {
-    // @ts-ignore
-    navigation.navigate('FeedbackCategories');
-  };
-
   const handlePrivacyPolicy = () => {
     Alert.alert('Privacy Policy', 'Navigate to privacy policy screen');
   };
@@ -373,27 +368,6 @@ export default function PersonalSettingsScreen() {
       </TouchableOpacity>
 
     </View>
-  );
-
-  const renderHelpCommunitySection = () => (
-    <TouchableOpacity
-      style={[styles.communityButton, { backgroundColor: '#DBEAFE' }]}
-      onPress={handleHelpCommunity}
-    >
-      <View style={styles.communityContent}>
-        <View style={styles.communityIcon}>
-          <Icon name="heart-outline" size={24} color={appTheme.colors.info} />
-        </View>
-        <View style={styles.communityText}>
-          <Text style={[styles.communityTitle, { color: appTheme.colors.info, fontFamily: theme.fonts.primary.bold }]}>
-            Help the Community grow
-          </Text>
-          <Text style={[styles.communitySubtitle, { color: appTheme.colors.secondary }]}>
-            Propose features, report bugs, and share your feedback
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
   );
 
   // Profile Switcher Modal
@@ -703,11 +677,6 @@ export default function PersonalSettingsScreen() {
         {renderSettingsSection()}
       </ScrollView>
 
-      {/* Bottom Fixed Buttons */}
-      <View style={styles.bottomButtonsContainer}>
-        {renderHelpCommunitySection()}
-      </View>
-
       {renderProfileSwitcherModal()}
       {renderAddBusinessOptionsModal()}
     </SafeAreaView>
@@ -749,40 +718,6 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.base,
     fontFamily: theme.fonts.primary.semiBold,
     marginLeft: theme.spacing.md,
-  },
-  bottomButtonsContainer: {
-    paddingHorizontal: 12,
-    paddingBottom: 40,
-    gap: 8,
-  },
-  communityButton: {
-    height: 80,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: 8,
-  },
-  communityContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  communityIcon: {
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.md,
-  },
-  communityText: {
-    flex: 1,
-  },
-  communityTitle: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  communitySubtitle: {
-    fontSize: theme.fontSize.sm,
-    fontFamily: theme.fonts.primary.medium,
   },
   // Modal styles
   modalOverlay: {

@@ -7,7 +7,7 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Icon } from '@/shared/utils/icons';
 import { SectionTitle } from '@/shared/components/ui';
@@ -55,7 +55,7 @@ export default function LogisticsOverviewScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <PrimaryHeader
+      <SecondaryHeader
         title="Logistics"
         leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
       />

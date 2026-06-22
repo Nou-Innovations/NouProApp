@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { EmptyState } from '@/shared/components/ui';
 import Pill from '@/shared/components/ui/Pill';
@@ -55,10 +55,10 @@ export default function RoutesScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <PrimaryHeader
+      <SecondaryHeader
         title="Routes"
         leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
-        actions={[{ icon: 'add', onPress: handleCreate, accessibilityLabel: 'New route' }]}
+        rightActions={[{ icon: 'add', onPress: handleCreate, accessibilityLabel: 'New route' }]}
       />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.segmentBar} style={{ flexGrow: 0 }}>

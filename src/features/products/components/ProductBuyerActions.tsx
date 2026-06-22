@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+import { AppButton } from '@/shared/components/ui';
 import { 
   BuyerCapabilities, 
   ProductAvailability, 
@@ -129,18 +130,15 @@ const ProductBuyerActions: React.FC<ProductBuyerActionsProps> = ({
           
           <View style={styles.outOfStockActions}>
             {onNotifyRestock && (
-              <TouchableOpacity
-                style={[styles.notifyButton, { borderColor: appTheme.colors.primary }]}
+              <AppButton
+                title="Notify Me"
                 onPress={onNotifyRestock}
-                activeOpacity={0.7}
-              >
-                <Icon name="notifications-outline" size={18} color={appTheme.colors.primary} />
-                <Text style={[styles.notifyButtonText, { color: appTheme.colors.primary }]}>
-                  Notify Me
-                </Text>
-              </TouchableOpacity>
+                variant="outline"
+                size="small"
+                iconLeft="notifications-outline"
+              />
             )}
-            
+
             {capabilities.canMessageSeller && (
               <TouchableOpacity
                 style={[styles.messageButton, { backgroundColor: appTheme.colors.surface }]}
@@ -234,27 +232,23 @@ const ProductBuyerActions: React.FC<ProductBuyerActionsProps> = ({
 
         {/* Add to Cart */}
         {capabilities.canAddToCart && (
-          <TouchableOpacity
-            style={[styles.cartButton, { borderColor: appTheme.colors.primary }]}
+          <AppButton
+            title="Add to Cart"
             onPress={onAddToCart}
-            activeOpacity={0.7}
-          >
-            <Icon name="cart-outline" size={20} color={appTheme.colors.primary} />
-            <Text style={[styles.cartButtonText, { color: appTheme.colors.primary }]}>
-              Add to Cart
-            </Text>
-          </TouchableOpacity>
+            variant="outline"
+            iconLeft="cart-outline"
+            style={styles.flexButton}
+          />
         )}
 
         {/* Order Now */}
         {capabilities.canOrder && (
-          <TouchableOpacity
-            style={[styles.orderButton, { backgroundColor: appTheme.colors.primary }]}
+          <AppButton
+            title="Order Now"
             onPress={onOrder}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.orderButtonText}>Order Now</Text>
-          </TouchableOpacity>
+            variant="primary"
+            style={styles.flexButton}
+          />
         )}
       </View>
     </View>
@@ -326,31 +320,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cartButton: {
+  flexButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    gap: 8,
-  },
-  cartButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  orderButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  orderButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
   },
   // Out of stock styles
   outOfStockContainer: {
@@ -379,19 +350,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  notifyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    gap: 6,
-  },
-  notifyButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   messageButton: {
     width: 44,

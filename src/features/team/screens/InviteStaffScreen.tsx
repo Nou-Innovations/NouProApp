@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Alert,
   TextInput,
   ScrollView,
@@ -19,7 +18,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import { post, get } from '@/shared/services/api';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { AppSearchBar, Avatar } from '@/shared/components/ui';
+import { AppSearchBar, Avatar, AppButton } from '@/shared/components/ui';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { checkPaywall, getLimitTriggerId, PaywallCheck } from '@/shared/utils/permissions';
 
@@ -215,28 +214,15 @@ export default function InviteStaffScreen() {
             {item.email}
           </Text>
         </View>
-        <TouchableOpacity
-          style={[
-            styles.sendRequestButton,
-            {
-              backgroundColor: isAdded ? appTheme.colors.surface : appTheme.colors.primary,
-              borderWidth: isAdded ? 1 : 0,
-              borderColor: appTheme.colors.borderColor,
-            }
-          ]}
+        <AppButton
+          title={isAdded ? 'Added' : 'Add to invite'}
           onPress={() => handleSendUserRequest(item)}
           disabled={isAdded}
-          activeOpacity={0.7}
-        >
-          {isAdded ? (
-            <View style={styles.requestSentContent}>
-              <Icon name="checkmark" size={16} color={appTheme.colors.textSecondary} />
-              <Text style={[styles.requestSentText, { color: appTheme.colors.textSecondary }]}>Added</Text>
-            </View>
-          ) : (
-            <Text style={styles.sendRequestText}>Add to invite</Text>
-          )}
-        </TouchableOpacity>
+          variant={isAdded ? 'outline' : 'primary'}
+          size="small"
+          iconLeft={isAdded ? 'checkmark' : undefined}
+          style={styles.sendRequestButton}
+        />
       </View>
     );
   };
@@ -269,14 +255,13 @@ export default function InviteStaffScreen() {
         </View>
 
         {/* Copy Link Button */}
-        <TouchableOpacity
-          style={[styles.copyLinkButton, { backgroundColor: appTheme.colors.primary }]}
+        <AppButton
+          title="Copy link"
           onPress={handleCopyLink}
-          activeOpacity={0.7}
-        >
-          <Icon name="link-outline" size={20} color="#FFFFFF" />
-          <Text style={styles.copyLinkText}>Copy link</Text>
-        </TouchableOpacity>
+          iconLeft="link-outline"
+          fullWidth
+          style={styles.copyLinkButton}
+        />
 
         {/* Divider */}
         <View style={styles.dividerContainer}>
@@ -362,28 +347,17 @@ export default function InviteStaffScreen() {
       </ScrollView>
       
       {/* Bottom Action Button */}
-      <View style={[styles.bottomActions, { 
+      <View style={[styles.bottomActions, {
         borderTopColor: appTheme.colors.borderColor,
         backgroundColor: appTheme.colors.background,
       }]}>
-        <TouchableOpacity 
-          style={[
-            styles.submitButton, 
-            { 
-              backgroundColor: isButtonEnabled ? appTheme.colors.primary : appTheme.colors.surface,
-            }
-          ]}
+        <AppButton
+          title="Send request"
           onPress={handleSubmit}
+          fullWidth
+          loading={isSubmitting}
           disabled={!isButtonEnabled || isSubmitting}
-          activeOpacity={0.7}
-        >
-          <Text style={[
-            styles.submitButtonText,
-            { color: isButtonEnabled ? '#FFFFFF' : appTheme.colors.textMuted }
-          ]}>
-            {isSubmitting ? 'Sending...' : 'Send request'}
-          </Text>
-        </TouchableOpacity>
+        />
       </View>
 
       {/* Paywall Modal for Staff Limit */}
@@ -433,18 +407,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   copyLinkButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 48,
-    borderRadius: 8,
-    gap: 8,
     marginBottom: 24,
-  },
-  copyLinkText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-    color: '#FFFFFF',
   },
   dividerContainer: {
     flexDirection: 'row',
@@ -514,26 +477,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   sendRequestButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
     minWidth: 110,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendRequestText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.semiBold,
-    color: '#FFFFFF',
-  },
-  requestSentContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  requestSentText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
   },
   emptyState: {
     alignItems: 'center',
@@ -548,15 +492,5 @@ const styles = StyleSheet.create({
   bottomActions: {
     padding: 16,
     borderTopWidth: 1,
-  },
-  submitButton: {
-    height: 48,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
   },
 });

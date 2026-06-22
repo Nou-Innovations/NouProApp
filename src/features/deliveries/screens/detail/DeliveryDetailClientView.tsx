@@ -22,7 +22,7 @@ import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/
 import { Icon } from '@/shared/utils/icons';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
-import { AppButton } from '@/shared/components/ui/AppButton';
+import AppButton from '@/shared/components/ui/AppButton';
 import type { Delivery, DeliveryStatus, PaymentStatus } from '@/shared/types/delivery';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';

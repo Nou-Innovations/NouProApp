@@ -3,8 +3,10 @@
  * transfer. Shortfalls/damage are turned into Issues by the backend.
  */
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
+import { QrCode } from 'lucide-react-native';
 import { Icon } from '@/shared/utils/icons';
+import { AppButton, TextButton } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import ScannerModal from '@/shared/components/ui/ScannerModal';
@@ -107,14 +109,22 @@ export function TransferReceiveModal({ visible, onClose, transfer, onReceived }:
             ))}
           </ScrollView>
 
-          <TouchableOpacity style={[styles.scanBtn, { borderColor: theme.colors.borderColor }]} onPress={() => setScanning(true)}>
-            <Icon name="qr-code-outline" size={18} color={theme.colors.accent} />
-            <Text style={[styles.scanText, { color: theme.colors.accent }]}>Scan to receive</Text>
-          </TouchableOpacity>
+          <TextButton
+            title="Scan to receive"
+            onPress={() => setScanning(true)}
+            iconLeft={QrCode}
+            style={styles.scanBtn}
+          />
 
-          <TouchableOpacity style={[styles.submit, { backgroundColor: theme.colors.success }]} onPress={submit} disabled={submitting}>
-            {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitText}>Confirm received</Text>}
-          </TouchableOpacity>
+          <AppButton
+            title="Confirm received"
+            onPress={submit}
+            variant="confirm"
+            loading={submitting}
+            disabled={submitting}
+            fullWidth
+            style={styles.submit}
+          />
         </View>
       </View>
 
@@ -141,10 +151,8 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 14, fontFamily: 'InterCustom-Medium', color: theme.colors.text },
   shipped: { fontSize: 14, fontFamily: 'InterCustom-Medium', color: theme.colors.textSecondary },
   input: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, fontSize: 14 },
-  scanBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', marginTop: 16 },
-  scanText: { fontSize: 15, fontFamily: 'InterCustom-SemiBold' },
-  submit: { height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
-  submitText: { color: '#FFFFFF', fontSize: 16, fontFamily: 'InterCustom-SemiBold' },
+  scanBtn: { alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', height: 46, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.colors.borderColor, marginTop: 16 },
+  submit: { marginTop: 12 },
 });
 
 export default TransferReceiveModal;

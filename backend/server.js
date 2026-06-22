@@ -322,6 +322,23 @@ const twoFactorLimiter = rateLimit({
   validate: { xForwardedForHeader: false },
 });
 
+// Allowed community-feedback category ids (server-side source of truth; mirrors the
+// frontend FEEDBACK_CATEGORIES). Categories are validated against this list, not a DB
+// enum, so adding one later needs no migration.
+const FEEDBACK_CATEGORY_IDS = ['interface', 'add', 'modify', 'ideas', 'other'];
+
+// Rate limiter for suggestion creation (anti-spam): 5 per 10 minutes per user.
+// Applied AFTER requireAuth, so req.user.id is available.
+const suggestionLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req.ip),
+  message: { success: false, error: 'Too many suggestions, please slow down' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+});
+
 // File upload setup with security hardening.
 //
 // Storage engine is chosen by configuration:
@@ -5083,6 +5100,73 @@ app.get('/api/users/me/tasks', requireAuth, async (req, res) => {
 });
 
 // ============================================================================
+// COMMUNITY FEEDBACK ROUTES (suggestions + voting)
+// Global community board — scoped by the authenticated user, not by company.
+// ============================================================================
+
+// List suggestions. Optional ?categoryId= filter (validated) and ?sort=top|new (default top).
+app.get('/api/suggestions', requireAuth, async (req, res) => {
+  try {
+    const { categoryId, sort } = req.query;
+    const safeCategory = FEEDBACK_CATEGORY_IDS.includes(categoryId) ? categoryId : undefined;
+    const safeSort = sort === 'new' ? 'new' : 'top';
+    const suggestions = await repos.suggestionRepo.list({
+      userId: req.user.id,
+      categoryId: safeCategory,
+      sort: safeSort,
+    });
+    res.json(successResponse(suggestions));
+  } catch (e) {
+    logger.error('Error fetching suggestions:', e);
+    res.status(500).json(errorResponse('Failed to fetch suggestions'));
+  }
+});
+
+// Create a suggestion (rate-limited to curb spam).
+app.post('/api/suggestions', requireAuth, suggestionLimiter, async (req, res) => {
+  try {
+    const text = (req.body?.text ?? '').trim();
+    const { categoryId } = req.body ?? {};
+    if (!text) {
+      return res.status(400).json(errorResponse('Suggestion text is required'));
+    }
+    if (text.length > 1000) {
+      return res.status(400).json(errorResponse('Suggestion is too long (max 1000 characters)'));
+    }
+    if (!FEEDBACK_CATEGORY_IDS.includes(categoryId)) {
+      return res.status(400).json(errorResponse('Invalid category'));
+    }
+    const created = await repos.suggestionRepo.create({
+      userId: req.user.id,
+      categoryId,
+      text,
+    });
+    res.status(201).json(successResponse(created, 'Suggestion submitted'));
+  } catch (e) {
+    logger.error('Error creating suggestion:', e);
+    res.status(500).json(errorResponse('Failed to submit suggestion'));
+  }
+});
+
+// Toggle the current user's vote on a suggestion. Returns the fresh { hasVoted, votes }.
+app.post('/api/suggestions/:id/vote', requireAuth, async (req, res) => {
+  try {
+    const suggestion = await repos.suggestionRepo.getById(req.params.id);
+    if (!suggestion) {
+      return res.status(404).json(errorResponse('Suggestion not found'));
+    }
+    const result = await repos.suggestionRepo.toggleVote({
+      userId: req.user.id,
+      suggestionId: req.params.id,
+    });
+    res.json(successResponse(result, 'Vote updated'));
+  } catch (e) {
+    logger.error('Error toggling suggestion vote:', e);
+    res.status(500).json(errorResponse('Failed to update vote'));
+  }
+});
+
+// ============================================================================
 // BUSINESS CONNECTION ROUTES
 // ============================================================================
 
@@ -8302,6 +8386,28 @@ app.get('/api/companies/:companyId/invoices/:invoiceId', requireAuth, async (req
   }
 });
 
+// Builds the rich `details` block attached to invoice/estimate chat messages so the
+// chat card can show item count, a few line items, and the total (see ChatLineItem /
+// InvoiceCardDetails on the frontend). All fields are best-effort/optional.
+function buildInvoiceCardDetails(inv, currency) {
+  const rawItems = Array.isArray(inv.items) ? inv.items : [];
+  const items = rawItems.slice(0, 3).map((it) => ({
+    name: it.description || it.name || 'Item',
+    quantity: Number(it.quantity) || 0,
+    unitPrice: Number(it.unitPrice) || 0,
+  }));
+  const num = (v) => (v == null ? undefined : Number(v));
+  return {
+    number: inv.invoiceNumber || undefined,
+    currency,
+    status: inv.status || undefined,
+    itemCount: rawItems.length,
+    items,
+    subtotal: num(inv.amount),
+    total: num(inv.totalAmount != null ? inv.totalAmount : inv.total),
+  };
+}
+
 // Create invoice at Parent level
 app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => {
   // PERMISSION: Require business membership
@@ -8484,6 +8590,7 @@ app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => 
             clientName: created.clientName,
             invoiceId: created.type === 'invoice' ? created.id : undefined,
             estimateId: created.type === 'estimate' ? created.id : undefined,
+            details: buildInvoiceCardDetails(created, business.settings?.currency || 'EUR'),
           }
         });
       } catch (msgErr) {
@@ -8704,7 +8811,10 @@ app.post('/api/locations/:locationId/invoices', requireAuth, async (req, res) =>
             currency: business.settings?.currency || 'EUR',
             invoiceNumber: created.invoiceNumber,
             clientName: created.clientName,
-            locationId: location.id
+            locationId: location.id,
+            invoiceId: created.type === 'invoice' ? created.id : undefined,
+            estimateId: created.type === 'estimate' ? created.id : undefined,
+            details: buildInvoiceCardDetails(created, business.settings?.currency || 'EUR'),
           }
         });
       } catch (msgErr) {
@@ -8866,6 +8976,7 @@ app.patch('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
             clientName: updated.clientName,
             invoiceId: updated.type === 'invoice' ? updated.id : undefined,
             estimateId: updated.type === 'estimate' ? updated.id : undefined,
+            details: buildInvoiceCardDetails(updated, updated.currency || 'EUR'),
           }
         });
       } catch (msgErr) {
@@ -9857,9 +9968,11 @@ app.post('/api/users/:userId/chats/:chatId/messages', requireAuth, messageLimite
     } else if (resolvedType === 'invoice') {
       newMessage.content = content;
       newMessage.invoiceId = metadata?.invoiceId;
+      if (metadata?.details) newMessage.details = metadata.details;
     } else if (resolvedType === 'estimate') {
       newMessage.content = content;
       newMessage.estimateId = metadata?.estimateId;
+      if (metadata?.details) newMessage.details = metadata.details;
     } else if (resolvedType === 'delivery') {
       newMessage.content = content;
       newMessage.meta = metadata;

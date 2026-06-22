@@ -26,6 +26,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { AppButton, ButtonRow } from '@/shared/components/ui';
 import ProcurementStatusBadge from '../components/ProcurementStatusBadge';
 import SupplierPickerModal from '../components/SupplierPickerModal';
 import type { PurchaseOrderItem, Supplier } from '@/shared/types/procurement';
@@ -198,10 +199,7 @@ export default function CreatePurchaseOrderScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.label, { color: appTheme.colors.textSecondary }]}>Items</Text>
-              <TouchableOpacity onPress={addItemRow} style={[styles.addButton, { backgroundColor: appTheme.colors.primary }]}>
-                <Icon name="add" size={18} color="#FFFFFF" />
-                <Text style={styles.addButtonText}>Add Item</Text>
-              </TouchableOpacity>
+              <AppButton title="Add Item" onPress={addItemRow} size="small" iconLeft="add" />
             </View>
 
             {items.map((item, index) => (
@@ -309,22 +307,20 @@ export default function CreatePurchaseOrderScreen() {
       {/* Bottom buttons */}
       <View style={[styles.bottomBar, { backgroundColor: appTheme.colors.cardBackground, borderTopColor: appTheme.colors.borderColor }]}>
         {isSubmitting && <ActivityIndicator style={styles.spinner} color={appTheme.colors.primary} />}
-        <View style={styles.bottomButtons}>
-          <TouchableOpacity
-            style={[styles.draftButton, { borderColor: appTheme.colors.borderColor }]}
+        <ButtonRow>
+          <AppButton
+            title="Save Draft"
             onPress={handleSaveDraft}
+            variant="outline"
             disabled={isSubmitting}
-          >
-            <Text style={[styles.draftButtonText, { color: appTheme.colors.text }]}>Save Draft</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.submitButton, { opacity: isSubmitting ? 0.6 : 1 }]}
+          />
+          <AppButton
+            title="Send to Supplier"
             onPress={handleSend}
+            variant="primary"
             disabled={isSubmitting}
-          >
-            <Text style={styles.submitButtonText}>Send to Supplier</Text>
-          </TouchableOpacity>
-        </View>
+          />
+        </ButtonRow>
       </View>
       <SupplierPickerModal
         visible={showSupplierPicker}
@@ -370,16 +366,6 @@ const styles = StyleSheet.create({
   },
   selectorText: { fontSize: 16, flex: 1 },
 
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 4,
-  },
-  addButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
-
   itemCard: {
     padding: 12,
     borderRadius: 8,
@@ -416,26 +402,5 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     borderTopWidth: 1,
   },
-  bottomButtons: { flexDirection: 'row', gap: 12 },
   spinner: { marginBottom: 8 },
-
-  draftButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  draftButtonText: { fontSize: 16, fontWeight: '600' },
-
-  submitButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#1C1917',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 });

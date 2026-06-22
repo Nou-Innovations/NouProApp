@@ -11,7 +11,6 @@ import {
   Text,
   FlatList,
   StyleSheet,
-  TouchableOpacity,
   Alert,
   ActivityIndicator,
   TextInput,
@@ -22,7 +21,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { Avatar, AppModal, ListItemCard, AppBottomSheet } from '@/shared/components/ui';
+import { Avatar, AppModal, ListItemCard, AppBottomSheet, AppButton, ButtonRow } from '@/shared/components/ui';
 import BusinessAdminGuard from '@/shared/guards/BusinessAdminGuard';
 import roleRequestService from '@/features/team/roleRequest.service';
 import { RoleRequestWithUser } from '@/shared/types/roleRequest';
@@ -189,26 +188,24 @@ export default function RoleRequestsScreen() {
                   ) : undefined
                 }
                 rightRow2={
-                  <View style={styles.requestActions}>
-                    <TouchableOpacity
-                      style={[styles.approveButton, { backgroundColor: appTheme.colors.success }]}
+                  <ButtonRow style={styles.requestActions}>
+                    <AppButton
+                      title="Approve"
                       onPress={() => handleApprove(item)}
                       disabled={isSubmitting}
-                    >
-                      <Icon name="checkmark" size={18} color="#FFFFFF" />
-                      <Text style={styles.approveButtonText}>Approve</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.rejectButton, { borderColor: appTheme.colors.error }]}
+                      variant="confirm"
+                      size="small"
+                      iconLeft="checkmark"
+                    />
+                    <AppButton
+                      title="Decline"
                       onPress={() => handleReject(item)}
                       disabled={isSubmitting}
-                    >
-                      <Icon name="close" size={18} color={appTheme.colors.error} />
-                      <Text style={[styles.rejectButtonText, { color: appTheme.colors.error }]}>
-                        Decline
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                      variant="destructive"
+                      size="small"
+                      iconLeft="close"
+                    />
+                  </ButtonRow>
                 }
                 showDivider={index < requests.length - 1}
               />
@@ -294,35 +291,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   requestActions: {
-    flexDirection: 'row',
-    gap: 8,
     marginTop: 8,
-  },
-  approveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 4,
-  },
-  approveButtonText: {
-    fontSize: 14,
-    fontFamily: 'InterCustom-SemiBold',
-    color: '#FFFFFF',
-  },
-  rejectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-  },
-  rejectButtonText: {
-    fontSize: 14,
-    fontFamily: 'InterCustom-SemiBold',
   },
   rejectionInputContainer: {
     gap: 8,

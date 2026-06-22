@@ -167,7 +167,7 @@ import { SubscriptionPlansScreen } from '@/features/subscription';
 import { CheckoutScreen, PaymentHistoryScreen } from '@/features/payments';
 
 // Screens - Feedback
-import { FeedbackCategoriesScreen, FeedbackListScreen, AddSuggestionScreen } from '@/features/feedback';
+import { FeedbackCategoriesScreen, AddSuggestionScreen } from '@/features/feedback';
 
 // Screens - Business/Team (TeamManagement is a hidden tab in BusinessTabNavigator)
 import InviteStaffScreen from '@/features/team/screens/InviteStaffScreen';
@@ -550,7 +550,6 @@ function AppNavigator() {
         
         {/* Feedback */}
         <RootStack.Screen name="FeedbackCategories" component={FeedbackCategoriesScreen} />
-        <RootStack.Screen name="FeedbackList" component={FeedbackListScreen} />
         <RootStack.Screen name="AddSuggestion" component={AddSuggestionScreen} />
         
         {/* Business Registration (from ProfileSwitcher) */}

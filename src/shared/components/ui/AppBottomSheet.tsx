@@ -3,7 +3,7 @@ import { Animated, Modal, Pressable, StyleSheet, View, Text, TouchableOpacity, S
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import { OVERLAY, MODAL_TYPOGRAPHY } from '@/shared/ui/tokens/overlays';
+import { OVERLAY } from '@/shared/ui/tokens/overlays';
 import ListItemCard, { ListItemCardAvatarProps } from './ListItemCard';
 import AppButton from './AppButton';
 
@@ -92,18 +92,33 @@ export default function AppBottomSheet({
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const isClosing = useRef(false);
   const dragY = useRef(0);
-  
+  // Current vertical scroll offset of the internal items-mode ScrollView. The
+  // swipe-to-close pan only engages when this is at the top (<= 0), so a long list
+  // scrolls normally and only closes the sheet once scrolled back to the top.
+  const scrollOffsetY = useRef(0);
+
   // Calculate max height for the sheet (screen height - top safe area - some margin from top)
   const maxSheetHeight = SCREEN_HEIGHT - insets.top - 20; // 20px margin from status bar
   
-  // Pan responder for drag-to-close gesture on handle
+  // Pan responder for swipe-to-close. Spread on the whole sheet so a downward swipe
+  // ANYWHERE closes it — not just on the drag handle. It is scroll-aware: it only
+  // takes over for a downward, mostly-vertical drag while the internal list is at the
+  // top (scrollOffsetY <= 0). When the list is scrolled down, the gesture is left to
+  // the ScrollView (so the list scrolls); scroll back to the top and a further swipe
+  // closes the sheet. `onStartShouldSetPanResponder` stays false so taps on list
+  // items / buttons / the close button are never hijacked.
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to vertical gestures
-        return Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+        return (
+          gestureState.dy > 6 &&
+          Math.abs(gestureState.dy) > Math.abs(gestureState.dx) &&
+          scrollOffsetY.current <= 0
+        );
       },
+      // Once we own the gesture, don't let the ScrollView steal it back mid-drag.
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         dragY.current = 0;
       },
@@ -138,6 +153,7 @@ export default function AppBottomSheet({
       setModalVisible(true);
       translateY.setValue(SCREEN_HEIGHT);
       overlayOpacity.setValue(0);
+      scrollOffsetY.current = 0; // reopened sheet starts "at top"
       
       // Small delay to ensure modal is rendered before animating
       requestAnimationFrame(() => {
@@ -276,6 +292,7 @@ export default function AppBottomSheet({
         <Pressable style={styles.backdrop} onPress={handleClose} />
 
         <Animated.View
+          {...panResponder.panHandlers}
           style={[
             styles.sheet,
             {
@@ -290,10 +307,10 @@ export default function AppBottomSheet({
             },
           ]}
         >
-          {/* Fixed header section with drag handle */}
-          <Animated.View {...panResponder.panHandlers} style={styles.handleContainer}>
+          {/* Fixed header section with drag handle (swipe-to-close works anywhere on the sheet) */}
+          <View style={styles.handleContainer}>
             <View style={styles.handle} />
-          </Animated.View>
+          </View>
 
           {(title || true) && (
             <View style={styles.headerRow}>
@@ -313,10 +330,12 @@ export default function AppBottomSheet({
           {/* Content area */}
           {items ? (
             // Items mode: use ScrollView for list
-            <ScrollView 
+            <ScrollView
               style={[styles.content, fullHeight && styles.contentFullHeight]}
               showsVerticalScrollIndicator={false}
               bounces={false}
+              scrollEventThrottle={16}
+              onScroll={(e) => { scrollOffsetY.current = e.nativeEvent.contentOffset.y; }}
               contentContainerStyle={[
                 styles.contentContainer, 
                 fullHeight && styles.contentContainerFullHeight,
@@ -377,11 +396,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, // Match card padding for title alignment
     paddingBottom: 16,
   },
-  title: { 
-    fontSize: MODAL_TYPOGRAPHY.title.fontSize, 
-    fontFamily: MODAL_TYPOGRAPHY.title.fontFamily, 
-    flex: 1, 
-    paddingRight: 10,
+  title: {
+    fontSize: 20,
+    fontFamily: 'InterCustom-Bold',
+    flex: 1,
+    paddingRight: 24,
   },
   closeBtn: { 
     width: 40, 

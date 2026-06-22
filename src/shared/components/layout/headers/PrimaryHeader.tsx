@@ -14,9 +14,12 @@ export type HeaderAction = {
 
 /**
  * PrimaryHeader
- * Canonical header for primary "navigating" screens (Deliveries/Products/Invoices/etc).
- * - Left aligned title (24/600)
- * - Optional subtitle (13/500)
+ * Canonical header for primary "navigating" tab screens only
+ * (Business: Inbox / Notifications / Analytics / Explore — Personal: Home / Inbox / Activities).
+ * Every other screen uses SecondaryHeader; chat uses ChatHeader.
+ * - Center-aligned title (32/600)
+ * - Optional subtitle (13/500), centered under the title
+ * - Optional leading icon button (hamburger menu / back)
  * - Right actions (icon buttons with optional badges)
  * - Optional onTitlePress for dropdown functionality
  */
@@ -73,42 +76,49 @@ export default function PrimaryHeader({
   );
 
   return (
-    <View style={[styles.container, leftAction ? styles.containerWithLeft : null, { backgroundColor: bg }, style]}>
-      {leftAction ? (
-        <TouchableOpacity
-          onPress={leftAction.onPress}
-          style={styles.leftButton}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityLabel={leftAction.accessibilityLabel}
-        >
-          {leftAction.icon === 'menu' || leftAction.icon === 'menu-outline' ? (
-            <AnimatedMenuIcon size={30} color={leftAction.iconColor ?? theme.colors.text} />
-          ) : (
-            <Icon
-              name={leftAction.icon}
-              size={26}
-              color={leftAction.iconColor ?? theme.colors.text}
-              strokeWidth={2}
-            />
-          )}
-        </TouchableOpacity>
-      ) : null}
+    <View style={[styles.container, { backgroundColor: bg }, style]}>
+      {/* Left zone (in normal flow, pinned left via space-between) */}
+      <View style={styles.side}>
+        {leftAction ? (
+          <TouchableOpacity
+            onPress={leftAction.onPress}
+            style={styles.iconButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel={leftAction.accessibilityLabel}
+          >
+            {leftAction.icon === 'menu' || leftAction.icon === 'menu-outline' ? (
+              <AnimatedMenuIcon size={30} color={leftAction.iconColor ?? theme.colors.text} />
+            ) : (
+              <Icon
+                name={leftAction.icon}
+                size={leftAction.icon.includes('chevron') ? 30 : 26}
+                color={leftAction.iconColor ?? theme.colors.text}
+                strokeWidth={2}
+              />
+            )}
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
-      {onTitlePress ? (
-        <TouchableOpacity
-          style={styles.left}
-          onPress={onTitlePress}
-          activeOpacity={0.7}
-        >
-          {titleContent}
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.left}>
-          {titleContent}
-        </View>
-      )}
+      {/* Centered title — absolute overlay so it stays in the true center of the
+          header regardless of how much content sits in the left/right zones.
+          pointerEvents="box-none" lets taps fall through to the side buttons. */}
+      <View style={styles.center} pointerEvents="box-none">
+        {onTitlePress ? (
+          <TouchableOpacity
+            style={styles.titleTouchable}
+            onPress={onTitlePress}
+            activeOpacity={0.7}
+          >
+            {titleContent}
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.titleTouchable}>{titleContent}</View>
+        )}
+      </View>
 
-      <View style={styles.right}>
+      {/* Right zone (rendered above the centered title so the buttons stay tappable) */}
+      <View style={[styles.side, styles.rightSide]}>
         {actions.map((a, idx) => (
           <TouchableOpacity
             key={`${a.icon}-${idx}`}
@@ -140,26 +150,40 @@ export default function PrimaryHeader({
 const styles = StyleSheet.create({
   container: {
     height: 56,
-    paddingLeft: 20,
-    paddingRight: 12,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  containerWithLeft: {
-    paddingLeft: 8,
+  side: {
+    minWidth: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  leftButton: {
+  rightSide: {
+    justifyContent: 'flex-end',
+  },
+  // Centered title overlay. Symmetric horizontal padding keeps the title visually
+  // centered while reserving room for the side icon buttons.
+  center: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 72,
+  },
+  titleTouchable: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconButton: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 4,
-  },
-  left: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingRight: 12,
   },
   titleRow: {
     flexDirection: 'row',
@@ -169,6 +193,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '600',
     lineHeight: 38,
+    textAlign: 'center',
   },
   chevronContainer: {
     height: 38,
@@ -180,17 +205,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     lineHeight: 16,
-  },
-  right: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 4,
+    textAlign: 'center',
   },
   badge: {
     position: 'absolute',
@@ -210,4 +225,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

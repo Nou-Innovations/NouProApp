@@ -2,12 +2,13 @@
  * ReturnDetailScreen — view a return (RMA) and advance its status.
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import Pill from '@/shared/components/ui/Pill';
+import { AppButton } from '@/shared/components/ui';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { Return, ReturnStatus, RETURN_STATUS_LABELS, RETURN_STATUS_COLORS } from '@/shared/types/return';
 import { getReturn, changeReturnStatus } from '../returns.service';
@@ -77,7 +78,7 @@ export default function ReturnDetailScreen() {
   if (loading) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-        <PrimaryHeader title="Return" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
+        <SecondaryHeader title="Return" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
         <View style={styles.center}><ActivityIndicator color={appTheme.colors.accent} /></View>
       </SafeAreaView>
     );
@@ -85,7 +86,7 @@ export default function ReturnDetailScreen() {
   if (!item) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-        <PrimaryHeader title="Return" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
+        <SecondaryHeader title="Return" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
         <View style={styles.center}><Text style={{ color: appTheme.colors.textSecondary }}>Return not found</Text></View>
       </SafeAreaView>
     );
@@ -97,7 +98,7 @@ export default function ReturnDetailScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <PrimaryHeader title="Return" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
+      <SecondaryHeader title="Return" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
         <View style={styles.row}>
           <Text style={[styles.title, { color: appTheme.colors.text }]}>
@@ -128,22 +129,24 @@ export default function ReturnDetailScreen() {
         </View>
 
         {action && (
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: appTheme.colors.accent }]}
+          <AppButton
+            title={action.label}
             onPress={advance}
+            variant="accent"
+            loading={submitting}
             disabled={submitting}
-          >
-            {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>{action.label}</Text>}
-          </TouchableOpacity>
+            fullWidth
+            style={styles.actionSpacing}
+          />
         )}
         {canReject && (
-          <TouchableOpacity
-            style={[styles.buttonOutline, { borderColor: appTheme.colors.error }]}
+          <AppButton
+            title="Reject"
             onPress={reject}
+            variant="destructive"
             disabled={submitting}
-          >
-            <Text style={[styles.buttonOutlineText, { color: appTheme.colors.error }]}>Reject</Text>
-          </TouchableOpacity>
+            fullWidth
+          />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -163,8 +166,5 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 15, fontFamily: 'InterCustom-Medium' },
   itemMeta: { fontSize: 13, fontFamily: 'InterCustom-Regular', marginTop: 2 },
   itemQty: { fontSize: 15, fontFamily: 'InterCustom-SemiBold' },
-  button: { height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontFamily: 'InterCustom-SemiBold' },
-  buttonOutline: { height: 50, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  buttonOutlineText: { fontSize: 16, fontFamily: 'InterCustom-SemiBold' },
+  actionSpacing: { marginTop: 4 },
 });

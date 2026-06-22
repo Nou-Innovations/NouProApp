@@ -25,8 +25,8 @@ import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { EmptyState, ExploreChips, SectionTitle } from '@/shared/components/ui';
+import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { EmptyState, ExploreChips, SectionTitle, TextButton } from '@/shared/components/ui';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import BusinessListCard from '@/features/profile/components/BusinessListCard';
 import { useExploreDiscovery } from '@/features/explore';
@@ -221,11 +221,7 @@ export default function BusinessExploreScreen() {
   const SectionHeader = ({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) => (
     <View style={styles.sectionHeader}>
       <SectionTitle>{title}</SectionTitle>
-      {onSeeAll && (
-        <TouchableOpacity onPress={onSeeAll} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={[styles.seeAll, { color: appTheme.colors.primary }]}>See all</Text>
-        </TouchableOpacity>
-      )}
+      {onSeeAll && <TextButton title="See all" onPress={onSeeAll} tone="primary" />}
     </View>
   );
 
@@ -437,7 +433,7 @@ export default function BusinessExploreScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <SecondaryHeader
+      <PrimaryHeader
         title="Explore"
         leftAction={
           navigation.canGoBack()
@@ -503,7 +499,6 @@ const styles = StyleSheet.create({
     marginTop: 32,
     marginBottom: 6,
   },
-  seeAll: { fontSize: 14, fontWeight: '600' },
   hList: { paddingHorizontal: 12, gap: 12, paddingVertical: 4 },
   productCard: {
     width: 180,

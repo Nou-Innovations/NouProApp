@@ -4,8 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { EmptyState, SectionTitle } from '@/shared/components/ui';
-import AppButton from '@/shared/components/ui/AppButton';
+import { AppButton, EmptyState, SectionTitle, TextButton } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useEvent } from '../hooks/useEvent';
@@ -93,10 +92,8 @@ export default function EventDetailScreen({ navigation, route }: Props) {
           </View>
         ) : (
           <View style={styles.section}>
-            <AppButton title={busy ? 'Saving...' : "I'm going"} onPress={() => doRsvp('going')} disabled={busy} />
-            <TouchableOpacity onPress={() => doRsvp('interested')} disabled={busy} style={styles.interested}>
-              <Text style={[styles.interestedText, { color: appTheme.colors.primary }]}>Interested</Text>
-            </TouchableOpacity>
+            <AppButton title="I'm going" onPress={() => doRsvp('going')} loading={busy} disabled={busy} fullWidth />
+            <TextButton title="Interested" onPress={() => doRsvp('interested')} disabled={busy} style={styles.interested} />
           </View>
         )}
       </ScrollView>
@@ -114,6 +111,5 @@ const styles = StyleSheet.create({
   bizName: { fontSize: 15, fontWeight: '600' },
   desc: { fontSize: 15, lineHeight: 22, marginTop: 16 },
   section: { marginTop: 24 },
-  interested: { marginTop: 14, alignItems: 'center' },
-  interestedText: { fontSize: 15, fontWeight: '600' },
+  interested: { marginTop: 14, alignSelf: 'center' },
 });

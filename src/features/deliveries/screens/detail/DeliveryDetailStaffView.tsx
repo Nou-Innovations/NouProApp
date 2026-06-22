@@ -36,7 +36,7 @@ import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/
 import { Icon } from '@/shared/utils/icons';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
-import { AppButton } from '@/shared/components/ui/AppButton';
+import AppButton from '@/shared/components/ui/AppButton';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import type { Delivery, DeliveryStatus, PaymentStatus, DeliveryItem } from '@/shared/types/delivery';
@@ -258,7 +258,7 @@ export function DeliveryDetailStaffView({ delivery }: DeliveryDetailStaffViewPro
               title="Call Customer"
               onPress={handleCallDestination}
               variant="outline"
-              leftIcon="call-outline"
+              iconLeft="call-outline"
               style={styles.quickActionButton}
             />
           )}
@@ -267,7 +267,7 @@ export function DeliveryDetailStaffView({ delivery }: DeliveryDetailStaffViewPro
               title="Update Status"
               onPress={handleShowStatusModal}
               variant="primary"
-              leftIcon="refresh-outline"
+              iconLeft="refresh-outline"
               style={styles.quickActionButton}
             />
           )}

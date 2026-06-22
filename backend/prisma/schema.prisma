@@ -44,6 +44,8 @@ model User {
   certifications       Certification[]
   userSkills           UserSkill[]
   businessFollows      BusinessFollow[]
+  suggestions          Suggestion[]     @relation("SuggestionAuthor")
+  suggestionVotes      SuggestionVote[] @relation("SuggestionVoter")
 }
 
 model Business {
@@ -1504,4 +1506,33 @@ model EventRSVP {
   @@unique([eventId, businessId])
   @@index([eventId])
   @@index([businessId])
+}
+
+// Community feedback board — global (scoped by user, not company).
+model Suggestion {
+  id         String           @id @default(uuid())
+  userId     String
+  categoryId String
+  text       String           @db.Text
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  user       User             @relation("SuggestionAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  votes      SuggestionVote[]
+
+  @@index([categoryId])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model SuggestionVote {
+  id           String     @id @default(uuid())
+  suggestionId String
+  userId       String
+  createdAt    DateTime   @default(now())
+  suggestion   Suggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  user         User       @relation("SuggestionVoter", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([suggestionId, userId]) // double-vote guard
+  @@index([userId])
+  @@index([suggestionId])
 }

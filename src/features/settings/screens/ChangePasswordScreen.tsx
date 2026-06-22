@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { authAPI } from '@/shared/services/api';
 import AppTextField from '@/shared/components/ui/AppTextField';
+import { AppButton } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 
 interface ChangePasswordScreenProps {
@@ -184,25 +184,15 @@ export default function ChangePasswordScreen({ navigation }: ChangePasswordScree
             </View>
           )}
 
-          <TouchableOpacity
-            style={[
-              styles.changeButton,
-              { 
-                backgroundColor: (isPasswordValid && passwordsMatch && currentPassword.length > 0) 
-                  ? appTheme.colors.accent 
-                  : appTheme.colors.buttonBackground,
-                opacity: isLoading ? 0.7 : 1
-              }
-            ]}
+          <AppButton
+            title="Change Password"
             onPress={handleChangePassword}
+            variant="accent"
+            fullWidth
+            loading={isLoading}
             disabled={!isPasswordValid || !passwordsMatch || !currentPassword.length || isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.changeButtonText}>Change Password</Text>
-            )}
-          </TouchableOpacity>
+            style={styles.changeButton}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -274,15 +264,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.regular,
   },
   changeButton: {
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: 'center',
     marginTop: 20,
-  },
-  changeButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    fontFamily: theme.fonts.primary.bold,
   },
 });

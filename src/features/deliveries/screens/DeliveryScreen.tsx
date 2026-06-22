@@ -15,13 +15,14 @@ import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/shared/components/ui/FilterBar';
 import DeliveryCard from '@/features/deliveries/components/DeliveryCard';
 import LocationDropdown from '@/shared/components/ui/LocationDropdown';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import DeliveryCreateModal from '@/features/deliveries/components/DeliveryCreateModal';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { EmptyState, Skeleton, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
+import { EmptyState, Skeleton, SkeletonRow, SkeletonColumn, Fab, TextButton } from '@/shared/components/ui';
+import { Plus } from 'lucide-react-native';
 import {
   canViewDeliveries,
   canManageDeliveries,
@@ -188,13 +189,12 @@ export default function DeliveryScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       {/* Primary Header */}
-      <PrimaryHeader
+      <SecondaryHeader
         title="Deliveries"
         leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
-        actions={[
+        rightActions={[
           { icon: 'bar-chart-outline', onPress: () => (navigation as any).navigate('DeliveriesAnalytics'), accessibilityLabel: 'Delivery analytics' },
           { icon: 'shopping-cart', onPress: handleOpenProcurement, badge: pendingProcurementCount, accessibilityLabel: 'Procurement' },
-          { icon: 'plus', onPress: handleCreateNew, accessibilityLabel: 'Create delivery' },
         ]}
       />
 
@@ -290,9 +290,7 @@ export default function DeliveryScreen() {
             {error && !loading && (
               <View style={styles.errorContainer}>
                 <Text style={[styles.errorText, { color: appTheme.colors.error }]}>{error}</Text>
-                <TouchableOpacity onPress={refresh} style={[styles.retryButton, { backgroundColor: appTheme.colors.primary }]}>
-                  <Text style={{ color: 'white' }}>Retry</Text>
-                </TouchableOpacity>
+                <TextButton title="Retry" onPress={refresh} />
               </View>
             )}
           </>
@@ -420,6 +418,7 @@ export default function DeliveryScreen() {
         title={paywallCheckResult?.title}
         description={paywallCheckResult?.description}
       />
+      <Fab icon={Plus} onPress={handleCreateNew} accessibilityLabel="Create delivery" />
     </SafeAreaView>
   );
 }
@@ -491,10 +490,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 16,
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 8,
   },
 }); 

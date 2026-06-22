@@ -6,7 +6,6 @@
 import React, { useState } from 'react';
 import {
   View,
-  TouchableOpacity,
   StyleSheet,
   Alert,
 } from 'react-native';
@@ -16,7 +15,7 @@ import { AuthStackParamList } from '@/shared/types/navigation';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
-import AppButton from '@/shared/components/ui/AppButton';
+import { AppButton, TextButton } from '@/shared/components/ui';
 import CodeInput from '@/shared/components/ui/CodeInput';
 import { authAPI } from '@/shared/services/api';
 import { IS_DEV } from '@/config/env';
@@ -159,14 +158,11 @@ export default function PhoneVerificationScreen({ navigation, route }: Props) {
         </View>
 
         {/* Send on Email Link */}
-        <TouchableOpacity
-          style={styles.sendEmailButton}
+        <TextButton
+          title="Send on email"
           onPress={handleSendOnEmail}
-        >
-          <Text style={[styles.sendEmailText, { color: appTheme.colors.primary }]}>
-            Send on email
-          </Text>
-        </TouchableOpacity>
+          style={styles.sendEmailButton}
+        />
       </View>
 
       {/* Bottom Buttons */}
@@ -181,15 +177,14 @@ export default function PhoneVerificationScreen({ navigation, route }: Props) {
           disabled={!isCodeComplete || isVerifying}
           loading={isVerifying}
         />
-        <TouchableOpacity
-          style={styles.resendButton}
+        <TextButton
+          title="Resend Code"
           onPress={handleResendCode}
           disabled={isVerifying}
-        >
-          <Text style={[styles.resendText, { color: appTheme.colors.text }]}>
-            Resend Code
-          </Text>
-        </TouchableOpacity>
+          tone="muted"
+          style={styles.resendButton}
+          textStyle={{ color: appTheme.colors.text }}
+        />
       </View>
     </View>
   );
@@ -233,10 +228,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 0,
   },
-  sendEmailText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.medium,
-  },
   bottomContainer: {
     paddingHorizontal: 16,
   },
@@ -244,9 +235,5 @@ const styles = StyleSheet.create({
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  resendText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
   },
 });

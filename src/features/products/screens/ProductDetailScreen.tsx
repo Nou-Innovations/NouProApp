@@ -43,7 +43,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from 'App';
 import { Icon } from '@/shared/utils/icons';
-import { AppButton } from '@/shared/components/ui';
+import { AppButton, TextButton } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -73,7 +73,7 @@ import SellerCard from '../components/productDetail/SellerCard';
 import OwnerDetailRows from '../components/productDetail/OwnerDetailRows';
 import ClientStoreCard from '../components/productDetail/ClientStoreCard';
 import RelatedRow from '../components/productDetail/RelatedRow';
-import FloatingHeader from '../components/productDetail/FloatingHeader';
+import { HeroHeader } from '@/shared/components/layout/headers';
 import ProductDetailSkeleton, { RelatedRowSkeleton } from '../components/productDetail/ProductDetailSkeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -85,7 +85,8 @@ const IMAGE_HEIGHT = SCREEN_WIDTH * (4 / 3);
 // between HEADER_FADE_START and HEADER_FADE_END of scroll.
 const SHEET_OVERLAP = 24;
 const PARALLAX_FACTOR = 0.5;
-const HEADER_FADE_START = IMAGE_HEIGHT * 0.45;
+// HeroHeader derives the title-bar fade range from heroHeight (0.45 → 0.78); this
+// constant is kept only to decide when the status bar flips to its solid style.
 const HEADER_FADE_END = IMAGE_HEIGHT * 0.78;
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProductDetail'>;
@@ -296,10 +297,6 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     const scale = y < 0 ? 1 + (-y / IMAGE_HEIGHT) * 1.6 : 1;
     return { transform: [{ translateY }, { scale }] };
   });
-  const headerBarStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollY.value, [HEADER_FADE_START, HEADER_FADE_END], [0, 1], Extrapolation.CLAMP),
-  }));
-
   // Fetch supplier pricing for owner's products
   useEffect(() => {
     if (dto?.viewerContext.isOwner && activeCompanyId && productId) {
@@ -634,18 +631,8 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <Text style={[styles.errorText, { color: appTheme.colors.text }]}>
             {error || 'Product not found'}
           </Text>
-          <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: appTheme.colors.primary }]}
-            onPress={fetchProduct}
-          >
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={[styles.backButtonText, { color: appTheme.colors.primary }]}>Go Back</Text>
-          </TouchableOpacity>
+          <AppButton title="Retry" onPress={fetchProduct} style={styles.retryButton} />
+          <TextButton title="Go Back" onPress={() => navigation.goBack()} style={styles.backButton} />
         </View>
       </SafeAreaView>
     );
@@ -853,16 +840,18 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         </View>
       </Animated.ScrollView>
 
-      {/* Floating header — controls always visible; solid bar + title fade in on scroll */}
-      <FloatingHeader
+      {/* Hero header — controls always visible; solid bar + title fade in on scroll */}
+      <HeroHeader
         title={product.name}
-        headerBarStyle={headerBarStyle}
-        topInset={insets.top}
-        showSave={showSave}
-        isSaved={isSaved}
-        onBack={() => navigation.goBack()}
-        onSave={handleSave}
-        onShare={handleShare}
+        scrollY={scrollY}
+        heroHeight={IMAGE_HEIGHT}
+        leftAction={{ icon: 'arrow-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }}
+        rightActions={[
+          ...(showSave
+            ? [{ icon: isSaved ? 'bookmark' : 'bookmark-outline', onPress: handleSave, accessibilityLabel: 'Save' }]
+            : []),
+          { icon: 'share-outline', onPress: handleShare, accessibilityLabel: 'Share' },
+        ]}
       />
 
       {/* Bottom Action Bar - BUSINESS MODE ONLY (Personal mode = browse only) */}
@@ -871,23 +860,21 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           {isProductOwner ? (
             /* Business Owner Mode: Edit + Reorder buttons */
             <View style={styles.ownerButtonsRow}>
-              <TouchableOpacity
-                style={[styles.editButton, { backgroundColor: appTheme.colors.primary, flex: (availability.isLowStock || availability.isOutOfStock) ? 1 : undefined }]}
+              <AppButton
+                title="Edit"
                 onPress={handleEdit}
-                activeOpacity={0.8}
-              >
-                <Icon name="create-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.editButtonText}>Edit</Text>
-              </TouchableOpacity>
+                variant="primary"
+                iconLeft="create-outline"
+                style={(availability.isLowStock || availability.isOutOfStock) ? styles.flexButton : undefined}
+              />
               {(availability.isLowStock || availability.isOutOfStock) && (
-                <TouchableOpacity
-                  style={[styles.reorderButton, { backgroundColor: appTheme.colors.warning }]}
+                <AppButton
+                  title="Reorder"
                   onPress={handleReorder}
-                  activeOpacity={0.8}
-                >
-                  <Icon name="refresh" size={20} color="#FFFFFF" />
-                  <Text style={styles.editButtonText}>Reorder</Text>
-                </TouchableOpacity>
+                  variant="accent"
+                  iconLeft="refresh"
+                  style={styles.flexButton}
+                />
               )}
             </View>
           ) : isOrdering ? (
@@ -915,22 +902,20 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 {formatPrice(totalPrice, pricing.currency)}
               </Text>
 
-              {/* Buttons with 0px gap */}
+              {/* Add to cart + Remove */}
               <View style={styles.orderButtonsContainer}>
-                <TouchableOpacity
-                  style={[styles.addToCartButton, { backgroundColor: appTheme.colors.primary }]}
+                <AppButton
+                  title="Add to cart"
                   onPress={handleAddToCart}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.addToCartButtonText}>Add to cart</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.removeButton, { backgroundColor: appTheme.colors.surface }]}
+                  variant="primary"
+                  fullWidth
+                />
+                <AppButton
+                  title="Remove"
                   onPress={handleRemove}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.removeButtonText, { color: appTheme.colors.textSecondary }]}>Remove</Text>
-                </TouchableOpacity>
+                  variant="secondary"
+                  fullWidth
+                />
               </View>
             </View>
           ) : (
@@ -1083,23 +1068,10 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     marginTop: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontFamily: theme.fonts.primary.semiBold,
   },
   backButton: {
     marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  backButtonText: {
-    fontSize: 15,
-    fontFamily: theme.fonts.primary.medium,
+    alignSelf: 'center',
   },
 
   // Hero + sheet
@@ -1219,27 +1191,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 14,
-    gap: 8,
-  },
-  editButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-  },
-  reorderButton: {
+  flexButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 14,
-    gap: 8,
   },
   orderFlowContainer: {
     alignItems: 'center',
@@ -1270,34 +1223,7 @@ const styles = StyleSheet.create({
   },
   orderButtonsContainer: {
     width: '100%',
-    gap: 0,
-  },
-  addToCartButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  addToCartButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-  },
-  removeButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
-  },
-  removeButtonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.medium,
+    gap: 8,
   },
 });
 

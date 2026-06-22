@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   Switch,
   KeyboardAvoidingView,
   Platform,
@@ -18,7 +17,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
 import Avatar from '@/shared/components/ui/Avatar';
-import { AppModal, SectionTitle } from '@/shared/components/ui';
+import { AppModal, SectionTitle, AppButton } from '@/shared/components/ui';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import ImageUploadField from '@/shared/components/ui/ImageUploadField';
@@ -615,40 +614,20 @@ export default function EditPersonalProfileScreen() {
 
   const renderActionButtons = () => (
     <View style={styles.actionButtonsContainer}>
-      <TouchableOpacity
-        style={[
-          styles.actionButton,
-          {
-            backgroundColor: hasChanges ? appTheme.colors.success : appTheme.colors.buttonBackgroundDisabled,
-          },
-        ]}
+      <AppButton
+        title="Save Changes"
         onPress={handleSavePersonalInfo}
+        variant="confirm"
+        fullWidth
+        loading={isSaving}
         disabled={!hasChanges || isSaving}
-      >
-        {isSaving ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
-        ) : (
-          <Text
-            style={[
-              styles.actionButtonText,
-              { color: hasChanges ? '#FFFFFF' : appTheme.colors.textMuted },
-            ]}
-          >
-            Save Changes
-          </Text>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[
-          styles.actionButton,
-          { backgroundColor: appTheme.colors.buttonBackground },
-        ]}
+      />
+      <AppButton
+        title="Cancel"
         onPress={() => navigation.goBack()}
-      >
-        <Text style={[styles.actionButtonText, { color: appTheme.colors.text }]}>
-          Cancel
-        </Text>
-      </TouchableOpacity>
+        variant="secondary"
+        fullWidth
+      />
     </View>
   );
 
@@ -830,17 +809,7 @@ const styles = StyleSheet.create({
   actionButtonsContainer: {
     paddingHorizontal: 12,
     marginTop: 8,
-    gap: 0,
-  },
-  actionButton: {
-    borderRadius: 8,
-    height: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
+    gap: 8,
   },
   accountOption: {
     flexDirection: 'row',

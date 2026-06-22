@@ -30,7 +30,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Icon } from '@/shared/utils/icons';
-import AnimatedMenuIcon from '@/shared/components/ui/AnimatedMenuIcon';
+import { PrimaryHeader } from '@/shared/components/layout/headers';
 import { EmptyState } from '@/shared/components/ui';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -122,19 +122,12 @@ export default function BusinessHomeScreen() {
       edges={['top']}
     >
       {/* Fixed Header */}
-      <View style={[styles.header, { backgroundColor: appTheme.colors.background }]}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={openDrawer}
-          activeOpacity={0.7}
-          accessibilityLabel="Open menu"
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <AnimatedMenuIcon size={30} color={appTheme.colors.text} />
-        </TouchableOpacity>
-        <View style={styles.headerActions}>
-          <LocationSelectorPill />
-        </View>
+      <PrimaryHeader
+        title="Analytics"
+        leftAction={{ icon: 'menu', onPress: openDrawer, accessibilityLabel: 'Open menu' }}
+      />
+      <View style={styles.locationRow}>
+        <LocationSelectorPill />
       </View>
 
       <ScrollView
@@ -236,6 +229,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  locationRow: {
+    paddingHorizontal: theme.spacing.sm,
+    paddingBottom: theme.spacing.sm,
+    alignItems: 'flex-start',
   },
   iconButton: {
     width: 40,

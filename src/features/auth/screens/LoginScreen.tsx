@@ -18,7 +18,7 @@ import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
 import AppTextField from '@/shared/components/ui/AppTextField';
-import AppButton from '@/shared/components/ui/AppButton';
+import { AppButton, TextButton } from '@/shared/components/ui';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -157,16 +157,12 @@ export default function LoginScreen({ navigation }: Props) {
               error={hasAttemptedSubmit && !password}
             />
 
-            <TouchableOpacity
+            <TextButton
+              title="Forgot Password?"
               onPress={() => navigation.navigate('ForgotPassword')}
               style={styles.forgotPasswordButton}
-              accessibilityRole="link"
               accessibilityLabel="Forgot password"
-            >
-              <Text style={[styles.forgotPasswordText, { color: appTheme.colors.primary }]}>
-                Forgot Password?
-              </Text>
-            </TouchableOpacity>
+            />
 
             {/* Stay Signed In Toggle */}
             <View style={styles.staySignedInRow}>
@@ -208,15 +204,12 @@ export default function LoginScreen({ navigation }: Props) {
         <Text style={[styles.registerText, { color: appTheme.colors.textSecondary }]}>
           Don't have an account?{' '}
         </Text>
-        <TouchableOpacity
+        <TextButton
+          title="Register"
           onPress={() => navigation.navigate('CreateAccount')}
-          accessibilityRole="link"
+          textStyle={styles.registerLink}
           accessibilityLabel="Register for a new account"
-        >
-          <Text style={[styles.registerLink, { color: appTheme.colors.primary }]}>
-            Register
-          </Text>
-        </TouchableOpacity>
+        />
       </View>
     </View>
   );
@@ -269,10 +262,6 @@ const styles = StyleSheet.create({
   forgotPasswordButton: {
     alignSelf: 'flex-end',
     marginTop: -8, // Reduce gap to 8px from password field
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.medium,
   },
   staySignedInRow: {
     flexDirection: 'row',

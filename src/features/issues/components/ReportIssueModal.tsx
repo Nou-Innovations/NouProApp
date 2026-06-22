@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Image, Alert } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
+import { AppButton } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { imageService, uploadImage } from '@/shared/services/imageService';
@@ -87,9 +88,15 @@ export function ReportIssueModal({ visible, onClose, entityType, entityId, onRep
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.submit, { backgroundColor: theme.colors.error }]} onPress={submit} disabled={submitting || uploading}>
-            {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitText}>Report issue</Text>}
-          </TouchableOpacity>
+          <AppButton
+            title="Report issue"
+            onPress={submit}
+            variant="alert"
+            loading={submitting}
+            disabled={submitting || uploading}
+            fullWidth
+            style={styles.submit}
+          />
         </View>
       </View>
     </Modal>
@@ -110,8 +117,7 @@ const styles = StyleSheet.create({
   photo: { width: '100%', height: '100%' },
   photoPlaceholder: { alignItems: 'center' },
   photoText: { marginTop: 6, fontSize: 13, fontFamily: 'InterCustom-Medium', color: theme.colors.textSecondary },
-  submit: { height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
-  submitText: { color: '#FFFFFF', fontSize: 16, fontFamily: 'InterCustom-SemiBold' },
+  submit: { marginTop: 20 },
 });
 
 export default ReportIssueModal;

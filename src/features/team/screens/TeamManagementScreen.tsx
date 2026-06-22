@@ -13,7 +13,7 @@ import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { AppSearchBar, StaffCard, StaffMember, StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard, EmptyState, SectionTitle } from '@/shared/components/ui';
+import { AppSearchBar, StaffCard, StaffMember, StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard, EmptyState, SectionTitle, ButtonRow } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import LocationDropdown from '@/shared/components/ui/LocationDropdown';
 import theme from '@/shared/theme';
@@ -425,12 +425,10 @@ export default function TeamManagementScreen() {
           <Text style={[styles.accessDeniedSubtext, { color: appTheme.colors.textLight }]}>
             Only admins can manage team members
           </Text>
-          <TouchableOpacity 
-            style={[styles.backButton, { backgroundColor: appTheme.colors.primary }]}
+          <AppButton
+            title="Go Back"
             onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>Go Back</Text>
-          </TouchableOpacity>
+          />
         </View>
       </SafeAreaView>
     );
@@ -549,22 +547,20 @@ export default function TeamManagementScreen() {
                           setShowJoinRequestOptions(true);
                         }}
                         bottomElement={
-                          <View style={styles.requestCardButtons}>
-                            <TouchableOpacity 
-                              style={[styles.requestCardButtonPrimary, { backgroundColor: appTheme.colors.primary }]}
+                          <ButtonRow style={styles.requestCardButtons}>
+                            <AppButton
+                              title="Accept"
                               onPress={() => handleAcceptRequest(request)}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={styles.requestCardButtonPrimaryText}>Accept</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                              style={[styles.requestCardButtonOutline, { borderColor: appTheme.colors.primary }]}
+                              variant="primary"
+                              size="small"
+                            />
+                            <AppButton
+                              title="Decline"
                               onPress={() => handleRejectRequest(request)}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={[styles.requestCardButtonOutlineText, { color: appTheme.colors.primary }]}>Decline</Text>
-                            </TouchableOpacity>
-                          </View>
+                              variant="outline"
+                              size="small"
+                            />
+                          </ButtonRow>
                         }
                         showDivider={index < joinRequests.length - 1}
                       />
@@ -822,33 +818,7 @@ const styles = StyleSheet.create({
   },
   // Request Card bottom buttons (used in ListItemCard bottomElement)
   requestCardButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  requestCardButtonPrimary: {
-    flex: 1,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  requestCardButtonPrimaryText: {
-    fontSize: 14,
-    fontFamily: 'InterCustom-SemiBold',
-    color: '#FFFFFF',
-  },
-  requestCardButtonOutline: {
-    flex: 1,
-    height: 40,
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  requestCardButtonOutlineText: {
-    fontSize: 14,
-    fontFamily: 'InterCustom-SemiBold',
+    marginTop: 4,
   },
   // Pending Card button (used in ListItemCard rightRow2)
   pendingCardButton: {
@@ -909,16 +879,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 32,
-  },
-  backButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  backButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
   },
   // Bottom sheet action styles
   bottomSheetContent: {

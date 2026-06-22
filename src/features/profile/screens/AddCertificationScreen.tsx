@@ -13,7 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { AppModal } from '@/shared/components/ui';
+import { AppModal, AppButton } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { addCertification } from '../services/profile.service';
 
@@ -120,16 +120,20 @@ export default function AddCertificationScreen() {
 
         <View style={styles.bottomContainer}>
           <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.saveButton, { backgroundColor: hasChanges ? appTheme.colors.success : appTheme.colors.buttonBackgroundDisabled }]}
+            <AppButton
+              title="Add Certification"
               onPress={handleSave}
+              variant="confirm"
+              fullWidth
+              loading={isSaving}
               disabled={!hasChanges || isSaving}
-            >
-              <Text style={[styles.saveButtonText, { color: hasChanges ? '#FFFFFF' : appTheme.colors.textMuted }]}>{isSaving ? 'Saving...' : 'Add Certification'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, styles.cancelButton, { backgroundColor: '#FFFFFF' }]} onPress={() => navigation.goBack()}>
-              <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>Cancel</Text>
-            </TouchableOpacity>
+            />
+            <AppButton
+              title="Cancel"
+              onPress={() => navigation.goBack()}
+              variant="secondary"
+              fullWidth
+            />
           </View>
         </View>
       </View>
@@ -154,10 +158,5 @@ const styles = StyleSheet.create({
   checkboxLabel: { fontSize: 13, fontFamily: theme.fonts.primary.regular },
   infoInput: { fontSize: 16, fontFamily: theme.fonts.primary.semiBold, borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, height: 40, justifyContent: 'center' },
   bottomContainer: { paddingBottom: 32 },
-  actionButtonsContainer: { paddingHorizontal: 12, gap: 0 },
-  actionButton: { borderRadius: 8, height: 56, justifyContent: 'center', alignItems: 'center' },
-  saveButton: {},
-  saveButtonText: { fontSize: 16, fontFamily: theme.fonts.primary.semiBold },
-  cancelButton: {},
-  cancelButtonText: { fontSize: 16, fontFamily: theme.fonts.primary.semiBold },
+  actionButtonsContainer: { paddingHorizontal: 12, gap: 8 },
 });

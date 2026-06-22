@@ -4,8 +4,10 @@
  * with quantity, condition (resellable/damaged) and disposition (restock/writeoff).
  */
 import React, { useState } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
+import { Plus } from 'lucide-react-native';
 import { Icon } from '@/shared/utils/icons';
+import { AppButton, TextButton } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { ReturnItem } from '@/shared/types/return';
@@ -124,16 +126,19 @@ export function ReturnCreateModal({ visible, onClose, orderId, onCreated }: Retu
                 })}
               </View>
 
-              <TouchableOpacity style={[styles.addBtn, { borderColor: theme.colors.borderColor }]} onPress={addItem}>
-                <Icon name="add-outline" size={18} color={theme.colors.accent} />
-                <Text style={[styles.addBtnText, { color: theme.colors.accent }]}>Add item</Text>
-              </TouchableOpacity>
+              <TextButton title="Add item" onPress={addItem} iconLeft={Plus} style={styles.addBtn} />
             </View>
           </ScrollView>
 
-          <TouchableOpacity style={[styles.submit, { backgroundColor: theme.colors.accent }]} onPress={submit} disabled={submitting}>
-            {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitText}>Create return</Text>}
-          </TouchableOpacity>
+          <AppButton
+            title="Create return"
+            onPress={submit}
+            variant="accent"
+            loading={submitting}
+            disabled={submitting}
+            fullWidth
+            style={styles.submit}
+          />
         </View>
       </View>
     </Modal>
@@ -157,10 +162,8 @@ const styles = StyleSheet.create({
   toggleRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   toggle: { flex: 1, paddingVertical: 9, borderRadius: 999, borderWidth: 1, alignItems: 'center' },
   toggleText: { fontSize: 13, fontFamily: 'InterCustom-Medium' },
-  addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, height: 42, borderRadius: 10, borderWidth: 1 },
-  addBtnText: { fontSize: 14, fontFamily: 'InterCustom-SemiBold' },
-  submit: { height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
-  submitText: { color: '#FFFFFF', fontSize: 16, fontFamily: 'InterCustom-SemiBold' },
+  addBtn: { alignSelf: 'center', marginTop: 12 },
+  submit: { marginTop: 16 },
 });
 
 export default ReturnCreateModal;

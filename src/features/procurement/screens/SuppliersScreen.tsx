@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import { EmptyState, Skeleton, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
 import { useSuppliers } from '../hooks/useSuppliers';
@@ -41,9 +41,9 @@ export default function SuppliersScreen() {
       edges={['top']}
     >
       {/* Primary Header */}
-      <PrimaryHeader
+      <SecondaryHeader
         title="Suppliers"
-        actions={[
+        rightActions={[
           {
             icon: 'plus',
             onPress: () => (navigation as any).navigate('AddSupplier'),

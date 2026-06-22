@@ -25,8 +25,8 @@ export const lightTheme = {
     textLight: '#57534E',
 
     // Status colors (base) - harmonized with warm palette
-    success: '#34A853',
-    error: '#D6453E',
+    success: '#2ACF01',
+    error: '#FF2400',
     warning: '#F2A900',
     info: '#2A75E6',
     neutral: '#A8A29E',
@@ -36,10 +36,10 @@ export const lightTheme = {
     statusDiscontinued: '#7A1F12',   // Discontinued (alias)
     statusDiscontinuedBg: '#2A0E07', // Discontinued background (dark warm brown-red)
     statusOngoing: '#2A75E6',        // Ongoing
-    statusDone: '#34A853',           // Done / Paid / Import
-    statusPaid: '#34A853',           // Paid (alias)
+    statusDone: '#2ACF01',           // Done / Paid / Import
+    statusPaid: '#2ACF01',           // Paid (alias)
     statusPaidText: '#10391F',       // Paid text (dark green)
-    statusImport: '#34A853',         // Import (alias)
+    statusImport: '#2ACF01',         // Import (alias)
     statusInReview: '#8B5CF6',       // In review
     statusPending: '#F2A900',        // Pending / In Production
     statusInProduction: '#F2A900',   // In Production (alias)
@@ -47,13 +47,13 @@ export const lightTheme = {
     statusLowStockText: '#FFE4C4',   // Low Stock text
     statusExport: '#E8590C',         // Export (alias)
     statusCanceled: '#F0705F',       // Canceled
-    statusUnpaid: '#D6453E',         // Unpaid / Out of Stock
-    statusOutOfStock: '#D6453E',     // Out of Stock (alias)
+    statusUnpaid: '#FF2400',         // Unpaid / Out of Stock
+    statusOutOfStock: '#FF2400',     // Out of Stock (alias)
     statusInactive: '#A89B92',       // Inactive
 
     // @deprecated - Status color aliases for backward compatibility (will be removed)
     // Use success, error, warning, info instead
-    errorBright: '#D6453E',
+    errorBright: '#FF2400',
     warningBright: '#F2A900',
     warningOrange: '#F2A900',
     infoBright: '#2A75E6',
@@ -84,7 +84,7 @@ export const lightTheme = {
 
     // Switch colors (from design.json)
     switchTrackOff: '#E7E1DA',
-    switchTrackOn: '#34A853',
+    switchTrackOn: '#2ACF01',
     switchThumb: '#FFFFFF',
 
     // Highlight/special states
@@ -156,7 +156,7 @@ export const lightTheme = {
   // Component heights
   heights: {
     button: 56,
-    buttonSmall: 40,
+    buttonSmall: 44,
     input: 44,
     inputSmall: 40,
     header: 48,
@@ -258,8 +258,8 @@ export const darkTheme = {
     textLight: '#A8A29E',
 
     // Status colors (base) - harmonized with warm palette
-    success: '#34A853',
-    error: '#D6453E',
+    success: '#2ACF01',
+    error: '#FF2400',
     warning: '#F2A900',
     info: '#2A75E6',
     neutral: '#78716C',
@@ -269,10 +269,10 @@ export const darkTheme = {
     statusDiscontinued: '#7A1F12',
     statusDiscontinuedBg: '#2A0E07',
     statusOngoing: '#2A75E6',
-    statusDone: '#34A853',
-    statusPaid: '#34A853',
+    statusDone: '#2ACF01',
+    statusPaid: '#2ACF01',
     statusPaidText: '#10391F',
-    statusImport: '#34A853',
+    statusImport: '#2ACF01',
     statusInReview: '#8B5CF6',
     statusPending: '#F2A900',
     statusInProduction: '#F2A900',
@@ -280,12 +280,12 @@ export const darkTheme = {
     statusLowStockText: '#FFE4C4',
     statusExport: '#E8590C',
     statusCanceled: '#F0705F',
-    statusUnpaid: '#D6453E',
-    statusOutOfStock: '#D6453E',
+    statusUnpaid: '#FF2400',
+    statusOutOfStock: '#FF2400',
     statusInactive: '#A89B92',
 
     // @deprecated - Status color aliases for backward compatibility (will be removed)
-    errorBright: '#D6453E',
+    errorBright: '#FF2400',
     warningBright: '#F2A900',
     warningOrange: '#F2A900',
     infoBright: '#2A75E6',
@@ -316,7 +316,7 @@ export const darkTheme = {
 
     // Switch colors (from design.json)
     switchTrackOff: '#44403C',
-    switchTrackOn: '#34A853',
+    switchTrackOn: '#2ACF01',
     switchThumb: '#FFFFFF',
 
     // Highlight/special states

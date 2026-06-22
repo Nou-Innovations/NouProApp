@@ -3,12 +3,13 @@
  * and review its ordered stops.
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import Pill from '@/shared/components/ui/Pill';
+import { AppButton } from '@/shared/components/ui';
 import { Icon } from '@/shared/utils/icons';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { Route, RouteStatus, RouteStop, ROUTE_STATUS_LABELS, ROUTE_STATUS_COLORS } from '@/shared/types/route';
@@ -90,7 +91,7 @@ export default function RouteDetailScreen() {
   if (loading) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-        <PrimaryHeader title="Route" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
+        <SecondaryHeader title="Route" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
         <View style={styles.center}><ActivityIndicator color={appTheme.colors.accent} /></View>
       </SafeAreaView>
     );
@@ -98,7 +99,7 @@ export default function RouteDetailScreen() {
   if (!data) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-        <PrimaryHeader title="Route" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
+        <SecondaryHeader title="Route" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
         <View style={styles.center}><Text style={{ color: appTheme.colors.textSecondary }}>Route not found</Text></View>
       </SafeAreaView>
     );
@@ -109,7 +110,7 @@ export default function RouteDetailScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <PrimaryHeader title="Route" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
+      <SecondaryHeader title="Route" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
         <View style={styles.row}>
           <Text style={[styles.title, { color: appTheme.colors.text }]}>{data.name || `Route ${shortId(data.id)}`}</Text>
@@ -165,13 +166,15 @@ export default function RouteDetailScreen() {
         </View>
 
         {action && (
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: appTheme.colors.accent }]}
+          <AppButton
+            title={action.label}
             onPress={advance}
+            variant="accent"
+            loading={submitting}
             disabled={submitting}
-          >
-            {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>{action.label}</Text>}
-          </TouchableOpacity>
+            fullWidth
+            style={styles.actionSpacing}
+          />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -193,6 +196,5 @@ const styles = StyleSheet.create({
   seqText: { color: '#FFFFFF', fontSize: 13, fontFamily: 'InterCustom-SemiBold' },
   stopTitle: { fontSize: 15, fontFamily: 'InterCustom-SemiBold' },
   stopMeta: { fontSize: 13, fontFamily: 'InterCustom-Regular', marginTop: 2 },
-  button: { height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontFamily: 'InterCustom-SemiBold' },
+  actionSpacing: { marginTop: 4 },
 });

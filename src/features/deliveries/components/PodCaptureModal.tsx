@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Icon } from '@/shared/utils/icons';
+import { AppButton } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 import { imageService, uploadImage } from '@/shared/services/imageService';
 
@@ -151,17 +152,14 @@ export function PodCaptureModal({ visible, onClose, onConfirm, submitting = fals
             {!hasSignature && <Text style={styles.signatureHint}>Sign here</Text>}
           </View>
 
-          <TouchableOpacity
-            style={[styles.confirmButton, { backgroundColor: theme.colors.success }]}
+          <AppButton
+            title="Confirm delivery"
             onPress={handleConfirm}
+            variant="confirm"
+            loading={submitting}
             disabled={submitting || uploading}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.confirmText}>Confirm delivery</Text>
-            )}
-          </TouchableOpacity>
+            fullWidth
+          />
         </View>
       </View>
     </Modal>
@@ -243,17 +241,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'InterCustom-Regular',
     color: theme.colors.textMuted,
-  },
-  confirmButton: {
-    height: 52,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'InterCustom-SemiBold',
   },
 });
 

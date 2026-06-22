@@ -11,9 +11,7 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
-  TouchableOpacity,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -23,6 +21,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { Text } from '@/shared/components/ui/Typography';
+import { AppButton } from '@/shared/components/ui';
 import { formatCurrency } from '@/shared/utils/format';
 import { useCart, useOrderStore } from '@/shared/store/orderStore';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -165,18 +164,13 @@ export default function PlaceOrderScreen({ route }: Props) {
           { backgroundColor: appTheme.colors.background, borderTopColor: appTheme.colors.borderColor },
         ]}
       >
-        <TouchableOpacity
-          style={[styles.confirmButton, { backgroundColor: appTheme.colors.primary, opacity: submitting || items.length === 0 ? 0.6 : 1 }]}
+        <AppButton
+          title={`Place order · ${formatCurrency(total)}`}
           onPress={handleConfirm}
+          loading={submitting}
           disabled={submitting || items.length === 0}
-          activeOpacity={0.8}
-        >
-          {submitting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.confirmButtonText}>Place order · {formatCurrency(total)}</Text>
-          )}
-        </TouchableOpacity>
+          fullWidth
+        />
       </View>
     </SafeAreaView>
   );
@@ -228,11 +222,4 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     borderTopWidth: 1,
   },
-  confirmButton: {
-    height: 52,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmButtonText: { color: '#FFFFFF', fontSize: 16, fontFamily: theme.fonts.primary.bold },
 });

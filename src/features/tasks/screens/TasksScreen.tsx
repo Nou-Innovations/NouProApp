@@ -10,18 +10,17 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Icon } from '@/shared/utils/icons';
+import { Plus } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import themeConstants from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import FilterBar from '@/shared/components/ui/FilterBar';
-import { EmptyState } from '@/shared/components/ui';
+import { EmptyState, Fab, TextButton } from '@/shared/components/ui';
 import { TaskCard } from '../components/TaskCard';
 import { useTasks, TaskFilterTab } from '../hooks/useTasks';
 import type { Task } from '@/shared/types/task';
@@ -150,9 +149,7 @@ export default function TasksScreen() {
       {error ? (
         <View style={styles.errorContainer}>
           <Text style={[styles.errorText, { color: appTheme.colors.error }]}>{error}</Text>
-          <TouchableOpacity onPress={refresh}>
-            <Text style={[styles.retryText, { color: appTheme.colors.text }]}>Tap to retry</Text>
-          </TouchableOpacity>
+          <TextButton title="Tap to retry" onPress={refresh} />
         </View>
       ) : filteredTasks.length === 0 ? (
         <EmptyState
@@ -174,9 +171,7 @@ export default function TasksScreen() {
       )}
 
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={handleCreateTask} activeOpacity={0.8}>
-        <Icon name="add" size={28} color="#FFFFFF" />
-      </TouchableOpacity>
+      <Fab icon={Plus} onPress={handleCreateTask} accessibilityLabel="Create task" />
     </SafeAreaView>
   );
 }
@@ -209,22 +204,5 @@ const styles = StyleSheet.create({
   },
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   errorText: { fontSize: 16, fontFamily: themeConstants.fonts.primary.medium, textAlign: 'center' },
-  retryText: { fontSize: 14, fontFamily: themeConstants.fonts.primary.regular, marginTop: 8 },
   listContent: { paddingBottom: 100 },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#34A853',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 8,
-  },
 });

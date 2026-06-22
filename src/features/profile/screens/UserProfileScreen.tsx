@@ -4,14 +4,14 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Alert, Share, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Alert, Share } from 'react-native';
 import { Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn } from '@/shared/components/ui/Skeleton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { userAvatarService } from '@/shared/services/userAvatarService';
 import Avatar from '@/shared/components/ui/Avatar';
-import { AppBottomSheet, SectionTitle, type AppBottomSheetItem } from '@/shared/components/ui';
+import { AppBottomSheet, SectionTitle, AppButton, ButtonRow, TextButton, type AppBottomSheetItem } from '@/shared/components/ui';
 import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
 import { ProfileViewType, getProfileAdditionalOptions, getRelationshipAction } from '@/shared/types/profile';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -300,9 +300,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
           <Text style={[styles.errorText, { color: appTheme.colors.secondary }]}>
             {error || 'Profile not found'}
           </Text>
-          <TouchableOpacity onPress={fetchUserProfile} style={styles.retryButton}>
-            <Text style={[styles.retryText, { color: appTheme.colors.primary }]}>Retry</Text>
-          </TouchableOpacity>
+          <TextButton title="Retry" onPress={fetchUserProfile} style={styles.retryButton} />
         </View>
       </SafeAreaView>
     );
@@ -368,35 +366,24 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
       </View>
 
       {/* Action Buttons - Message + (Connect only in personal mode) */}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={styles.messageButton}
+      <ButtonRow style={styles.actionButtons}>
+        <AppButton
+          title="Message"
           onPress={handlePrimaryAction}
-        >
-          <Text style={styles.messageButtonText}>Message</Text>
-        </TouchableOpacity>
+          variant="outline"
+          size="small"
+        />
         {showConnectButton && (
-          <TouchableOpacity
-            style={[
-              styles.connectButton,
-              user.connectionStatus?.status === 'accepted' && styles.connectedButton,
-            ]}
+          <AppButton
+            title={getConnectButtonLabel()}
             onPress={handleSecondaryAction}
+            variant={user.connectionStatus?.status === 'accepted' ? 'outline' : 'primary'}
+            size="small"
+            loading={connectLoading}
             disabled={connectLoading}
-          >
-            {connectLoading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={[
-                styles.connectButtonText,
-                user.connectionStatus?.status === 'accepted' && styles.connectedButtonText,
-              ]}>
-                {getConnectButtonLabel()}
-              </Text>
-            )}
-          </TouchableOpacity>
+          />
         )}
-      </View>
+      </ButtonRow>
     </View>
   );
 
@@ -551,10 +538,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  retryText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-  },
   // Header styles - matching PersonalProfileScreen
   header: {
     flexDirection: 'row',
@@ -635,45 +618,8 @@ const styles = StyleSheet.create({
   },
   // Action Buttons
   actionButtons: {
-    flexDirection: 'row',
     marginTop: theme.spacing.md,
     gap: 10,
-  },
-  messageButton: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#1C1917',
-    borderRadius: 8,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  messageButtonText: {
-    color: '#1C1917',
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.bold,
-  },
-  connectButton: {
-    flex: 1,
-    backgroundColor: '#1C1917',
-    borderRadius: 8,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  connectButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.bold,
-  },
-  connectedButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#1C1917',
-  },
-  connectedButtonText: {
-    color: '#1C1917',
   },
   // Section styles - matching PersonalProfileScreen
   section: {

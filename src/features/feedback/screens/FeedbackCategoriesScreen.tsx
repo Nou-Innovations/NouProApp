@@ -1,57 +1,149 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-} from 'react-native';
+import React, { useCallback, useRef } from 'react';
+import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowUp } from 'lucide-react-native';
-import { Icon } from '@/shared/utils/icons';
-import { useTheme } from '@/shared/theme/ThemeProvider';
-import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import {
+  SectionTitle,
+  ExploreChips,
+  EmptyState,
+  SkeletonListItem,
+} from '@/shared/components/ui';
+import { Text } from '@/shared/components/ui/Typography';
+import { useTheme } from '@/shared/theme/ThemeProvider';
 import type { RootStackParamList } from '@/shared/types/navigation';
+import { useSuggestions } from '../hooks/useSuggestions';
+import { SuggestionRow } from '../components/SuggestionRow';
+import { FEEDBACK_CATEGORIES, ALL_CATEGORY_ID } from '../types';
+import type { Suggestion, SuggestionSort } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-interface Suggestion {
-  id: string;
-  text: string;
-  votes: number;
-  hasVoted: boolean;
-}
+const CATEGORY_CHIPS = ['All', ...FEEDBACK_CATEGORIES.map((c) => c.title)];
+const chipToCategoryId = (chip: string) =>
+  chip === 'All' ? ALL_CATEGORY_ID : FEEDBACK_CATEGORIES.find((c) => c.title === chip)?.id ?? ALL_CATEGORY_ID;
+const categoryIdToChip = (id: string) =>
+  id === ALL_CATEGORY_ID ? 'All' : FEEDBACK_CATEGORIES.find((c) => c.id === id)?.title ?? 'All';
 
 export default function FeedbackCategoriesScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { theme: appTheme } = useTheme();
+  const {
+    suggestions,
+    loading,
+    refreshing,
+    error,
+    categoryId,
+    sort,
+    setCategoryId,
+    setSort,
+    refresh,
+    vote,
+  } = useSuggestions();
 
-  // Local state for suggestions with voting - starts empty for real users
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]
+  // Reload when returning to the board (e.g. after submitting a suggestion),
+  // but skip the very first focus — the hook already fetches on mount.
+  const didMount = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (didMount.current) {
+        refresh();
+      } else {
+        didMount.current = true;
+      }
+    }, [refresh])
   );
 
-  const handleVote = (suggestionId: string) => {
-    setSuggestions(prev => {
-      const updated = prev.map(s => {
-        if (s.id === suggestionId) {
-          return {
-            ...s,
-            hasVoted: !s.hasVoted,
-            votes: s.hasVoted ? s.votes - 1 : s.votes + 1,
-          };
-        }
-        return s;
-      });
-      // Re-sort by votes
-      return updated.sort((a, b) => b.votes - a.votes);
+  const goToAdd = useCallback(() => {
+    navigation.navigate('AddSuggestion', {
+      defaultCategoryId: categoryId === ALL_CATEGORY_ID ? undefined : categoryId,
     });
-  };
+  }, [navigation, categoryId]);
 
-  const handleAddSuggestion = () => {
-    navigation.navigate('AddSuggestion', { categoryId: 'general', categoryTitle: 'Suggestion' });
+  const renderItem = useCallback(
+    ({ item }: { item: Suggestion }) => <SuggestionRow suggestion={item} onVote={vote} />,
+    [vote]
+  );
+
+  const SortToggle = () => (
+    <View style={styles.sortRow}>
+      {(['top', 'new'] as SuggestionSort[]).map((option) => {
+        const active = sort === option;
+        return (
+          <TouchableOpacity
+            key={option}
+            onPress={() => setSort(option)}
+            activeOpacity={0.7}
+            style={[
+              styles.sortPill,
+              {
+                backgroundColor: active ? appTheme.colors.surface : 'transparent',
+                borderColor: active ? appTheme.colors.borderColor : 'transparent',
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.sortPillText,
+                { color: active ? appTheme.colors.text : appTheme.colors.textMuted },
+              ]}
+            >
+              {option === 'top' ? 'Top' : 'New'}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  const ListHeader = (
+    <View>
+      <View style={styles.hero}>
+        <SectionTitle style={styles.heroTitle}>Your feedback shapes NouPro</SectionTitle>
+        <Text style={[styles.heroSubtitle, { color: appTheme.colors.textSecondary }]}>
+          In French or English — add ideas and upvote what matters most to you.
+        </Text>
+      </View>
+      <ExploreChips
+        chips={CATEGORY_CHIPS}
+        selected={categoryIdToChip(categoryId)}
+        onSelect={(chip) => setCategoryId(chipToCategoryId(chip))}
+      />
+      <SortToggle />
+    </View>
+  );
+
+  const renderEmpty = () => {
+    if (loading && !refreshing) {
+      return (
+        <View style={styles.skeletons}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <SkeletonListItem key={i} avatarSize={28} lines={2} showTimestamp={false} />
+          ))}
+        </View>
+      );
+    }
+    if (error) {
+      return (
+        <EmptyState
+          iconName="cloud-offline-outline"
+          title="Couldn't load suggestions"
+          subtitle={error}
+          ctaLabel="Try again"
+          onCtaPress={refresh}
+        />
+      );
+    }
+    return (
+      <EmptyState
+        iconName="chatbubble-ellipses-outline"
+        title="No suggestions yet"
+        subtitle="Be the first to share your ideas!"
+        ctaLabel="Add suggestion"
+        onCtaPress={goToAdd}
+      />
+    );
   };
 
   return (
@@ -66,100 +158,31 @@ export default function FeedbackCategoriesScreen() {
         rightActions={[
           {
             icon: 'create-outline',
-            onPress: handleAddSuggestion,
+            onPress: goToAdd,
             accessibilityLabel: 'Add suggestion',
           },
         ]}
       />
-      
-      <ScrollView 
-        style={styles.content} 
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <Text style={[styles.title, { color: appTheme.colors.text }]}>
-            Your Feedback & Suggestions are the most welcome!
-          </Text>
-          <Text style={[styles.subtitle, { color: appTheme.colors.textSecondary }]}>
-            In French or English, add and vote what's the most important things for you
-          </Text>
-        </View>
 
-        {/* Suggestions List */}
-        {suggestions.length > 0 ? (
-          <View style={styles.suggestionsContainer}>
-            {suggestions.map((suggestion, index) => (
-              <View
-                key={suggestion.id}
-                style={[
-                  styles.suggestionItem,
-                  { 
-                    backgroundColor: appTheme.colors.surface,
-                    borderTopColor: appTheme.colors.borderColor,
-                    borderBottomColor: appTheme.colors.borderColor,
-                  },
-                  index === 0 && styles.firstItem,
-                ]}
-              >
-                {/* Suggestion text */}
-                <Text style={[styles.suggestionText, { color: appTheme.colors.text }]}>
-                  {suggestion.text}
-                </Text>
-
-                {/* Vote button */}
-                <View style={styles.voteContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.voteButton,
-                      suggestion.hasVoted
-                        ? { backgroundColor: appTheme.colors.primary }
-                        : { 
-                            backgroundColor: 'transparent',
-                            borderWidth: 1,
-                            borderColor: appTheme.colors.borderColor,
-                          }
-                    ]}
-                    onPress={() => handleVote(suggestion.id)}
-                    activeOpacity={0.7}
-                  >
-                    <ArrowUp 
-                      size={18} 
-                      color={suggestion.hasVoted ? '#FFFFFF' : appTheme.colors.text} 
-                      strokeWidth={2}
-                    />
-                  </TouchableOpacity>
-                  <Text style={[
-                    styles.voteCount, 
-                    { color: suggestion.hasVoted ? appTheme.colors.primary : appTheme.colors.text }
-                  ]}>
-                    {suggestion.votes}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <Icon name="chatbubble-outline" size={64} color={appTheme.colors.textMuted} />
-            <Text style={[styles.emptyStateTitle, { color: appTheme.colors.text }]}>
-              No suggestions yet
-            </Text>
-            <Text style={[styles.emptyStateText, { color: appTheme.colors.textSecondary }]}>
-              Be the first to share your ideas!
-            </Text>
-            <TouchableOpacity
-              style={[styles.addFirstButton, { backgroundColor: appTheme.colors.primary }]}
-              onPress={handleAddSuggestion}
-              activeOpacity={0.7}
-            >
-              <Icon name="add" size={20} color="#FFFFFF" />
-              <Text style={styles.addFirstButtonText}>Add suggestion</Text>
-            </TouchableOpacity>
-          </View>
+      <FlatList
+        data={suggestions}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={renderEmpty}
+        ItemSeparatorComponent={() => (
+          <View style={[styles.separator, { backgroundColor: appTheme.colors.borderColor }]} />
         )}
-      </ScrollView>
+        contentContainerStyle={suggestions.length === 0 ? styles.emptyContent : styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            tintColor={appTheme.colors.primary}
+          />
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -169,92 +192,46 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
-  },
-  contentContainer: {
     paddingBottom: 32,
   },
-  heroSection: {
+  emptyContent: {
+    flexGrow: 1,
+    paddingBottom: 32,
+  },
+  hero: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
-  title: {
-    fontSize: 24,
-    fontFamily: theme.fonts.primary.bold,
-    marginBottom: 12,
-    textAlign: 'center',
-    lineHeight: 32,
+  heroTitle: {
+    marginBottom: 6,
   },
-  subtitle: {
+  heroSubtitle: {
     fontSize: 14,
-    fontFamily: theme.fonts.primary.regular,
-    textAlign: 'center',
     lineHeight: 20,
   },
-  suggestionsContainer: {
-    // No gap - borders create separation
-  },
-  suggestionItem: {
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  firstItem: {
-    borderTopWidth: 1,
-  },
-  suggestionText: {
-    fontSize: 15,
-    fontFamily: theme.fonts.primary.regular,
-    lineHeight: 22,
-    marginBottom: 12,
-  },
-  voteContainer: {
+  sortRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  voteButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  voteCount: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 64,
-    paddingHorizontal: 32,
-  },
-  emptyStateTitle: {
-    fontSize: 20,
-    fontFamily: theme.fonts.primary.bold,
-    marginTop: 20,
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.regular,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  addFirstButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 8,
     gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
-  addFirstButtonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-    color: '#FFFFFF',
+  sortPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  sortPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 16,
+  },
+  skeletons: {
+    paddingTop: 8,
   },
 });

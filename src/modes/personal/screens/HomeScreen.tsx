@@ -25,8 +25,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Icon } from '@/shared/utils/icons';
-import AnimatedMenuIcon from '@/shared/components/ui/AnimatedMenuIcon';
+import { PrimaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -140,47 +139,19 @@ export default function HomeScreen() {
     return currentUser.name.split(' ')[0];
   };
 
-  const renderBadge = (count: number) => {
-    if (count <= 0) return null;
-    
-    return (
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>
-          {count > 9 ? '9+' : count.toString()}
-        </Text>
-      </View>
-    );
-  };
-
   const renderHeader = () => (
-    <View style={[styles.header, { backgroundColor: appTheme.colors.background }]}>
-      {/* Hamburger Menu Button - opens the sidebar drawer */}
-      <TouchableOpacity
-        style={styles.iconButton}
-        onPress={openDrawer}
-        activeOpacity={0.7}
-        accessibilityLabel="Open menu"
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <AnimatedMenuIcon size={30} color={appTheme.colors.text} />
-      </TouchableOpacity>
-      <View style={styles.headerActions}>
-        {/* Notifications Button */}
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={navigateToNotifications}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Icon 
-            name="notifications-outline" 
-            size={24} 
-            color={appTheme.colors.text} 
-          />
-          {renderBadge(unreadCount)}
-        </TouchableOpacity>
-      </View>
-    </View>
+    <PrimaryHeader
+      title="Home"
+      leftAction={{ icon: 'menu', onPress: openDrawer, accessibilityLabel: 'Open menu' }}
+      actions={[
+        {
+          icon: 'notifications-outline',
+          onPress: navigateToNotifications,
+          badge: unreadCount,
+          accessibilityLabel: 'Notifications',
+        },
+      ]}
+    />
   );
 
   const renderGreeting = () => (

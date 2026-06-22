@@ -6,6 +6,7 @@ import { Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn } from '@/shared/
 import { get as apiGet } from '@/shared/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
+import { HeroHeader } from '@/shared/components/layout/headers';
 import BrandCard from '@/features/brands/components/BrandCard';
 import ProductCardOtherCompany from '@/features/products/components/ProductCardOtherCompany';
 import CartPopup from '@/features/cart/components/CartPopup';
@@ -981,13 +982,6 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
             style={styles.coverImage}
             resizeMode="cover"
           />
-          {/* Floating Back Button */}
-          <TouchableOpacity
-            style={[styles.floatingBackButton, { top: insets.top + 10 }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Icon name="chevron-back" size={24} color={appTheme.colors.text} />
-          </TouchableOpacity>
         </View>
 
         {/* Profile Section - Matching BusinessProfileOwnScreen UI */}
@@ -1119,6 +1113,12 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
         </View>
       </ScrollView>
 
+      {/* Hero header — floating back control pinned over the cover image */}
+      <HeroHeader
+        title={business?.name ?? ''}
+        leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }}
+      />
+
       {/* Cart Popup - Fixed across all tabs */}
       <CartPopup
         isVisible={effectiveCanOrder && isCartPopupVisible && activeTab === 'products'}
@@ -1217,21 +1217,6 @@ const styles = StyleSheet.create({
   coverImage: {
     width: '100%',
     height: '100%',
-  },
-  floatingBackButton: {
-    position: 'absolute',
-    left: 12,
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   // Profile Section - Matching BusinessProfileOwnScreen
   profileSection: {

@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/shared/components/ui/FilterBar';
 import { EmptyState, Skeleton, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
@@ -91,9 +91,9 @@ export default function PurchaseOrdersScreen() {
       edges={['top']}
     >
       {/* Primary Header */}
-      <PrimaryHeader
+      <SecondaryHeader
         title="Orders"
-        actions={[
+        rightActions={[
           {
             icon: 'plus',
             onPress: () => (navigation as any).navigate('CreatePurchaseOrder'),

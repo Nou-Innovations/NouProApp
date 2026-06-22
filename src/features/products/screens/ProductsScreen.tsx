@@ -22,7 +22,7 @@ import PaywallModal from '@/shared/components/ui/PaywallModal';
 import AppButton from '@/shared/components/ui/AppButton';
 import IconButton from '@/shared/components/ui/IconButton';
 import { AppModal, AppBottomSheet, ListItemCard , EmptyState, Skeleton, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { useBusinessStore } from '@/shared/store/businessStore';
@@ -285,11 +285,11 @@ const ProductsScreen: React.FC = () => {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       {/* Primary Header */}
-      <PrimaryHeader
+      <SecondaryHeader
         title={currentViewTitle}
         onTitlePress={toggleViewDropdown}
         leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
-        actions={[
+        rightActions={[
           { icon: 'plus', onPress: handleOpenCreateOptions, accessibilityLabel: 'Create product' },
           ...((isEditing || isAdmin()) ? [{
             icon: isSaving ? 'time' : (isEditing ? 'save' : 'pencil'),

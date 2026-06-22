@@ -12,16 +12,15 @@ import {
   Text,
   StyleSheet,
   SectionList,
-  TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import { EmptyState } from '@/shared/components/ui';
+import { EmptyState, AppButton, TextButton } from '@/shared/components/ui';
 import DeliveryCard from '@/features/deliveries/components/DeliveryCard';
 import PodCaptureModal from '@/features/deliveries/components/PodCaptureModal';
 import { Delivery, DeliveryStatus } from '@/shared/types/delivery';
@@ -87,7 +86,7 @@ export default function MyDeliveriesScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <PrimaryHeader
+      <SecondaryHeader
         title="My deliveries"
         leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
       />
@@ -99,9 +98,7 @@ export default function MyDeliveriesScreen() {
       ) : error && deliveries.length === 0 ? (
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: appTheme.colors.error }]}>{error}</Text>
-          <TouchableOpacity onPress={refresh} style={[styles.retryButton, { backgroundColor: appTheme.colors.primary }]}>
-            <Text style={{ color: '#FFFFFF' }}>Retry</Text>
-          </TouchableOpacity>
+          <TextButton title="Retry" onPress={refresh} />
         </View>
       ) : (
         <SectionList
@@ -123,12 +120,13 @@ export default function MyDeliveriesScreen() {
                   onPress={() => (navigation as any).navigate('DeliveryDetail', { deliveryId: item.id })}
                 />
                 {action && (
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: appTheme.colors.accent }]}
+                  <AppButton
+                    title={action.label}
                     onPress={() => handleAdvance(item)}
-                  >
-                    <Text style={styles.actionButtonText}>{action.label}</Text>
-                  </TouchableOpacity>
+                    variant="accent"
+                    fullWidth
+                    style={styles.actionButton}
+                  />
                 )}
               </View>
             );
@@ -170,11 +168,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
   sectionHeader: {
     fontSize: 14,
     fontFamily: 'InterCustom-SemiBold',
@@ -186,14 +179,5 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: -4,
     marginBottom: 12,
-    height: 44,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontFamily: 'InterCustom-SemiBold',
   },
 });

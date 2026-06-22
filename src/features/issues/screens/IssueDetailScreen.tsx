@@ -2,12 +2,13 @@
  * IssueDetailScreen — view an issue and advance its status / resolve it.
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import Pill from '@/shared/components/ui/Pill';
+import { AppButton } from '@/shared/components/ui';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { Issue, IssueStatus, ISSUE_TYPE_LABELS, ISSUE_STATUS_LABELS, ISSUE_STATUS_COLORS } from '@/shared/types/issue';
 import { getIssue, updateIssue } from '../issues.service';
@@ -64,7 +65,7 @@ export default function IssueDetailScreen() {
   if (loading) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-        <PrimaryHeader title="Issue" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
+        <SecondaryHeader title="Issue" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
         <View style={styles.center}><ActivityIndicator color={appTheme.colors.accent} /></View>
       </SafeAreaView>
     );
@@ -72,7 +73,7 @@ export default function IssueDetailScreen() {
   if (!issue) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-        <PrimaryHeader title="Issue" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
+        <SecondaryHeader title="Issue" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
         <View style={styles.center}><Text style={{ color: appTheme.colors.textSecondary }}>Issue not found</Text></View>
       </SafeAreaView>
     );
@@ -82,7 +83,7 @@ export default function IssueDetailScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <PrimaryHeader title="Issue" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
+      <SecondaryHeader title="Issue" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
         <View style={styles.row}>
           <Text style={[styles.title, { color: appTheme.colors.text }]}>{ISSUE_TYPE_LABELS[issue.type] || issue.type}</Text>
@@ -112,13 +113,15 @@ export default function IssueDetailScreen() {
         )}
 
         {action && (
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: appTheme.colors.accent }]}
+          <AppButton
+            title={action.label}
             onPress={advance}
+            variant="accent"
+            loading={submitting}
             disabled={submitting}
-          >
-            {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>{action.label}</Text>}
-          </TouchableOpacity>
+            fullWidth
+            style={styles.actionSpacing}
+          />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -136,6 +139,5 @@ const styles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, padding: 14 },
   label: { fontSize: 13, fontFamily: 'InterCustom-SemiBold', marginBottom: 8 },
   input: { minHeight: 70, borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 15, textAlignVertical: 'top' },
-  button: { height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontFamily: 'InterCustom-SemiBold' },
+  actionSpacing: { marginTop: 4 },
 });

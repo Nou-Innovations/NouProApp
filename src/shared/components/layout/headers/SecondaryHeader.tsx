@@ -10,6 +10,8 @@ export type HeaderAction = {
   onPress: () => void;
   accessibilityLabel?: string;
   badge?: number; // Optional badge count (shows if > 0)
+  iconColor?: string; // Optional tint override (defaults to theme icon color)
+  disabled?: boolean; // Dims + disables the button (e.g. while saving)
 };
 
 export type SecondaryHeaderVariant = 'solid' | 'transparent';
@@ -108,11 +110,12 @@ export default function SecondaryHeader({
               <TouchableOpacity
                 key={`${a.icon}-${idx}`}
                 onPress={a.onPress}
-                style={styles.iconButton}
+                disabled={a.disabled}
+                style={[styles.iconButton, a.disabled ? styles.iconButtonDisabled : null]}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityLabel={a.accessibilityLabel}
               >
-                <Icon name={a.icon} size={28} color={theme.colors.iconColor} strokeWidth={2} />
+                <Icon name={a.icon} size={28} color={a.iconColor ?? theme.colors.iconColor} strokeWidth={2} />
                 {a.badge != null && a.badge > 0 && (
                   <View style={[styles.badge, { backgroundColor: theme.colors.error }]}>
                     <Text style={styles.badgeText}>
@@ -152,6 +155,9 @@ const styles = StyleSheet.create({
     height: 56,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconButtonDisabled: {
+    opacity: 0.4,
   },
   rightElementContainer: {
     paddingRight: 8,

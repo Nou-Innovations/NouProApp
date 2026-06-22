@@ -16,7 +16,7 @@ import { Icon } from '@/shared/utils/icons';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
-import AppButton from '@/shared/components/ui/AppButton';
+import { AppButton, TextButton } from '@/shared/components/ui';
 import AppModal from '@/shared/components/ui/AppModal';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { authAPI } from '@/shared/services/api';
@@ -196,14 +196,13 @@ export default function ChoosePathScreen({ navigation, route }: Props) {
           variant={selectedOption ? 'primary' : 'disabled'}
           disabled={!selectedOption}
         />
-        <TouchableOpacity
-          style={styles.skipButton}
+        <TextButton
+          title="Skip"
           onPress={handleSkip}
-        >
-          <Text style={[styles.skipText, { color: appTheme.colors.text }]}>
-            Skip
-          </Text>
-        </TouchableOpacity>
+          tone="muted"
+          style={styles.skipButton}
+          textStyle={{ color: appTheme.colors.text }}
+        />
       </View>
 
       {/* Success Modal */}
@@ -275,9 +274,5 @@ const styles = StyleSheet.create({
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  skipText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
   },
 });

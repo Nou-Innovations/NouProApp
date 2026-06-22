@@ -192,16 +192,13 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
         {!isFullyPaid && (
           <View style={[styles.addPaymentSection, { backgroundColor: theme.colors.cardBackground }]}>
             {!showAddPayment ? (
-              <TouchableOpacity 
-                style={[styles.addPaymentButton, { borderColor: theme.colors.primary }]}
+              <AppButton
+                title="Add Partial Payment"
                 onPress={() => setShowAddPayment(true)}
-                activeOpacity={0.7}
-              >
-                <Icon name="add-circle-outline" size={24} color={theme.colors.primary} />
-                <Text style={[styles.addPaymentText, { color: theme.colors.primary }]}>
-                  Add Partial Payment
-                </Text>
-              </TouchableOpacity>
+                variant="outline"
+                fullWidth
+                iconLeft="add-circle-outline"
+              />
             ) : (
               <View style={styles.addPaymentForm}>
                 <Text style={[styles.formLabel, { color: theme.colors.text }]}>Partial Payment</Text>
@@ -245,13 +242,13 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
                   </View>
                 )}
                 
-                <TouchableOpacity 
-                  style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+                <AppButton
+                  title="Add"
                   onPress={handleAddPayment}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.addButtonText}>Add</Text>
-                </TouchableOpacity>
+                  variant="primary"
+                  fullWidth
+                  style={styles.addButton}
+                />
               </View>
             )}
           </View>
@@ -362,20 +359,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
   },
-  addPaymentButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-  },
-  addPaymentText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
   addPaymentForm: {
     
   },
@@ -398,14 +381,6 @@ const styles = StyleSheet.create({
   },
   addButton: {
     marginTop: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
   },
   bottomBar: {
     position: 'absolute',

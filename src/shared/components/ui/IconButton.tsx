@@ -1,19 +1,22 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
+import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'disable' | 'alert' | 'confirm';
 type ButtonSize = 'default' | 'small';
 
 interface IconButtonProps {
-  iconName: keyof typeof Icon.glyphMap;
+  iconName: string;
   onPress: () => void;
   variant?: ButtonVariant;
   size?: ButtonSize;
   style?: ViewStyle;
   disabled?: boolean;
   iconColor?: string;
+  /** Screen-reader label — recommended for icon-only buttons since there's no visible text. */
+  accessibilityLabel?: string;
 }
 
 const IconButton: React.FC<IconButtonProps> = ({
@@ -24,6 +27,7 @@ const IconButton: React.FC<IconButtonProps> = ({
   style,
   disabled = false,
   iconColor,
+  accessibilityLabel,
 }) => {
   const { theme: appTheme } = useTheme();
   
@@ -91,6 +95,9 @@ const IconButton: React.FC<IconButtonProps> = ({
       onPress={onPress}
       disabled={disabled || variant === 'disable'}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: disabled || variant === 'disable' }}
+      accessibilityLabel={accessibilityLabel}
     >
       <Icon name={iconName} size={iconSize} color={variantIconColor} />
     </TouchableOpacity>
@@ -99,17 +106,17 @@ const IconButton: React.FC<IconButtonProps> = ({
 
 const styles = StyleSheet.create({
   baseButton: {
-    borderRadius: 8,
+    borderRadius: theme.borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   defaultButton: {
-    width: 40,
-    height: 40,
+    width: theme.heights.iconButton,
+    height: theme.heights.iconButton,
   },
   smallButton: {
-    width: 32,
-    height: 32,
+    width: theme.heights.iconButtonSmall,
+    height: theme.heights.iconButtonSmall,
   },
 });
 

@@ -71,9 +71,9 @@ import { convertEstimateToInvoice } from '@/features/invoices/invoices.service';
 const ORDER_STATUS_COLORS: Record<string, string> = {
   'pending': '#F2A900',
   'accepted': '#2A75E6',
-  'completed': '#34A853',
+  'completed': '#2ACF01',
   'cancelled': '#A8A29E',
-  'Done': '#34A853',
+  'Done': '#2ACF01',
   'New': '#7A1F12',
   'Ongoing': '#2A75E6',
   'Pending': '#F2A900',
@@ -84,18 +84,18 @@ const ORDER_STATUS_COLORS: Record<string, string> = {
   'ONGOING': '#2A75E6',
   'PENDING': '#F2A900',
   'IN_REVIEW': '#8B5CF6',
-  'DONE': '#34A853',
+  'DONE': '#2ACF01',
   'CANCELED': '#A8A29E',
   'REJECTED': '#F0705F',
 };
 
 const PAYMENT_STATUS_COLORS: Record<string, string> = {
-  'Paid': '#34A853',
-  'Unpaid': '#D6453E',
+  'Paid': '#2ACF01',
+  'Unpaid': '#FF2400',
   'Payment Pending Confirmation': '#F2A900',
   // UPPERCASE enum values
-  'PAID': '#34A853',
-  'UNPAID': '#D6453E',
+  'PAID': '#2ACF01',
+  'UNPAID': '#FF2400',
   'PENDING_CONFIRMATION': '#F2A900',
   'PARTIALLY_PAID': '#F2A900',
   'OVERDUE': '#D6453E',
@@ -170,8 +170,9 @@ export default function ChatScreen() {
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   // Typing indicator
   const { typingUsers, handleTyping, stopTyping } = useTypingIndicator(id);
-  // Voice recorder
-  const { state: voiceState, duration: voiceDuration, recordingUri, startRecording, stopRecording, cancelRecording } = useVoiceRecorder();
+  // Voice recorder (recording entry point disabled for now — playback of existing
+  // voice messages still works; see attachmentOptions below).
+  const { state: voiceState, duration: voiceDuration, recordingUri, stopRecording, cancelRecording } = useVoiceRecorder();
   // Network status for offline support
   const { isConnected } = useNetworkStatus();
   // Edit message state
@@ -1565,9 +1566,6 @@ export default function ChatScreen() {
       case 'location':
         handleShareLocation();
         break;
-      case 'voice':
-        startRecording();
-        break;
       case 'profile':
         handleShareProfile();
         break;
@@ -1590,11 +1588,6 @@ export default function ChatScreen() {
       id: 'location',
       title: 'Location',
       avatar: { type: 'icon' as const, icon: 'map-pin' },
-    },
-    {
-      id: 'voice',
-      title: 'Voice Message',
-      avatar: { type: 'icon' as const, icon: 'mic' },
     },
     {
       id: 'profile',

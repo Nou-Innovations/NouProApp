@@ -1,7 +1,5 @@
 import React from 'react';
-import { Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { ListItemCard } from '@/shared/components/ui';
-import { useTheme } from '@/shared/theme/ThemeProvider';
+import { AppButton, ListItemCard } from '@/shared/components/ui';
 import { type Opportunity, OPPORTUNITY_TYPE_LABELS } from '../opportunities.service';
 
 interface Props {
@@ -20,7 +18,6 @@ function budgetText(o: Opportunity): string | null {
 }
 
 export default function OpportunityCard({ opportunity, onPress, onRespond, showRespond }: Props) {
-  const { theme: appTheme } = useTheme();
   const o = opportunity;
   const subtitle = [OPPORTUNITY_TYPE_LABELS[o.type] || o.type, o.locationText, budgetText(o)]
     .filter(Boolean)
@@ -28,9 +25,7 @@ export default function OpportunityCard({ opportunity, onPress, onRespond, showR
 
   const respondBtn =
     showRespond && onRespond ? (
-      <TouchableOpacity onPress={onRespond} style={[styles.btn, { backgroundColor: appTheme.colors.primary }]}>
-        <Text style={styles.btnText}>Respond</Text>
-      </TouchableOpacity>
+      <AppButton title="Respond" onPress={onRespond} size="small" />
     ) : undefined;
 
   return (
@@ -50,8 +45,3 @@ export default function OpportunityCard({ opportunity, onPress, onRespond, showR
     />
   );
 }
-
-const styles = StyleSheet.create({
-  btn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  btnText: { color: '#FFFFFF', fontWeight: '600', fontSize: 13 },
-});

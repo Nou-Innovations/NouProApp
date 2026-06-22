@@ -29,7 +29,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
-import { SectionTitle } from '@/shared/components/ui';
+import { AppButton, SectionTitle } from '@/shared/components/ui';
 import { createLocation } from '@/features/locations/locations.service';
 import { canUseIndependentLocations } from '@/shared/utils/permissions';
 
@@ -519,24 +519,13 @@ export default function AddLocationScreen() {
           borderTopColor: appTheme.colors.borderColor,
           backgroundColor: appTheme.colors.background,
         }]}>
-          <TouchableOpacity
-            style={[
-              styles.submitButton,
-              {
-                backgroundColor: isFormValid ? appTheme.colors.primary : appTheme.colors.surface,
-              }
-            ]}
+          <AppButton
+            title="Create"
             onPress={handleSubmit}
             disabled={!isFormValid || isSubmitting}
-            activeOpacity={0.7}
-          >
-            <Text style={[
-              styles.submitButtonText,
-              { color: isFormValid ? '#FFFFFF' : appTheme.colors.textMuted }
-            ]}>
-              {isSubmitting ? 'Creating...' : 'Create'}
-            </Text>
-          </TouchableOpacity>
+            loading={isSubmitting}
+            fullWidth
+          />
         </View>
       </KeyboardAvoidingView>
 
@@ -787,16 +776,6 @@ const styles = StyleSheet.create({
   bottomActions: {
     padding: 16,
     borderTopWidth: 1,
-  },
-  submitButton: {
-    height: 52,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
   },
   // Bottom Sheet Styles
   typeOptionsContainer: {

@@ -36,9 +36,9 @@ import {
   ORDER_STATUS_COLORS,
   PAYMENT_STATUS_COLORS,
 } from '../inbox.constants';
-import AppButton from '@/shared/components/ui/AppButton';
 // AppBottomSheet lifted to ChatScreen level for performance
 import { OrderEventCard } from './OrderEventCard';
+import { InvoiceEventCard } from './InvoiceEventCard';
 import VoicePlayer from './VoicePlayer';
 import ProfileCard from './ProfileCard';
 
@@ -140,10 +140,11 @@ function MessageStatus({ status }: MessageStatusProps) {
   
   return (
     <View style={styles.messageStatusContainer}>
-      <Icon 
-        name={iconName} 
-        size={12} 
-        color={iconColor} 
+      <Icon
+        name={iconName}
+        size={15}
+        strokeWidth={2}
+        color={iconColor}
         style={styles.messageStatusIcon}
       />
     </View>
@@ -233,10 +234,25 @@ export function MessageBubble({
     ? [styles.textOutgoing, { color: appTheme.colors.textInverse }] 
     : [styles.textIncoming, { color: appTheme.colors.primary }];
   
-  const bubbleContainerStyle = isOutgoing 
-    ? styles.bubbleContainerOutgoing 
+  const bubbleContainerStyle = isOutgoing
+    ? styles.bubbleContainerOutgoing
     : styles.bubbleContainerIncoming;
-  
+
+  // Nested "two bubble" pattern for attachment/special messages: an outer colored
+  // shell (radius 12, padding 4 = the gap) wrapping an inner content card (radius 8).
+  const shellStyle = [
+    styles.shell,
+    { backgroundColor: isOutgoing ? appTheme.colors.primary : appTheme.colors.cardBackground },
+  ];
+  const innerCardStyle = [
+    styles.innerCard,
+    isOutgoing
+      ? { backgroundColor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.14)' }
+      : { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.borderColor },
+  ];
+  // Muted text color that reads on the inner card in both directions.
+  const mutedOnCard = isOutgoing ? appTheme.colors.textMuted : appTheme.colors.textSecondary;
+
   // ========== Render Helpers ==========
   
   const renderForwardedLabel = () => {
@@ -274,7 +290,7 @@ export function MessageBubble({
     );
   };
   
-  const renderTextWithLinks = (text: string) => {
+  const renderTextWithLinks = (text: string, trailing?: React.ReactNode) => {
     // Combined regex for URLs and @mentions
     const combinedRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|(@\w[\w\s]*?)(?=\s@|\s*$|[,.!?;:])/gi;
     const elements: React.ReactNode[] = [];
@@ -331,10 +347,10 @@ export function MessageBubble({
     }
 
     if (elements.length === 0) {
-      return <Text style={textStyle}>{text}</Text>;
+      return <Text style={textStyle}>{text}{trailing}</Text>;
     }
 
-    return <Text style={textStyle}>{elements}</Text>;
+    return <Text style={textStyle}>{elements}{trailing}</Text>;
   };
   
   const renderReplyContext = () => {
@@ -342,18 +358,18 @@ export function MessageBubble({
     
     const senderColor = isOutgoing ? appTheme.colors.textInverse : appTheme.colors.text;
     const snippetColor = isOutgoing ? appTheme.colors.textInverse : appTheme.colors.textSecondary;
-    
+
     return (
       <View style={[
-        styles.replyContextContainer, 
+        styles.replyContextContainer,
         isOutgoing ? styles.replyContextContainerOutgoing : styles.replyContextContainerIncoming
       ]}>
         <View style={[
-          styles.replyContextIndicator, 
+          styles.replyContextIndicator,
           { backgroundColor: isOutgoing ? appTheme.colors.textInverse : appTheme.colors.accent }
         ]} />
         <View style={styles.replyContextTextContainer}>
-          <Text style={[styles.replyContextSender, { color: senderColor }]}>
+          <Text style={[styles.replyContextSender, { color: senderColor }]} numberOfLines={1}>
             {message.replyingTo.senderName}
           </Text>
           <Text style={[styles.replyContextSnippet, { color: snippetColor }]} numberOfLines={1}>
@@ -384,12 +400,12 @@ export function MessageBubble({
             )
           )}
           <View style={bubbleContainerStyle}>
-            <TouchableOpacity 
+            <TouchableOpacity
               activeOpacity={0.8}
               onLongPress={handleLongPress}
               delayLongPress={500}
             >
-              <View style={[bubbleStyle, message.replyingTo && styles.bubbleWithReply]}>
+              <View style={bubbleStyle}>
                 {showSenderName && !isOutgoing && (
                   <Text style={[styles.senderName, { color: senderNameColor }]}>
                     {sender.name}
@@ -397,8 +413,21 @@ export function MessageBubble({
                 )}
                 {renderForwardedLabel()}
                 {renderReplyContext()}
-                {renderTextWithLinks(message.text)}
-                {renderTimestamp(message.timestamp, message.status, message.editedAt)}
+                <View style={styles.textTimeWrap}>
+                  {renderTextWithLinks(
+                    message.text,
+                    <Text style={styles.inlineSpacer}>{String.fromCharCode(0x2007).repeat(isOutgoing ? 8 : 5)}</Text>
+                  )}
+                  <View style={styles.inlineTimestamp}>
+                    {message.editedAt && (
+                      <Text style={[styles.timestamp, { color: mutedOnCard, marginRight: 4, fontStyle: 'italic' }]}>edited</Text>
+                    )}
+                    <Text style={[styles.timestamp, { color: mutedOnCard }]}>
+                      {formatMessageTimestamp(message.timestamp)}
+                    </Text>
+                    {isOutgoing && message.status && <MessageStatus status={message.status} />}
+                  </View>
+                </View>
               </View>
             </TouchableOpacity>
           </View>
@@ -407,180 +436,101 @@ export function MessageBubble({
     );
   };
 
+  // Shared wrapper for "tap to open" attachment messages: an outer colored shell
+  // (radius 12, padding 4 = the gap) wrapping an inner content card (radius 8).
+  const renderAttachmentBubble = ({
+    onPress,
+    children,
+    footer,
+    cardStyle,
+  }: {
+    onPress?: () => void;
+    children: React.ReactNode;
+    footer?: React.ReactNode;
+    cardStyle?: object;
+  }) => (
+    <View style={[
+      styles.row,
+      isGrouped && styles.rowGrouped,
+      isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' },
+    ]}>
+      {!isOutgoing && isGroupChat && (
+        showAvatar && sender.avatar ? (
+          <Image source={{ uri: sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
+        ) : (
+          <View style={styles.avatarPlaceholder} />
+        )
+      )}
+      <View style={bubbleContainerStyle}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={onPress}
+          onLongPress={handleLongPress}
+          delayLongPress={500}
+        >
+          <View style={shellStyle}>
+            {showSenderName && !isOutgoing && (
+              <Text style={[styles.senderName, { color: senderNameColor, marginLeft: 4, marginBottom: 4 }]}>
+                {sender.name}
+              </Text>
+            )}
+            {renderForwardedLabel()}
+            <View style={[innerCardStyle, cardStyle]}>
+              {children}
+            </View>
+            {footer}
+          </View>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   const renderPdfMessage = () => {
     if (message.type !== 'pdf') return null;
-    
-    return (
-      <>
-        <View style={[
-          styles.row, 
-          isGrouped && styles.rowGrouped,
-          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
-        ]}> 
-          {!isOutgoing && isGroupChat && (
-            showAvatar && sender.avatar ? (
-              <Image source={{ uri: sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
-            ) : (
-              <View style={styles.avatarPlaceholder} />
-            )
-          )}
-          <View style={bubbleContainerStyle}>
-            <TouchableOpacity
-              style={bubbleStyle}
-              onPress={() => onOpenDocument?.(message.fileName, message.fileUrl)}
-              onLongPress={handleLongPress}
-              delayLongPress={500}
-            >
-              {showSenderName && !isOutgoing && (
-                <Text style={[styles.senderName, { color: senderNameColor }]}>
-                  {sender.name}
-                </Text>
-              )}
-              {renderForwardedLabel()}
-              <View style={styles.iconTextRow}>
-                <Icon name="file-text" size={18} color={isOutgoing ? appTheme.colors.textInverse : appTheme.colors.primary} style={styles.inlineIcon}/>
-                <Text style={textStyle}>{message.fileName || 'Document.pdf'}</Text>
-              </View>
-              <Text style={[{ fontSize: 14 }, { color: isOutgoing ? appTheme.colors.textMuted : appTheme.colors.textSecondary }]}>
-                Tap to view
-              </Text>
-              {renderTimestamp(message.timestamp, message.status)}
-            </TouchableOpacity>
+    return renderAttachmentBubble({
+      onPress: () => onOpenDocument?.(message.fileName, message.fileUrl),
+      children: (
+        <>
+          <View style={styles.iconTextRow}>
+            <Icon name="file-text" size={18} color={isOutgoing ? appTheme.colors.textInverse : appTheme.colors.primary} style={styles.inlineIcon} />
+            <Text style={[textStyle, { flexShrink: 1 }]} numberOfLines={1}>{message.fileName || 'Document.pdf'}</Text>
           </View>
-        </View>
-      </>
-    );
+          <Text style={[{ fontSize: 14 }, { color: mutedOnCard }]}>Tap to view</Text>
+          {renderTimestamp(message.timestamp, message.status)}
+        </>
+      ),
+    });
   };
   
-  const renderInvoiceMessage = () => {
-    if (message.type !== 'invoice') return null;
-    
+  // Invoice & estimate use the order-card visual language (InvoiceEventCard),
+  // wrapped in the standard message row (avatar + alignment), like the order card.
+  const renderDocCard = () => {
+    if (message.type !== 'invoice' && message.type !== 'estimate') return null;
+    const isInvoice = message.type === 'invoice';
     return (
-      <>
-        <View style={[
-          styles.row, 
-          isGrouped && styles.rowGrouped,
-          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
-        ]}> 
-          {!isOutgoing && isGroupChat && (
-            showAvatar && sender.avatar ? (
-              <Image source={{ uri: sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
-            ) : (
-              <View style={styles.avatarPlaceholder} />
-            )
-          )}
-          <View style={bubbleContainerStyle}>
-            <TouchableOpacity 
-              style={[
-                styles.specialMessageBubble,
-                isOutgoing ? { backgroundColor: appTheme.colors.primary } : { backgroundColor: appTheme.colors.cardBackground },
-              ]} 
-              onPress={() => onInvoicePress?.(message.invoiceId)}
-              onLongPress={handleLongPress}
-              delayLongPress={500}
-            >
-              {showSenderName && !isOutgoing && (
-                <Text style={[styles.senderName, { color: senderNameColor }]}>
-                  {sender.name}
-                </Text>
-              )}
-              <View style={styles.specialMessageHeader}>
-                <Icon 
-                  name="receipt-outline" 
-                  size={18} 
-                  color={isOutgoing ? appTheme.colors.textInverse : appTheme.colors.primary} 
-                  style={styles.specialMessageIcon}
-                />
-                <Text style={[
-                  styles.specialMessageTitle,
-                  { color: isOutgoing ? appTheme.colors.textInverse : appTheme.colors.text }
-                ]} numberOfLines={1}>
-                  Invoice #{message.invoiceId}
-                </Text>
-              </View>
-              <Text style={[
-                styles.specialMessageSubtext,
-                { color: isOutgoing ? appTheme.colors.textMuted : appTheme.colors.textSecondary }
-              ]}>
-                Tap to view invoice details
-              </Text>
-              {renderTimestamp(message.timestamp, message.status)}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </>
+      <View style={[
+        styles.row,
+        isGrouped && styles.rowGrouped,
+        isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' },
+      ]}>
+        {!isOutgoing && isGroupChat && (
+          showAvatar && sender.avatar ? (
+            <Image source={{ uri: sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
+          ) : (
+            <View style={styles.avatarPlaceholder} />
+          )
+        )}
+        <InvoiceEventCard
+          message={message}
+          onPress={(docId) => (isInvoice ? onInvoicePress?.(docId) : onEstimatePress?.(docId))}
+          onConfirm={(docId) => onEstimateConfirm?.(docId)}
+        />
+      </View>
     );
   };
-  
-  const renderEstimateMessage = () => {
-    if (message.type !== 'estimate') return null;
-    
-    return (
-      <>
-        <View style={[
-          styles.row, 
-          isGrouped && styles.rowGrouped,
-          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
-        ]}> 
-          {!isOutgoing && isGroupChat && (
-            showAvatar && sender.avatar ? (
-              <Image source={{ uri: sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
-            ) : (
-              <View style={styles.avatarPlaceholder} />
-            )
-          )}
-          <View style={bubbleContainerStyle}>
-            <TouchableOpacity 
-              style={[
-                styles.specialMessageBubble,
-                isOutgoing ? { backgroundColor: appTheme.colors.primary } : { backgroundColor: appTheme.colors.cardBackground },
-              ]} 
-              onPress={() => onEstimatePress?.(message.estimateId)}
-              onLongPress={handleLongPress}
-              delayLongPress={500}
-            >
-              {showSenderName && !isOutgoing && (
-                <Text style={[styles.senderName, { color: senderNameColor }]}>
-                  {sender.name}
-                </Text>
-              )}
-              <View style={styles.specialMessageHeader}>
-                <Icon 
-                  name="receipt-outline" 
-                  size={18} 
-                  color={isOutgoing ? appTheme.colors.textInverse : appTheme.colors.primary} 
-                  style={styles.specialMessageIcon}
-                />
-                <Text style={[
-                  styles.specialMessageTitle,
-                  { color: isOutgoing ? appTheme.colors.textInverse : appTheme.colors.text }
-                ]} numberOfLines={1}>
-                  Estimate #{message.estimateId}
-                </Text>
-              </View>
-              <Text style={[
-                styles.specialMessageSubtext,
-                { color: isOutgoing ? appTheme.colors.textMuted : appTheme.colors.textSecondary }
-              ]}>
-                Tap to view estimate details
-              </Text>
-              
-              {/* Confirm Estimate Button */}
-              <AppButton
-                title="Confirm Estimate"
-                size="small"
-                variant={isOutgoing ? 'secondary' : 'primary'}
-                onPress={() => onEstimateConfirm?.(message.estimateId)}
-                style={{ marginTop: 8 }}
-              />
-              
-              {renderTimestamp(message.timestamp, message.status)}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </>
-    );
-  };
+
+  const renderInvoiceMessage = renderDocCard;
+  const renderEstimateMessage = renderDocCard;
   
   // NOTE: renderOrderMessage was removed - it was dead code.
   // Both 'order' and 'order_event' message types are handled by renderOrderEventMessage().
@@ -649,77 +599,22 @@ export function MessageBubble({
       }
     };
     
-    return (
-      <>
-        <View style={[
-          styles.row, 
-          isGrouped && styles.rowGrouped,
-          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
-        ]}>
-          {!isOutgoing && isGroupChat && (
-            showAvatar && sender.avatar ? (
-              <Image source={{ uri: sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
-            ) : (
-              <View style={styles.avatarPlaceholder} />
-            )
-          )}
-          <View style={bubbleContainerStyle}>
-            {showSenderName && !isOutgoing && (
-              <Text style={[styles.senderName, { color: senderNameColor }]} numberOfLines={1}>
-                {sender.name}
-              </Text>
-            )}
-            <TouchableOpacity 
-              activeOpacity={0.8}
-              onPress={handleOpenMaps}
-              onLongPress={handleLongPress}
-              delayLongPress={500}
-              style={bubbleStyle}
-            >
-              {/* Location Icon and Title */}
-              <View style={styles.locationHeader}>
-                <Icon name="map-pin" size={20} color={isOutgoing ? appTheme.colors.textInverse : appTheme.colors.primary} />
-                <Text style={[textStyle, { marginLeft: 8, fontWeight: '600' }]}>
-                  {locationName || 'Shared Location'}
-                </Text>
-              </View>
-              
-              {/* Address */}
-              {address && (
-                <Text style={[
-                  { fontSize: 14, marginTop: 4 },
-                  { color: isOutgoing ? 'rgba(255,255,255,0.8)' : appTheme.colors.textSecondary }
-                ]} numberOfLines={2}>
-                  {address}
-                </Text>
-              )}
-              
-              {/* Map Preview Placeholder - Could be replaced with actual map image */}
-              <View style={[
-                styles.locationMapPreview,
-                { backgroundColor: isOutgoing ? 'rgba(255,255,255,0.1)' : appTheme.colors.surface }
-              ]}>
-                <Icon name="map" size={32} color={isOutgoing ? 'rgba(255,255,255,0.5)' : appTheme.colors.textMuted} />
-                <Text style={[
-                  { fontSize: 12, marginTop: 4 },
-                  { color: isOutgoing ? 'rgba(255,255,255,0.5)' : appTheme.colors.textMuted }
-                ]}>
-                  Tap to open in Maps
-                </Text>
-              </View>
-              
-              {/* Timestamp */}
-              <View style={styles.timestampContainer}>
-                <Text style={[styles.timestamp, { color: isOutgoing ? 'rgba(255,255,255,0.7)' : appTheme.colors.textMuted }]}>
-                  {formatMessageTimestamp(message.timestamp)}
-                </Text>
-                {isOutgoing && message.status && <MessageStatus status={message.status} />}
-              </View>
-            </TouchableOpacity>
+    // Same layout as the PDF bubble: icon + title on one row, muted subtext below.
+    return renderAttachmentBubble({
+      onPress: handleOpenMaps,
+      children: (
+        <>
+          <View style={styles.iconTextRow}>
+            <Icon name="map-pin" size={18} color={isOutgoing ? appTheme.colors.textInverse : appTheme.colors.primary} style={styles.inlineIcon} />
+            <Text style={[textStyle, { flexShrink: 1 }]} numberOfLines={1}>{locationName || 'Shared Location'}</Text>
           </View>
-        </View>
-      </>
-    );
+          <Text style={[{ fontSize: 14 }, { color: mutedOnCard }]} numberOfLines={2}>
+            {address || 'Tap to open in Maps'}
+          </Text>
+          {renderTimestamp(message.timestamp, message.status)}
+        </>
+      ),
+    });
   };
   
   const renderImageMessage = () => {
@@ -845,90 +740,38 @@ export function MessageBubble({
   const renderProfileMessage = () => {
     if (message.type !== 'profile') return null;
     const profileMsg = message as ProfileMessage;
-
-    return (
-      <>
-        <View style={[
-          styles.row,
-          isGrouped && styles.rowGrouped,
-          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
-        ]}>
-          {!isOutgoing && isGroupChat && (
-            showAvatar && sender.avatar ? (
-              <Image source={{ uri: sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
-            ) : (
-              <View style={styles.avatarPlaceholder} />
-            )
-          )}
-          <View style={bubbleContainerStyle}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onLongPress={handleLongPress}
-              delayLongPress={500}
-            >
-              <View style={bubbleStyle}>
-                {showSenderName && !isOutgoing && (
-                  <Text style={[styles.senderName, { color: senderNameColor }]}>
-                    {sender.name}
-                  </Text>
-                )}
-                {renderForwardedLabel()}
-                <ProfileCard
-                  profileName={profileMsg.profileName}
-                  profileAvatar={profileMsg.profileAvatar}
-                  profileType={profileMsg.profileType}
-                  isOutgoing={isOutgoing}
-                  onPress={() => onProfilePress?.(profileMsg.profileId, profileMsg.profileType)}
-                />
-                {renderTimestamp(message.timestamp, message.status)}
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </>
-    );
+    return renderAttachmentBubble({
+      children: (
+        <>
+          <ProfileCard
+            profileName={profileMsg.profileName}
+            profileAvatar={profileMsg.profileAvatar}
+            profileType={profileMsg.profileType}
+            isOutgoing={isOutgoing}
+            onPress={() => onProfilePress?.(profileMsg.profileId, profileMsg.profileType)}
+          />
+          {renderTimestamp(message.timestamp, message.status)}
+        </>
+      ),
+    });
   };
 
   const renderUnsupportedMessage = () => {
     // contact - Not yet implemented
-    if (!['contact'].includes(message.type)) return null;
-    
-    const labels: Record<string, string> = {
-      contact: '👤 Contact',
-    };
-    
-    return (
-      <>
-        <View style={[
-          styles.row, 
-          isGrouped && styles.rowGrouped,
-          isOutgoing ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }
-        ]}> 
-          {!isOutgoing && isGroupChat && (
-            showAvatar && sender.avatar ? (
-              <Image source={{ uri: sender.avatar }} style={[styles.avatarSmall, { backgroundColor: appTheme.colors.surface }]} />
-            ) : (
-              <View style={styles.avatarPlaceholder} />
-            )
-          )}
-          <View style={bubbleContainerStyle}>
-            <TouchableOpacity 
-              activeOpacity={0.8}
-              onLongPress={handleLongPress}
-              delayLongPress={500}
-              style={[bubbleStyle, { opacity: 0.6 }]}
-            >
-              <Text style={[textStyle, { fontStyle: 'italic' }]}>
-                {labels[message.type] || message.type}
-              </Text>
-              <Text style={[{ fontSize: 14 }, { color: isOutgoing ? appTheme.colors.textMuted : appTheme.colors.textSecondary }]}>
-                Not available in this version
-              </Text>
-            </TouchableOpacity>
+    if (message.type !== 'contact') return null;
+    return renderAttachmentBubble({
+      cardStyle: { opacity: 0.85 },
+      children: (
+        <>
+          <View style={styles.iconTextRow}>
+            <Icon name="user" size={18} color={isOutgoing ? appTheme.colors.textInverse : appTheme.colors.primary} style={styles.inlineIcon} />
+            <Text style={[textStyle, { fontStyle: 'italic', flexShrink: 1 }]} numberOfLines={1}>Contact</Text>
           </View>
-        </View>
-      </>
-    );
+          <Text style={[{ fontSize: 14 }, { color: mutedOnCard }]}>Not available in this version</Text>
+          {renderTimestamp(message.timestamp, message.status)}
+        </>
+      ),
+    });
   };
   
   const renderOrderEventMessage = () => {
@@ -1080,11 +923,6 @@ const styles = StyleSheet.create({
     maxWidth: '80%',
     alignSelf: 'flex-end',
   },
-  bubbleWithReply: {
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    marginTop: 0,
-  },
   textIncoming: {
     fontSize: 16,
     lineHeight: 22,
@@ -1112,27 +950,38 @@ const styles = StyleSheet.create({
   messageStatusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 14,
   },
   messageStatusIcon: {
-    marginLeft: 1,
+    marginLeft: 3,
   },
   linkText: {
     textDecorationLine: 'underline',
   },
-  // Location message styles
-  locationHeader: {
+  // Inline (WhatsApp-style) timestamp tucked into the last text line
+  textTimeWrap: {
+    position: 'relative',
+  },
+  inlineSpacer: {
+    fontSize: 12,
+    opacity: 0,
+  },
+  inlineTimestamp: {
+    position: 'absolute',
+    right: 0,
+    bottom: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
   },
-  locationMapPreview: {
-    marginTop: 8,
+  // Nested "two bubble" shell + inner content card
+  shell: {
+    borderRadius: 12,
+    padding: 4,
+    overflow: 'visible',
+  },
+  innerCard: {
     borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 80,
+    padding: 10,
+    borderWidth: 0.5,
   },
   // Image message styles
   imageBubble: {
@@ -1167,30 +1016,6 @@ const styles = StyleSheet.create({
   },
   pdfSubtext: {
     fontSize: 14,
-  },
-  // Special message styles
-  specialMessageBubble: {
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    width: 280,
-  },
-  specialMessageHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  specialMessageIcon: {
-    marginRight: 8,
-  },
-  specialMessageTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  specialMessageSubtext: {
-    fontSize: 14,
-    marginBottom: 4,
   },
   // Order styles
   orderBubble: {
@@ -1280,38 +1105,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontStyle: 'italic',
   },
-  // Reply context
+  // Reply context (single-line, fully rounded quote)
   replyContextContainer: {
     flexDirection: 'row',
-    marginBottom: 0,
-    paddingLeft: 8,
-    paddingVertical: 8,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    alignItems: 'stretch',
+    marginBottom: 6,
+    paddingRight: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   replyContextContainerIncoming: {
     backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderLeftWidth: 4,
-    borderLeftColor: '#ECE6DF',
   },
   replyContextContainerOutgoing: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderLeftWidth: 4,
-    borderLeftColor: '#ECE6DF',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   replyContextIndicator: {
-    width: 4,
+    width: 3,
     marginRight: 8,
   },
   replyContextTextContainer: {
     flex: 1,
+    justifyContent: 'center',
   },
   replyContextSender: {
     fontWeight: '600',
     fontSize: 13,
-    marginBottom: 2,
+    marginBottom: 1,
   },
   replyContextSnippet: {
     fontSize: 13,

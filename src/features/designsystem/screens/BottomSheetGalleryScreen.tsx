@@ -10,7 +10,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { SectionTitle } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import {
@@ -67,7 +67,7 @@ export default function BottomSheetGalleryScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
-      <PrimaryHeader
+      <SecondaryHeader
         title="Bottom Sheet Gallery"
         leftAction={{
           icon: 'menu',

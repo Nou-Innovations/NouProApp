@@ -129,15 +129,38 @@ export interface PdfMessage extends BaseMessage {
   replyingTo?: ReplyContext;
 }
 
+/** Lightweight line item carried on invoice/estimate chat cards (subset of InvoiceItem). */
+export interface ChatLineItem {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+/**
+ * Rich detail block shown on invoice/estimate bubbles. All optional so old messages
+ * (which only carry the id) still render via a minimal fallback card.
+ */
+export interface InvoiceCardDetails {
+  number?: string;
+  currency?: string;
+  itemCount?: number;
+  items?: ChatLineItem[];
+  subtotal?: number;
+  total?: number;
+  status?: string;
+}
+
 export interface InvoiceMessage extends BaseMessage {
   type: 'invoice';
   invoiceId: string;
+  details?: InvoiceCardDetails;
   replyingTo?: ReplyContext;
 }
 
 export interface EstimateMessage extends BaseMessage {
   type: 'estimate';
   estimateId: string;
+  details?: InvoiceCardDetails;
   replyingTo?: ReplyContext;
 }
 

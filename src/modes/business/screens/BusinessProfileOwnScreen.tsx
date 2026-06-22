@@ -21,16 +21,18 @@ import {
   Dimensions,
   FlatList,
   Linking,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
+import { HeroHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import Avatar from '@/shared/components/ui/Avatar';
-import { EmptyState, Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
+import { AppButton, EmptyState, Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
 import BrandCard from '@/features/brands/components/BrandCard';
 import ProductCard from '@/features/products/components/ProductCard';
 import ProfileActionButtons from '@/features/profile/components/ProfileActionButtons';
@@ -335,24 +337,17 @@ export default function BusinessProfileOwnScreen() {
     }
   };
 
-  // Render cover image with floating settings button
+  // Render cover image (the settings control lives in the HeroHeader overlay)
   const renderCoverImage = () => (
     <View style={styles.coverContainer}>
       <Image
-        source={{ 
-          uri: activeBusiness?.banner_url || 
-            'https://images.unsplash.com/photo-1596178065887-1198b6148b2b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80' 
+        source={{
+          uri: activeBusiness?.banner_url ||
+            'https://images.unsplash.com/photo-1596178065887-1198b6148b2b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80'
         }}
         style={styles.coverImage}
         resizeMode="cover"
       />
-      {/* Floating Settings Button */}
-      <TouchableOpacity
-        style={styles.floatingSettingsButton}
-        onPress={handleSettings}
-      >
-        <Icon name="settings-outline" size={24} color={appTheme.colors.text} />
-      </TouchableOpacity>
     </View>
   );
 
@@ -781,18 +776,16 @@ export default function BusinessProfileOwnScreen() {
             })}
 
             {/* Add New Business Button */}
-            <TouchableOpacity
-              style={styles.addNewBusinessButton}
+            <AppButton
+              title="Add New Business"
+              iconLeft="add"
               onPress={() => {
                 closeProfileSwitcher();
                 setTimeout(openAddBusinessOptions, 300);
               }}
-            >
-              <View style={{ marginRight: 8 }}>
-                <Icon name="add" size={20} color="#FFFFFF" />
-              </View>
-              <Text style={styles.addNewBusinessButtonText}>Add New Business</Text>
-            </TouchableOpacity>
+              fullWidth
+              style={styles.addNewBusinessButton}
+            />
           </ScrollView>
         </Animated.View>
       </Animated.View>
@@ -880,6 +873,7 @@ export default function BusinessProfileOwnScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <ScrollView showsVerticalScrollIndicator={false}>
         {renderCoverImage()}
         {renderProfileSection()}
@@ -894,6 +888,13 @@ export default function BusinessProfileOwnScreen() {
         {activeTab === 'products' ? renderProductsTab() : renderAboutTab()}
         <View style={{ height: theme.spacing.xl + 34 }} />
       </ScrollView>
+
+      {/* Hero header — settings control pinned over the cover image (no back: tab root) */}
+      <HeroHeader
+        title={activeBusiness?.name ?? ''}
+        rightActions={[{ icon: 'settings-outline', onPress: handleSettings, accessibilityLabel: 'Settings' }]}
+      />
+
       {renderProfileSwitcherModal()}
       {renderAddBusinessOptionsModal()}
     </View>
@@ -914,22 +915,6 @@ const styles = StyleSheet.create({
   coverImage: {
     width: '100%',
     height: '100%',
-  },
-  floatingSettingsButton: {
-    position: 'absolute',
-    top: 60, // Account for status bar
-    right: 12,
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   profileSection: {
     paddingHorizontal: 12,
@@ -1252,19 +1237,8 @@ const styles = StyleSheet.create({
     color: '#34A853',
   },
   addNewBusinessButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1C1917',
-    borderRadius: 8,
-    height: 56,
     marginTop: 24,
     marginBottom: 16,
-  },
-  addNewBusinessButtonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-    color: '#FFFFFF',
   },
   // Add Business Options Modal styles
   addOptionsBottomSheet: {

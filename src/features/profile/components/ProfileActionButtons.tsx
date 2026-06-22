@@ -14,15 +14,13 @@
 import React from 'react';
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import theme from '@/shared/theme';
+import { AppButton, ButtonRow } from '@/shared/components/ui';
 import {
   ProfileViewType,
   getProfileActionConfig,
@@ -119,75 +117,25 @@ export default function ProfileActionButtons({
     }
   };
 
-  // Dynamic styles based on theme
-  const dynamicStyles = {
-    outlineButton: {
-      backgroundColor: 'transparent',
-      borderWidth: 1,
-      borderColor: appTheme.colors.primary,
-    },
-    filledButton: {
-      backgroundColor: appTheme.colors.primary,
-    },
-    outlineButtonText: {
-      color: appTheme.colors.primary,
-    },
-    filledButtonText: {
-      color: appTheme.colors.textInverse,
-    },
-  };
-
   return (
     <View style={[styles.container, style]}>
-      {/* Primary Button */}
-      <TouchableOpacity
-        style={[
-          styles.button,
-          config.primaryButton.variant === 'outline' && dynamicStyles.outlineButton,
-          config.primaryButton.variant === 'primary' && dynamicStyles.filledButton,
-        ]}
-        onPress={onPrimaryPress}
-        activeOpacity={0.7}
-      >
-        <Text
-          style={[
-            styles.buttonText,
-            config.primaryButton.variant === 'outline' && dynamicStyles.outlineButtonText,
-            config.primaryButton.variant === 'primary' && dynamicStyles.filledButtonText,
-          ]}
-        >
-          {config.primaryButton.label}
-        </Text>
-      </TouchableOpacity>
-
-      {/* Secondary Button */}
-      <TouchableOpacity
-        style={[
-          styles.button,
-          resolvedSecondaryVariant === 'primary' && dynamicStyles.filledButton,
-          resolvedSecondaryVariant === 'outline' && dynamicStyles.outlineButton,
-        ]}
-        onPress={onSecondaryPress}
-        activeOpacity={0.7}
-        disabled={secondaryLoading}
-      >
-        {secondaryLoading ? (
-          <ActivityIndicator
-            size="small"
-            color={resolvedSecondaryVariant === 'primary' ? appTheme.colors.textInverse : appTheme.colors.primary}
-          />
-        ) : (
-          <Text
-            style={[
-              styles.buttonText,
-              resolvedSecondaryVariant === 'primary' && dynamicStyles.filledButtonText,
-              resolvedSecondaryVariant === 'outline' && dynamicStyles.outlineButtonText,
-            ]}
-          >
-            {resolvedSecondaryLabel}
-          </Text>
-        )}
-      </TouchableOpacity>
+      {/* Primary + Secondary action pair */}
+      <ButtonRow style={styles.buttonRow}>
+        <AppButton
+          title={config.primaryButton.label}
+          onPress={onPrimaryPress}
+          variant={config.primaryButton.variant === 'outline' ? 'outline' : 'primary'}
+          size="small"
+        />
+        <AppButton
+          title={resolvedSecondaryLabel}
+          onPress={onSecondaryPress}
+          variant={resolvedSecondaryVariant === 'outline' ? 'outline' : 'primary'}
+          size="small"
+          loading={secondaryLoading}
+          disabled={secondaryLoading}
+        />
+      </ButtonRow>
 
       {/* More Options Button (only for OTHER_* profiles) */}
       {showMoreButton && (
@@ -212,18 +160,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginTop: 16,
-  },
-  button: {
-    flex: 1,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
   },
-  buttonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
+  buttonRow: {
+    flex: 1,
+    gap: 10,
   },
   moreButton: {
     width: 40,

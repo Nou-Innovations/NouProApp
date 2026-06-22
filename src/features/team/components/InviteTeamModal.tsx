@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+import { AppButton, ButtonRow } from '@/shared/components/ui';
 
 type Role = 'Super Admin' | 'Admin' | 'Staff';
 
@@ -118,29 +119,19 @@ const InviteTeamModal: React.FC<InviteTeamModalProps> = ({
               </View>
             </View>
 
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity 
-                style={[styles.cancelButton, { borderColor: appTheme.colors.borderColor }]} 
+            <ButtonRow style={styles.buttonContainer}>
+              <AppButton
+                title="Cancel"
                 onPress={onClose}
-              >
-                <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.inviteButton, 
-                  { backgroundColor: email.trim() ? appTheme.colors.accent : appTheme.colors.buttonBackground }
-                ]}
+                variant="outline"
+              />
+              <AppButton
+                title="Send Invitation"
                 onPress={handleInvite}
+                variant="accent"
                 disabled={!email.trim()}
-              >
-                <Text style={[
-                  styles.inviteButtonText, 
-                  { color: email.trim() ? '#FFFFFF' : appTheme.colors.textLight }
-                ]}>
-                  Send Invitation
-                </Text>
-              </TouchableOpacity>
-            </View>
+              />
+            </ButtonRow>
           </View>
         </View>
       </View>
@@ -209,32 +200,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
     marginTop: 24,
-  },
-  cancelButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginRight: 12,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  inviteButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  inviteButtonDisabled: {
-    backgroundColor: '#F4F0EB',
-  },
-  inviteButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
   },
 });
 

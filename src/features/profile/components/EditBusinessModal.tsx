@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+import { AppButton, ButtonRow } from '@/shared/components/ui';
 
 interface EditBusinessModalProps {
   isVisible: boolean;
@@ -185,23 +186,21 @@ const EditBusinessModal: React.FC<EditBusinessModalProps> = ({
             <View style={styles.bottomPadding} />
           </ScrollView>
 
-          <View style={[styles.buttonContainer, { 
+          <ButtonRow style={[styles.buttonContainer, {
             borderTopColor: appTheme.colors.borderColor,
-            backgroundColor: appTheme.colors.cardBackground 
+            backgroundColor: appTheme.colors.cardBackground,
           }]}>
-            <TouchableOpacity 
-              style={[styles.cancelButton, { borderColor: appTheme.colors.borderColor }]} 
+            <AppButton
+              title="Cancel"
               onPress={onClose}
-            >
-              <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.saveButton, { backgroundColor: appTheme.colors.accent }]} 
+              variant="outline"
+            />
+            <AppButton
+              title="Save"
               onPress={handleSave}
-            >
-              <Text style={styles.saveButtonText}>Save</Text>
-            </TouchableOpacity>
-          </View>
+              variant="accent"
+            />
+          </ButtonRow>
         </View>
       </View>
     </Modal>
@@ -304,31 +303,8 @@ const styles = StyleSheet.create({
     height: Platform.OS === 'ios' ? 34 : 24,
   },
   buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
     padding: 16,
     borderTopWidth: 1,
-  },
-  cancelButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginRight: 12,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  saveButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '500',
   },
 });
 

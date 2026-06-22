@@ -20,6 +20,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { AppButton } from '@/shared/components/ui';
 import { Icon } from '@/shared/utils/icons';
 import ProcurementStatusBadge from '../components/ProcurementStatusBadge';
 import * as procurementService from '../services/procurement.service';
@@ -119,12 +120,7 @@ export default function SupplierDetailScreen() {
           <Text style={[styles.errorText, { color: appTheme.colors.error }]}>
             {error || 'Supplier not found'}
           </Text>
-          <TouchableOpacity
-            onPress={() => fetchSupplier()}
-            style={[styles.retryButton, { backgroundColor: appTheme.colors.primary }]}
-          >
-            <Text style={{ color: appTheme.colors.textInverse, fontWeight: '600' }}>Retry</Text>
-          </TouchableOpacity>
+          <AppButton title="Retry" onPress={() => fetchSupplier()} size="small" />
         </View>
       </SafeAreaView>
     );
@@ -340,11 +336,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     marginBottom: 16,
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 8,
   },
   /* Cards */
   card: {

@@ -20,7 +20,7 @@ import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
 import AppTextField from '@/shared/components/ui/AppTextField';
-import AppButton from '@/shared/components/ui/AppButton';
+import { AppButton, TextButton } from '@/shared/components/ui';
 import PhoneNumberField from '@/shared/components/ui/PhoneNumberField';
 import { authAPI } from '@/shared/services/api';
 
@@ -241,11 +241,11 @@ export default function CreateAccountScreen({ navigation }: Props) {
         <Text style={[styles.loginText, { color: appTheme.colors.textSecondary }]}>
           Already have an account?{' '}
         </Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-          <Text style={[styles.loginLink, { color: appTheme.colors.primary }]}>
-            Login
-          </Text>
-        </TouchableOpacity>
+        <TextButton
+          title="Login"
+          onPress={() => navigation.navigate('Login')}
+          textStyle={styles.loginLink}
+        />
       </View>
     </View>
   );

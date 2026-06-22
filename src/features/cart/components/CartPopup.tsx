@@ -3,14 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Animated,
   Dimensions,
   Alert,
 } from 'react-native';
-import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useOrderStore, useCarts } from '@/shared/store/orderStore';
+import { AppButton, TextButton } from '@/shared/components/ui';
 
 interface CartPopupProps {
   isVisible: boolean;
@@ -107,21 +106,19 @@ const CartPopup: React.FC<CartPopupProps> = ({
           </View>
         </View>
         
-        <TouchableOpacity 
-          style={styles.addToCartButton}
+        <AppButton
+          title="Add to Cart"
           onPress={handleAddToCart}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.addToCartText}>Add to Cart</Text>
-        </TouchableOpacity>
+          variant="secondary"
+          fullWidth
+        />
 
-        <TouchableOpacity 
-          style={styles.cancelButton}
+        <TextButton
+          title="Cancel"
           onPress={handleCancel}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.cancelText}>Cancel</Text>
-        </TouchableOpacity>
+          style={styles.cancelButton}
+          textStyle={styles.cancelText}
+        />
       </View>
     </View>
   );
@@ -177,31 +174,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
   },
-  addToCartButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    height: 48,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addToCartText: {
-    color: '#1C1917',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   cancelButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignSelf: 'center',
     marginTop: 8,
   },
   cancelText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
 

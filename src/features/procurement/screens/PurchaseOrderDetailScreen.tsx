@@ -23,7 +23,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { SectionTitle } from '@/shared/components/ui';
+import { SectionTitle, AppButton } from '@/shared/components/ui';
 import ProcurementStatusBadge from '../components/ProcurementStatusBadge';
 import type {
   PurchaseOrder,
@@ -154,9 +154,7 @@ export default function PurchaseOrderDetailScreen() {
         <SecondaryHeader title="Purchase Order" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack() }} />
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: appTheme.colors.textSecondary }]}>{error || 'Order not found.'}</Text>
-          <TouchableOpacity onPress={fetchData} style={[styles.retryButton, { borderColor: appTheme.colors.borderColor }]}>
-            <Text style={{ color: appTheme.colors.text, fontWeight: '600' }}>Retry</Text>
-          </TouchableOpacity>
+          <AppButton title="Retry" onPress={fetchData} variant="outline" size="small" />
         </View>
       </SafeAreaView>
     );
@@ -251,42 +249,18 @@ export default function PurchaseOrderDetailScreen() {
         {!isTerminal && (
           <View style={styles.actionsSection}>
             {po.status === 'DRAFT' && (
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: appTheme.colors.info }]}
-                onPress={onSend}
-                disabled={actionLoading}
-              >
-                <Text style={styles.actionButtonText}>Send</Text>
-              </TouchableOpacity>
+              <AppButton title="Send" onPress={onSend} variant="primary" fullWidth disabled={actionLoading} />
             )}
 
             {po.status === 'SENT' && (
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: appTheme.colors.success }]}
-                onPress={onConfirm}
-                disabled={actionLoading}
-              >
-                <Text style={styles.actionButtonText}>Mark Confirmed</Text>
-              </TouchableOpacity>
+              <AppButton title="Mark Confirmed" onPress={onConfirm} variant="confirm" fullWidth disabled={actionLoading} />
             )}
 
             {po.status === 'CONFIRMED' && (
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: appTheme.colors.success }]}
-                onPress={onReceiveGoods}
-                disabled={actionLoading}
-              >
-                <Text style={styles.actionButtonText}>Receive Goods</Text>
-              </TouchableOpacity>
+              <AppButton title="Receive Goods" onPress={onReceiveGoods} variant="confirm" fullWidth disabled={actionLoading} />
             )}
 
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: appTheme.colors.error }]}
-              onPress={onCancel}
-              disabled={actionLoading}
-            >
-              <Text style={styles.actionButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            <AppButton title="Cancel" onPress={onCancel} variant="alert" fullWidth disabled={actionLoading} />
           </View>
         )}
 
@@ -348,7 +322,6 @@ const styles = StyleSheet.create({
   scroll: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
 
   errorText: { fontSize: 16, textAlign: 'center', marginBottom: 16 },
-  retryButton: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8, borderWidth: 1 },
 
   badgeRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
 
@@ -377,13 +350,6 @@ const styles = StyleSheet.create({
   notesText: { fontSize: 14, lineHeight: 20 },
 
   actionsSection: { gap: 10, marginBottom: 16 },
-  actionButton: {
-    height: 48,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 
   deliveryLinkCard: {
     flexDirection: 'row',

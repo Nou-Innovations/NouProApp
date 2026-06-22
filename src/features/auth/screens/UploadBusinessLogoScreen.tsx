@@ -6,7 +6,6 @@
 import React, { useState } from 'react';
 import {
   View,
-  TouchableOpacity,
   StyleSheet,
   Alert,
 } from 'react-native';
@@ -18,7 +17,7 @@ import { UserBusiness } from '@/shared/types/business';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
-import AppButton from '@/shared/components/ui/AppButton';
+import { AppButton, TextButton } from '@/shared/components/ui';
 import AppModal from '@/shared/components/ui/AppModal';
 import ImageUploadField from '@/shared/components/ui/ImageUploadField';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -174,18 +173,14 @@ export default function UploadBusinessLogoScreen({ navigation, route }: Props) {
           disabled={!logoImage || isCreating}
           loading={isCreating && logoImage !== null}
         />
-        <TouchableOpacity
-          style={styles.laterButton}
+        <TextButton
+          title="Later"
           onPress={handleLater}
           disabled={isCreating}
-        >
-          <Text style={[
-            styles.laterText,
-            { color: isCreating ? appTheme.colors.textMuted : appTheme.colors.text }
-          ]}>
-            Later
-          </Text>
-        </TouchableOpacity>
+          tone="muted"
+          style={styles.laterButton}
+          textStyle={{ color: appTheme.colors.text }}
+        />
       </View>
 
       {/* Success Modal */}
@@ -237,9 +232,5 @@ const styles = StyleSheet.create({
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  laterText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
   },
 });

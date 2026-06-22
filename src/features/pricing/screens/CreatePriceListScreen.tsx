@@ -6,7 +6,7 @@
  * "Assign customers" entry point appear. Backed by priceLists.service.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Switch, Modal, FlatList, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Switch, Modal, FlatList, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
@@ -158,9 +158,11 @@ const CreatePriceListScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         <AppButton
-          title={saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create price list'}
+          title={isEdit ? 'Save changes' : 'Create price list'}
           onPress={handleSave}
+          loading={saving}
           disabled={!isValid || saving}
+          fullWidth
           style={styles.save}
         />
 
@@ -263,7 +265,9 @@ const OverridePicker: React.FC<{
                 keyboardType="numeric"
                 style={[styles.priceInput, { color: colors.text, borderColor: colors.border }]}
               />
-              <TouchableOpacity
+              <AppButton
+                title="Add"
+                size="small"
                 onPress={() => {
                   const v = Number(priceById[item.id]);
                   if (Number.isNaN(v) || priceById[item.id] === undefined || priceById[item.id] === '') {
@@ -272,10 +276,7 @@ const OverridePicker: React.FC<{
                   }
                   onAdd(item.id, v);
                 }}
-                style={[styles.addBtn, { backgroundColor: colors.primary }]}
-              >
-                <Text style={styles.addBtnText}>Add</Text>
-              </TouchableOpacity>
+              />
             </View>
           )}
         />
@@ -298,8 +299,6 @@ const styles = StyleSheet.create({
   pickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 8 },
   pickerName: { fontSize: 15, fontWeight: '500' },
   priceInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, width: 80, textAlign: 'right' },
-  addBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
-  addBtnText: { color: '#fff', fontWeight: '600' },
 });
 
 export default CreatePriceListScreen;

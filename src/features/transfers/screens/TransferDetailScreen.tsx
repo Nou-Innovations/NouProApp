@@ -2,13 +2,13 @@
  * TransferDetailScreen — view a transfer and advance it through its approval lifecycle.
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import Pill from '@/shared/components/ui/Pill';
-import { SectionTitle } from '@/shared/components/ui';
+import { SectionTitle, AppButton, ButtonRow } from '@/shared/components/ui';
 import { Icon } from '@/shared/utils/icons';
 import { useProfileStore } from '@/shared/store/profileStore';
 import {
@@ -115,7 +115,7 @@ export default function TransferDetailScreen() {
   if (loading) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-        <PrimaryHeader title="Transfer" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
+        <SecondaryHeader title="Transfer" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
         <View style={styles.center}><ActivityIndicator color={appTheme.colors.accent} /></View>
       </SafeAreaView>
     );
@@ -123,7 +123,7 @@ export default function TransferDetailScreen() {
   if (!transfer) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-        <PrimaryHeader title="Transfer" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
+        <SecondaryHeader title="Transfer" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
         <View style={styles.center}><Text style={{ color: appTheme.colors.textSecondary }}>Transfer not found</Text></View>
       </SafeAreaView>
     );
@@ -136,7 +136,7 @@ export default function TransferDetailScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <PrimaryHeader title="Transfer" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
+      <SecondaryHeader title="Transfer" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
         {/* From → To + status */}
         <View style={[styles.card, { backgroundColor: appTheme.colors.cardBackground, borderColor: appTheme.colors.borderColor }]}>
@@ -216,35 +216,35 @@ export default function TransferDetailScreen() {
               multiline
               style={[styles.input, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor }]}
             />
-            <View style={styles.rejectActions}>
-              <TouchableOpacity
-                style={[styles.button, styles.flex1, { backgroundColor: appTheme.colors.inputBackground }]}
+            <ButtonRow gap={10} style={styles.rejectActions}>
+              <AppButton
+                title="Cancel"
                 onPress={() => { setRejecting(false); setRejectReason(''); }}
+                variant="outline"
                 disabled={submitting}
-              >
-                <Text style={[styles.buttonText, { color: appTheme.colors.textSecondary }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.flex1, { backgroundColor: appTheme.colors.error }]}
+              />
+              <AppButton
+                title="Confirm reject"
                 onPress={() => applyStatus('Rejected', rejectReason || undefined)}
+                variant="alert"
+                loading={submitting}
                 disabled={submitting}
-              >
-                {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Confirm reject</Text>}
-              </TouchableOpacity>
-            </View>
+              />
+            </ButtonRow>
           </View>
         )}
 
         {/* Action buttons */}
         {!rejecting && actions.map((action) => (
-          <TouchableOpacity
+          <AppButton
             key={action.next}
-            style={[styles.button, { backgroundColor: action.destructive ? appTheme.colors.error : appTheme.colors.accent }]}
+            title={action.label}
             onPress={() => onAction(action)}
+            variant={action.destructive ? 'alert' : 'accent'}
+            loading={submitting}
             disabled={submitting}
-          >
-            {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>{action.label}</Text>}
-          </TouchableOpacity>
+            fullWidth
+          />
         ))}
       </ScrollView>
 
@@ -279,8 +279,5 @@ const styles = StyleSheet.create({
   historyDate: { fontSize: 12, fontFamily: 'InterCustom-Regular' },
   label: { fontSize: 13, fontFamily: 'InterCustom-SemiBold', marginBottom: 8 },
   input: { minHeight: 70, borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 15, textAlignVertical: 'top' },
-  rejectActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  flex1: { flex: 1 },
-  button: { height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontFamily: 'InterCustom-SemiBold' },
+  rejectActions: { marginTop: 4 },
 });

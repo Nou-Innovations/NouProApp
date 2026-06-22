@@ -12,7 +12,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   TextInput,
   Alert,
   ActivityIndicator,
@@ -25,6 +24,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { AppButton } from '@/shared/components/ui';
 import ProcurementStatusBadge from '../components/ProcurementStatusBadge';
 import type { PurchaseOrder, GoodsReceiptItem, CreateGoodsReceiptData } from '@/shared/types/procurement';
 import * as procurementService from '../services/procurement.service';
@@ -142,9 +142,7 @@ export default function GoodsReceiptScreen() {
         <SecondaryHeader title="Receive Goods" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack() }} />
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: appTheme.colors.textSecondary }]}>{error || 'Purchase order not found.'}</Text>
-          <TouchableOpacity onPress={fetchPO} style={[styles.retryButton, { borderColor: appTheme.colors.borderColor }]}>
-            <Text style={{ color: appTheme.colors.text, fontWeight: '600' }}>Retry</Text>
-          </TouchableOpacity>
+          <AppButton title="Retry" onPress={fetchPO} variant="outline" size="small" />
         </View>
       </SafeAreaView>
     );
@@ -230,17 +228,14 @@ export default function GoodsReceiptScreen() {
 
       {/* Submit button */}
       <View style={[styles.bottomBar, { backgroundColor: appTheme.colors.cardBackground, borderTopColor: appTheme.colors.borderColor }]}>
-        <TouchableOpacity
-          style={[styles.submitButton, { opacity: isSubmitting ? 0.6 : 1 }]}
+        <AppButton
+          title="Submit Receipt"
           onPress={handleSubmit}
+          variant="confirm"
+          fullWidth
+          loading={isSubmitting}
           disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.submitButtonText}>Submit Receipt</Text>
-          )}
-        </TouchableOpacity>
+        />
       </View>
     </SafeAreaView>
   );
@@ -253,7 +248,6 @@ const styles = StyleSheet.create({
   scroll: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
 
   errorText: { fontSize: 16, textAlign: 'center', marginBottom: 16 },
-  retryButton: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8, borderWidth: 1 },
 
   refCard: {
     borderRadius: 10,
@@ -301,12 +295,4 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     borderTopWidth: 1,
   },
-  submitButton: {
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#34A853',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 });

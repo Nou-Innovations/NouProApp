@@ -7,7 +7,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -18,7 +17,7 @@ import { Icon } from '@/shared/utils/icons';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
-import AppButton from '@/shared/components/ui/AppButton';
+import { AppButton, TextButton } from '@/shared/components/ui';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'TwoFactorVerify'>;
 
@@ -143,23 +142,19 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
             />
 
             <AppButton
-              title={loading ? 'Verifying...' : 'Verify'}
+              title="Verify"
               onPress={handleVerify}
               loading={loading}
               disabled={loading || !code.trim()}
               variant={code.trim() && !loading ? 'primary' : 'disabled'}
             />
 
-            <TouchableOpacity
-              style={styles.switchModeButton}
+            <TextButton
+              title={isBackupMode ? 'Use authenticator app instead' : 'Use a backup code instead'}
               onPress={toggleBackupMode}
-            >
-              <Text style={[styles.switchModeText, { color: appTheme.colors.primary }]}>
-                {isBackupMode
-                  ? 'Use authenticator app instead'
-                  : 'Use a backup code instead'}
-              </Text>
-            </TouchableOpacity>
+              style={styles.switchModeButton}
+              textStyle={styles.switchModeText}
+            />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

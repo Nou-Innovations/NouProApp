@@ -363,40 +363,19 @@ export default function AddWorkExperienceScreen() {
         {/* Action Buttons - Fixed at bottom */}
         <View style={styles.bottomContainer}>
           <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.saveButton,
-                {
-                  backgroundColor: hasChanges ? appTheme.colors.success : appTheme.colors.buttonBackgroundDisabled,
-                },
-              ]}
+            <AppButton
+              title="Add Experience"
               onPress={handleSave}
+              variant="confirm"
+              fullWidth
               disabled={!hasChanges}
-            >
-              <Text
-                style={[
-                  styles.saveButtonText,
-                  { color: hasChanges ? '#FFFFFF' : appTheme.colors.textMuted },
-                ]}
-              >
-                Add Experience
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.cancelButton,
-                {
-                  backgroundColor: '#FFFFFF',
-                },
-              ]}
+            />
+            <AppButton
+              title="Cancel"
               onPress={handleCancel}
-            >
-              <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
+              variant="secondary"
+              fullWidth
+            />
           </View>
         </View>
       </View>
@@ -550,26 +529,6 @@ const styles = StyleSheet.create({
   },
   actionButtonsContainer: {
     paddingHorizontal: 12,
-    gap: 0,
-  },
-  actionButton: {
-    borderRadius: 8,
-    height: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  saveButton: {
-    // Background color set dynamically
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-  },
-  cancelButton: {
-    // Background color set dynamically
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
+    gap: 8,
   },
 });

@@ -14,14 +14,13 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
-  TouchableOpacity,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
-import { PrimaryHeader } from '@/shared/components/layout/headers';
+import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import { EmptyState } from '@/shared/components/ui';
+import { EmptyState, TextButton } from '@/shared/components/ui';
 import {
   DELIVERY_STATUS_LABELS,
   DELIVERY_STATUS_COLORS,
@@ -75,7 +74,7 @@ export default function DeliveriesAnalyticsScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      <PrimaryHeader
+      <SecondaryHeader
         title="Delivery analytics"
         leftAction={{ icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }}
       />
@@ -87,9 +86,7 @@ export default function DeliveriesAnalyticsScreen() {
       ) : error && !data ? (
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: appTheme.colors.error }]}>{error}</Text>
-          <TouchableOpacity onPress={refresh} style={[styles.retryButton, { backgroundColor: appTheme.colors.primary }]}>
-            <Text style={{ color: '#FFFFFF' }}>Retry</Text>
-          </TouchableOpacity>
+          <TextButton title="Retry" onPress={refresh} />
         </View>
       ) : !data || data.summary.total === 0 ? (
         <EmptyState
@@ -180,11 +177,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 16,
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 8,
   },
   scrollContent: {
     padding: 16,

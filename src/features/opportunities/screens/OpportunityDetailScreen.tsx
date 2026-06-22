@@ -4,8 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { EmptyState, ListItemCard, SectionTitle } from '@/shared/components/ui';
-import AppButton from '@/shared/components/ui/AppButton';
+import { AppButton, EmptyState, ListItemCard, SectionTitle } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useOpportunity } from '../hooks/useOpportunity';
@@ -122,7 +121,7 @@ export default function OpportunityDetailScreen({ navigation, route }: Props) {
               onChangeText={setMessage}
               multiline
             />
-            <AppButton title={sending ? 'Sending...' : 'Send response'} onPress={handleRespond} disabled={sending} style={styles.sendBtn} />
+            <AppButton title="Send response" onPress={handleRespond} loading={sending} disabled={sending} fullWidth style={styles.sendBtn} />
           </View>
         )}
       </ScrollView>

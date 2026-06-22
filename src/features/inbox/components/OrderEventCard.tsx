@@ -22,10 +22,10 @@ import {
   Easing,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
+import { AppButton, ButtonRow } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import type { OrderEventMessage, OrderEventStatus } from '@/shared/types/inbox';
 import { formatCurrency } from '../utils/orderEventMapper';
-import { theme } from '@/shared';
 
 // ============================================================================
 // Types
@@ -247,11 +247,6 @@ export function OrderEventCard({
     textMuted: isOutgoingCard ? '#A8A29E' : (isDarkMode ? '#A8A29E' : '#A8A29E'),
     border: isOutgoingCard ? '#44403C' : (isDarkMode ? '#332E2A' : '#FAF8F5'),
     iconColor: isOutgoingCard ? '#FFFFFF' : (isDarkMode ? '#A8A29E' : '#57534E'),
-    // Button colors based on direction
-    confirmBg: isOutgoingCard ? '#FFFFFF' : '#1C1917',
-    confirmText: isOutgoingCard ? '#1C1917' : '#FFFFFF',
-    declineBorder: isOutgoingCard ? '#FFFFFF' : '#1C1917',
-    declineText: isOutgoingCard ? '#FFFFFF' : '#1C1917',
   };
   
   // Status
@@ -343,7 +338,7 @@ export function OrderEventCard({
         <View style={styles.headerSpacer} />
         <View style={[
           styles.directionPill,
-          { backgroundColor: message.isOutgoing ? '#E8590C' : '#34A853' }
+          { backgroundColor: message.isOutgoing ? '#E8590C' : '#2ACF01' }
         ]}>
           <Text style={[
             styles.directionPillText,
@@ -500,26 +495,20 @@ export function OrderEventCard({
       
       {/* === ACTION BUTTONS (NEW orders only, seller side) === */}
       {payload.status === 'NEW' && !message.isOutgoing && (
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={[styles.declineButton, { borderColor: colors.declineBorder }]}
+        <ButtonRow style={styles.actionButtons}>
+          <AppButton
+            title="Decline"
+            variant="outline"
+            size="small"
             onPress={() => onDeclineOrder?.(payload.orderId)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.declineButtonText, { color: colors.declineText }]}>
-              Decline
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.confirmButton, { backgroundColor: colors.confirmBg }]}
+          />
+          <AppButton
+            title="Confirm order"
+            variant="primary"
+            size="small"
             onPress={() => onConfirmOrder?.(payload.orderId)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.confirmButtonText, { color: colors.confirmText }]}>
-              Confirm order
-            </Text>
-          </TouchableOpacity>
-        </View>
+          />
+        </ButtonRow>
       )}
     </TouchableOpacity>
   );
@@ -680,33 +669,8 @@ const styles = StyleSheet.create({
   
   // Action buttons
   actionButtons: {
-    flexDirection: 'row',
     marginTop: 8,
     paddingBottom: 4,
-  },
-  declineButton: {
-    width: '49%',
-    height: 40,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  declineButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  confirmButton: {
-    width: '49%',
-    height: 40,
-    marginLeft: '2%',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
   },
 });
 

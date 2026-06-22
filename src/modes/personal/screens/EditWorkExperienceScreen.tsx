@@ -298,50 +298,27 @@ export default function EditWorkExperienceScreen() {
         {/* Action Buttons - Fixed at bottom */}
         <View style={styles.bottomContainer}>
           <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.saveButton,
-                {
-                  backgroundColor: hasChanges ? appTheme.colors.success : appTheme.colors.buttonBackgroundDisabled,
-                },
-              ]}
+            <AppButton
+              title="Save Changes"
               onPress={handleSave}
+              variant="confirm"
+              fullWidth
               disabled={!hasChanges}
-            >
-              <Text
-                style={[
-                  styles.saveButtonText,
-                  { color: hasChanges ? '#FFFFFF' : appTheme.colors.textMuted },
-                ]}
-              >
-                Save Changes
-              </Text>
-            </TouchableOpacity>
+            />
             {/* Leave / Remove Button */}
-            <TouchableOpacity
-              style={styles.deleteButton}
+            <AppButton
+              title={isCurrentRole ? 'Leave Company' : 'Remove Experience'}
               onPress={handleDelete}
-            >
-              <Icon name="trash-outline" size={20} color={appTheme.colors.error} />
-              <Text style={styles.deleteButtonText}>
-                {isCurrentRole ? 'Leave Company' : 'Remove Experience'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.cancelButton,
-                {
-                  backgroundColor: '#FFFFFF',
-                },
-              ]}
+              variant="destructive"
+              fullWidth
+              iconLeft="trash-outline"
+            />
+            <AppButton
+              title="Cancel"
               onPress={handleCancel}
-            >
-              <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
+              variant="secondary"
+              fullWidth
+            />
           </View>
         </View>
       </View>
@@ -471,43 +448,6 @@ const styles = StyleSheet.create({
   },
   actionButtonsContainer: {
     paddingHorizontal: 12,
-    gap: 0,
-  },
-  actionButton: {
-    borderRadius: 8,
-    height: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  saveButton: {
-    // Background color set dynamically
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-  },
-  cancelButton: {
-    // Background color set dynamically
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-  },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 56,
-    borderRadius: 8,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#D6453E',
-    marginTop: 8,
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.medium,
-    color: '#D6453E',
-    marginLeft: 8,
+    gap: 8,
   },
 });

@@ -3,8 +3,10 @@
  * business's own locations. Bottom-sheet modal mirroring ReportIssueModal.
  */
 import React, { useState, useMemo } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
+import { Plus } from 'lucide-react-native';
 import { Icon } from '@/shared/utils/icons';
+import { AppButton, TextButton } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
@@ -161,14 +163,17 @@ export function TransferCreateModal({ visible, onClose, onCreated }: TransferCre
               </View>
             ))}
 
-            <TouchableOpacity style={[styles.addItemBtn, { borderColor: theme.colors.borderColor }]} onPress={addItem}>
-              <Icon name="add" size={18} color={theme.colors.accent} />
-              <Text style={[styles.addItemText, { color: theme.colors.accent }]}>Add item</Text>
-            </TouchableOpacity>
+            <TextButton title="Add item" onPress={addItem} iconLeft={Plus} style={styles.addItemBtn} />
 
-            <TouchableOpacity style={[styles.submit, { backgroundColor: theme.colors.accent }]} onPress={submit} disabled={submitting}>
-              {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitText}>Request transfer</Text>}
-            </TouchableOpacity>
+            <AppButton
+              title="Request transfer"
+              onPress={submit}
+              variant="accent"
+              loading={submitting}
+              disabled={submitting}
+              fullWidth
+              style={styles.submit}
+            />
           </ScrollView>
         </View>
       </View>
@@ -192,10 +197,8 @@ const styles = StyleSheet.create({
   itemName: { flex: 1 },
   itemQty: { width: 64, textAlign: 'center' },
   removeBtn: { padding: 4 },
-  addItemBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', marginTop: 4 },
-  addItemText: { fontSize: 14, fontFamily: 'InterCustom-SemiBold' },
-  submit: { height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
-  submitText: { color: '#FFFFFF', fontSize: 16, fontFamily: 'InterCustom-SemiBold' },
+  addItemBtn: { alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', height: 44, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.colors.borderColor, marginTop: 4 },
+  submit: { marginTop: 20 },
 });
 
 export default TransferCreateModal;

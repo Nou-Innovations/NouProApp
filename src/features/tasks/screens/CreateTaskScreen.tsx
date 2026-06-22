@@ -18,7 +18,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import themeConstants from '@/shared/theme';
-import { AppModal } from '@/shared/components/ui';
+import { AppModal, AppButton } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { createTask } from '../services/tasks.service';
@@ -186,16 +186,21 @@ export default function CreateTaskScreen() {
 
         <View style={styles.bottomContainer}>
           <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.saveButton, { backgroundColor: hasChanges ? appTheme.colors.success : appTheme.colors.buttonBackgroundDisabled }]}
+            <AppButton
+              title="Create Task"
               onPress={handleSave}
+              variant="confirm"
+              loading={isSaving}
               disabled={!hasChanges || isSaving}
-            >
-              <Text style={[styles.saveButtonText, { color: hasChanges ? '#FFFFFF' : appTheme.colors.textMuted }]}>{isSaving ? 'Creating...' : 'Create Task'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, styles.cancelButton, { backgroundColor: '#FFFFFF' }]} onPress={() => navigation.goBack()}>
-              <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>Cancel</Text>
-            </TouchableOpacity>
+              fullWidth
+              style={styles.saveButton}
+            />
+            <AppButton
+              title="Cancel"
+              onPress={() => navigation.goBack()}
+              variant="secondary"
+              fullWidth
+            />
           </View>
         </View>
       </View>
@@ -221,10 +226,6 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 14, fontFamily: themeConstants.fonts.primary.medium, color: '#57534E' },
   chipTextSelected: { color: '#FFFFFF' },
   bottomContainer: { paddingBottom: 32 },
-  actionButtonsContainer: { paddingHorizontal: 12, gap: 0 },
-  actionButton: { borderRadius: 8, height: 56, justifyContent: 'center', alignItems: 'center' },
-  saveButton: {},
-  saveButtonText: { fontSize: 16, fontFamily: themeConstants.fonts.primary.semiBold },
-  cancelButton: {},
-  cancelButtonText: { fontSize: 16, fontFamily: themeConstants.fonts.primary.semiBold },
+  actionButtonsContainer: { paddingHorizontal: 12 },
+  saveButton: { marginBottom: 10 },
 });

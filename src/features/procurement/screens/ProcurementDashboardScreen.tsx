@@ -22,7 +22,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { Icon } from '@/shared/utils/icons';
-import { Skeleton, SkeletonRow, SkeletonColumn, SectionTitle } from '@/shared/components/ui';
+import { Skeleton, SkeletonRow, SkeletonColumn, SectionTitle, AppButton } from '@/shared/components/ui';
 import { canCreateProcurementOrders, checkPaywall, PaywallCheck } from '@/shared/utils/permissions';
 import { usePurchaseOrders } from '../hooks/usePurchaseOrders';
 import { usePurchaseRequests } from '../hooks/usePurchaseRequests';
@@ -161,27 +161,20 @@ export default function ProcurementDashboardScreen() {
 
         {/* ── Quick Actions ── */}
         <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={[styles.quickActionBtn, { backgroundColor: appTheme.colors.primary }]}
+          <AppButton
+            title="New Request"
             onPress={() => handleQuickAction('CreatePurchaseRequest')}
-            activeOpacity={0.7}
-          >
-            <Icon name="document-text-outline" size={20} color={appTheme.colors.textInverse} />
-            <Text style={[styles.quickActionText, { color: appTheme.colors.textInverse }]}>
-              New Request
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.quickActionBtn, { backgroundColor: appTheme.colors.primary }]}
+            variant="primary"
+            iconLeft="document-text-outline"
+            style={styles.quickActionBtn}
+          />
+          <AppButton
+            title="New PO"
             onPress={() => handleQuickAction('CreatePurchaseOrder')}
-            activeOpacity={0.7}
-          >
-            <Icon name="cart-outline" size={20} color={appTheme.colors.textInverse} />
-            <Text style={[styles.quickActionText, { color: appTheme.colors.textInverse }]}>
-              New PO
-            </Text>
-          </TouchableOpacity>
+            variant="primary"
+            iconLeft="cart-outline"
+            style={styles.quickActionBtn}
+          />
         </View>
 
         {/* ── Recent Purchase Orders ── */}
@@ -401,16 +394,6 @@ const styles = StyleSheet.create({
   },
   quickActionBtn: {
     flex: 1,
-    height: 48,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  quickActionText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   /* Sections */
   section: {

@@ -140,7 +140,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     'LogisticsOverview', 'Deliveries', 'Transfers', 'Orders', 'MyDeliveries', 'Routes',
     'Issues', 'Returns', 'DeliveriesAnalytics', 'Products', 'Categories', 'Brands', 'Stock',
     'ProductVisibility', 'PriceLists', 'Invoices', 'TeamManagement', 'Locations', 'CompanySettings', 'SubscriptionHub',
-    'BottomSheetGallery',
+    'BottomSheetGallery', 'MessageGallery', 'ButtonGallery',
   ]);
 
   // Navigate from the sidebar, closing the drawer first. Workspace pages route into the
@@ -251,6 +251,10 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
+
+  // "Help the community" card (footer) → feedback hub. Lives here so it's reachable from
+  // both Personal and Business mode (it used to be duplicated in the two Settings screens).
+  const handleHelpCommunity = () => go('FeedbackCategories');
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -368,6 +372,8 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
             title: 'Design System',
             items: [
               { label: 'Bottom Sheet Gallery', icon: 'apps-outline', onPress: () => go('BottomSheetGallery') },
+              { label: 'Message Gallery', icon: 'chatbubbles-outline', onPress: () => go('MessageGallery') },
+              { label: 'Button Gallery', icon: 'radio-button-on-outline', onPress: () => go('ButtonGallery') },
             ],
           },
         ]
@@ -729,6 +735,24 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
 
       <View style={styles.spacer} />
 
+      {/* Help the community */}
+      <Pressable
+        onPress={handleHelpCommunity}
+        style={({ pressed }) => [styles.communityButton, pressed && { opacity: 0.85 }]}
+      >
+        <View style={styles.communityIcon}>
+          <Icon name="heart-outline" size={24} color={appTheme.colors.info} strokeWidth={2} />
+        </View>
+        <View style={styles.communityText}>
+          <Text style={[styles.communityTitle, { color: appTheme.colors.info }]} numberOfLines={1}>
+            Help the Community grow
+          </Text>
+          <Text style={[styles.communitySubtitle, { color: appTheme.colors.secondary }]} numberOfLines={2}>
+            Propose features, report bugs, and share your feedback
+          </Text>
+        </View>
+      </Pressable>
+
       {/* Logout */}
       <Pressable
         onPress={handleLogout}
@@ -949,6 +973,32 @@ const styles = StyleSheet.create({
   spacer: {
     flex: 1,
     minHeight: 24,
+  },
+  communityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 72,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#DBEAFE',
+  },
+  communityIcon: {
+    width: LEADING_SLOT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  communityText: {
+    flex: 1,
+  },
+  communityTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  communitySubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   logoutButton: {
     flexDirection: 'row',

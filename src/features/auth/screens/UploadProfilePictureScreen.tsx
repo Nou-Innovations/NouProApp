@@ -15,7 +15,7 @@ import { AuthStackParamList } from '@/shared/types/navigation';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
-import AppButton from '@/shared/components/ui/AppButton';
+import { AppButton, TextButton } from '@/shared/components/ui';
 import ImageUploadField from '@/shared/components/ui/ImageUploadField';
 import { Icon } from '@/shared/utils/icons';
 import { authAPI, unwrapAuthResponse } from '@/shared/services/api';
@@ -138,15 +138,15 @@ export default function UploadProfilePictureScreen({ navigation, route }: Props)
           disabled={!profileImage || loading}
           loading={loading}
         />
-        <TouchableOpacity
-          style={styles.laterButton}
+        <TextButton
+          title="Later"
           onPress={handleLater}
           disabled={loading}
-        >
-          <Text style={[styles.laterText, { color: loading ? appTheme.colors.textMuted : appTheme.colors.text }]}>
-            {loading ? 'Creating account...' : 'Later'}
-          </Text>
-        </TouchableOpacity>
+          loading={loading}
+          tone="muted"
+          style={styles.laterButton}
+          textStyle={{ color: appTheme.colors.text }}
+        />
       </View>
     </View>
   );
@@ -198,9 +198,5 @@ const styles = StyleSheet.create({
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  laterText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
   },
 });

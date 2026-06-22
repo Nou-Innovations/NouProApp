@@ -14,7 +14,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { Skeleton, SectionTitle } from '@/shared/components/ui';
+import { AppButton, Skeleton, SectionTitle } from '@/shared/components/ui';
 import { formatCurrency } from '@/shared/utils/format';
 import { StatusDonut, type DonutSegment } from '@/features/deliveries/components/charts';
 import type { BusinessOverview, OverviewRange } from '@/features/business';
@@ -214,14 +214,14 @@ function BusinessOverviewLocked({ onUpgrade }: { onUpgrade: () => void }) {
         <Text style={[styles.lockedSubtitle, { color: appTheme.colors.textSecondary }]}>
           See revenue trends, order breakdowns and cash flow. Available on the Business plan and above.
         </Text>
-        <TouchableOpacity
-          style={[styles.upgradeButton, { backgroundColor: appTheme.colors.accent }]}
-          activeOpacity={0.85}
+        <AppButton
+          title="Upgrade"
+          variant="accent"
+          size="small"
+          iconLeft="sparkles"
           onPress={onUpgrade}
-        >
-          <Icon name="sparkles" size={16} color={appTheme.colors.textInverse} />
-          <Text style={[styles.upgradeText, { color: appTheme.colors.textInverse }]}>Upgrade</Text>
-        </TouchableOpacity>
+          style={styles.upgradeButton}
+        />
       </View>
     </View>
   );
@@ -335,17 +335,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   upgradeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 12,
     marginTop: 6,
-  },
-  upgradeText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.semiBold,
   },
 });
 

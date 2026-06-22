@@ -27,7 +27,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { PrimaryHeader } from '@/shared/components/layout/headers';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import FilterBar from '@/shared/components/ui/FilterBar';
 import { AppModal, ListItemCard, EmptyState, SkeletonListItem } from '@/shared/components/ui';
@@ -93,18 +93,18 @@ const TYPE_COLORS: Record<string, string> = {
   join_accepted: '#8B5CF6',
   invite_pending: '#2A75E6',
   company_request: '#FF7A00',
-  connection_accepted: '#34A853',
+  connection_accepted: '#2ACF01',
   invoice: '#8B5CF6',
-  delivery: '#34A853',
+  delivery: '#2ACF01',
   stock_alert: '#D6453E',
   order_update: '#FF7A00',
   subscription_due: '#D6453E',
   // Personal mode
   invite_received: '#2A75E6',
-  join_request_accepted: '#34A853',
+  join_request_accepted: '#2ACF01',
   join_request_rejected: '#D6453E',
   status_change: '#8B5CF6',
-  delivery_assigned: '#34A853',
+  delivery_assigned: '#2ACF01',
   // Shared
   message: '#2A75E6',
   system: '#57534E',
@@ -567,7 +567,7 @@ export default function NotificationsScreen() {
       style={[styles.safeArea, { backgroundColor: appTheme.colors.background }]}
       edges={['top', 'bottom']}
     >
-      <SecondaryHeader
+      <PrimaryHeader
         title="Notifications"
         leftAction={
           navigation.canGoBack()

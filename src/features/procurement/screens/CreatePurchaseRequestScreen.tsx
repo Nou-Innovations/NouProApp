@@ -26,6 +26,7 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { AppButton, ButtonRow } from '@/shared/components/ui';
 import ProcurementStatusBadge from '../components/ProcurementStatusBadge';
 import SupplierPickerModal from '../components/SupplierPickerModal';
 import type { PurchaseRequestPriority, PurchaseRequestItem, Supplier } from '@/shared/types/procurement';
@@ -44,7 +45,7 @@ const PRIORITIES: PurchaseRequestPriority[] = ['LOW', 'NORMAL', 'URGENT'];
 const PRIORITY_STYLES: Record<PurchaseRequestPriority, { bg: string; text: string }> = {
   LOW: { bg: '#FAF8F5', text: '#57534E' },
   NORMAL: { bg: '#DBEAFE', text: '#2A75E6' },
-  URGENT: { bg: '#FEE2E2', text: '#D6453E' },
+  URGENT: { bg: '#FEE2E2', text: '#FF2400' },
 };
 
 let keyCounter = 0;
@@ -200,10 +201,7 @@ export default function CreatePurchaseRequestScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.label, { color: appTheme.colors.textSecondary }]}>Items</Text>
-              <TouchableOpacity onPress={addItemRow} style={[styles.addButton, { backgroundColor: appTheme.colors.primary }]}>
-                <Icon name="add" size={18} color="#FFFFFF" />
-                <Text style={styles.addButtonText}>Add Item</Text>
-              </TouchableOpacity>
+              <AppButton title="Add Item" onPress={addItemRow} size="small" iconLeft="add" />
             </View>
 
             {items.map((item, index) => (
@@ -324,22 +322,20 @@ export default function CreatePurchaseRequestScreen() {
       {/* Bottom buttons */}
       <View style={[styles.bottomBar, { backgroundColor: appTheme.colors.cardBackground, borderTopColor: appTheme.colors.borderColor }]}>
         {isSubmitting && <ActivityIndicator style={styles.spinner} color={appTheme.colors.primary} />}
-        <View style={styles.bottomButtons}>
-          <TouchableOpacity
-            style={[styles.draftButton, { borderColor: appTheme.colors.borderColor }]}
+        <ButtonRow>
+          <AppButton
+            title="Save Draft"
             onPress={handleSaveDraft}
+            variant="outline"
             disabled={isSubmitting}
-          >
-            <Text style={[styles.draftButtonText, { color: appTheme.colors.text }]}>Save Draft</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.submitButton, { opacity: isSubmitting ? 0.6 : 1 }]}
+          />
+          <AppButton
+            title="Submit"
             onPress={handleSubmit}
+            variant="primary"
             disabled={isSubmitting}
-          >
-            <Text style={styles.submitButtonText}>Submit</Text>
-          </TouchableOpacity>
-        </View>
+          />
+        </ButtonRow>
       </View>
       <SupplierPickerModal
         visible={showSupplierPicker}
@@ -384,16 +380,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   selectorText: { fontSize: 16, flex: 1 },
-
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 4,
-  },
-  addButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
 
   itemCard: {
     padding: 12,
@@ -442,26 +428,5 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     borderTopWidth: 1,
   },
-  bottomButtons: { flexDirection: 'row', gap: 12 },
   spinner: { marginBottom: 8 },
-
-  draftButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  draftButtonText: { fontSize: 16, fontWeight: '600' },
-
-  submitButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#1C1917',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 });

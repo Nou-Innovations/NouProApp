@@ -12,7 +12,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -22,7 +21,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { SectionTitle } from '@/shared/components/ui';
+import { SectionTitle, AppButton, ButtonRow } from '@/shared/components/ui';
 import ProcurementStatusBadge from '../components/ProcurementStatusBadge';
 import type { PurchaseRequest } from '@/shared/types/procurement';
 import * as procurementService from '../services/procurement.service';
@@ -134,9 +133,7 @@ export default function PurchaseRequestDetailScreen() {
         <SecondaryHeader title="Purchase Request" leftAction={{ icon: 'chevron-back', onPress: () => navigation.goBack() }} />
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: appTheme.colors.textSecondary }]}>{error || 'Request not found.'}</Text>
-          <TouchableOpacity onPress={fetchData} style={[styles.retryButton, { borderColor: appTheme.colors.borderColor }]}>
-            <Text style={{ color: appTheme.colors.text, fontWeight: '600' }}>Retry</Text>
-          </TouchableOpacity>
+          <AppButton title="Retry" onPress={fetchData} variant="outline" size="small" />
         </View>
       </SafeAreaView>
     );
@@ -214,32 +211,32 @@ export default function PurchaseRequestDetailScreen() {
 
         {/* Action buttons */}
         {pr.status === 'SUBMITTED' && (
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: appTheme.colors.success }]}
+          <ButtonRow style={styles.actionRow}>
+            <AppButton
+              title="Approve"
               onPress={onApprove}
+              variant="confirm"
               disabled={actionLoading}
-            >
-              <Text style={styles.actionButtonText}>Approve</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: appTheme.colors.error }]}
+            />
+            <AppButton
+              title="Reject"
               onPress={onReject}
+              variant="alert"
               disabled={actionLoading}
-            >
-              <Text style={styles.actionButtonText}>Reject</Text>
-            </TouchableOpacity>
-          </View>
+            />
+          </ButtonRow>
         )}
 
         {pr.status === 'APPROVED' && (
-          <TouchableOpacity
-            style={[styles.convertButton, { backgroundColor: appTheme.colors.primary, opacity: actionLoading ? 0.6 : 1 }]}
+          <AppButton
+            title="Convert to PO"
             onPress={onConvert}
+            variant="primary"
+            fullWidth
+            loading={actionLoading}
             disabled={actionLoading}
-          >
-            <Text style={styles.convertButtonText}>Convert to PO</Text>
-          </TouchableOpacity>
+            style={styles.convertButton}
+          />
         )}
 
         {actionLoading && <ActivityIndicator style={{ marginTop: 12 }} color={appTheme.colors.primary} />}
@@ -272,7 +269,6 @@ const styles = StyleSheet.create({
   scroll: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
 
   errorText: { fontSize: 16, textAlign: 'center', marginBottom: 16 },
-  retryButton: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8, borderWidth: 1 },
 
   badgeRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
 
@@ -307,23 +303,10 @@ const styles = StyleSheet.create({
 
   notesText: { fontSize: 14, lineHeight: 20 },
 
-  actionRow: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 16 },
-  actionButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  actionRow: { marginTop: 8, marginBottom: 16 },
 
   convertButton: {
-    height: 48,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 8,
     marginBottom: 16,
   },
-  convertButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 });

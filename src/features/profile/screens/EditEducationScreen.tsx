@@ -14,7 +14,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { AppModal } from '@/shared/components/ui';
+import { AppModal, AppButton } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { getEducation, updateEducation, deleteEducation } from '../services/profile.service';
@@ -211,20 +211,27 @@ export default function EditEducationScreen() {
 
         <View style={styles.bottomContainer}>
           <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.saveButton, { backgroundColor: hasChanges ? appTheme.colors.success : appTheme.colors.buttonBackgroundDisabled }]}
+            <AppButton
+              title="Save Changes"
               onPress={handleSave}
+              variant="confirm"
+              fullWidth
+              loading={isSaving}
               disabled={!hasChanges || isSaving}
-            >
-              <Text style={[styles.saveButtonText, { color: hasChanges ? '#FFFFFF' : appTheme.colors.textMuted }]}>{isSaving ? 'Saving...' : 'Save Changes'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.deleteButton} onPress={() => setShowDeleteDialog(true)}>
-              <Icon name="trash-outline" size={20} color={appTheme.colors.error} />
-              <Text style={styles.deleteButtonText}>Remove Education</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, styles.cancelButton, { backgroundColor: '#FFFFFF' }]} onPress={() => navigation.goBack()}>
-              <Text style={[styles.cancelButtonText, { color: appTheme.colors.text }]}>Cancel</Text>
-            </TouchableOpacity>
+            />
+            <AppButton
+              title="Remove Education"
+              onPress={() => setShowDeleteDialog(true)}
+              variant="destructive"
+              fullWidth
+              iconLeft="trash-outline"
+            />
+            <AppButton
+              title="Cancel"
+              onPress={() => navigation.goBack()}
+              variant="secondary"
+              fullWidth
+            />
           </View>
         </View>
       </View>
@@ -253,12 +260,5 @@ const styles = StyleSheet.create({
   infoInput: { fontSize: 16, fontFamily: theme.fonts.primary.semiBold, borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, height: 40, justifyContent: 'center' },
   multilineInput: { fontSize: 16, fontFamily: theme.fonts.primary.semiBold, borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, minHeight: 100 },
   bottomContainer: { paddingBottom: 32 },
-  actionButtonsContainer: { paddingHorizontal: 12, gap: 0 },
-  actionButton: { borderRadius: 8, height: 56, justifyContent: 'center', alignItems: 'center' },
-  saveButton: {},
-  saveButtonText: { fontSize: 16, fontFamily: theme.fonts.primary.semiBold },
-  cancelButton: {},
-  cancelButtonText: { fontSize: 16, fontFamily: theme.fonts.primary.semiBold },
-  deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 56, borderRadius: 8, backgroundColor: 'transparent', borderWidth: 1, borderColor: '#D6453E', marginTop: 8 },
-  deleteButtonText: { fontSize: 16, fontFamily: theme.fonts.primary.medium, color: '#D6453E', marginLeft: 8 },
+  actionButtonsContainer: { paddingHorizontal: 12, gap: 8 },
 });

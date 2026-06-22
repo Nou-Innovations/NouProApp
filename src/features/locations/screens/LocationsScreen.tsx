@@ -229,12 +229,7 @@ export default function LocationsScreen() {
           <Text style={[styles.accessDeniedSubtext, { color: appTheme.colors.textLight }]}>
             Only admins can manage locations
           </Text>
-          <TouchableOpacity 
-            style={[styles.backButton, { backgroundColor: appTheme.colors.primary }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>Go Back</Text>
-          </TouchableOpacity>
+          <AppButton title="Go Back" onPress={() => navigation.goBack()} />
         </View>
       </SafeAreaView>
     );
@@ -278,12 +273,7 @@ export default function LocationsScreen() {
             }
           </Text>
           {!searchQuery && (
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: appTheme.colors.primary }]}
-              onPress={handleAddLocation}
-            >
-              <Text style={styles.addButtonText}>Add Location</Text>
-            </TouchableOpacity>
+            <AppButton title="Add Location" onPress={handleAddLocation} />
           )}
         </View>
       ) : (
@@ -560,16 +550,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
-  addButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-  },
   // Access Denied
   accessDeniedContainer: {
     flex: 1,
@@ -588,15 +568,5 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.regular,
     textAlign: 'center',
     marginBottom: 32,
-  },
-  backButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  backButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
   },
 });

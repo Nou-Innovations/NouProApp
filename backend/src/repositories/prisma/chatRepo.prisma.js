@@ -57,8 +57,10 @@ function mapMessageToApi(msg, requestingUserId = null) {
     mapped.profileType = meta.profileType || 'user';
   } else if (msg.type === 'invoice') {
     mapped.invoiceId = meta.invoiceId;
+    if (meta.details) mapped.details = meta.details;
   } else if (msg.type === 'estimate') {
     mapped.estimateId = meta.estimateId;
+    if (meta.details) mapped.details = meta.details;
   } else if (msg.type === 'event') {
     mapped.event = msg.content || meta.event;
   } else if (msg.type === 'deleted') {
@@ -303,6 +305,7 @@ async function addMessage(chatId, message, options = {}) {
           ...(message.audioUrl && { audioUrl: message.audioUrl }),
           ...(message.invoiceId && { invoiceId: message.invoiceId }),
           ...(message.estimateId && { estimateId: message.estimateId }),
+          ...(message.details && { details: message.details }),
           ...(message.event && { event: message.event }),
           ...(message.profileId && { profileId: message.profileId }),
           ...(message.profileName && { profileName: message.profileName }),

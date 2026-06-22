@@ -39,8 +39,7 @@ import { getTransports } from '@/features/transports/transports.service';
 import type { Transport, VehicleType, VehicleStatus } from '@/shared/types/transport';
 import { getVehicleIcon, getVehicleStatusLabel, VEHICLE_STATUS_COLORS } from '@/shared/types/transport';
 import { formatCurrency } from '@/shared/utils/format';
-import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, TimeSelector, ListItemCard } from '@/shared/components/ui';
-import AppButton from '@/shared/components/ui/AppButton';
+import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, TimeSelector, ListItemCard, AppButton, ButtonRow } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { canUseAdvancedPermissions , checkPaywall, PaywallCheck } from '@/shared/utils/permissions';
 import { createDelivery } from '@/features/deliveries/deliveries.service';
@@ -660,15 +659,13 @@ export default function CreateDeliveryScreen() {
 
       {/* Bottom Button */}
       <View style={[styles.bottomContainer, { backgroundColor: appTheme.colors.cardBackground, borderTopColor: appTheme.colors.borderColor }]}>
-        <TouchableOpacity
-          style={[styles.createButton, { backgroundColor: appTheme.colors.primary, opacity: isCreating ? 0.6 : 1 }]}
+        <AppButton
+          title={isTransfer ? 'Create Transfer' : 'Create Delivery'}
           onPress={handleCreate}
+          loading={isCreating}
           disabled={isCreating}
-        >
-          <Text style={[styles.createButtonText, { fontFamily: theme.fonts.primary.bold }]}>
-            {isCreating ? 'Creating...' : isTransfer ? 'Create Transfer' : 'Create Delivery'}
-          </Text>
-        </TouchableOpacity>
+          fullWidth
+        />
       </View>
 
       {/* Client Selection Modal */}
@@ -783,15 +780,14 @@ export default function CreateDeliveryScreen() {
                   {formatCurrency(orderTotal)}
                 </Text>
               </View>
-              <TouchableOpacity
-                style={[styles.doneButton, { backgroundColor: appTheme.colors.primary }]}
+              <AppButton
+                title="Done"
                 onPress={() => {
                   setShowItemsModal(false);
                   setItemSearch('');
                 }}
-              >
-                <Text style={[styles.doneButtonText, { fontFamily: theme.fonts.primary.bold }]}>Done</Text>
-              </TouchableOpacity>
+                size="small"
+              />
             </View>
           )}
           
@@ -951,24 +947,18 @@ export default function CreateDeliveryScreen() {
           </View>
 
           {/* Action Buttons */}
-          <View style={styles.scheduleActions}>
-            <TouchableOpacity
-              style={[styles.scheduleActionButton, styles.scheduleCancelButton, { borderColor: appTheme.colors.borderColor }]}
+          <ButtonRow gap={12} style={styles.scheduleActions}>
+            <AppButton
+              title="Cancel"
               onPress={() => setShowScheduleModal(false)}
-            >
-              <Text style={[styles.scheduleCancelText, { color: appTheme.colors.text, fontFamily: theme.fonts.primary.medium }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.scheduleActionButton, styles.scheduleConfirmButton, { backgroundColor: appTheme.colors.primary }]}
+              variant="outline"
+            />
+            <AppButton
+              title="Confirm"
               onPress={() => setShowScheduleModal(false)}
-            >
-              <Text style={[styles.scheduleConfirmText, { fontFamily: theme.fonts.primary.bold }]}>
-                Confirm
-              </Text>
-            </TouchableOpacity>
-          </View>
+              variant="primary"
+            />
+          </ButtonRow>
         </View>
       </AppBottomSheet>
 
@@ -1141,16 +1131,6 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     borderTopWidth: 1,
   },
-  createButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
-    borderRadius: 8,
-  },
-  createButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-  },
   // Bottom sheet content
   bottomSheetContent: {
     maxHeight: 500,
@@ -1200,17 +1180,6 @@ const styles = StyleSheet.create({
   },
   summaryTotal: {
     fontSize: 15,
-  },
-  doneButton: {
-    paddingHorizontal: 20,
-    height: 36,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  doneButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
   },
   productItem: {
     flexDirection: 'row',
@@ -1294,28 +1263,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   scheduleActions: {
-    flexDirection: 'row',
-    gap: 12,
     marginTop: 8,
-  },
-  scheduleActionButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scheduleCancelButton: {
-    borderWidth: 1,
-  },
-  scheduleCancelText: {
-    fontSize: 15,
-  },
-  scheduleConfirmButton: {
-    
-  },
-  scheduleConfirmText: {
-    color: '#FFFFFF',
-    fontSize: 15,
   },
 });

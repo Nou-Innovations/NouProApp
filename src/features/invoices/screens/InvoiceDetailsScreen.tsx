@@ -536,9 +536,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
         <SecondaryHeader title="Invoice" leftAction={{ icon: 'chevron-left', onPress: goBack }} />
         <View style={styles.errorContainer}>
           <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text>
-          <TouchableOpacity style={[styles.retryButton, { backgroundColor: theme.colors.primary }]} onPress={fetchInvoice}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
+          <AppButton title="Retry" onPress={fetchInvoice} size="small" />
         </View>
       </SafeAreaView>
     );
@@ -669,19 +667,13 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
           
           {/* Payment Status Button - Only for invoices, not estimates */}
           {!isEstimate && (
-            <TouchableOpacity 
-              style={[
-                styles.paymentToggleButton,
-                { backgroundColor: paymentStatus === 'paid' ? theme.colors.success : theme.colors.error },
-                !isInvoiceOwner && { opacity: 0.7 }
-              ]}
+            <AppButton
+              title={paymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
               onPress={handlePaymentButtonPress}
-              disabled={paymentStatus === 'paid'}
-            >
-              <Text style={styles.paymentToggleText}>
-                {paymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
-              </Text>
-            </TouchableOpacity>
+              variant={paymentStatus === 'paid' ? 'confirm' : 'alert'}
+              fullWidth
+              style={[styles.paymentToggleButton, !isInvoiceOwner && { opacity: 0.7 }]}
+            />
           )}
         </View>
 
@@ -803,63 +795,56 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
         {isEstimate ? (
           // Estimate: Only show "Convert to Invoice" for owner
           isInvoiceOwner && (
-            <TouchableOpacity
+            <AppButton
+              title="Convert to Invoice"
               onPress={handleConvertToInvoice}
-              style={[styles.actionButton, { backgroundColor: theme.colors.primary, flex: 1 }]}
-            >
-              <Text style={styles.actionButtonText}>Convert to Invoice</Text>
-            </TouchableOpacity>
+              variant="primary"
+              style={styles.flexButton}
+            />
           )
         ) : (
           // Invoice: Show Record Payment, Pay Now, and Download PDF
           <>
             {isAdmin && isInvoiceOwner && status !== 'paid' && (
-              <TouchableOpacity
+              <AppButton
+                title="Record Payment"
                 onPress={recordPayment}
-                style={[styles.actionButton, { backgroundColor: theme.colors.success }]}
-              >
-                <Text style={styles.actionButtonText}>Record Payment</Text>
-              </TouchableOpacity>
+                variant="confirm"
+                style={styles.flexButton}
+              />
             )}
             {!isInvoiceOwner && (status === 'sent' || status === 'partially_paid' || status === 'overdue') && (
-              <TouchableOpacity
+              <AppButton
+                title={`Pay Now ${fmtCurrency(grandTotal - (Number(invoice?.paidAmount) || 0))}`}
                 onPress={handlePayNow}
+                variant="primary"
+                loading={isPayingNow}
                 disabled={isPayingNow}
-                style={[styles.actionButton, { backgroundColor: theme.colors.primary, opacity: isPayingNow ? 0.6 : 1 }]}
-              >
-                {isPayingNow ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.actionButtonText}>
-                    Pay Now {fmtCurrency(grandTotal - (Number(invoice?.paidAmount) || 0))}
-                  </Text>
-                )}
-              </TouchableOpacity>
+                style={styles.flexButton}
+              />
             )}
             {isAdmin && isInvoiceOwner && status === 'draft' && (
-              <TouchableOpacity
+              <AppButton
+                title="Edit Draft"
                 onPress={() => (navigation as any).navigate('CreateInvoice', { invoiceId, type: invoice?.type || 'invoice' })}
-                style={[styles.actionButton, { backgroundColor: theme.colors.surface }]}
-              >
-                <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>Edit Draft</Text>
-              </TouchableOpacity>
+                variant="secondary"
+                style={styles.flexButton}
+              />
             )}
             {isAdmin && isInvoiceOwner && status === 'draft' && (
-              <TouchableOpacity
+              <AppButton
+                title="Send Invoice"
                 onPress={sendDocument}
-                style={[styles.actionButton, { backgroundColor: theme.colors.error }]}
-              >
-                <Text style={styles.actionButtonText}>Send Invoice</Text>
-              </TouchableOpacity>
+                variant="alert"
+                style={styles.flexButton}
+              />
             )}
-            <TouchableOpacity
+            <AppButton
+              title="Download PDF"
               onPress={downloadPDF}
-              style={[styles.actionButton, { backgroundColor: theme.colors.surface }]}
-            >
-              <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>
-                Download PDF
-              </Text>
-            </TouchableOpacity>
+              variant="secondary"
+              style={styles.flexButton}
+            />
           </>
         )}
       </View>
@@ -936,8 +921,11 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
                   />
                 </View>
                 
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: theme.colors.success, marginTop: 20 }]}
+                <AppButton
+                  title="Record Payment"
+                  variant="confirm"
+                  fullWidth
+                  style={{ marginTop: 20 }}
                   onPress={async () => {
                     try {
                       const amount = parseFloat(paymentAmount);
@@ -965,9 +953,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
                       Alert.alert('Error', 'Failed to record payment. Please try again.');
                     }
                   }}
-                >
-                  <Text style={styles.actionButtonText}>Record Payment</Text>
-                </TouchableOpacity>
+                />
               </View>
             </View>
           </View>
@@ -1104,16 +1090,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
-  retryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  
   // Header Styles
   header: {
     flexDirection: 'row',
@@ -1224,21 +1200,9 @@ const styles = StyleSheet.create({
   
   // Payment Toggle Button
   paymentToggleButton: {
-    width: '100%',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 16,
   },
-  paymentToggleText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  
+
   // Line Items
   lineItem: {
     flexDirection: 'row',
@@ -1328,18 +1292,10 @@ const styles = StyleSheet.create({
     gap: 8,
     borderTopWidth: 1,
   },
-  actionButton: {
+  flexButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
   },
-  actionButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  
+
   // Modal Styles
   modalOverlay: {
     flex: 1,
