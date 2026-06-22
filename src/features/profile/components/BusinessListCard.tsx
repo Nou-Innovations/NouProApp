@@ -16,7 +16,6 @@ interface BusinessListCardProps {
   name: string;
   logo?: string;
   industry?: string;
-  description?: string;
   isConnected?: boolean;
   productsCount?: number;
   rating?: number;
@@ -30,7 +29,6 @@ export function BusinessListCard({
   name,
   logo,
   industry,
-  description,
   isConnected = false,
   productsCount,
   rating,
@@ -59,8 +57,7 @@ export function BusinessListCard({
       <View style={styles.stats}>
         {productsCount !== undefined && (
           <View style={styles.stat}>
-            <Icon name="cube-outline" size={14} color={appTheme.colors.textMuted} />
-            <Text style={[styles.statText, { color: appTheme.colors.textMuted }]}>
+            <Text style={[styles.statText, { color: appTheme.colors.textMuted, marginLeft: 0 }]}>
               {productsCount} products
             </Text>
           </View>
@@ -126,10 +123,9 @@ export function BusinessListCard({
         }}
         title={name}
         subtitle={industry ? industryLabels[industry] || industry : undefined}
-        extraInfo={description}
-        rightRow1={{ timestamp: undefined }} // placeholder, we use rightRow2 for button
-        rightRow2={connectButton}
-        bottomElement={extraInfoContent()}
+        rightColumn={connectButton}
+        centerRightColumn
+        extraContent={extraInfoContent()}
         onPress={onPress}
         showDivider
         style={containerStyle}
@@ -160,7 +156,6 @@ const styles = StyleSheet.create({
   stats: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: theme.spacing.xs,
   },
   stat: {
     flexDirection: 'row',

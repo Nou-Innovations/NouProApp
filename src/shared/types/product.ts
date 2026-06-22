@@ -229,6 +229,12 @@ export interface UIProduct {
   retailPriceLimit?: number;
   // Price privacy (set by backend)
   priceHidden?: boolean;
+  // Customer-specific pricing (set by backend when a price list applies to the viewer).
+  // `price` is left untouched; consumers should prefer `yourPrice ?? price`.
+  yourPrice?: number;
+  basePrice?: number | null;
+  priceListId?: string;
+  priceSource?: 'item_fixed' | 'list_discount' | 'base' | 'client';
 }
 
 /**

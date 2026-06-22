@@ -139,7 +139,8 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
   const TAB_ROUTES = new Set([
     'LogisticsOverview', 'Deliveries', 'Transfers', 'Orders', 'MyDeliveries', 'Routes',
     'Issues', 'Returns', 'DeliveriesAnalytics', 'Products', 'Categories', 'Brands', 'Stock',
-    'ProductVisibility', 'Invoices', 'TeamManagement', 'Locations', 'CompanySettings', 'SubscriptionHub',
+    'ProductVisibility', 'PriceLists', 'Invoices', 'TeamManagement', 'Locations', 'CompanySettings', 'SubscriptionHub',
+    'BottomSheetGallery',
   ]);
 
   // Navigate from the sidebar, closing the drawer first. Workspace pages route into the
@@ -335,7 +336,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
               { label: 'Categories', icon: 'grid-outline', onPress: () => go('Categories') },
               { label: 'Brands', icon: 'bookmark-outline', onPress: () => go('Brands') },
               { label: 'Stock', icon: 'archive-outline', onPress: () => go('Stock') },
-              { label: 'Price lists', icon: 'cash-outline', onPress: () => comingSoon('Price lists') },
+              { label: 'Price lists', icon: 'cash-outline', onPress: () => go('PriceLists') },
               { label: 'Visibility', icon: 'eye-outline', onPress: () => go('ProductVisibility') },
               { label: 'Collections', icon: 'folder-outline', onPress: () => comingSoon('Collections') },
               { label: 'Recipes', icon: 'restaurant-outline', onPress: () => comingSoon('Recipes') },
@@ -361,6 +362,12 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
               { label: 'Variance', icon: 'pie-chart-outline', onPress: () => comingSoon('Variance') },
               { label: 'Subscription', icon: 'card-outline', onPress: () => go('SubscriptionHub') },
               { label: 'Settings', icon: 'settings-outline', onPress: () => go('CompanySettings') },
+            ],
+          },
+          {
+            title: 'Design System',
+            items: [
+              { label: 'Bottom Sheet Gallery', icon: 'apps-outline', onPress: () => go('BottomSheetGallery') },
             ],
           },
         ]

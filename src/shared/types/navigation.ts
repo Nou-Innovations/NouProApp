@@ -129,6 +129,7 @@ export type BusinessTabParamList = {
   Brands: undefined;
   Stock: undefined;
   ProductVisibility: undefined;
+  PriceLists: undefined;
   Invoices: { initialTab?: 'invoices' | 'estimates' } | undefined;
   Orders: { initialTab?: 'incoming' | 'outgoing' } | undefined;
 
@@ -140,6 +141,8 @@ export type BusinessTabParamList = {
   // (bottom bar + hamburger) when opened from the sidebar, while the RootStack
   // `SubscriptionPlans` route keeps a back button for the in-app "Upgrade" buttons.
   SubscriptionHub: undefined;
+  // Design System showroom — catalogs every modal/bottom-sheet surface (sidebar).
+  BottomSheetGallery: undefined;
 };
 
 // ========== Root Stack Navigator ==========
@@ -201,6 +204,11 @@ export type RootStackParamList = {
   Categories: undefined;
   Stock: undefined;
   ProductVisibility: undefined;
+
+  // Price list screens (customer-specific pricing)
+  PriceLists: undefined;
+  CreatePriceList: { manage?: boolean; listId?: string } | undefined;
+  AssignCustomers: { listId: string };
 
   // Brand screens
   Brands: undefined;

@@ -78,6 +78,9 @@ import PlaceOrderScreen from '@/features/orders/screens/PlaceOrderScreen';
 import BusinessProfileScreen from '@/features/profile/screens/BusinessProfileScreen';
 import UserProfileScreen from '@/features/profile/screens/UserProfileScreen';
 
+// Screens - Pricing (price lists)
+import CreatePriceListScreen from '@/features/pricing/screens/CreatePriceListScreen';
+import AssignCustomersScreen from '@/features/pricing/screens/AssignCustomersScreen';
 // Screens - Brands
 import CreateBrandScreen from '@/features/brands/screens/CreateBrandScreen';
 import BrandSelectionScreen from '@/features/brands/screens/BrandSelectionScreen';
@@ -454,6 +457,8 @@ function AppNavigator() {
         <RootStack.Screen name="PlaceOrder" component={PlaceOrderScreen} />
         
         {/* Product Screens */}
+        <RootStack.Screen name="CreatePriceList" component={CreatePriceListScreen} />
+        <RootStack.Screen name="AssignCustomers" component={AssignCustomersScreen} />
         <RootStack.Screen name="CreateBrand" component={CreateBrandScreen} />
         <RootStack.Screen name="CreateProduct" component={CreateProductScreen} />
         <RootStack.Screen name="ProductDetail" component={ProductDetailScreen} />

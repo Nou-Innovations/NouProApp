@@ -48,12 +48,14 @@ import CategoriesScreen from '@/features/products/screens/CategoriesScreen';
 import BrandsScreen from '@/features/brands/screens/BrandsScreen';
 import StockScreen from '@/features/products/screens/StockScreen';
 import ProductVisibilityScreen from '@/features/products/screens/ProductVisibilityScreen';
+import PriceListsScreen from '@/features/pricing/screens/PriceListsScreen';
 import InvoicesScreen from '@/features/invoices/screens/InvoicesScreen';
 import OrdersScreen from '@/features/orders/screens/OrdersScreen';
 import TeamManagementScreen from '@/features/team/screens/TeamManagementScreen';
 import LocationsScreen from '@/features/locations/screens/LocationsScreen';
 import CompanySettingsScreen from '@/features/company/screens/CompanySettingsScreen';
 import { SubscriptionPlansScreen } from '@/features/subscription';
+import BottomSheetGalleryScreen from '@/features/designsystem/screens/BottomSheetGalleryScreen';
 
 const Tab = createBottomTabNavigator<BusinessTabParamList>();
 
@@ -203,6 +205,7 @@ export function BusinessTabNavigator() {
       <Tab.Screen name="Brands" component={BrandsScreen} options={hiddenTabOptions} />
       <Tab.Screen name="Stock" component={StockScreen} options={hiddenTabOptions} />
       <Tab.Screen name="ProductVisibility" component={ProductVisibilityScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="PriceLists" component={PriceListsScreen} options={hiddenTabOptions} />
 
       {/* Accounting */}
       <Tab.Screen name="Invoices" component={InvoicesScreen} options={hiddenTabOptions} />
@@ -214,6 +217,9 @@ export function BusinessTabNavigator() {
       {/* Sidebar-only alias of SubscriptionPlansScreen (shell version with hamburger).
           The RootStack `SubscriptionPlans` route stays for the in-app "Upgrade" buttons. */}
       <Tab.Screen name="SubscriptionHub" component={SubscriptionPlansScreen} options={hiddenTabOptions} />
+
+      {/* Design System */}
+      <Tab.Screen name="BottomSheetGallery" component={BottomSheetGalleryScreen} options={hiddenTabOptions} />
     </Tab.Navigator>
   );
 }

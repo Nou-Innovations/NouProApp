@@ -32,8 +32,8 @@ import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import BusinessListCard from '@/features/profile/components/BusinessListCard';
 import { useExploreDiscovery } from '@/features/explore';
 import type { ExploreBusiness } from '@/features/explore';
-import { useOpportunities, OpportunityCard } from '@/features/opportunities';
-import { useUpcomingEvents, EventCard } from '@/features/events';
+import { useOpportunities, OpportunityCard, type Opportunity } from '@/features/opportunities';
+import { useUpcomingEvents, EventCard, type BizEvent } from '@/features/events';
 import type { UIProduct } from '@/shared/types/product';
 import { RootStackParamList } from '@/shared/types/navigation';
 
@@ -46,6 +46,131 @@ const CHIPS = [
   'Opportunities',
   'Events',
   'Near Me',
+];
+
+// Preview-only placeholder data so Opportunities & Events render even before any
+// real records exist. Falls back automatically once the backend returns data.
+// Flip USE_MOCK_DISCOVERY to false to disable. IDs are prefixed `mock-` so taps no-op.
+const USE_MOCK_DISCOVERY = true;
+
+const MOCK_OPPORTUNITIES: Opportunity[] = [
+  {
+    id: 'mock-opp-1',
+    businessId: 'mock-biz-1',
+    title: 'Looking for a bulk basmati rice supplier',
+    description: null,
+    type: 'buying',
+    category: null,
+    budgetMin: 50000,
+    budgetMax: 120000,
+    currency: 'Rs',
+    locationText: 'Port Louis',
+    status: 'open',
+    createdByUserId: 'mock-user',
+    createdAt: '2026-06-15T08:00:00.000Z',
+    updatedAt: '2026-06-15T08:00:00.000Z',
+    business: { id: 'mock-biz-1', name: 'Spice Route Trading', logoUrl: null, industry: 'food_beverage' },
+    responseCount: 4,
+  },
+  {
+    id: 'mock-opp-2',
+    businessId: 'mock-biz-2',
+    title: 'Surplus stainless steel cookware — 30% off',
+    description: null,
+    type: 'selling',
+    category: null,
+    budgetMin: null,
+    budgetMax: null,
+    currency: 'Rs',
+    locationText: 'Curepipe',
+    status: 'open',
+    createdByUserId: 'mock-user',
+    createdAt: '2026-06-14T08:00:00.000Z',
+    updatedAt: '2026-06-14T08:00:00.000Z',
+    business: { id: 'mock-biz-2', name: 'MetroWares Ltd', logoUrl: null, industry: 'general_retail' },
+    responseCount: 2,
+  },
+  {
+    id: 'mock-opp-3',
+    businessId: 'mock-biz-3',
+    title: 'Seeking a co-distribution partner for the North',
+    description: null,
+    type: 'partnership',
+    category: null,
+    budgetMin: null,
+    budgetMax: null,
+    currency: 'Rs',
+    locationText: 'Grand Baie',
+    status: 'open',
+    createdByUserId: 'mock-user',
+    createdAt: '2026-06-12T08:00:00.000Z',
+    updatedAt: '2026-06-12T08:00:00.000Z',
+    business: { id: 'mock-biz-3', name: 'Island Logistics Co', logoUrl: null, industry: 'services' },
+    responseCount: 6,
+  },
+];
+
+const MOCK_EVENTS: BizEvent[] = [
+  {
+    id: 'mock-evt-1',
+    businessId: 'mock-biz-1',
+    title: 'Retail Merchandising Masterclass',
+    description: null,
+    type: 'workshop',
+    startAt: '2026-07-10T09:30:00.000Z',
+    endAt: null,
+    locationText: 'Ebène',
+    isOnline: false,
+    onlineUrl: null,
+    coverImageUrl: null,
+    capacity: 40,
+    status: 'scheduled',
+    createdByUserId: 'mock-user',
+    createdAt: '2026-06-15T08:00:00.000Z',
+    updatedAt: '2026-06-15T08:00:00.000Z',
+    business: { id: 'mock-biz-1', name: 'NouPro Academy', logoUrl: null },
+    rsvpCount: 18,
+  },
+  {
+    id: 'mock-evt-2',
+    businessId: 'mock-biz-2',
+    title: 'F&B Distributors Mixer',
+    description: null,
+    type: 'networking',
+    startAt: '2026-07-18T14:00:00.000Z',
+    endAt: null,
+    locationText: 'Grand Baie',
+    isOnline: false,
+    onlineUrl: null,
+    coverImageUrl: null,
+    capacity: 80,
+    status: 'scheduled',
+    createdByUserId: 'mock-user',
+    createdAt: '2026-06-13T08:00:00.000Z',
+    updatedAt: '2026-06-13T08:00:00.000Z',
+    business: { id: 'mock-biz-2', name: 'Mauritius Trade Hub', logoUrl: null },
+    rsvpCount: 35,
+  },
+  {
+    id: 'mock-evt-3',
+    businessId: 'mock-biz-3',
+    title: 'Digital Invoicing 101 (Webinar)',
+    description: null,
+    type: 'webinar',
+    startAt: '2026-07-22T11:00:00.000Z',
+    endAt: null,
+    locationText: null,
+    isOnline: true,
+    onlineUrl: 'https://example.com/webinar',
+    coverImageUrl: null,
+    capacity: null,
+    status: 'scheduled',
+    createdByUserId: 'mock-user',
+    createdAt: '2026-06-11T08:00:00.000Z',
+    updatedAt: '2026-06-11T08:00:00.000Z',
+    business: { id: 'mock-biz-3', name: 'FinTech MU', logoUrl: null },
+    rsvpCount: 52,
+  },
 ];
 
 export default function BusinessExploreScreen() {
@@ -70,9 +195,21 @@ export default function BusinessExploreScreen() {
   } = useExploreDiscovery();
 
   const { items: opportunities } = useOpportunities({ limit: 10 });
-  const openOpportunity = (id: string) => navigation.navigate('OpportunityDetail', { opportunityId: id });
+  const openOpportunity = (id: string) => {
+    if (id.startsWith('mock-')) return; // preview placeholder — no real detail to open
+    navigation.navigate('OpportunityDetail', { opportunityId: id });
+  };
   const { items: events } = useUpcomingEvents({ limit: 10 });
-  const openEvent = (id: string) => navigation.navigate('EventDetail', { eventId: id });
+  const openEvent = (id: string) => {
+    if (id.startsWith('mock-')) return; // preview placeholder — no real detail to open
+    navigation.navigate('EventDetail', { eventId: id });
+  };
+
+  // Show placeholder cards when there's no real data yet (preview aid, see USE_MOCK_DISCOVERY).
+  const oppList = opportunities.length || !USE_MOCK_DISCOVERY ? opportunities : MOCK_OPPORTUNITIES;
+  const evList = events.length || !USE_MOCK_DISCOVERY ? events : MOCK_EVENTS;
+  // Business directory should only surface businesses the user is NOT already connected to.
+  const directoryUnconnected = directory.filter((b) => !isConnected(b.id));
 
   // ---- navigation helpers ----
   const openDrawer = () => navigation.dispatch(DrawerActions.toggleDrawer());
@@ -101,7 +238,6 @@ export default function BusinessExploreScreen() {
       name={b.name}
       logo={b.logoUrl || undefined}
       industry={b.industry || b.category || undefined}
-      description={b.description || b.address || undefined}
       isConnected={isConnected(b.id)}
       productsCount={b.productsCount}
       onPress={() => goBusiness(b.id)}
@@ -119,7 +255,7 @@ export default function BusinessExploreScreen() {
         source={{ uri: item.productPicture || 'https://via.placeholder.com/140' }}
         style={[styles.productImg, { backgroundColor: appTheme.colors.imagePlaceholder }]}
       />
-      <Text numberOfLines={1} style={[styles.productName, { color: appTheme.colors.text }]}>{item.name}</Text>
+      <Text numberOfLines={2} style={[styles.productName, { color: appTheme.colors.text }]}>{item.name}</Text>
       <Text numberOfLines={1} style={[styles.productMeta, { color: appTheme.colors.textMuted }]}>{item.brand || ''}</Text>
       <Text numberOfLines={1} style={[styles.productPrice, { color: appTheme.colors.primary }]}>
         {item.priceHidden ? 'Price on request' : `Rs ${item.price?.toFixed(2) ?? '0.00'}`}
@@ -201,7 +337,7 @@ export default function BusinessExploreScreen() {
         );
 
       case 'Buyers': {
-        const buyers = opportunities.filter((o) => o.type === 'buying');
+        const buyers = oppList.filter((o) => o.type === 'buying');
         return (
           <>
             <SectionHeader title="Businesses looking to buy" onSeeAll={() => navigation.navigate('Opportunities')} />
@@ -220,8 +356,8 @@ export default function BusinessExploreScreen() {
         return (
           <>
             <SectionHeader title="Opportunities" onSeeAll={() => navigation.navigate('Opportunities')} />
-            {opportunities.length ? (
-              opportunities.map((o) => (
+            {oppList.length ? (
+              oppList.map((o) => (
                 <OpportunityCard key={o.id} opportunity={o} onPress={() => openOpportunity(o.id)} showRespond onRespond={() => openOpportunity(o.id)} />
               ))
             ) : (
@@ -234,8 +370,8 @@ export default function BusinessExploreScreen() {
         return (
           <>
             <SectionHeader title="Upcoming events" onSeeAll={() => navigation.navigate('Events')} />
-            {events.length ? (
-              events.map((ev) => (
+            {evList.length ? (
+              evList.map((ev) => (
                 <EventCard key={ev.id} event={ev} onPress={() => openEvent(ev.id)} showRsvp onRsvp={() => openEvent(ev.id)} />
               ))
             ) : (
@@ -271,12 +407,12 @@ export default function BusinessExploreScreen() {
               </>
             )}
             <SectionHeader title="Business directory" onSeeAll={() => setSelectedChip('Businesses')} />
-            {directory.length ? directory.slice(0, 6).map(renderBusiness) : (
-              <ComingSoon icon="business-outline" title="No businesses found" subtitle="Discoverable businesses will appear here." />
+            {directoryUnconnected.length ? directoryUnconnected.slice(0, 6).map(renderBusiness) : (
+              <ComingSoon icon="business-outline" title="No new businesses" subtitle="You're connected to everyone here — check back soon." />
             )}
             <SectionHeader title="Opportunities" onSeeAll={() => navigation.navigate('Opportunities')} />
-            {opportunities.length ? (
-              opportunities.slice(0, 3).map((o) => (
+            {oppList.length ? (
+              oppList.slice(0, 3).map((o) => (
                 <OpportunityCard key={o.id} opportunity={o} onPress={() => openOpportunity(o.id)} showRespond onRespond={() => openOpportunity(o.id)} />
               ))
             ) : (
@@ -289,8 +425,8 @@ export default function BusinessExploreScreen() {
               </>
             )}
             <SectionHeader title="Upcoming events" onSeeAll={() => navigation.navigate('Events')} />
-            {events.length ? (
-              events.slice(0, 3).map((ev) => (
+            {evList.length ? (
+              evList.slice(0, 3).map((ev) => (
                 <EventCard key={ev.id} event={ev} onPress={() => openEvent(ev.id)} showRsvp onRsvp={() => openEvent(ev.id)} />
               ))
             ) : (
@@ -374,15 +510,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    marginTop: 18,
+    marginTop: 32,
     marginBottom: 6,
   },
   seeAll: { fontSize: 14, fontWeight: '600' },
   hList: { paddingHorizontal: 12, gap: 12, paddingVertical: 4 },
   productCard: {
-    width: 150,
+    width: 180,
   },
-  productImg: { width: '100%', aspectRatio: 3 / 4, borderRadius: 12, marginBottom: 8 },
+  productImg: { width: 180, height: 200, borderRadius: 12, marginBottom: 8 },
   productRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -391,8 +527,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   productRowImg: { width: 56, height: 56, borderRadius: 8, backgroundColor: '#FAF8F5' },
-  productName: { fontFamily: theme.fonts.primary.semiBold, fontSize: 14 },
-  productMeta: { fontFamily: theme.fonts.primary.regular, fontSize: 12, marginTop: 2 },
-  productPrice: { fontFamily: theme.fonts.primary.semiBold, fontSize: 14, marginTop: 4 },
+  productName: { fontFamily: theme.fonts.primary.semiBold, fontSize: 16 },
+  productMeta: { fontFamily: theme.fonts.primary.regular, fontSize: 14, marginTop: 2 },
+  productPrice: { fontFamily: theme.fonts.primary.semiBold, fontSize: 16, marginTop: 4 },
   comingSoon: { paddingVertical: 8 },
 });

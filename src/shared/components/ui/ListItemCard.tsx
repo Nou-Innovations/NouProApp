@@ -79,6 +79,8 @@ export interface ListItemCardProps {
   subtitle?: string | React.ReactNode;
   /** Extra info text (Row 3) - 14px medium textMuted */
   extraInfo?: string;
+  /** Custom node in the left column below subtitle/extraInfo, evenly spaced (e.g. stats) */
+  extraContent?: React.ReactNode;
 
   // === RIGHT CONTENT (row-aligned) ===
   /** Row 1 right: Status pill + Timestamp */
@@ -91,6 +93,8 @@ export interface ListItemCardProps {
   // === RIGHT COLUMN (stacked, alternative to row-aligned) ===
   /** Custom right column element that spans all rows (use instead of rightRow1/2/3) */
   rightColumn?: React.ReactNode;
+  /** Vertically center the rightColumn against the left text block (default: top-aligned) */
+  centerRightColumn?: boolean;
 
   // === OPTIONS BUTTON (far right) ===
   /** Show 3-dots options button */
@@ -228,10 +232,12 @@ export function ListItemCard({
   title,
   subtitle,
   extraInfo,
+  extraContent,
   rightRow1,
   rightRow2,
   rightRow3,
   rightColumn,
+  centerRightColumn = false,
   showOptionsButton = false,
   onOptionsPress,
   showCheckmark = false,
@@ -380,7 +386,7 @@ export function ListItemCard({
           <View style={styles.mainContent}>
             {rightColumn ? (
               /* When rightColumn is provided, render left content + right column side by side */
-              <View style={styles.contentWithRightColumn}>
+              <View style={[styles.contentWithRightColumn, centerRightColumn && styles.contentWithRightColumnCentered]}>
                 <View style={styles.leftContent}>
                   <Text
                     style={[
@@ -415,6 +421,7 @@ export function ListItemCard({
                       {extraInfo}
                     </Text>
                   )}
+                  {extraContent && <View style={{ marginTop: lineGap }}>{extraContent}</View>}
                 </View>
                 <View style={styles.rightColumnContainer}>
                   {rightColumn}
@@ -458,6 +465,7 @@ export function ListItemCard({
                       {extraInfo}
                     </Text>
                   )}
+                  {extraContent && <View style={{ marginTop: lineGap }}>{extraContent}</View>}
                 </View>
 
                 {/* Right column: rightRow1, rightRow2, rightRow3 stacked */}
@@ -551,6 +559,9 @@ const styles = StyleSheet.create({
   contentWithRightColumn: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+  },
+  contentWithRightColumnCentered: {
+    alignItems: 'center',
   },
   leftContent: {
     flex: 1,
