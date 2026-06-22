@@ -2,10 +2,11 @@
  * Business Tab Navigator (Pro Mode)
  * Navigation for Business Profile mode
  *
- * Tab structure:
- * - Home: Dashboard (KPIs, priority queue, quick actions, recent activity). Notifications bell in header.
- * - Explore: B2B discovery (businesses, products, suppliers, opportunities, events).
+ * Tab structure (visible order):
  * - Inbox: Conversation list / messaging
+ * - Notifications: mode-aware NotificationsScreen (shows the unread badge)
+ * - Analytics (route BusinessHome): Dashboard (KPIs, priority queue, quick actions, recent activity)
+ * - Explore: B2B discovery (businesses, products, suppliers, opportunities, events)
  * - Profile: Business profile, settings, staff, subscription
  *
  * Note: The full Activities timeline opens as the RootStack `AllActivity` screen
@@ -17,12 +18,14 @@ import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
-  Home,
+  ChartColumn,
   Compass,
   Mail,
+  Bell,
 } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
+import { useNotifications } from '@/shared/context/NotificationContext';
 import theme from '@/shared/theme';
 import { BusinessTabParamList } from '@/shared/types/navigation';
 
@@ -30,6 +33,7 @@ import { BusinessTabParamList } from '@/shared/types/navigation';
 import { BusinessHomeScreen, BusinessExploreScreen } from '@/modes/business/screens';
 import BusinessProfileOwnScreen from '@/modes/business/screens/BusinessProfileOwnScreen';
 import BusinessInboxScreen from '@/modes/business/screens/BusinessInboxScreen';
+import NotificationsScreen from '@/features/notifications/screens/NotificationsScreen';
 
 // Workspace pages opened from the sidebar. Registered here as hidden tabs (no button
 // in the bottom bar via `tabBarButton: () => null`) so they keep the bottom nav bar
@@ -69,6 +73,7 @@ const hiddenTabOptions = { tabBarButton: () => null } as const;
 export function BusinessTabNavigator() {
   const { theme: appTheme } = useTheme();
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
+  const { unreadCount } = useNotifications();
 
   /**
    * Render business logo or fallback icon (24x24px, border radius 4px)
@@ -109,47 +114,7 @@ export function BusinessTabNavigator() {
         },
       }}
     >
-      {/* Home Tab - Dashboard (KPIs, priority queue, quick actions, recent activity) */}
-      <Tab.Screen
-        name="BusinessHome"
-        component={BusinessHomeScreen}
-        options={{
-          tabBarLabel: ({ focused, color }) => (
-            <Text style={{
-              fontSize: theme.fontSize.xs,
-              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color,
-            }}>
-              Home
-            </Text>
-          ),
-          tabBarIcon: ({ color, focused }) => (
-            <Home size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-          ),
-        }}
-      />
-
-      {/* Explore Tab - B2B discovery (notifications bell lives in this screen's header) */}
-      <Tab.Screen
-        name="BusinessExplore"
-        component={BusinessExploreScreen}
-        options={{
-          tabBarLabel: ({ focused, color }) => (
-            <Text style={{
-              fontSize: theme.fontSize.xs,
-              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
-              color,
-            }}>
-              Explore
-            </Text>
-          ),
-          tabBarIcon: ({ color, focused }) => (
-            <Compass size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-          ),
-        }}
-      />
-
-      {/* Inbox Tab - Dashboard with Activity + Chats */}
+      {/* Inbox Tab - Dashboard with Activity + Chats (first position) */}
       <Tab.Screen
         name="BusinessInbox"
         component={BusinessInboxScreen}
@@ -165,6 +130,67 @@ export function BusinessTabNavigator() {
           ),
           tabBarIcon: ({ color, focused }) => (
             <Mail size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+          ),
+        }}
+      />
+
+      {/* Notifications Tab - mode-aware NotificationsScreen (replaces the old header bell) */}
+      <Tab.Screen
+        name="BusinessNotifications"
+        component={NotificationsScreen}
+        options={{
+          tabBarLabel: ({ focused, color }) => (
+            <Text style={{
+              fontSize: theme.fontSize.xs,
+              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
+              color,
+            }}>
+              Notifications
+            </Text>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <Bell size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+          ),
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 9 ? '9+' : unreadCount) : undefined,
+        }}
+      />
+
+      {/* Analytics Tab - Dashboard (KPIs, priority queue, quick actions, recent activity) */}
+      <Tab.Screen
+        name="BusinessHome"
+        component={BusinessHomeScreen}
+        options={{
+          tabBarLabel: ({ focused, color }) => (
+            <Text style={{
+              fontSize: theme.fontSize.xs,
+              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
+              color,
+            }}>
+              Analytics
+            </Text>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <ChartColumn size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+          ),
+        }}
+      />
+
+      {/* Explore Tab - B2B discovery */}
+      <Tab.Screen
+        name="BusinessExplore"
+        component={BusinessExploreScreen}
+        options={{
+          tabBarLabel: ({ focused, color }) => (
+            <Text style={{
+              fontSize: theme.fontSize.xs,
+              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
+              color,
+            }}>
+              Explore
+            </Text>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <Compass size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />

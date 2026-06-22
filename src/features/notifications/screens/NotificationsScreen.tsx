@@ -22,7 +22,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
@@ -569,7 +569,11 @@ export default function NotificationsScreen() {
     >
       <SecondaryHeader
         title="Notifications"
-        leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
+        leftAction={
+          navigation.canGoBack()
+            ? { icon: 'chevron-left', onPress: () => navigation.goBack() }
+            : { icon: 'menu', onPress: () => navigation.dispatch(DrawerActions.toggleDrawer()), accessibilityLabel: 'Open menu' }
+        }
       />
 
       <AppSearchBar

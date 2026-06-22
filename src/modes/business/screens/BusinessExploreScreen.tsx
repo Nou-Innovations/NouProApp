@@ -25,7 +25,6 @@ import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { useNotifications } from '@/shared/context/NotificationContext';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { EmptyState, ExploreChips, SectionTitle } from '@/shared/components/ui';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
@@ -176,7 +175,6 @@ const MOCK_EVENTS: BizEvent[] = [
 export default function BusinessExploreScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { theme: appTheme } = useTheme();
-  const { unreadCount } = useNotifications();
   const [selectedChip, setSelectedChip] = useState('Overall');
   const [query, setQuery] = useState('');
 
@@ -446,14 +444,6 @@ export default function BusinessExploreScreen() {
             ? { icon: 'chevron-left', onPress: () => navigation.goBack() }
             : { icon: 'menu', onPress: openDrawer, accessibilityLabel: 'Open menu' }
         }
-        rightActions={[
-          {
-            icon: 'notifications-outline',
-            onPress: () => navigation.navigate('Notifications'),
-            badge: unreadCount,
-            accessibilityLabel: 'Notifications',
-          },
-        ]}
       />
 
       <View style={styles.searchRow}>

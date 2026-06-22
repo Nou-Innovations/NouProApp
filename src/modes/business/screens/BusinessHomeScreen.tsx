@@ -36,7 +36,6 @@ import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useBusinessStore } from '@/shared/store/businessStore';
-import { useNotifications } from '@/shared/context/NotificationContext';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { RootStackParamList } from '@/shared/types/navigation';
 import {
@@ -60,7 +59,6 @@ export default function BusinessHomeScreen() {
   const locationCount = useBusinessStore((s) => s.locations.length);
   // Single-location businesses are always business-wide; multi-location only when "All".
   const isBusinessWide = locationCount < 2 || currentLocationId === null;
-  const { unreadCount } = useNotifications();
   const { analyticsType } = usePermissions();
 
   const {
@@ -93,10 +91,6 @@ export default function BusinessHomeScreen() {
     navigation.dispatch(DrawerActions.toggleDrawer());
   }, [navigation]);
 
-  const goToNotifications = useCallback(() => {
-    navigation.navigate('Notifications');
-  }, [navigation]);
-
   const goToActivities = useCallback(() => {
     navigation.navigate('AllActivity');
   }, [navigation]);
@@ -122,15 +116,6 @@ export default function BusinessHomeScreen() {
     recentActivity.length === 0 &&
     priorityItems.length === 0;
 
-  const renderBadge = (count: number) => {
-    if (count <= 0) return null;
-    return (
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>{count > 9 ? '9+' : count.toString()}</Text>
-      </View>
-    );
-  };
-
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: appTheme.colors.background }]}
@@ -149,15 +134,6 @@ export default function BusinessHomeScreen() {
         </TouchableOpacity>
         <View style={styles.headerActions}>
           <LocationSelectorPill />
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={goToNotifications}
-            activeOpacity={0.7}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Icon name="notifications-outline" size={24} color={appTheme.colors.text} />
-            {renderBadge(unreadCount)}
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -268,23 +244,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    backgroundColor: theme.colors.accent,
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: theme.colors.textInverse,
-    fontSize: 10,
-    fontFamily: theme.fonts.primary.bold,
   },
   scrollContent: {
     paddingTop: theme.spacing.sm,

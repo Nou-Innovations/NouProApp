@@ -102,12 +102,13 @@ export type PersonalTabParamList = {
  * The full Activities timeline opens as the RootStack `AllActivity` screen
  * (reached via "See all" on the Home screen).
  * Deliveries / Products / Invoices live in the sidebar and open as RootStack screens.
- * Notifications are reached via the bell in the Home/Explore header (not a tab).
+ * Visible tab order: Inbox · Notifications · Analytics (BusinessHome) · Explore · Profile.
  */
 export type BusinessTabParamList = {
-  BusinessHome: undefined; // Dashboard: KPIs, priority queue, quick actions, recent activity
-  BusinessExplore: undefined; // Feed / discovery, with notifications bell in header
   BusinessInbox: undefined; // Business inbox with activity timeline and chats
+  BusinessNotifications: undefined; // Notifications tab (mode-aware NotificationsScreen)
+  BusinessHome: undefined; // "Analytics" — dashboard: KPIs, priority queue, quick actions, recent activity
+  BusinessExplore: undefined; // Feed / discovery
   BusinessProfile: undefined;
 
   // Workspace pages opened from the sidebar — registered here as hidden tabs
