@@ -34,7 +34,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Font from 'expo-font';
 import theme from '@/shared/theme';
+
+// TEMP: bump this string every time we publish a diagnostic OTA, so we can
+// confirm on-device which JS bundle is actually running. Remove when fonts work.
+const BUILD_TAG = 'DX1';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -356,6 +361,21 @@ export default function LaunchScreen({
 
   return (
     <View style={styles.root}>
+      {/* TEMP DIAGNOSTIC — remove once fonts render correctly.
+          Uses the default system font on purpose so it shows regardless of
+          custom-font state. */}
+      <View style={[styles.debugBox, { top: insets.top + 8 }]} pointerEvents="none">
+        <Text style={styles.debugText}>
+          {`BUILD ${BUILD_TAG}  •  EB:${Font.isLoaded('InterCustom-ExtraBold') ? 'Y' : 'N'} `}
+          {`B:${Font.isLoaded('InterCustom-Bold') ? 'Y' : 'N'} `}
+          {`SB:${Font.isLoaded('InterCustom-SemiBold') ? 'Y' : 'N'} `}
+          {`M:${Font.isLoaded('InterCustom-Medium') ? 'Y' : 'N'} `}
+          {`R:${Font.isLoaded('InterCustom-Regular') ? 'Y' : 'N'}`}
+        </Text>
+        <Text style={styles.debugCompare}>AaGg 123 — system font ↑ vs Inter ↓</Text>
+        <Text style={[styles.debugCompare, { fontFamily: 'InterCustom-ExtraBold' }]}>AaGg 123 — Inter ExtraBold</Text>
+      </View>
+
       {/* Background Image (fades in at stage 2) */}
       {backgroundImage && (
         <Animated.Image
@@ -428,6 +448,32 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+
+  // TEMP DIAGNOSTIC styles — remove with the debug overlay above.
+  debugBox: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    zIndex: 9999,
+    elevation: 9999,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    borderWidth: 1,
+    borderColor: '#FF7A00',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  debugText: {
+    color: '#FF7A00',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  debugCompare: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    marginTop: 4,
   },
   
   // Background
