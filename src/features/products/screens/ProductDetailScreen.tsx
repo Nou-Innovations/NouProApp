@@ -25,7 +25,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   TextInput,
   TouchableOpacity,
   Dimensions,
@@ -1148,23 +1147,43 @@ const styles = StyleSheet.create({
   },
 
   // Brand row
+  // Brand + status row
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  brandLogo: {
-    width: 18,
-    height: 18,
-    borderRadius: 5,
+  brandTap: {
+    flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   brandName: {
     flexShrink: 1,
-    fontSize: 13,
-    fontFamily: theme.fonts.primary.medium,
+    fontSize: 10,
+    fontFamily: theme.fonts.primary.semiBold,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontFamily: theme.fonts.primary.medium,
   },
 
   // Name
@@ -1176,54 +1195,24 @@ const styles = StyleSheet.create({
   },
   name: {
     flex: 1,
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 24,
+    lineHeight: 30,
     fontFamily: theme.fonts.primary.semiBold,
   },
   menuButton: {
     width: 32,
     height: 32,
-    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 2,
   },
 
-  // Chips
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 14,
-  },
-  chip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  chipText: {
-    fontSize: 13,
-    fontFamily: theme.fonts.primary.medium,
-  },
-
-  // Availability
-  availabilityPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 8,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 999,
+  // Unit / carton (plain text)
+  unitWrap: {
+    gap: 2,
     marginBottom: 16,
   },
-  availabilityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  availabilityText: {
-    fontSize: 13,
+  unitText: {
+    fontSize: 14,
     fontFamily: theme.fonts.primary.medium,
   },
 
@@ -1234,12 +1223,7 @@ const styles = StyleSheet.create({
   descriptionText: {
     fontSize: 14,
     lineHeight: 21,
-    fontFamily: theme.fonts.primary.regular,
-  },
-  readMore: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.semiBold,
-    marginTop: 6,
+    fontFamily: theme.fonts.primary.medium,
   },
 
   // Bottom Bar

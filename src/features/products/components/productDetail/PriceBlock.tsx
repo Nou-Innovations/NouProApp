@@ -68,8 +68,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   current: {
-    fontSize: 28,
-    fontFamily: theme.fonts.primary.bold,
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.semiBold,
   },
   originalWrap: {
     position: 'relative',
