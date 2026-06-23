@@ -1536,3 +1536,20 @@ model SuggestionVote {
   @@index([userId])
   @@index([suggestionId])
 }
+
+// User-submitted content reports (products today; targetType keeps it generic
+// for businesses etc. later). Polymorphic targetId, so no FK relation.
+model Report {
+  id                   String   @id @default(uuid())
+  targetType           String // 'product' | 'business'
+  targetId             String
+  reason               String // 'inappropriate' | 'counterfeit' | 'wrong_info' | 'spam' | 'other'
+  details              String?
+  reportedByUserId     String?
+  reportedByBusinessId String?
+  status               String   @default("open") // 'open' | 'reviewed' | 'dismissed'
+  createdAt            DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([status])
+}

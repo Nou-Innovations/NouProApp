@@ -66,7 +66,7 @@ import {
   RelatedProduct,
 } from '@/shared/types/productDetails';
 import { getSuppliersForProduct, type ProductSupplierPricing } from '@/features/procurement/services/procurement.service';
-import { toggleProductListed, carryProduct } from '@/features/products/products.service';
+import { toggleProductListed, carryProduct, reportProduct, type ProductReportReason } from '@/features/products/products.service';
 import SupplierPickerModal from '@/features/procurement/components/SupplierPickerModal';
 import type { Supplier } from '@/shared/types/procurement';
 import ProductHero from '../components/productDetail/ProductHero';
@@ -262,6 +262,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [reportSheetVisible, setReportSheetVisible] = useState(false);
 
   // Order flow state (buyer mode)
   const [isOrdering, setIsOrdering] = useState(false);
@@ -444,19 +445,25 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
-  const handleReport = () => {
-    Alert.alert(
-      'Report product',
-      'Thanks for flagging this. Our team will review it.',
-      [{ text: 'OK' }]
-    );
-  };
-
   // Options menu (⋯ beside the name): Share + Edit for the owner, Share + Report otherwise.
   const handleMenuSelect = (item: AppBottomSheetItem) => {
     if (item.id === 'share') handleShare();
     else if (item.id === 'edit') handleEdit();
-    else if (item.id === 'report') handleReport();
+    else if (item.id === 'report') {
+      // The menu sheet closes itself on select; open the reason picker once its
+      // close animation finishes (two Modals can't be presented at once).
+      setTimeout(() => setReportSheetVisible(true), 350);
+    }
+  };
+
+  // A report reason was chosen — submit it and acknowledge.
+  const handleReportReason = async (item: AppBottomSheetItem) => {
+    try {
+      await reportProduct(productId, item.id as ProductReportReason, undefined, activeCompanyId || undefined);
+      Alert.alert('Report received', 'Thanks for flagging this. Our team will review it.', [{ text: 'OK' }]);
+    } catch {
+      Alert.alert('Could not report', 'Something went wrong. Please try again.');
+    }
   };
 
   const handleBusinessPress = () => {
@@ -675,6 +682,13 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     isProductOwner
       ? { id: 'edit', title: 'Edit' }
       : { id: 'report', title: 'Report' },
+  ];
+  const reportReasons: AppBottomSheetItem[] = [
+    { id: 'inappropriate', title: 'Inappropriate content' },
+    { id: 'counterfeit', title: 'Counterfeit or fake' },
+    { id: 'wrong_info', title: 'Incorrect information' },
+    { id: 'spam', title: 'Spam or misleading' },
+    { id: 'other', title: 'Other' },
   ];
   const statusBarStyle = isDarkMode ? 'light' : headerSolid ? 'dark' : 'light';
 
@@ -975,6 +989,15 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         title={product.name}
         items={menuItems}
         onSelectItem={handleMenuSelect}
+      />
+
+      {/* Report reason picker */}
+      <AppBottomSheet
+        visible={reportSheetVisible}
+        onClose={() => setReportSheetVisible(false)}
+        title="Report product"
+        items={reportReasons}
+        onSelectItem={handleReportReason}
       />
     </View>
   );

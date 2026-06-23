@@ -13485,6 +13485,43 @@ app.get('/api/products/:productId', optionalAuth, async (req, res) => {
   }
 });
 
+// Report a product (content moderation). Persists a Report row for review.
+const PRODUCT_REPORT_REASONS = ['inappropriate', 'counterfeit', 'wrong_info', 'spam', 'other'];
+app.post('/api/products/:productId/report', requireAuth, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { reason, details, reportedByBusinessId } = req.body || {};
+
+    if (!reason || !PRODUCT_REPORT_REASONS.includes(reason)) {
+      return res.status(400).json(errorResponse('A valid reason is required'));
+    }
+
+    const product = await repos.productRepo.getById(productId);
+    if (!product) {
+      return res.status(404).json(errorResponse('Product not found'));
+    }
+
+    const report = await prisma.report.create({
+      data: {
+        id: uuidv4(),
+        targetType: 'product',
+        targetId: productId,
+        reason,
+        details: details ? String(details).slice(0, 1000) : null,
+        reportedByUserId: req.user?.id || null,
+        reportedByBusinessId: reportedByBusinessId || null,
+        status: 'open',
+      },
+    });
+
+    logger.info('[report] product reported', { productId, reason, by: req.user?.id });
+    res.status(201).json(successResponse({ id: report.id }));
+  } catch (e) {
+    logger.error('Error reporting product:', e);
+    res.status(500).json(errorResponse('Failed to submit report'));
+  }
+});
+
 // ============================================================================
 // PUBLIC STOREFRONT ENDPOINTS (for customer-facing orders)
 // ============================================================================

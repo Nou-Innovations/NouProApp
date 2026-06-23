@@ -159,6 +159,22 @@ export async function carryProduct(companyId: string, sourceProductId: string): 
   return post<UIProduct>(`/companies/${companyId}/products/carry`, { sourceProductId });
 }
 
+export type ProductReportReason = 'inappropriate' | 'counterfeit' | 'wrong_info' | 'spam' | 'other';
+
+/** Report a product for moderation review. */
+export async function reportProduct(
+  productId: string,
+  reason: ProductReportReason,
+  details?: string,
+  reportedByBusinessId?: string
+): Promise<{ id: string }> {
+  return post<{ id: string }>(`/products/${productId}/report`, {
+    reason,
+    details,
+    reportedByBusinessId,
+  });
+}
+
 // ============================================================================
 // Export as namespace
 // ============================================================================
@@ -174,6 +190,7 @@ const productsService = {
   toggleProductDisplayable,
   toggleProductListed,
   carryProduct,
+  reportProduct,
 };
 
 export default productsService;
