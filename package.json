@@ -8,6 +8,8 @@
     "web": "expo start --web",
     "test": "jest",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "preflight": "node scripts/preflight.js",
     "postinstall": "npx patch-package"
   },
   "dependencies": {

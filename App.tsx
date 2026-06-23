@@ -26,6 +26,7 @@ import { View, StyleSheet } from 'react-native';
 import theme from '@/shared/theme';
 import { ThemeProvider, useTheme } from '@/shared/theme/ThemeProvider';
 import { NotificationProvider } from '@/shared/context/NotificationContext';
+import ErrorBoundary from '@/shared/components/ui/ErrorBoundary';
 
 // Stores
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -829,7 +830,9 @@ const AppWithTheme = () => {
             style={[styles.container, { backgroundColor: LAUNCH_BACKGROUND }]} 
             onLayout={onLayoutRootView}
           >
-            {renderScreen()}
+            <ErrorBoundary>
+              {renderScreen()}
+            </ErrorBoundary>
           </View>
         </NotificationProvider>
       </SafeAreaProvider>

@@ -6,6 +6,7 @@
  */
 
 import { theme } from '@/shared/theme';
+import type { PaymentStatus } from './order';
 
 // ============================================================================
 // Status Enums
@@ -28,7 +29,8 @@ export type DeliveryStatus =
  * PaymentStatus, PAYMENT_STATUS_COLORS, and PAYMENT_STATUS_LABELS are
  * re-exported from order.ts to ensure a single source of truth.
  */
-export { PaymentStatus, PAYMENT_STATUS_COLORS, PAYMENT_STATUS_LABELS } from './order';
+export type { PaymentStatus };
+export { PAYMENT_STATUS_COLORS, PAYMENT_STATUS_LABELS } from './order';
 
 export type ItemStatus = 'Available' | 'In Stock' | 'Out of Stock' | 'In Production' | 'Discontinued';
 
