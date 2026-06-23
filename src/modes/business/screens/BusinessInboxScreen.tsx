@@ -14,7 +14,6 @@ import {
   View,
   FlatList,
   StyleSheet,
-  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
@@ -27,7 +26,6 @@ import AppSearchBar, { AppSearchBarRef } from '@/shared/components/ui/AppSearchB
 import FilterBar from '@/shared/components/ui/FilterBar';
 import MessageCard from '@/features/inbox/components/MessageCard';
 import NewChatModalList from '@/features/inbox/components/NewChatModalList';
-import { Pencil } from '@/shared/utils/icons';
 import { EmptyState, SkeletonListItem } from '@/shared/components/ui';
 import { useInbox } from '@/features/inbox/hooks/useInbox';
 import type { Chat, ChatFilter } from '@/shared/types/inbox';
@@ -62,12 +60,6 @@ export default function BusinessInboxScreen() {
 
   // Chat filter types
   const chatTypes = ['all', 'unread', 'direct', 'group'];
-
-  // Navigation handlers
-  const navigateToOrders = useCallback(() => {
-    // @ts-ignore
-    navigation.navigate('Orders');
-  }, [navigation]);
 
   // Update the inbox unread count when component mounts or data changes
   useEffect(() => {
@@ -189,11 +181,11 @@ export default function BusinessInboxScreen() {
         title="Inbox"
         leftAction={{ icon: 'menu', onPress: openDrawer, accessibilityLabel: 'Open menu' }}
         actions={[
-          { icon: 'cart', onPress: navigateToOrders, badge: undefined, accessibilityLabel: 'Orders' },
+          { icon: 'create-outline', onPress: handleNewChat, badge: undefined, accessibilityLabel: 'New conversation' },
         ]}
       />
 
-      {/* Search Bar with new-chat button */}
+      {/* Search Bar (new-chat moved to the header create action) */}
       <View style={[styles.searchContainer, { backgroundColor: appTheme.colors.background }]}>
         <AppSearchBar
           ref={searchBarRef}
@@ -203,14 +195,6 @@ export default function BusinessInboxScreen() {
           onClear={() => setInboxSearch('')}
           containerStyle={styles.searchBarContainer}
         />
-        <TouchableOpacity
-          onPress={handleNewChat}
-          style={styles.addButton}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Pencil size={24} color={appTheme.colors.text} strokeWidth={2} />
-        </TouchableOpacity>
       </View>
 
       {/* Filter Bar */}
@@ -271,7 +255,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 8,
-    paddingRight: 4,
+    paddingRight: 8,
     paddingTop: 8,
     paddingBottom: 0,
   },
@@ -279,13 +263,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 0,
     marginBottom: 0,
-  },
-  addButton: {
-    marginLeft: 0,
-    width: 52,
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   listContent: {
     flexGrow: 1,
