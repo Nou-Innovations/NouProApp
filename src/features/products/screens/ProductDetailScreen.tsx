@@ -967,6 +967,15 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           phone: sp.phone,
         })) as Supplier[]}
       />
+
+      {/* Options menu (⋯ beside the product name) */}
+      <AppBottomSheet
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        title={product.name}
+        items={menuItems}
+        onSelectItem={handleMenuSelect}
+      />
     </View>
   );
 };
@@ -1140,11 +1149,25 @@ const styles = StyleSheet.create({
   },
 
   // Name
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 12,
+  },
   name: {
+    flex: 1,
     fontSize: 26,
     lineHeight: 32,
     fontFamily: theme.fonts.primary.semiBold,
-    marginBottom: 12,
+  },
+  menuButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
   },
 
   // Chips
@@ -1211,6 +1234,9 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  bottomBarOrdering: {
+    paddingBottom: 24,
+  },
   ownerButtonsRow: {
     flexDirection: 'row',
     gap: 12,
@@ -1221,29 +1247,42 @@ const styles = StyleSheet.create({
   orderFlowContainer: {
     alignItems: 'center',
   },
-  quantityRow: {
+  qtyField: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 52,
     marginBottom: 12,
   },
-  quantityButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+  qtyLabel: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
   },
-  quantityText: {
-    fontSize: 20,
+  qtyInput: {
+    minWidth: 60,
+    textAlign: 'right',
+    fontSize: 16,
     fontFamily: theme.fonts.primary.semiBold,
-    marginHorizontal: 24,
-    minWidth: 40,
-    textAlign: 'center',
+    paddingVertical: 0,
   },
-  totalAmount: {
-    fontSize: 24,
-    fontFamily: theme.fonts.primary.bold,
+  totalRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 16,
+  },
+  totalLabel: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.medium,
+  },
+  totalValue: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.semiBold,
   },
   orderButtonsContainer: {
     width: '100%',
