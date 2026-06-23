@@ -230,17 +230,20 @@ export default function AppBottomSheet({
       : selectedItemId === item.id;
     const isLast = items ? index === items.length - 1 : false;
     const isDestructive = item.variant === 'destructive';
+    // Bottom-sheet rows use a 40x40 picture box and the small checkbox.
+    const avatar = item.avatar ? { ...item.avatar, size: 40 } : undefined;
 
     return (
       <ListItemCard
         key={item.id}
-        avatar={item.avatar}
+        avatar={avatar}
         title={item.title}
         subtitle={item.subtitle}
         onPress={() => handleItemPress(item)}
         disabled={item.disabled}
         showCheckmark={multiSelect || isSelected}
         selected={isSelected}
+        compactCheckmark
         selectionVariant={isSelected ? 'highlight' : undefined}
         showDivider={!isLast}
         style={isDestructive ? { opacity: 0.9 } : undefined}

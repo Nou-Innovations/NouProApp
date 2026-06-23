@@ -293,11 +293,11 @@ function buildRows(): Row[] {
       isGroupChat: true,
       showSenderName: true,
       isFirstInGroup: true,
+      isGrouped: true, // same sender (Sam) below → 4px gap
     }),
     msg(mk({ type: 'text', text: 'Should be ready before noon.', sender: SAM, isOutgoing: false }), {
       isGroupChat: true,
-      isGrouped: true,
-      isLastInGroup: true,
+      isLastInGroup: true, // different sender below → default 12px gap
     }),
     msg(mk({ type: 'text', text: 'Perfect, thanks both 🙌', isOutgoing: true }), { isGroupChat: true }),
   ];

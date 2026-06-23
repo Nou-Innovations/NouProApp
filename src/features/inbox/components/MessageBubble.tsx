@@ -41,6 +41,7 @@ import { OrderEventCard } from './OrderEventCard';
 import { InvoiceEventCard } from './InvoiceEventCard';
 import VoicePlayer from './VoicePlayer';
 import ProfileCard from './ProfileCard';
+import DoubleCheck, { SingleCheck } from './DoubleCheck';
 
 // ============================================================================
 // Types
@@ -114,30 +115,34 @@ interface MessageStatusProps {
 
 function MessageStatus({ status }: MessageStatusProps) {
   const { theme: appTheme } = useTheme();
-  
+
   if (!status) return null;
-  
-  let iconName: 'checkmark' | 'checkmark-done' | 'time-outline' | 'alert-circle-outline' = 'checkmark';
+
+  // Sent → single tick; delivered/seen → double tick (grey vs accent). Custom SVG ticks.
+  if (status === 'sent' || status === 'delivered' || status === 'seen') {
+    const tickColor = status === 'seen' ? appTheme.colors.accent : appTheme.colors.textMuted;
+    return (
+      <View style={[styles.messageStatusContainer, styles.messageStatusIcon]}>
+        {status === 'sent'
+          ? <SingleCheck size={14} color={tickColor} />
+          : <DoubleCheck size={14} color={tickColor} />}
+      </View>
+    );
+  }
+
+  let iconName: 'time-outline' | 'alert-circle-outline' = 'time-outline';
   let iconColor = appTheme.colors.textMuted;
-  
+
   switch (status) {
     case 'sending':
       iconName = 'time-outline';
-      break;
-    case 'sent':
-      iconName = 'checkmark';
-      break;
-    case 'delivered':
-    case 'seen':
-      iconName = 'checkmark-done';
-      iconColor = status === 'seen' ? appTheme.colors.accent : appTheme.colors.textMuted;
       break;
     case 'failed':
       iconName = 'alert-circle-outline';
       iconColor = appTheme.colors.error;
       break;
   }
-  
+
   return (
     <View style={styles.messageStatusContainer}>
       <Icon
@@ -416,7 +421,7 @@ export function MessageBubble({
                 <View style={styles.textTimeWrap}>
                   {renderTextWithLinks(
                     message.text,
-                    <Text style={styles.inlineSpacer}>{String.fromCharCode(0x2007).repeat(isOutgoing ? 8 : 5)}</Text>
+                    <Text style={styles.inlineSpacer}>{String.fromCharCode(0x2007).repeat(isOutgoing ? 8 : 6)}</Text>
                   )}
                   <View style={styles.inlineTimestamp}>
                     {message.editedAt && (
@@ -479,6 +484,8 @@ export function MessageBubble({
               {children}
             </View>
             {footer}
+            {/* Timestamp lives in the shell, BELOW the inner card (not inside it). */}
+            {renderTimestamp(message.timestamp, message.status)}
           </View>
         </TouchableOpacity>
       </View>
@@ -496,7 +503,6 @@ export function MessageBubble({
             <Text style={[textStyle, { flexShrink: 1 }]} numberOfLines={1}>{message.fileName || 'Document.pdf'}</Text>
           </View>
           <Text style={[{ fontSize: 14 }, { color: mutedOnCard }]}>Tap to view</Text>
-          {renderTimestamp(message.timestamp, message.status)}
         </>
       ),
     });
@@ -611,7 +617,6 @@ export function MessageBubble({
           <Text style={[{ fontSize: 14 }, { color: mutedOnCard }]} numberOfLines={2}>
             {address || 'Tap to open in Maps'}
           </Text>
-          {renderTimestamp(message.timestamp, message.status)}
         </>
       ),
     });
@@ -741,6 +746,8 @@ export function MessageBubble({
     if (message.type !== 'profile') return null;
     const profileMsg = message as ProfileMessage;
     return renderAttachmentBubble({
+      // Shared-profile inner card: 8px vertical + left padding (right keeps room for the chevron).
+      cardStyle: { paddingTop: 8, paddingBottom: 8, paddingLeft: 8 },
       children: (
         <>
           <ProfileCard
@@ -750,7 +757,6 @@ export function MessageBubble({
             isOutgoing={isOutgoing}
             onPress={() => onProfilePress?.(profileMsg.profileId, profileMsg.profileType)}
           />
-          {renderTimestamp(message.timestamp, message.status)}
         </>
       ),
     });
@@ -768,7 +774,6 @@ export function MessageBubble({
             <Text style={[textStyle, { fontStyle: 'italic', flexShrink: 1 }]} numberOfLines={1}>Contact</Text>
           </View>
           <Text style={[{ fontSize: 14 }, { color: mutedOnCard }]}>Not available in this version</Text>
-          {renderTimestamp(message.timestamp, message.status)}
         </>
       ),
     });
@@ -957,7 +962,9 @@ const styles = StyleSheet.create({
   linkText: {
     textDecorationLine: 'underline',
   },
-  // Inline (WhatsApp-style) timestamp tucked into the last text line
+  // Inline (WhatsApp-style) timestamp: an invisible spacer reserves room on the last
+  // text line so the absolutely-positioned timestamp tucks into it (~8px gap) instead
+  // of dropping to a new line.
   textTimeWrap: {
     position: 'relative',
   },

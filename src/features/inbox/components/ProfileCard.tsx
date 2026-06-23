@@ -59,7 +59,6 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
     minWidth: 200,
   },
   avatar: {

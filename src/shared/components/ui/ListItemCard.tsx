@@ -54,6 +54,8 @@ export interface ListItemCardAvatarProps {
   iconColor?: string;
   /** Override background color */
   backgroundColor?: string;
+  /** Override avatar box size (default from LIST_ITEM_CARD token, 48px) */
+  size?: number;
   /** Override border radius (default is 8px) */
   borderRadius?: number;
 }
@@ -107,6 +109,8 @@ export interface ListItemCardProps {
   showCheckmark?: boolean;
   /** Whether item is selected (fills checkmark) */
   selected?: boolean;
+  /** Render a smaller checkbox (for compact lists / bottom sheets) */
+  compactCheckmark?: boolean;
 
   // === STATUS PILL (left of checkmark, for vehicle status etc.) ===
   /** Status pill configuration (appears left of checkmark) */
@@ -156,32 +160,40 @@ const StatusPill: React.FC<{ text: string; color: string }> = ({ text, color }) 
 };
 
 /** Checkmark circle for selections */
-const Checkmark: React.FC<{ 
-  selected: boolean; 
+const Checkmark: React.FC<{
+  selected: boolean;
   color: string;
   isOptionList?: boolean;
-}> = ({ selected, color, isOptionList }) => {
+  /** Smaller box + icon, for compact lists / bottom sheets */
+  compact?: boolean;
+}> = ({ selected, color, isOptionList, compact }) => {
   const { theme: appTheme } = useTheme();
-  
+
+  // Compact size override (used by bottom-sheet selection lists).
+  const compactBox = compact
+    ? { width: 24, height: 24, borderRadius: 6 }
+    : null;
+  const iconSize = compact ? 16 : LIST_ITEM_CARD.checkmark.iconSize;
+
   if (selected) {
     // Option list variant: white bg, no border, primary icon
     if (isOptionList) {
       return (
-        <View style={[styles.checkmark, styles.checkmarkOptionList]}>
-          <Icon name="checkmark" size={LIST_ITEM_CARD.checkmark.iconSize} color={color} />
+        <View style={[styles.checkmark, styles.checkmarkOptionList, compactBox]}>
+          <Icon name="checkmark" size={iconSize} color={color} />
         </View>
       );
     }
     // Default: colored bg with white icon
     return (
-      <View style={[styles.checkmark, { backgroundColor: color }]}>
-        <Icon name="checkmark" size={LIST_ITEM_CARD.checkmark.iconSize} color="#FFFFFF" />
+      <View style={[styles.checkmark, { backgroundColor: color }, compactBox]}>
+        <Icon name="checkmark" size={iconSize} color="#FFFFFF" />
       </View>
     );
   }
-  
+
   return (
-    <View style={[styles.checkmarkEmpty, { borderColor: appTheme.colors.borderColor }]} />
+    <View style={[styles.checkmarkEmpty, { borderColor: appTheme.colors.borderColor }, compactBox]} />
   );
 };
 
@@ -210,14 +222,16 @@ const IconAvatar: React.FC<{
   iconColor?: string;
   backgroundColor?: string;
   borderRadius?: number;
-}> = ({ icon, iconColor, backgroundColor, borderRadius }) => {
+  size?: number;
+}> = ({ icon, iconColor, backgroundColor, borderRadius, size }) => {
   const { theme: appTheme } = useTheme();
   const bgColor = backgroundColor || `${appTheme.colors.primary}15`;
   const color = iconColor || appTheme.colors.primary;
   const radius = borderRadius ?? LIST_ITEM_CARD.avatar.borderRadius;
-  
+  const boxSize = size ?? LIST_ITEM_CARD.avatar.size;
+
   return (
-    <View style={[styles.iconAvatar, { backgroundColor: bgColor, borderRadius: radius }]}>
+    <View style={[styles.iconAvatar, { width: boxSize, height: boxSize, backgroundColor: bgColor, borderRadius: radius }]}>
       {icon ? <Icon name={icon as any} size={LIST_ITEM_CARD.avatar.iconSize} color={color} /> : null}
     </View>
   );
@@ -242,6 +256,7 @@ export function ListItemCard({
   onOptionsPress,
   showCheckmark = false,
   selected = false,
+  compactCheckmark = false,
   statusPill,
   showChevron = false,
   bottomElement,
@@ -306,6 +321,7 @@ export function ListItemCard({
           iconColor={avatar.iconColor}
           backgroundColor={avatar.backgroundColor}
           borderRadius={avatar.borderRadius}
+          size={avatar.size}
         />
       );
     }
@@ -316,7 +332,7 @@ export function ListItemCard({
         userId={avatar.userId || 'default'}
         userName={avatar.userName || title}
         imageUri={avatar.imageUri}
-        size={LIST_ITEM_CARD.avatar.size}
+        size={avatar.size ?? LIST_ITEM_CARD.avatar.size}
         borderRadius={avatar.borderRadius ?? LIST_ITEM_CARD.avatar.borderRadius}
       />
     );
@@ -341,10 +357,11 @@ export function ListItemCard({
               <Text style={[styles.statusPillText, { color: statusPill.color }]}>{statusPill.text}</Text>
             </View>
           )}
-          <Checkmark 
-            selected={selected} 
-            color={appTheme.colors.primary} 
+          <Checkmark
+            selected={selected}
+            color={appTheme.colors.primary}
             isOptionList={isOptionList && selected}
+            compact={compactCheckmark}
           />
         </View>
       );

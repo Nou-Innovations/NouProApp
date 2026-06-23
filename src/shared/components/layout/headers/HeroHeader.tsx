@@ -13,6 +13,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   interpolate,
+  interpolateColor,
   Extrapolation,
   type SharedValue,
 } from 'react-native-reanimated';
@@ -68,6 +69,30 @@ export default function HeroHeader({
     };
   }, [scrollY, start, end]);
 
+  // As the solid bar fades in, the controls shed their dark scrim and the icons
+  // cross-fade from `controlIconColor` (white) to the primary color. Without a
+  // scrollY the bar never appears, so the controls stay in the resting state.
+  const buttonBgStyle = useAnimatedStyle(() => {
+    if (!scrollY) return { backgroundColor: 'rgba(0,0,0,0.38)' };
+    return {
+      backgroundColor: interpolateColor(
+        scrollY.value,
+        [start, end],
+        ['rgba(0,0,0,0.38)', 'rgba(0,0,0,0)'],
+      ),
+    };
+  }, [scrollY, start, end]);
+
+  const restingIconStyle = useAnimatedStyle(() => {
+    if (!scrollY) return { opacity: 1 };
+    return { opacity: interpolate(scrollY.value, [start, end], [1, 0], Extrapolation.CLAMP) };
+  }, [scrollY, start, end]);
+
+  const solidIconStyle = useAnimatedStyle(() => {
+    if (!scrollY) return { opacity: 0 };
+    return { opacity: interpolate(scrollY.value, [start, end], [0, 1], Extrapolation.CLAMP) };
+  }, [scrollY, start, end]);
+
   const renderButton = (action: HeaderAction, key: string) => (
     <TouchableOpacity
       key={key}
@@ -79,7 +104,15 @@ export default function HeroHeader({
       accessibilityLabel={action.accessibilityLabel}
       accessibilityRole="button"
     >
-      <Icon name={action.icon} size={20} color={action.iconColor ?? controlIconColor} />
+      <Animated.View pointerEvents="none" style={[styles.buttonBg, buttonBgStyle]} />
+      {/* Resting (over image): white icon. Cross-fades out as the header solidifies. */}
+      <Animated.View pointerEvents="none" style={[styles.iconLayer, restingIconStyle]}>
+        <Icon name={action.icon} size={20} color={action.iconColor ?? controlIconColor} />
+      </Animated.View>
+      {/* Solid (white header): primary icon. Cross-fades in. */}
+      <Animated.View pointerEvents="none" style={[styles.iconLayer, solidIconStyle]}>
+        <Icon name={action.icon} size={20} color={appTheme.colors.primary} />
+      </Animated.View>
       {action.badge != null && action.badge > 0 ? (
         <View style={[styles.badge, { backgroundColor: appTheme.colors.accent }]}>
           <Text style={styles.badgeText}>{action.badge > 9 ? '9+' : action.badge}</Text>
@@ -178,10 +211,26 @@ const styles = StyleSheet.create({
   button: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.38)',
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  buttonBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 12,
+  },
+  iconLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonDisabled: {
     opacity: 0.4,

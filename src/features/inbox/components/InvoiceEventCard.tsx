@@ -28,6 +28,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import type { InvoiceMessage, EstimateMessage } from '@/shared/types/inbox';
 import { formatCurrency } from '../utils/orderEventMapper';
 import { formatMessageTimestamp } from '../inbox.format';
+import DoubleCheck, { SingleCheck } from './DoubleCheck';
 
 // ============================================================================
 // Types
@@ -196,13 +197,20 @@ export function InvoiceEventCard({ message, onPress, onConfirm }: InvoiceEventCa
 
   const renderTick = () => {
     if (!isOutgoing || !message.status) return null;
-    let name: string = 'checkmark';
+    if (message.status === 'sent' || message.status === 'delivered' || message.status === 'seen') {
+      const tickColor = message.status === 'seen' ? '#FF7A00' : colors.textMuted;
+      return (
+        <View style={{ marginLeft: 4 }}>
+          {message.status === 'sent'
+            ? <SingleCheck size={14} color={tickColor} />
+            : <DoubleCheck size={14} color={tickColor} />}
+        </View>
+      );
+    }
+    let name: string = 'time-outline';
     let color = colors.textMuted;
     switch (message.status) {
       case 'sending': name = 'time-outline'; break;
-      case 'sent': name = 'checkmark'; break;
-      case 'delivered': name = 'checkmark-done'; break;
-      case 'seen': name = 'checkmark-done'; color = '#FF7A00'; break;
       case 'failed': name = 'alert-circle-outline'; color = '#D6453E'; break;
     }
     return <Icon name={name} size={15} strokeWidth={2} color={color} style={{ marginLeft: 4 }} />;
@@ -333,7 +341,7 @@ export function InvoiceEventCard({ message, onPress, onConfirm }: InvoiceEventCa
 
 const styles = StyleSheet.create({
   card: {
-    width: 260,
+    width: 300,
     paddingHorizontal: 8,
     paddingTop: 12,
     paddingBottom: 4,

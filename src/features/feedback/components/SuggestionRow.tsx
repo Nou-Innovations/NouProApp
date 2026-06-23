@@ -83,8 +83,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   text: {
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 24,
   },
   votePill: {
     minWidth: 56,

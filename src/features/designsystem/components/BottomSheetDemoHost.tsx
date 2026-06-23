@@ -3,7 +3,7 @@
  * preview: the REAL AppBottomSheet / AppModal for canonical entries, or a faithful
  * Demo* reproduction (driven by the entry's attributes) for everything else.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import AppBottomSheet, { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
 import AppModal, { AppModalVariant } from '@/shared/components/ui/AppModal';
@@ -35,6 +35,13 @@ const BUTTON_ITEMS: AppBottomSheetItem[] = [
   { id: '3', title: 'Delete', variant: 'destructive' },
 ];
 
+const MULTI_ITEMS: AppBottomSheetItem[] = [
+  { id: '1', title: 'In stock', subtitle: 'Show available products', avatar: { type: 'icon', icon: 'cube-outline' } },
+  { id: '2', title: 'On promotion', subtitle: 'Discounted items', avatar: { type: 'icon', icon: 'pricetag-outline' } },
+  { id: '3', title: 'New arrivals', avatar: { type: 'icon', icon: 'sparkles-outline' } },
+  { id: '4', title: 'Featured', avatar: { type: 'icon', icon: 'star-outline' } },
+];
+
 const FULL_ITEMS: AppBottomSheetItem[] = Array.from({ length: 12 }, (_, i) => ({
   id: String(i + 1),
   title: `List item ${i + 1}`,
@@ -53,7 +60,24 @@ export default function BottomSheetDemoHost({ entry, visible, onClose }: BottomS
   const { theme } = useTheme();
   const { kind, variant } = entry.demo;
 
+  // Local selection state for the multi-select (checkbox) demo.
+  const [selectedIds, setSelectedIds] = useState<string[]>(['2']);
+
   if (kind === 'app-bottomsheet') {
+    if (variant === 'multiSelect') {
+      return (
+        <AppBottomSheet
+          visible={visible}
+          onClose={onClose}
+          title={entry.name}
+          items={MULTI_ITEMS}
+          mode="list"
+          multiSelect
+          selectedItemIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+        />
+      );
+    }
     if (variant === 'buttons') {
       return (
         <AppBottomSheet

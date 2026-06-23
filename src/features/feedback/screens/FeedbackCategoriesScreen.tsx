@@ -102,7 +102,7 @@ export default function FeedbackCategoriesScreen() {
       <View style={styles.hero}>
         <SectionTitle style={styles.heroTitle}>Your feedback shapes NouPro</SectionTitle>
         <Text style={[styles.heroSubtitle, { color: appTheme.colors.textSecondary }]}>
-          In French or English — add ideas and upvote what matters most to you.
+          In French or English, add ideas and vote what matters most to you.
         </Text>
       </View>
       <ExploreChips
@@ -204,11 +204,12 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   heroTitle: {
-    marginBottom: 6,
+    marginBottom: 4,
   },
   heroSubtitle: {
     fontSize: 14,
     lineHeight: 20,
+    marginBottom: 4,
   },
   sortRow: {
     flexDirection: 'row',

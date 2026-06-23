@@ -26,6 +26,8 @@ import { AppButton, ButtonRow } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import type { OrderEventMessage, OrderEventStatus } from '@/shared/types/inbox';
 import { formatCurrency } from '../utils/orderEventMapper';
+import { formatMessageTimestamp } from '../inbox.format';
+import DoubleCheck, { SingleCheck } from './DoubleCheck';
 
 // ============================================================================
 // Types
@@ -266,7 +268,29 @@ export function OrderEventCard({
   };
   
   const handleCardPress = () => onOrderPress?.(payload.orderId);
-  
+
+  // Bottom timestamp + delivery-status tick (same as InvoiceEventCard).
+  const renderTick = () => {
+    if (!message.isOutgoing || !message.status) return null;
+    if (message.status === 'sent' || message.status === 'delivered' || message.status === 'seen') {
+      const tickColor = message.status === 'seen' ? '#FF7A00' : colors.textMuted;
+      return (
+        <View style={{ marginLeft: 4 }}>
+          {message.status === 'sent'
+            ? <SingleCheck size={14} color={tickColor} />
+            : <DoubleCheck size={14} color={tickColor} />}
+        </View>
+      );
+    }
+    let name = 'time-outline';
+    let color = colors.textMuted;
+    switch (message.status) {
+      case 'sending': name = 'time-outline'; break;
+      case 'failed': name = 'alert-circle-outline'; color = '#D6453E'; break;
+    }
+    return <Icon name={name} size={15} strokeWidth={2} color={color} style={{ marginLeft: 4 }} />;
+  };
+
   // Helper: generate proportional timestamps between createdAt and now
   const proportionalDate = (index: number, total: number): string => {
     const start = new Date(payload.createdAt).getTime();
@@ -503,13 +527,21 @@ export function OrderEventCard({
             onPress={() => onDeclineOrder?.(payload.orderId)}
           />
           <AppButton
-            title="Confirm order"
+            title="Confirm"
             variant="primary"
             size="small"
             onPress={() => onConfirmOrder?.(payload.orderId)}
           />
         </ButtonRow>
       )}
+
+      {/* === TIMESTAMP (below buttons, like invoice/estimate) === */}
+      <View style={styles.footer}>
+        <Text style={[styles.footerTime, { color: colors.textMuted }]}>
+          {formatMessageTimestamp(message.timestamp)}
+        </Text>
+        {renderTick()}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -520,7 +552,7 @@ export function OrderEventCard({
 
 const styles = StyleSheet.create({
   card: {
-    width: 260,
+    width: 300,
     paddingHorizontal: 8,
     paddingTop: 12,
     paddingBottom: 4,
@@ -671,6 +703,18 @@ const styles = StyleSheet.create({
   actionButtons: {
     marginTop: 8,
     paddingBottom: 4,
+  },
+  // Bottom timestamp
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 4,
+    paddingTop: 6,
+    paddingBottom: 2,
+  },
+  footerTime: {
+    fontSize: 12,
   },
 });
 

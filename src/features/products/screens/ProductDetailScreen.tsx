@@ -26,6 +26,7 @@ import {
   StyleSheet,
   ScrollView,
   Image,
+  TextInput,
   TouchableOpacity,
   Dimensions,
   Share,
@@ -43,7 +44,8 @@ import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from 'App';
 import { Icon } from '@/shared/utils/icons';
-import { AppButton, TextButton } from '@/shared/components/ui';
+import { AppButton, TextButton, AppBottomSheet } from '@/shared/components/ui';
+import type { AppBottomSheetItem } from '@/shared/components/ui/AppBottomSheet';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -259,7 +261,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [error, setError] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
 
   // Order flow state (buyer mode)
   const [isOrdering, setIsOrdering] = useState(false);
@@ -442,8 +444,19 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
-  const handleSave = () => {
-    setIsSaved(!isSaved);
+  const handleReport = () => {
+    Alert.alert(
+      'Report product',
+      'Thanks for flagging this. Our team will review it.',
+      [{ text: 'OK' }]
+    );
+  };
+
+  // Options menu (⋯ beside the name): Share + Edit for the owner, Share + Report otherwise.
+  const handleMenuSelect = (item: AppBottomSheetItem) => {
+    if (item.id === 'share') handleShare();
+    else if (item.id === 'edit') handleEdit();
+    else if (item.id === 'report') handleReport();
   };
 
   const handleBusinessPress = () => {
@@ -592,15 +605,17 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     setQuantity(1);
   };
 
-  const adjustQuantity = (delta: number) => {
-    const moq = dto?.availability.moq || 1;
+  const handleQuantityChange = (text: string) => {
+    const digits = text.replace(/[^0-9]/g, '');
     const maxQty = dto?.availability.maxOrderQuantity || 99;
-    let newQuantity = quantity + delta;
-
-    if (newQuantity < moq) newQuantity = moq;
-    if (newQuantity > maxQty) newQuantity = maxQty;
-
-    setQuantity(newQuantity);
+    if (digits === '') {
+      setQuantity(1);
+      return;
+    }
+    let n = parseInt(digits, 10);
+    if (n < 1) n = 1;
+    if (n > maxQty) n = maxQty;
+    setQuantity(n);
   };
 
   // Related product tap
@@ -653,8 +668,14 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const showOwnerDetails = isProductOwner;
   const showActionBar = isBusinessMode;
   const showSellerCard = showRelatedProducts && !!seller.companyName;
-  const showSave = isPersonalMode || canOrder;
   const hasCartonInfo = !!(product.hasCarton && pricing.unitsPerCarton && !pricing.priceHidden);
+  // Options menu (⋯ beside the name): owner gets Edit; everyone else gets Report.
+  const menuItems: AppBottomSheetItem[] = [
+    { id: 'share', title: 'Share' },
+    isProductOwner
+      ? { id: 'edit', title: 'Edit' }
+      : { id: 'report', title: 'Report' },
+  ];
   const statusBarStyle = isDarkMode ? 'light' : headerSolid ? 'dark' : 'light';
 
   return (
@@ -709,8 +730,18 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </TouchableOpacity>
           )}
 
-          {/* Product name */}
-          <Text style={[styles.name, { color: appTheme.colors.text }]}>{product.name}</Text>
+          {/* Product name + options (⋯) menu */}
+          <View style={styles.nameRow}>
+            <Text style={[styles.name, { color: appTheme.colors.text }]}>{product.name}</Text>
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() => setMenuVisible(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="More options"
+            >
+              <Icon name="ellipsis-horizontal" size={22} color={appTheme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
 
           {/* Price */}
           <PriceBlock pricing={pricing} />
@@ -846,17 +877,11 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         scrollY={scrollY}
         heroHeight={IMAGE_HEIGHT}
         leftAction={{ icon: 'arrow-back', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }}
-        rightActions={[
-          ...(showSave
-            ? [{ icon: isSaved ? 'bookmark' : 'bookmark-outline', onPress: handleSave, accessibilityLabel: 'Save' }]
-            : []),
-          { icon: 'share-outline', onPress: handleShare, accessibilityLabel: 'Share' },
-        ]}
       />
 
       {/* Bottom Action Bar - BUSINESS MODE ONLY (Personal mode = browse only) */}
       {showActionBar && (
-        <View style={[styles.bottomBar, { backgroundColor: appTheme.colors.cardBackground, borderTopColor: appTheme.colors.borderColor }]}>
+        <View style={[styles.bottomBar, { backgroundColor: appTheme.colors.cardBackground, borderTopColor: appTheme.colors.borderColor }, isOrdering && styles.bottomBarOrdering]}>
           {isProductOwner ? (
             /* Business Owner Mode: Edit + Reorder buttons */
             <View style={styles.ownerButtonsRow}>
@@ -880,27 +905,26 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           ) : isOrdering ? (
             /* Business Buyer Mode: Order flow expanded */
             <View style={styles.orderFlowContainer}>
-              {/* Quantity selector */}
-              <View style={styles.quantityRow}>
-                <TouchableOpacity
-                  style={[styles.quantityButton, { backgroundColor: appTheme.colors.surface }]}
-                  onPress={() => adjustQuantity(-1)}
-                >
-                  <Icon name="remove" size={20} color={appTheme.colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.quantityText, { color: appTheme.colors.text }]}>{quantity}</Text>
-                <TouchableOpacity
-                  style={[styles.quantityButton, { backgroundColor: appTheme.colors.surface }]}
-                  onPress={() => adjustQuantity(1)}
-                >
-                  <Icon name="add" size={20} color={appTheme.colors.text} />
-                </TouchableOpacity>
+              {/* Quantity field */}
+              <View style={[styles.qtyField, { borderColor: appTheme.colors.borderColor }]}>
+                <Text style={[styles.qtyLabel, { color: appTheme.colors.textSecondary }]}>Quantity</Text>
+                <TextInput
+                  style={[styles.qtyInput, { color: appTheme.colors.text }]}
+                  value={String(quantity)}
+                  onChangeText={handleQuantityChange}
+                  keyboardType="number-pad"
+                  selectTextOnFocus
+                  returnKeyType="done"
+                />
               </View>
 
-              {/* Total amount */}
-              <Text style={[styles.totalAmount, { color: appTheme.colors.text }]}>
-                {formatPrice(totalPrice, pricing.currency)}
-              </Text>
+              {/* Total */}
+              <View style={styles.totalRow}>
+                <Text style={[styles.totalLabel, { color: appTheme.colors.textSecondary }]}>Total</Text>
+                <Text style={[styles.totalValue, { color: appTheme.colors.text }]}>
+                  {formatPrice(totalPrice, pricing.currency)}
+                </Text>
+              </View>
 
               {/* Add to cart + Remove */}
               <View style={styles.orderButtonsContainer}>

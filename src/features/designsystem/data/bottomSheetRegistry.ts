@@ -153,6 +153,16 @@ export const GALLERY_ENTRIES: GalleryEntry[] = [
     demo: { kind: 'app-bottomsheet', variant: 'fullHeight' },
   },
   {
+    id: 'canon-appbs-multiselect',
+    name: 'AppBottomSheet · Multi-select (checkboxes)',
+    source: 'shared/components/ui/AppBottomSheet.tsx',
+    category: 'Canonical',
+    attributes: CANONICAL_SHEET,
+    recommendation: 'canonical',
+    note: 'Choose one or more options with a checkbox per row (empty box → filled check). Toggling a row does NOT close the sheet; dismiss to confirm the selection.',
+    demo: { kind: 'app-bottomsheet', variant: 'multiSelect' },
+  },
+  {
     id: 'canon-appmodal-default',
     name: 'AppModal · Default',
     source: 'shared/components/ui/AppModal.tsx',

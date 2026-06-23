@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DoubleCheck, { SingleCheck } from './DoubleCheck';
 import theme from '@/shared/theme';
 import { Text } from '@/shared/components/ui/Typography';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -211,11 +211,11 @@ function MessageCard({
       case 'sending':
         return <Icon name="time-outline" size={18} color={iconColor} />;
       case 'sent':
-        return <Icon name="checkmark" size={18} color={iconMuted} />;
+        return <SingleCheck size={16} color={iconMuted} />;
       case 'delivered':
-        return <MaterialCommunityIcons name="check-all" size={18} color={iconColor} />;
+        return <DoubleCheck size={16} color={iconMuted} />;
       case 'seen':
-        return <MaterialCommunityIcons name="check-all" size={18} color={redColor} />;
+        return <DoubleCheck size={16} color={redColor} />;
       case 'failed':
         return <Icon name="alert-circle" size={16} color={errorColor} />;
       default:
