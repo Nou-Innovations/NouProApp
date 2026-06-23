@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, View, Text, TouchableOpacity, ScrollView, Dimensions, PanResponder } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState, useCallback, createContext, useContext } from 'react';
+import { Animated, Modal, Pressable, StyleSheet, View, Text, TouchableOpacity, ScrollView, FlatList, Dimensions, PanResponder } from 'react-native';
+import type { NativeScrollEvent, NativeSyntheticEvent, ScrollViewProps, FlatListProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -9,6 +10,48 @@ import AppButton from './AppButton';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const ANIMATION_DURATION = 300;
+// Fixed bottom padding for every sheet (replaces the device safe-area inset). Single source of
+// truth — fullHeight children that set their own content paddingBottom should import this.
+export const SHEET_BOTTOM_PADDING = 32;
+
+// Lets children-mode sheets that render their OWN ScrollView/FlatList report their scroll
+// offset to the sheet's swipe-to-close pan (which only closes when the list is at the top).
+type SheetScrollProps = {
+  onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  scrollEventThrottle?: number;
+};
+const AppBottomSheetScrollContext = createContext<SheetScrollProps | null>(null);
+
+/**
+ * Drop-in replacement for `ScrollView` inside an AppBottomSheet (children mode). It reports
+ * its scroll offset to the sheet so swipe-down-to-close engages once it's scrolled to the top.
+ * Defaults to `bounces={false}` (required for the gesture to win at the top). Outside a sheet
+ * it behaves like a normal ScrollView.
+ */
+export function AppBottomSheetScrollView({ onScroll, ...rest }: ScrollViewProps) {
+  const ctx = useContext(AppBottomSheetScrollContext);
+  return (
+    <ScrollView
+      bounces={false}
+      scrollEventThrottle={16}
+      {...rest}
+      onScroll={(e) => { ctx?.onScroll?.(e); onScroll?.(e); }}
+    />
+  );
+}
+
+/** FlatList counterpart of {@link AppBottomSheetScrollView}. */
+export function AppBottomSheetFlatList<ItemT>({ onScroll, ...rest }: FlatListProps<ItemT>) {
+  const ctx = useContext(AppBottomSheetScrollContext);
+  return (
+    <FlatList<ItemT>
+      bounces={false}
+      scrollEventThrottle={16}
+      {...rest}
+      onScroll={(e) => { ctx?.onScroll?.(e); onScroll?.(e); }}
+    />
+  );
+}
 
 // ============================================================================
 // TYPES
@@ -92,10 +135,20 @@ export default function AppBottomSheet({
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const isClosing = useRef(false);
   const dragY = useRef(0);
-  // Current vertical scroll offset of the internal items-mode ScrollView. The
-  // swipe-to-close pan only engages when this is at the top (<= 0), so a long list
-  // scrolls normally and only closes the sheet once scrolled back to the top.
+  // Current vertical scroll offset of the sheet's list. The swipe-to-close pan only
+  // engages when this is at the top (<= 0), so a long list scrolls normally and only
+  // closes the sheet once scrolled back to the top. Written by the internal items-mode
+  // ScrollView and (in children mode) by any child AppBottomSheetScrollView/FlatList.
   const scrollOffsetY = useRef(0);
+
+  // Scroll props handed to children-mode scrollables through context.
+  const childScrollProps = useMemo<SheetScrollProps>(
+    () => ({
+      scrollEventThrottle: 16,
+      onScroll: (e) => { scrollOffsetY.current = e.nativeEvent.contentOffset.y; },
+    }),
+    []
+  );
 
   // Calculate max height for the sheet (screen height - top safe area - some margin from top)
   const maxSheetHeight = SCREEN_HEIGHT - insets.top - 20; // 20px margin from status bar
@@ -261,7 +314,7 @@ export default function AppBottomSheet({
         title={item.title}
         onPress={() => handleItemPress(item)}
         disabled={item.disabled}
-        variant={isDestructive ? 'danger' : 'outline'}
+        variant={isDestructive ? 'alert' : 'outline'}
       />
     );
   };
@@ -304,7 +357,7 @@ export default function AppBottomSheet({
               transform: [{ translateY }],
               maxHeight: maxSheetHeight,
               // Don't add bottom padding when fullHeight - content handles its own scrolling
-              paddingBottom: fullHeight ? 0 : insets.bottom,
+              paddingBottom: fullHeight ? 0 : SHEET_BOTTOM_PADDING,
               // When fullHeight is true, force the sheet to take full available height
               ...(fullHeight && { height: maxSheetHeight }),
             },
@@ -342,19 +395,22 @@ export default function AppBottomSheet({
               contentContainerStyle={[
                 styles.contentContainer, 
                 fullHeight && styles.contentContainerFullHeight,
-                fullHeight && { paddingBottom: insets.bottom + 20 }
+                fullHeight && { paddingBottom: SHEET_BOTTOM_PADDING }
               ]}
             >
               {renderListContent()}
             </ScrollView>
           ) : (
-            // Children mode: children manage their own scrolling
-            <View style={[
-              styles.content, 
-              fullHeight && styles.contentFullHeight,
-            ]}>
-              {children}
-            </View>
+            // Children mode: children manage their own scrolling. The context lets a child
+            // AppBottomSheetScrollView/FlatList report its offset so swipe-to-close works.
+            <AppBottomSheetScrollContext.Provider value={childScrollProps}>
+              <View style={[
+                styles.content,
+                fullHeight && styles.contentFullHeight,
+              ]}>
+                {children}
+              </View>
+            </AppBottomSheetScrollContext.Provider>
           )}
         </Animated.View>
       </Animated.View>

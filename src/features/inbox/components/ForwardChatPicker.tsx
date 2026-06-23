@@ -6,8 +6,8 @@
  */
 
 import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
-import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import { View, Text, StyleSheet } from 'react-native';
+import AppBottomSheet, { AppBottomSheetFlatList } from '@/shared/components/ui/AppBottomSheet';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import { ListItemCard } from '@/shared/components/ui/ListItemCard';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -44,7 +44,7 @@ export default function ForwardChatPicker({ visible, onClose, onSelect }: Forwar
           onClear={() => setSearch('')}
           containerStyle={{ marginHorizontal: 0, marginBottom: 8 }}
         />
-        <FlatList
+        <AppBottomSheetFlatList<Chat>
           data={filteredChats}
           keyExtractor={(item) => item.id}
           style={styles.list}

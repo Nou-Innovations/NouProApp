@@ -135,6 +135,7 @@ import RouteDetailScreen from '@/features/routes/screens/RouteDetailScreen';
 import TransferDetailScreen from '@/features/transfers/screens/TransferDetailScreen';
 
 // Screens - Personal (from modes)
+import PersonalProfileScreen from '@/modes/personal/screens/PersonalProfileScreen';
 import EditPersonalProfileScreen from '@/modes/personal/screens/EditPersonalProfileScreen';
 import AddWorkExperienceScreen from '@/modes/personal/screens/AddWorkExperienceScreen';
 import EditWorkExperienceScreen from '@/modes/personal/screens/EditWorkExperienceScreen';
@@ -435,6 +436,8 @@ function AppNavigator() {
         {/* Profile Screens */}
         <RootStack.Screen name="ViewBusinessProfile" component={BusinessProfileScreen} />
         <RootStack.Screen name="ViewUserProfile" component={UserProfileScreen} />
+        {/* Own personal profile, reachable as a standalone push (the tab version lives in PersonalTabNavigator) */}
+        <RootStack.Screen name="MyProfile" component={PersonalProfileScreen} />
         <RootStack.Screen name="EditPersonalProfile" component={EditPersonalProfileScreen} />
         <RootStack.Screen name="AddWorkExperience" component={AddWorkExperienceScreen} />
         <RootStack.Screen name="EditWorkExperience" component={EditWorkExperienceScreen} />

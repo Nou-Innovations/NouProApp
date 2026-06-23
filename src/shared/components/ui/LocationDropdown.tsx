@@ -3,13 +3,13 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { AppBottomSheet, ListItemCard } from '@/shared/components/ui';
+import { AppBottomSheetScrollView } from './AppBottomSheet';
 
 interface LocationDropdownProps {
   onLocationSelect?: (locationId: string | null) => void;
@@ -150,7 +150,7 @@ export default function LocationDropdown({
         onClose={() => setIsOpen(false)}
         title="Locations"
       >
-        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+        <AppBottomSheetScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
           {locationItems.map((item, index) => {
             const isSelected = selectedLocationId === item.id || 
               (!selectedLocationId && item.id === null);
@@ -178,7 +178,7 @@ export default function LocationDropdown({
               </Text>
             </View>
           )}
-        </ScrollView>
+        </AppBottomSheetScrollView>
       </AppBottomSheet>
     </>
   );

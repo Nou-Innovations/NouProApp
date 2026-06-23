@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, ReactNode } from 'react';
-import { View, StyleSheet, Text, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, StyleSheet, Text, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import AppBottomSheet, { AppBottomSheetScrollView, SHEET_BOTTOM_PADDING } from '@/shared/components/ui/AppBottomSheet';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import AppButton from '@/shared/components/ui/AppButton';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -111,7 +110,6 @@ export default function NewChatModalList({
 }: NewChatModalListProps) {
   const { theme: appTheme } = useTheme();
   const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [members, setMembers] = useState<CompanyMember[]>([]);
@@ -460,6 +458,7 @@ export default function NewChatModalList({
       visible={visible}
       onClose={onClose}
       title={modalTitle}
+      fullHeight
     >
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -473,10 +472,9 @@ export default function NewChatModalList({
       </View>
 
       {/* Scrollable Content: Action Items + Contact List */}
-      <ScrollView
+      <AppBottomSheetScrollView
         style={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        bounces={false}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -531,10 +529,10 @@ export default function NewChatModalList({
             testID="empty-new-chat-list"
           />
         )}
-      </ScrollView>
+      </AppBottomSheetScrollView>
 
-      {/* Fixed Bottom Button */}
-      <View style={[styles.bottomButtonContainer, { paddingBottom: insets.bottom || 16, borderTopColor: appTheme.colors.surface }]}>
+      {/* Fixed Bottom Button (fullHeight sheet zeroes its own padding, so add it here) */}
+      <View style={[styles.bottomButtonContainer, { borderTopColor: appTheme.colors.surface, paddingBottom: SHEET_BOTTOM_PADDING }]}>
         <AppButton
           title={buttonText}
           onPress={handleStartConversation}
@@ -557,7 +555,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   listContainer: {
-    maxHeight: 450,
+    flex: 1,
   },
   scrollContent: {
     paddingBottom: 4,

@@ -34,6 +34,7 @@ function getRepos() {
     brandRepo: require('./prisma/brandRepo.prisma'),
     transportRepo: require('./prisma/transportRepo.prisma'),
     connectionRepo: require('./prisma/connectionRepo.prisma'),
+    blockRepo: require('./prisma/blockRepo.prisma'),
     pushTokenRepo: require('./prisma/pushTokenRepo.prisma'),
     notificationPreferenceRepo: require('./prisma/notificationPreferenceRepo.prisma'),
     deliveryStaffRepo: require('./prisma/deliveryStaffRepo.prisma'),

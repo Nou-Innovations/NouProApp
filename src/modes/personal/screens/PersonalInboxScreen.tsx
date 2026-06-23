@@ -93,6 +93,7 @@ export default function PersonalInboxScreen() {
   // Profile store for role checks
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const isAdmin = useProfileStore((state) => state.isAdmin);
+  const currentUserId = useProfileStore((state) => state.currentUser?.id);
 
   // Update the inbox unread count when data changes
   useEffect(() => {
@@ -135,12 +136,18 @@ export default function PersonalInboxScreen() {
     // Determine partner type
     const partnerType = 'user';
 
+    // Derive partnerId as the OTHER participant (not the chat id, not yourself), so tapping
+    // the chat header opens that person's profile. Falls back to chat.id only if unknown.
+    const partnerId = Array.isArray(chat.participants)
+      ? chat.participants.find((p: string) => p !== currentUserId) || chat.id
+      : chat.id;
+
     (navigation as any).navigate('Chat', {
       id: chat.id,
       name: chat.name,
       isGroup: isGroupChat,
       avatar: chat.avatar,
-      partnerId: chat.id,
+      partnerId,
       partnerType,
       unreadCount: chat.unreadCount || 0,
     });

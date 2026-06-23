@@ -2756,6 +2756,11 @@ app.post('/api/connections/request', requireAuth, async (req, res) => {
       return res.status(404).json(errorResponse('User not found'));
     }
 
+    // Refuse if either side has blocked the other.
+    if (await repos.blockRepo.isBlocked(req.user.id, receiverId)) {
+      return res.status(403).json(errorResponse('You cannot connect with this user'));
+    }
+
     // Check for existing connection
     const existing = await repos.connectionRepo.findExisting(req.user.id, receiverId);
     if (existing) {
@@ -2845,16 +2850,23 @@ app.delete('/api/connections/:id', requireAuth, async (req, res) => {
 app.get('/api/connections', requireAuth, async (req, res) => {
   try {
     const connections = await repos.connectionRepo.listByUserId(req.user.id, 'accepted');
+    // Hide any connection with a blocked user (either direction) as a safety net.
+    const blockedIds = new Set(await repos.blockRepo.getBlockedIds(req.user.id));
     // Map to return the other user in each connection
-    const result = connections.map(conn => {
-      const otherUser = conn.senderId === req.user.id ? conn.receiver : conn.sender;
-      const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = otherUser;
-      return {
-        connectionId: conn.id,
-        user: safeUser,
-        connectedAt: conn.updatedAt,
-      };
-    });
+    const result = connections
+      .filter(conn => {
+        const otherId = conn.senderId === req.user.id ? conn.receiverId : conn.senderId;
+        return !blockedIds.has(otherId);
+      })
+      .map(conn => {
+        const otherUser = conn.senderId === req.user.id ? conn.receiver : conn.sender;
+        const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = otherUser;
+        return {
+          connectionId: conn.id,
+          user: safeUser,
+          connectedAt: conn.updatedAt,
+        };
+      });
     res.json(successResponse(result));
   } catch (err) {
     logger.error('[ConnectionsList] Error:', err);
@@ -2878,6 +2890,119 @@ app.get('/api/connections/pending', requireAuth, async (req, res) => {
   } catch (err) {
     logger.error('[ConnectionsPending] Error:', err);
     res.status(500).json(errorResponse('Failed to list pending connections'));
+  }
+});
+
+// ============================================================================
+// REPORTS (generic content moderation for users & businesses;
+// products keep their own /api/products/:productId/report route)
+// ============================================================================
+const REPORT_REASONS = ['inappropriate', 'spam', 'harassment', 'impersonation', 'scam', 'other'];
+const REPORTABLE_TYPES = ['user', 'business'];
+
+app.post('/api/reports', requireAuth, suggestionLimiter, async (req, res) => {
+  try {
+    const { targetType, targetId, reason, details } = req.body || {};
+
+    if (!REPORTABLE_TYPES.includes(targetType)) {
+      return res.status(400).json(errorResponse('A valid targetType is required'));
+    }
+    if (!targetId) {
+      return res.status(400).json(errorResponse('targetId is required'));
+    }
+    if (!reason || !REPORT_REASONS.includes(reason)) {
+      return res.status(400).json(errorResponse('A valid reason is required'));
+    }
+
+    // Verify the target exists and prevent self-reporting.
+    if (targetType === 'user') {
+      if (targetId === req.user.id) {
+        return res.status(400).json(errorResponse('You cannot report yourself'));
+      }
+      const target = await repos.userRepo.getById(targetId);
+      if (!target) return res.status(404).json(errorResponse('User not found'));
+    } else {
+      const target = await repos.businessRepo.getById(targetId);
+      if (!target) return res.status(404).json(errorResponse('Business not found'));
+    }
+
+    const report = await prisma.report.create({
+      data: {
+        id: uuidv4(),
+        targetType,
+        targetId,
+        reason,
+        details: details ? String(details).slice(0, 1000) : null,
+        reportedByUserId: req.user?.id || null,
+        status: 'open',
+      },
+    });
+
+    logger.info('[report] entity reported', { targetType, targetId, reason, by: req.user?.id });
+    res.status(201).json(successResponse({ id: report.id }, 'Report submitted'));
+  } catch (e) {
+    logger.error('Error submitting report:', e);
+    res.status(500).json(errorResponse('Failed to submit report'));
+  }
+});
+
+// ============================================================================
+// USER BLOCKS (a block in either direction is treated as mutual — see blockRepo.isBlocked)
+// ============================================================================
+
+// Block a user. Also removes any connection between the two so they drop off each
+// other's connection lists; chat lists hide their 1:1 thread (see chat endpoints).
+app.post('/api/users/:userId/block', requireAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (userId === req.user.id) {
+      return res.status(400).json(errorResponse('You cannot block yourself'));
+    }
+    const target = await repos.userRepo.getById(userId);
+    if (!target) {
+      return res.status(404).json(errorResponse('User not found'));
+    }
+
+    await repos.blockRepo.blockUser(req.user.id, userId);
+
+    // Remove any existing connection (pending or accepted) between the two.
+    const existing = await repos.connectionRepo.findExisting(req.user.id, userId);
+    if (existing) {
+      await repos.connectionRepo.removeConnection(existing.id);
+    }
+
+    res.status(201).json(successResponse(null, 'User blocked'));
+  } catch (err) {
+    logger.error('[BlockUser] Error:', err);
+    res.status(500).json(errorResponse('Failed to block user'));
+  }
+});
+
+// Unblock a user
+app.delete('/api/users/:userId/block', requireAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    await repos.blockRepo.unblockUser(req.user.id, userId);
+    res.json(successResponse(null, 'User unblocked'));
+  } catch (err) {
+    logger.error('[UnblockUser] Error:', err);
+    res.status(500).json(errorResponse('Failed to unblock user'));
+  }
+});
+
+// List users the current user has blocked. (Path is /api/blocks to avoid colliding
+// with the /api/users/:userId param route.)
+app.get('/api/blocks', requireAuth, async (req, res) => {
+  try {
+    const blocks = await repos.blockRepo.listBlocked(req.user.id);
+    const result = blocks.map((b) => {
+      const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = b.blocked;
+      return { blockedAt: b.createdAt, user: safeUser };
+    });
+    res.json(successResponse(result));
+  } catch (err) {
+    logger.error('[BlocksList] Error:', err);
+    res.status(500).json(errorResponse('Failed to list blocked users'));
   }
 });
 
@@ -9737,10 +9862,20 @@ app.get('/api/users/:userId/chats', requireAuth, async (req, res) => {
 
     if (search) {
       const searchLower = search.toLowerCase();
-      userChats = userChats.filter(c => 
+      userChats = userChats.filter(c =>
         (c.name || '').toLowerCase().includes(searchLower) ||
         (c.lastMessage && (c.lastMessage.content || '').toLowerCase().includes(searchLower))
       );
+    }
+
+    // Hide 1:1 chats with blocked users (either direction).
+    const blockedIds = new Set(await repos.blockRepo.getBlockedIds(userId));
+    if (blockedIds.size > 0) {
+      userChats = userChats.filter(c => {
+        if (c.type !== 'direct' || !Array.isArray(c.participants)) return true;
+        const other = c.participants.find(p => p !== userId);
+        return !(other && blockedIds.has(other));
+      });
     }
 
     // Sort by updatedAt (most recent first)
@@ -9787,6 +9922,13 @@ app.post('/api/users/:userId/chats', requireAuth, chatCreationLimiter, async (re
     const allParticipants = Array.isArray(participants) ? [...participants] : [];
     if (!allParticipants.includes(userId)) {
       allParticipants.push(userId);
+    }
+
+    // Block enforcement: can't start a chat with someone blocked (either direction).
+    for (const other of allParticipants.filter(p => p !== userId)) {
+      if (await repos.blockRepo.isBlocked(userId, other)) {
+        return res.status(403).json(errorResponse('You cannot start a chat with this user'));
+      }
     }
 
     const newChat = await repos.chatRepo.create({
@@ -9926,6 +10068,14 @@ app.post('/api/users/:userId/chats/:chatId/messages', requireAuth, messageLimite
     const isParticipant = Array.isArray(chat.participants) && chat.participants.includes(userId);
     if (!isParticipant) {
       return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    // Block enforcement: refuse to message into a 1:1 chat with a blocked user (either direction).
+    if (chat.type === 'direct' && Array.isArray(chat.participants)) {
+      const other = chat.participants.find(p => p !== userId);
+      if (other && await repos.blockRepo.isBlocked(userId, other)) {
+        return res.status(403).json(errorResponse('You cannot message this user'));
+      }
     }
 
     // Create message

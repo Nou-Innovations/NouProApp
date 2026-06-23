@@ -66,7 +66,7 @@ const ProductDetailSkeleton: React.FC<Props> = ({ onBack }) => {
           onPress={onBack}
           activeOpacity={0.8}
         >
-          <Icon name="arrow-back" size={22} color="#FFFFFF" />
+          <Icon name="arrow-back" size={20} color="#FFFFFF" />
         </TouchableOpacity>
       )}
 
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     left: 16,
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 12,
     backgroundColor: 'rgba(0,0,0,0.38)',
     justifyContent: 'center',
     alignItems: 'center',

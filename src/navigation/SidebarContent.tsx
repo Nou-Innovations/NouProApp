@@ -170,7 +170,8 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     if (activeMode === 'business' && activeBusiness) {
       go('ViewBusinessProfile', { businessId: activeBusiness.id });
     } else {
-      go('ViewUserProfile', { userId: currentUser.id });
+      // Own personal profile — open the dedicated screen, not the other-user viewer.
+      go('MyProfile');
     }
   };
 

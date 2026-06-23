@@ -22,7 +22,7 @@ import {
   Easing,
 } from 'react-native';
 import AppTextField from '@/shared/components/ui/AppTextField';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 
@@ -39,7 +39,7 @@ import { getTransports } from '@/features/transports/transports.service';
 import type { Transport, VehicleType, VehicleStatus } from '@/shared/types/transport';
 import { getVehicleIcon, getVehicleStatusLabel, VEHICLE_STATUS_COLORS } from '@/shared/types/transport';
 import { formatCurrency } from '@/shared/utils/format';
-import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, TimeSelector, ListItemCard, AppButton, ButtonRow } from '@/shared/components/ui';
+import { AppModal, AppBottomSheet, AppBottomSheetScrollView, SHEET_BOTTOM_PADDING, AppSearchBar, DateSelector, TimeSelector, ListItemCard, AppButton, ButtonRow } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { canUseAdvancedPermissions , checkPaywall, PaywallCheck } from '@/shared/utils/permissions';
 import { createDelivery } from '@/features/deliveries/deliveries.service';
@@ -91,7 +91,6 @@ export default function CreateDeliveryScreen() {
   const navigation = useNavigation();
   const route = useRoute<CreateDeliveryRouteProp>();
   const { theme: appTheme } = useTheme();
-  const insets = useSafeAreaInsets();
   
   // Get mode from route params
   const mode = route.params?.mode || 'delivery';
@@ -685,7 +684,7 @@ export default function CreateDeliveryScreen() {
             onClear={() => setClientSearch('')}
             containerStyle={styles.searchBarContainer}
           />
-          <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
+          <AppBottomSheetScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
             {filteredClients.map((item, index) => (
               <ListItemCard
                 key={item.id}
@@ -714,7 +713,7 @@ export default function CreateDeliveryScreen() {
                 </Text>
               </View>
             )}
-          </ScrollView>
+          </AppBottomSheetScrollView>
         </View>
       </AppBottomSheet>
 
@@ -725,7 +724,7 @@ export default function CreateDeliveryScreen() {
         title="Select Destination"
       >
         <View style={styles.bottomSheetContent}>
-          <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
+          <AppBottomSheetScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
             {safeLocations.filter(loc => loc.id !== currentLocation?.id).map((item, index, arr) => (
               <ListItemCard
                 key={item.id}
@@ -754,7 +753,7 @@ export default function CreateDeliveryScreen() {
                 </Text>
               </View>
             )}
-          </ScrollView>
+          </AppBottomSheetScrollView>
         </View>
       </AppBottomSheet>
 
@@ -800,11 +799,11 @@ export default function CreateDeliveryScreen() {
             containerStyle={styles.searchBarContainer}
           />
           
-          <ScrollView 
-            style={styles.modalScrollListFullHeight} 
+          <AppBottomSheetScrollView
+            style={styles.modalScrollListFullHeight}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingBottom: insets.bottom }}
+            contentContainerStyle={{ paddingBottom: SHEET_BOTTOM_PADDING }}
           >
             {filteredProducts.map((product, index) => {
               const quantity = getItemQuantity(product.id);
@@ -908,7 +907,7 @@ export default function CreateDeliveryScreen() {
                 </Text>
               </View>
             )}
-          </ScrollView>
+          </AppBottomSheetScrollView>
         </View>
       </AppBottomSheet>
 
@@ -969,7 +968,7 @@ export default function CreateDeliveryScreen() {
         title="Select Vehicle"
       >
         <View style={styles.bottomSheetContent}>
-          <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
+          <AppBottomSheetScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
             {businessVehicles
               .filter(v => v.status !== 'inactive') // Hide inactive vehicles
               .map((item, index, arr) => {
@@ -1008,7 +1007,7 @@ export default function CreateDeliveryScreen() {
                 </Text>
               </View>
             )}
-          </ScrollView>
+          </AppBottomSheetScrollView>
         </View>
       </AppBottomSheet>
 

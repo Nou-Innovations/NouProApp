@@ -282,7 +282,17 @@ export default function PersonalProfileScreen() {
 
   const renderHeader = () => (
     <View style={[styles.header, { backgroundColor: appTheme.colors.background }]}>
-      <View style={{ width: 40 }} />
+      {/* Back control only when pushed as a standalone screen (MyProfile); the Profile tab has no parent to go back to. */}
+      {navigation.canGoBack() ? (
+        <TouchableOpacity
+          style={styles.settingsButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Icon name="chevron-back" size={24} color={appTheme.colors.text} />
+        </TouchableOpacity>
+      ) : (
+        <View style={{ width: 40 }} />
+      )}
       <TouchableOpacity
         style={styles.settingsButton}
         onPress={handleSettings}

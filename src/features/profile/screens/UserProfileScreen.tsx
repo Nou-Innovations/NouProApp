@@ -16,6 +16,8 @@ import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
 import { ProfileViewType, getProfileAdditionalOptions, getRelationshipAction } from '@/shared/types/profile';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { get as apiGet, post as apiPost } from '@/shared/services/api';
+import { reportEntity, blockUser, REPORT_REASONS, type ReportReason } from '@/features/profile/profile.service';
+import { getUserChats, createUserChat } from '@/features/inbox/inbox.service';
 import theme from '@/shared/theme';
 
 interface UserProfileScreenProps {
@@ -59,11 +61,13 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
 
   // UI state
   const [isMoreOptionsVisible, setIsMoreOptionsVisible] = useState(false);
+  const [reportSheetVisible, setReportSheetVisible] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [connectLoading, setConnectLoading] = useState(false);
+  const [messageLoading, setMessageLoading] = useState(false);
 
   // Determine profile view type using the hook
-  const { viewType, isOwnProfile, canEdit, showAdditionalOptions } = useProfileViewType({
+  const { viewType } = useProfileViewType({
     profileId: userId,
     profileType: 'user',
   });
@@ -72,6 +76,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
   // personal mode → Connect (person↔person); business mode → no button (a business
   // does not connect with a person).
   const activeMode = useProfileStore((state) => state.activeMode);
+  const currentUserId = useProfileStore((state) => state.currentUser?.id);
   const relationshipAction = getRelationshipAction(activeMode, 'user');
   const showConnectButton = viewType === ProfileViewType.OTHER_USER && relationshipAction === 'connect';
 
@@ -94,6 +99,16 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     fetchUserProfile();
   }, [fetchUserProfile]);
 
+  // This screen is the OTHER-user viewer. Only when an EXPLICIT, real own-id is passed
+  // (e.g. you tap yourself in the bidirectional connections list) do we redirect to the
+  // dedicated personal-profile screen. We deliberately ignore the '1' fallback / a missing
+  // param so a wrong/empty id can never bounce you onto your own profile by accident.
+  useEffect(() => {
+    if (route.params?.userId && currentUserId && route.params.userId === currentUserId) {
+      navigation.replace('MyProfile');
+    }
+  }, [route.params?.userId, currentUserId, navigation]);
+
   const handleCompanyPress = (businessId: string) => {
     if (navigation && businessId) {
       navigation.push('ViewBusinessProfile', { businessId });
@@ -107,20 +122,50 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
   };
 
   // Profile action handlers
-  const handlePrimaryAction = () => {
+  const handlePrimaryAction = async () => {
     if (viewType === ProfileViewType.SELF_PROFILE) {
       navigation.navigate('EditPersonalProfile');
-    } else {
-      // Message user
+      return;
+    }
+    // Message user — open the REAL direct chat (reuse an existing 1:1 thread if there is one,
+    // otherwise create it). The old code navigated to a synthetic `user-${id}` chat that did
+    // not exist on the backend, so the chat screen could neither load nor send.
+    if (!currentUserId) {
+      Alert.alert('Sign in required', 'Please log in again to send a message.');
+      return;
+    }
+    if (messageLoading) return;
+    setMessageLoading(true);
+    try {
+      const { chats } = await getUserChats({ userId: currentUserId, limit: 100 });
+      let chat = chats.find(
+        (c) =>
+          c.type === 'direct' &&
+          Array.isArray(c.participants) &&
+          c.participants.includes(userId),
+      );
+      if (!chat) {
+        chat = await createUserChat({
+          userId: currentUserId,
+          type: 'direct',
+          name: user?.name || 'Chat',
+          participants: [userId],
+        });
+      }
       navigation.navigate('Chat', {
-        id: `user-${userId}`,
-        name: user?.name || 'User',
+        id: chat.id,
+        name: user?.name || chat.name || 'User',
         avatar: user?.avatar,
         isGroup: false,
         partnerId: userId,
         partnerType: 'user',
         unreadCount: 0,
       });
+    } catch (e) {
+      console.error('Failed to open chat:', e);
+      Alert.alert('Error', 'Could not open the conversation. Please try again.');
+    } finally {
+      setMessageLoading(false);
     }
   };
 
@@ -207,18 +252,50 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     variant: option === 'Block' ? 'destructive' : 'default',
   }));
 
+  // Only show the ⋯ menu when there are actual options to show. SELF profiles have
+  // no additional options, so this prevents the menu from opening an empty bottom sheet.
+  const showMoreMenu = moreOptionsItems.length > 0;
+
+  // Report reasons rendered as bottom-sheet buttons (mirrors the product report flow).
+  const reportReasonItems: AppBottomSheetItem[] = REPORT_REASONS.map((r) => ({
+    id: r.id,
+    title: r.label,
+  }));
+
+  const handleBlockUser = () => {
+    Alert.alert('Block User', `Are you sure you want to block ${user?.name || 'this user'}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await blockUser(userId);
+            navigation.goBack();
+          } catch {
+            Alert.alert('Could not block', 'Something went wrong. Please try again.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleReportReason = async (item: AppBottomSheetItem) => {
+    setReportSheetVisible(false);
+    try {
+      await reportEntity('user', userId, item.id as ReportReason);
+      Alert.alert('Report received', 'Thanks for flagging this. Our team will review it.', [{ text: 'OK' }]);
+    } catch {
+      Alert.alert('Could not report', 'Something went wrong. Please try again.');
+    }
+  };
+
   const handleMoreOptionAction = (title: string) => {
     setIsMoreOptionsVisible(false);
     if (title === 'Block') {
-      Alert.alert('Block User', `Are you sure you want to block ${user?.name}?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Block', style: 'destructive', onPress: () => {} },
-      ]);
+      handleBlockUser();
     } else if (title === 'Report') {
-      Alert.alert('Report', `Report ${user?.name} for inappropriate content?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Report', onPress: () => {} },
-      ]);
+      setReportSheetVisible(true);
     } else if (title === 'Share') {
       Share.share({
         message: `Check out ${user?.name || 'this user'}'s profile on NouPro!`,
@@ -227,18 +304,21 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     }
   };
 
-  // Render header with back button and 3-dots menu
-  const renderHeader = () => (
+  // Render header with back button and 3-dots menu. The ⋯ only renders when `showMenu`
+  // is true (i.e. there are options) so it can never open an empty bottom sheet.
+  const renderHeader = (showMenu: boolean = false) => (
     <View style={[styles.header, { backgroundColor: appTheme.colors.background }]}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
         <Icon name="chevron-back" size={24} color={appTheme.colors.text} />
       </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.menuButton}
-        onPress={() => setIsMoreOptionsVisible(true)}
-      >
-        <Icon name="ellipsis-vertical" size={24} color={appTheme.colors.text} />
-      </TouchableOpacity>
+      {showMenu && (
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => setIsMoreOptionsVisible(true)}
+        >
+          <Icon name="ellipsis-vertical" size={24} color={appTheme.colors.text} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -372,6 +452,8 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
           onPress={handlePrimaryAction}
           variant="outline"
           size="small"
+          loading={messageLoading}
+          disabled={messageLoading}
         />
         {showConnectButton && (
           <AppButton
@@ -495,7 +577,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
-      {renderHeader()}
+      {renderHeader(showMoreMenu)}
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {renderProfileSection()}
@@ -514,6 +596,16 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
         items={moreOptionsItems}
         mode="buttons"
         onSelectItem={(item) => handleMoreOptionAction(item.title)}
+      />
+
+      {/* Report reason picker */}
+      <AppBottomSheet
+        visible={reportSheetVisible}
+        onClose={() => setReportSheetVisible(false)}
+        title="Report user"
+        items={reportReasonItems}
+        mode="buttons"
+        onSelectItem={handleReportReason}
       />
     </SafeAreaView>
   );

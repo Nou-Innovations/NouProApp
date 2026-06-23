@@ -14,7 +14,7 @@
  */
 
 // Overlay components
-export { default as AppBottomSheet } from './AppBottomSheet';
+export { default as AppBottomSheet, AppBottomSheetScrollView, AppBottomSheetFlatList, SHEET_BOTTOM_PADDING } from './AppBottomSheet';
 export type { AppBottomSheetProps, AppBottomSheetItem } from './AppBottomSheet';
 export { default as AppModal } from './AppModal';
 export type { AppModalProps, AppModalVariant } from './AppModal';

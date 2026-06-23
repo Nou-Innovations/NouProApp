@@ -16,7 +16,7 @@ import {
   Easing,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import SecondaryHeader from '@/shared/components/layout/headers/SecondaryHeader';
 import AppButton from '@/shared/components/ui/AppButton';
@@ -28,7 +28,7 @@ import AccordionSection from '@/shared/components/ui/AccordionSection';
 import ColorPicker from '@/shared/components/ui/ColorPicker';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { AppModal, AppBottomSheet, AppSearchBar, DateSelector, ListItemCard } from '@/shared/components/ui';
+import { AppModal, AppBottomSheet, AppBottomSheetScrollView, SHEET_BOTTOM_PADDING, AppSearchBar, DateSelector, ListItemCard } from '@/shared/components/ui';
 import { formatInvoiceCurrency, getCurrencySymbol } from '@/shared/types/invoice';
 import invoicesService from '../invoices.service';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -62,7 +62,6 @@ interface ClientOption {
 
 export default function CreateInvoiceScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
-  const insets = useSafeAreaInsets();
   // Edit mode: if invoiceId is passed, we're editing an existing invoice
   const editInvoiceId = route.params?.invoiceId;
   const isEditMode = !!editInvoiceId;
@@ -927,7 +926,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
               onClear={() => setClientSearch('')}
               containerStyle={styles.searchBarContainer}
             />
-            <ScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
+            <AppBottomSheetScrollView style={styles.modalScrollList} showsVerticalScrollIndicator={false}>
               {clientsLoading ? (
                 <View style={styles.emptyState}>
                   <Text style={[styles.emptyText, { color: appTheme.colors.textLight, fontFamily: theme.fonts.primary.regular }]}>
@@ -941,7 +940,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
                       key={client.id}
                       avatar={{
                         type: client.avatar ? 'image' : 'initials',
-                        imageUrl: client.avatar || undefined,
+                        imageUri: client.avatar || undefined,
                         userName: client.name,
                         userId: client.id,
                       }}
@@ -967,7 +966,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
                   )}
                 </>
               )}
-            </ScrollView>
+            </AppBottomSheetScrollView>
           </View>
         </AppBottomSheet>
 
@@ -1085,11 +1084,11 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
               containerStyle={styles.searchBarContainer}
             />
             
-            <ScrollView 
-              style={styles.modalScrollListFullHeight} 
+            <AppBottomSheetScrollView
+              style={styles.modalScrollListFullHeight}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingBottom: insets.bottom }}
+              contentContainerStyle={{ paddingBottom: SHEET_BOTTOM_PADDING }}
             >
               {filteredProducts.map((product, index) => {
                 const quantity = getItemQuantity(product.id);
@@ -1193,7 +1192,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
                   </Text>
                 </View>
               )}
-            </ScrollView>
+            </AppBottomSheetScrollView>
           </View>
         </AppBottomSheet>
 

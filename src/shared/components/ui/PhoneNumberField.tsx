@@ -10,13 +10,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   TextInput,
 } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import AppBottomSheet from './AppBottomSheet';
+import AppBottomSheet, { AppBottomSheetScrollView } from './AppBottomSheet';
 import ListItemCard from './ListItemCard';
 
 // Country codes data
@@ -155,8 +154,8 @@ export default function PhoneNumberField({
         onClose={() => setShowCountrySheet(false)}
         title="Select Country Code"
       >
-        <ScrollView 
-          style={styles.countryList} 
+        <AppBottomSheetScrollView
+          style={styles.countryList}
           showsVerticalScrollIndicator={false}
         >
           {COUNTRY_CODES.map((country, index) => (
@@ -175,7 +174,7 @@ export default function PhoneNumberField({
               showDivider={index < COUNTRY_CODES.length - 1}
             />
           ))}
-        </ScrollView>
+        </AppBottomSheetScrollView>
       </AppBottomSheet>
     </View>
   );

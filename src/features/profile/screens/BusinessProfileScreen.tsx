@@ -26,6 +26,8 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import MapView, { Marker } from 'react-native-maps';
 import { requestToJoinCompany } from '@/features/notifications/notifications.service';
+import { AppBottomSheet, type AppBottomSheetItem } from '@/shared/components/ui';
+import { reportEntity, REPORT_REASONS, type ReportReason } from '@/features/profile/profile.service';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const COVER_HEIGHT = SCREEN_WIDTH * (4 / 3); // 3:4 aspect ratio - matching BusinessProfileOwnScreen
@@ -192,6 +194,8 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
 
   // Business ↔ business connection state (used as the secondary button in business mode)
   const [connectLoading, setConnectLoading] = useState(false);
+  const [moreOptionsVisible, setMoreOptionsVisible] = useState(false);
+  const [reportSheetVisible, setReportSheetVisible] = useState(false);
   const bizConn = business?.businessConnectionStatus as
     | { id: string; status: string; direction: string }
     | null
@@ -388,48 +392,65 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     }
   };
 
-  const handleMoreOptions = () => {
-    const options: any[] = [
-      { text: 'Share', onPress: handleShareProfile },
-      { text: 'Report', onPress: () => {} },
-      { text: 'Block', onPress: () => {} },
-    ];
+  // ⋯ menu items (shared AppBottomSheet, matching UserProfileScreen). Follow/Connect live in
+  // the secondary action button (see docs/PROFILES.md). "Request to Join" only shows in
+  // personal mode when not already a member.
+  const moreOptionsItems: AppBottomSheetItem[] = [
+    ...(activeMode === 'personal' && !isAlreadyMember
+      ? [{ id: 'request-join', title: 'Request to Join' }]
+      : []),
+    { id: 'share', title: 'Share' },
+    { id: 'report', title: 'Report' },
+  ];
 
-    // Follow/Connect now live in the secondary action button (see docs/PROFILES.md),
-    // not in this menu.
+  const reportReasonItems: AppBottomSheetItem[] = REPORT_REASONS.map((r) => ({
+    id: r.id,
+    title: r.label,
+  }));
 
-    // Add "Request to Join" only in personal mode when not already a member
-    if (activeMode === 'personal' && !isAlreadyMember) {
-      options.unshift({
-        text: 'Request to Join',
-        onPress: () => {
-          Alert.alert(
-            'Request to Join',
-            `Send a request to join ${business?.name || 'this company'}?`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Send Request',
-                onPress: async () => {
-                  try {
-                    await requestToJoinCompany(businessId);
-                    Alert.alert('Request Sent', `Your request to join ${business?.name || 'the company'} has been sent.`);
-                  } catch (err: any) {
-                    const msg = err?.response?.data?.error?.message || 'Failed to send request. Please try again.';
-                    Alert.alert('Error', msg);
-                  }
-                },
-              },
-            ],
-          );
+  const handleMoreOptions = () => setMoreOptionsVisible(true);
+
+  const handleRequestToJoin = () => {
+    Alert.alert(
+      'Request to Join',
+      `Send a request to join ${business?.name || 'this company'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send Request',
+          onPress: async () => {
+            try {
+              await requestToJoinCompany(businessId);
+              Alert.alert('Request Sent', `Your request to join ${business?.name || 'the company'} has been sent.`);
+            } catch (err: any) {
+              const msg = err?.response?.data?.error?.message || 'Failed to send request. Please try again.';
+              Alert.alert('Error', msg);
+            }
+          },
         },
-      });
-    }
+      ],
+    );
+  };
 
-    Alert.alert('Options', 'Select an action', [
-      ...options,
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  const handleMoreOptionSelect = (item: AppBottomSheetItem) => {
+    setMoreOptionsVisible(false);
+    if (item.id === 'request-join') {
+      handleRequestToJoin();
+    } else if (item.id === 'share') {
+      handleShareProfile();
+    } else if (item.id === 'report') {
+      setReportSheetVisible(true);
+    }
+  };
+
+  const handleReportReason = async (item: AppBottomSheetItem) => {
+    setReportSheetVisible(false);
+    try {
+      await reportEntity('business', businessId, item.id as ReportReason);
+      Alert.alert('Report received', 'Thanks for flagging this. Our team will review it.', [{ text: 'OK' }]);
+    } catch {
+      Alert.alert('Could not report', 'Something went wrong. Please try again.');
+    }
   };
 
   // Adding state management functions
@@ -1125,6 +1146,26 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
         onClose={handleCartPopupClose}
         onAddToCart={handleAddToCart}
         onGoToCart={handleGoToCart}
+      />
+
+      {/* ⋯ options menu */}
+      <AppBottomSheet
+        visible={moreOptionsVisible}
+        onClose={() => setMoreOptionsVisible(false)}
+        title="Options"
+        items={moreOptionsItems}
+        mode="buttons"
+        onSelectItem={handleMoreOptionSelect}
+      />
+
+      {/* Report reason picker */}
+      <AppBottomSheet
+        visible={reportSheetVisible}
+        onClose={() => setReportSheetVisible(false)}
+        title="Report business"
+        items={reportReasonItems}
+        mode="buttons"
+        onSelectItem={handleReportReason}
       />
 
       {/* Cart Bottom Section - Only show on cart tab with items */}

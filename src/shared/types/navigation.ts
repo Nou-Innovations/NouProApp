@@ -201,6 +201,9 @@ export type RootStackParamList = {
   
   // User profile (viewing others)
   ViewUserProfile: { userId: string };
+
+  // Own personal profile (standalone push; tab version lives in PersonalTabNavigator)
+  MyProfile: undefined;
   
   // Product screens
   CreateProduct: { selectedBrand?: string; selectedBrandId?: string; product?: import('./product').UIProduct };

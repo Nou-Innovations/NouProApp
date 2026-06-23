@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
-import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import AppBottomSheet, { AppBottomSheetScrollView } from '@/shared/components/ui/AppBottomSheet';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import AppButton from '@/shared/components/ui/AppButton';
@@ -262,13 +262,12 @@ export default function AssignStaffModal({
       </View>
 
       {/* Staff List */}
-      <ScrollView 
-        style={styles.listContainer} 
+      <AppBottomSheetScrollView
+        style={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        bounces={false}
       >
         {filteredStaff.map((item, index) => renderItem(item, index))}
-      </ScrollView>
+      </AppBottomSheetScrollView>
 
       {/* Footer Action */}
       {selectedStaffIds.length > 0 && (

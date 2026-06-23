@@ -38,6 +38,7 @@ export default function BusinessInboxScreen() {
   // Profile store
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const isAdmin = useProfileStore((state) => state.isAdmin);
+  const currentUserId = useProfileStore((state) => state.currentUser?.id);
 
   // Use the unified inbox hook for chats
   const {
@@ -100,12 +101,18 @@ export default function BusinessInboxScreen() {
     // Determine partner type based on mode
     const partnerType = chat.type === 'client' ? 'business' : 'user';
 
+    // Derive partnerId as the OTHER participant (participants[0] is often the current user),
+    // so tapping the chat header opens that person's profile — not yourself.
+    const partnerId = Array.isArray(chat.participants)
+      ? chat.participants.find((p: string) => p !== currentUserId) || chat.id
+      : chat.id;
+
     (navigation as any).navigate('Chat', {
       id: chat.id,
       name: chat.name,
       isGroup: isGroupChat,
       avatar: chat.avatar,
-      partnerId: chat.participants?.[0] || chat.id,
+      partnerId,
       partnerType,
       unreadCount: chat.unreadCount || 0,
     });

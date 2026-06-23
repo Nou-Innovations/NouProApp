@@ -21,7 +21,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import AppButton from '@/shared/components/ui/AppButton';
-import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
+import AppBottomSheet, { AppBottomSheetScrollView, SHEET_BOTTOM_PADDING } from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
 import PhoneNumberField from '@/shared/components/ui/PhoneNumberField';
 import { BUSINESS_CATEGORIES, getCategoryLabel } from '@/shared/constants/categories';
@@ -251,10 +251,10 @@ export default function BusinessBasicInfoScreen({ navigation, route }: Props) {
         fullHeight
       >
         <View style={styles.bottomSheetContentFullHeight}>
-          <ScrollView
+          <AppBottomSheetScrollView
             style={styles.modalScrollListFullHeight}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: insets.bottom }}
+            contentContainerStyle={{ paddingBottom: SHEET_BOTTOM_PADDING }}
           >
             {BUSINESS_TYPES.map((type, index) => (
               <ListItemCard
@@ -272,7 +272,7 @@ export default function BusinessBasicInfoScreen({ navigation, route }: Props) {
                 showDivider={index < BUSINESS_TYPES.length - 1}
               />
             ))}
-          </ScrollView>
+          </AppBottomSheetScrollView>
         </View>
       </AppBottomSheet>
 
@@ -284,10 +284,10 @@ export default function BusinessBasicInfoScreen({ navigation, route }: Props) {
         fullHeight
       >
         <View style={styles.bottomSheetContentFullHeight}>
-          <ScrollView
+          <AppBottomSheetScrollView
             style={styles.modalScrollListFullHeight}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: insets.bottom }}
+            contentContainerStyle={{ paddingBottom: SHEET_BOTTOM_PADDING }}
           >
             {BUSINESS_CATEGORIES.map((cat, index) => (
               <ListItemCard
@@ -305,7 +305,7 @@ export default function BusinessBasicInfoScreen({ navigation, route }: Props) {
                 showDivider={index < BUSINESS_CATEGORIES.length - 1}
               />
             ))}
-          </ScrollView>
+          </AppBottomSheetScrollView>
         </View>
       </AppBottomSheet>
     </View>

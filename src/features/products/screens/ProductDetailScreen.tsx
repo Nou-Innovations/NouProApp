@@ -724,27 +724,49 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         <View style={[styles.sheet, { backgroundColor: appTheme.colors.cardBackground }]}>
           <View style={[styles.grabber, { backgroundColor: appTheme.colors.borderColor }]} />
 
-          {/* Brand row */}
-          {!!product.brand && (
-            <TouchableOpacity
-              style={styles.brandRow}
-              activeOpacity={0.6}
-              disabled={!showRelatedProducts}
-              onPress={handleBrandPress}
-            >
-              {!!product.brandLogo && (
-                <Image source={{ uri: product.brandLogo }} style={styles.brandLogo} />
+          {/* Brand + status row (brand left, stock pill right) */}
+          {(!!product.brand || !showOwnerDetails) && (
+            <View style={styles.brandRow}>
+              {product.brand ? (
+                <TouchableOpacity
+                  style={styles.brandTap}
+                  activeOpacity={0.6}
+                  disabled={!showRelatedProducts}
+                  onPress={handleBrandPress}
+                >
+                  <Text style={[styles.brandName, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
+                    {product.brand}
+                  </Text>
+                  {showRelatedProducts && (
+                    <Icon name="chevron-forward" size={12} color={appTheme.colors.textMuted} />
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <View />
               )}
-              <Text style={[styles.brandName, { color: appTheme.colors.textSecondary }]} numberOfLines={1}>
-                {product.brand}
-              </Text>
-              {showRelatedProducts && (
-                <Icon name="chevron-forward" size={14} color={appTheme.colors.textMuted} />
+
+              {!showOwnerDetails && (
+                <View style={[styles.statusPill, { backgroundColor: appTheme.colors.surface }]}>
+                  <View
+                    style={[
+                      styles.statusDot,
+                      { backgroundColor: availability.isOutOfStock ? appTheme.colors.error : appTheme.colors.success },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.statusText,
+                      { color: availability.isOutOfStock ? appTheme.colors.error : appTheme.colors.text },
+                    ]}
+                  >
+                    {availability.isOutOfStock ? 'Out of stock' : 'In stock'}
+                  </Text>
+                </View>
               )}
-            </TouchableOpacity>
+            </View>
           )}
 
-          {/* Product name + options (⋯) menu */}
+          {/* Product name + options (⋮) menu */}
           <View style={styles.nameRow}>
             <Text style={[styles.name, { color: appTheme.colors.text }]}>{product.name}</Text>
             <TouchableOpacity
@@ -753,70 +775,42 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityLabel="More options"
             >
-              <Icon name="ellipsis-horizontal" size={22} color={appTheme.colors.textSecondary} />
+              <Icon name="ellipsis-vertical" size={22} color={appTheme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           {/* Price */}
           <PriceBlock pricing={pricing} />
 
-          {/* Unit + carton chips */}
+          {/* Unit / carton info (plain text) */}
           {(!!unitDisplay || hasCartonInfo) && (
-            <View style={styles.chipsRow}>
+            <View style={styles.unitWrap}>
               {!!unitDisplay && (
-                <View style={[styles.chip, { backgroundColor: appTheme.colors.surface }]}>
-                  <Text style={[styles.chipText, { color: appTheme.colors.textSecondary }]}>{unitDisplay}</Text>
-                </View>
+                <Text style={[styles.unitText, { color: appTheme.colors.textSecondary }]}>{unitDisplay}</Text>
               )}
               {hasCartonInfo && (
-                <View style={[styles.chip, { backgroundColor: appTheme.colors.surface }]}>
-                  <Text style={[styles.chipText, { color: appTheme.colors.textSecondary }]}>
-                    {pricing.unitsPerCarton} / carton
-                    {pricing.pricePerCarton ? ` · ${formatPrice(pricing.pricePerCarton, pricing.currency)}` : ''}
-                  </Text>
-                </View>
+                <Text style={[styles.unitText, { color: appTheme.colors.textSecondary }]}>
+                  {pricing.unitsPerCarton} / carton
+                  {pricing.pricePerCarton ? ` · ${formatPrice(pricing.pricePerCarton, pricing.currency)}` : ''}
+                </Text>
               )}
             </View>
           )}
 
-          {/* Availability (non-owner views) */}
-          {!showOwnerDetails && (
-            <View style={[styles.availabilityPill, { backgroundColor: appTheme.colors.surface }]}>
-              <View
-                style={[
-                  styles.availabilityDot,
-                  { backgroundColor: availability.isOutOfStock ? appTheme.colors.error : appTheme.colors.success },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.availabilityText,
-                  { color: availability.isOutOfStock ? appTheme.colors.error : appTheme.colors.text },
-                ]}
-              >
-                {availability.isOutOfStock ? 'Out of stock' : 'In stock'}
-              </Text>
-            </View>
-          )}
-
-          {/* Description */}
+          {/* Description — 4 lines collapsed (… on line 4), tap to expand */}
           {!!product.description && (
             <TouchableOpacity
-              activeOpacity={0.8}
+              activeOpacity={0.9}
               style={styles.description}
               onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
             >
               <Text
                 style={[styles.descriptionText, { color: appTheme.colors.textSecondary }]}
-                numberOfLines={isDescriptionExpanded ? undefined : 3}
+                numberOfLines={isDescriptionExpanded ? undefined : 4}
+                ellipsizeMode="tail"
               >
                 {product.description}
               </Text>
-              {product.description.length > 120 && (
-                <Text style={[styles.readMore, { color: appTheme.colors.accent }]}>
-                  {isDescriptionExpanded ? 'Read less' : 'Read more'}
-                </Text>
-              )}
             </TouchableOpacity>
           )}
 
@@ -989,6 +983,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         title={product.name}
         items={menuItems}
         onSelectItem={handleMenuSelect}
+        mode="buttons"
       />
 
       {/* Report reason picker */}
@@ -998,6 +993,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         title="Report product"
         items={reportReasons}
         onSelectItem={handleReportReason}
+        mode="buttons"
       />
     </View>
   );

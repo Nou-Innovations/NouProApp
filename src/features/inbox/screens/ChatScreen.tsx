@@ -203,22 +203,27 @@ export default function ChatScreen() {
   // Extract unique participants from messages for group chats
   // Also detect group chats by having multiple unique senders
   const participants = React.useMemo(() => {
+    // Keyed by user id (not name) so the current user — whose own messages carry their
+    // real name, not "You" — is never double-counted. Double-counting both triggered a
+    // duplicate React key and miscounted a 1-on-1 as a group (participants.length > 2).
     const participantMap = new Map<string, { id: string; name: string; avatar: string; role: string; isCurrentUser?: boolean }>();
-    
+
     // Add current user first
-    participantMap.set('You', {
+    participantMap.set(currentUserId, {
       id: currentUserId,
       name: currentUser?.displayName || 'You',
       avatar: currentUser?.profileImage || '',
       role: 'user',
       isCurrentUser: true,
     });
-    
+
     messages.forEach(msg => {
-      if (msg.type !== 'event' && msg.sender && msg.sender.name !== 'You' && msg.sender.name !== 'System') {
-        if (!participantMap.has(msg.sender.name)) {
-          participantMap.set(msg.sender.name, {
-            id: msg.sender.id || msg.sender.name,
+      if (msg.type !== 'event' && msg.sender && msg.sender.name !== 'System') {
+        const senderId = msg.sender.id || msg.sender.name;
+        if (senderId === currentUserId) return; // already added as the current user
+        if (!participantMap.has(senderId)) {
+          participantMap.set(senderId, {
+            id: senderId,
             name: msg.sender.name,
             avatar: msg.sender.avatar || '',
             role: msg.sender.role || 'user',
@@ -227,7 +232,7 @@ export default function ChatScreen() {
         }
       }
     });
-    
+
     return Array.from(participantMap.values());
   }, [messages, currentUserId, currentUser]);
   
