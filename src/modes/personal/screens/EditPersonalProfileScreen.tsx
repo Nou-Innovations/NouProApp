@@ -3,12 +3,9 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
   Switch,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -20,6 +17,7 @@ import Avatar from '@/shared/components/ui/Avatar';
 import { AppModal, SectionTitle, AppButton } from '@/shared/components/ui';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { KeyboardAwareScreen } from '@/shared/components/layout';
 import ImageUploadField from '@/shared/components/ui/ImageUploadField';
 import { imageService } from '@/shared/services/imageService';
 import { patch as apiPatch, authAPI } from '@/shared/services/api';
@@ -641,16 +639,10 @@ export default function EditPersonalProfileScreen() {
         leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
         rightActions={hasChanges && !isSaving ? [{ icon: 'save', onPress: handleSavePersonalInfo }] : []}
       />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <KeyboardAwareScreen
+        style={styles.scrollView}
+        keyboardDismissMode="interactive"
       >
-        <ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-        >
           {renderProfileHeader()}
           {renderBasicSection()}
           {renderPersonalInfoSection()}
@@ -658,8 +650,7 @@ export default function EditPersonalProfileScreen() {
           {renderAccountSection()}
           {renderActionButtons()}
           <View style={{ height: 40 }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
 
       {/* Success Dialog */}
       <AppModal

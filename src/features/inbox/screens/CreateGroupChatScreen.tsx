@@ -10,12 +10,9 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
   Image,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -24,6 +21,7 @@ import { Camera } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { KeyboardAwareScreen } from '@/shared/components/layout';
 import { ListItemCard } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { createChat, createUserChat, searchContacts, uploadAttachment, ContactSearchResult } from '../inbox.service';
@@ -149,16 +147,10 @@ export default function CreateGroupChatScreen() {
         leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <KeyboardAwareScreen
         style={styles.flex}
+        contentContainerStyle={styles.scrollContent}
       >
-        <ScrollView
-          style={styles.flex}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
           {/* Group Avatar */}
           <View style={styles.avatarSection}>
             <TouchableOpacity
@@ -224,19 +216,18 @@ export default function CreateGroupChatScreen() {
               />
             ))}
           </View>
-        </ScrollView>
+      </KeyboardAwareScreen>
 
-        {/* Create Button */}
-        <View style={[styles.bottomButton, { paddingBottom: 16, backgroundColor: appTheme.colors.background, borderTopColor: appTheme.colors.surface }]}>
-          <AppButton
-            title="Create group"
-            onPress={handleCreateGroup}
-            variant={groupName.trim() ? 'primary' : 'disabled'}
-            disabled={!groupName.trim() || isCreating}
-            loading={isCreating}
-          />
-        </View>
-      </KeyboardAvoidingView>
+      {/* Create Button */}
+      <View style={[styles.bottomButton, { paddingBottom: 16, backgroundColor: appTheme.colors.background, borderTopColor: appTheme.colors.surface }]}>
+        <AppButton
+          title="Create group"
+          onPress={handleCreateGroup}
+          variant={groupName.trim() ? 'primary' : 'disabled'}
+          disabled={!groupName.trim() || isCreating}
+          loading={isCreating}
+        />
+      </View>
     </SafeAreaView>
   );
 }

@@ -7,9 +7,6 @@ import React, { useState } from 'react';
 import {
   View,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +19,7 @@ import { Text } from '@/shared/components/ui/Typography';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import { AppButton, TextButton } from '@/shared/components/ui';
 import PhoneNumberField from '@/shared/components/ui/PhoneNumberField';
+import { KeyboardAwareScreen } from '@/shared/components/layout';
 import { authAPI } from '@/shared/services/api';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'CreateAccount'>;
@@ -95,18 +93,10 @@ export default function CreateAccountScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={0}
+      <KeyboardAwareScreen
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 40 }]}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 40 }]}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-        >
           {/* Back Button */}
           <TouchableOpacity
             style={styles.backButton}
@@ -210,9 +200,21 @@ export default function CreateAccountScreen({ navigation }: Props) {
               </View>
               <Text style={[styles.termsText, { color: appTheme.colors.textSecondary }]}>
                 I agree to the{' '}
-                <Text style={{ color: appTheme.colors.primary }}>Terms of Service</Text>
+                <Text
+                  style={{ color: appTheme.colors.primary }}
+                  onPress={() => navigation.navigate('Terms')}
+                  accessibilityRole="link"
+                >
+                  Terms of Service
+                </Text>
                 {' '}and{' '}
-                <Text style={{ color: appTheme.colors.primary }}>Privacy Policy</Text>
+                <Text
+                  style={{ color: appTheme.colors.primary }}
+                  onPress={() => navigation.navigate('Privacy')}
+                  accessibilityRole="link"
+                >
+                  Privacy Policy
+                </Text>
               </Text>
             </TouchableOpacity>
 
@@ -226,8 +228,7 @@ export default function CreateAccountScreen({ navigation }: Props) {
               style={styles.continueButton}
             />
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
 
       {/* Fixed Bottom - Login Link */}
       <View style={[
@@ -253,9 +254,6 @@ export default function CreateAccountScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  keyboardView: {
     flex: 1,
   },
   scrollView: {

@@ -8,9 +8,6 @@ import {
   View,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -21,6 +18,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
 import AppButton from '@/shared/components/ui/AppButton';
 import AppTextField from '@/shared/components/ui/AppTextField';
+import { KeyboardAwareScreen } from '@/shared/components/layout';
 import { authAPI } from '@/shared/services/api';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
@@ -102,18 +100,10 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={0}
+      <KeyboardAwareScreen
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 40 }]}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 40 }]}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-        >
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
@@ -150,27 +140,23 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
               leftIcon="mail-outline"
             />
           </View>
-        </ScrollView>
+      </KeyboardAwareScreen>
 
-        <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 16 }]}>
-          <AppButton
-            title="Send Reset Link"
-            onPress={handleSendReset}
-            loading={loading}
-            disabled={loading || !isFormValid}
-            variant={isFormValid && !loading ? 'primary' : 'disabled'}
-          />
-        </View>
-      </KeyboardAvoidingView>
+      <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 16 }]}>
+        <AppButton
+          title="Send Reset Link"
+          onPress={handleSendReset}
+          loading={loading}
+          disabled={loading || !isFormValid}
+          variant={isFormValid && !loading ? 'primary' : 'disabled'}
+        />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  keyboardView: {
     flex: 1,
   },
   scrollView: {

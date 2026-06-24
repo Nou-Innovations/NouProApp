@@ -9,12 +9,9 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TextInput,
   TouchableOpacity,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +19,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { KeyboardAwareScreen } from '@/shared/components/layout';
 import * as procurementService from '../services/procurement.service';
 import { useProcurementStore } from '../store/procurement.store';
 import type { CreateSupplierData } from '@/shared/types/procurement';
@@ -178,17 +176,10 @@ export default function AddSupplierScreen() {
         }}
       />
 
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+      <KeyboardAwareScreen
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
       >
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
           {renderField('Name', name, setName, {
             placeholder: 'Supplier name',
             required: true,
@@ -224,50 +215,49 @@ export default function AddSupplierScreen() {
             placeholder: 'Additional notes...',
             multiline: true,
           })}
-        </ScrollView>
+      </KeyboardAwareScreen>
 
-        {/* Submit Button */}
-        <View
+      {/* Submit Button */}
+      <View
+        style={[
+          styles.bottomActions,
+          {
+            borderTopColor: appTheme.colors.borderColor,
+            backgroundColor: appTheme.colors.background,
+          },
+        ]}
+      >
+        <TouchableOpacity
           style={[
-            styles.bottomActions,
+            styles.submitButton,
             {
-              borderTopColor: appTheme.colors.borderColor,
-              backgroundColor: appTheme.colors.background,
+              backgroundColor: isFormValid
+                ? appTheme.colors.primary
+                : appTheme.colors.surface,
             },
           ]}
+          onPress={handleSubmit}
+          disabled={!isFormValid || isSubmitting}
+          activeOpacity={0.7}
         >
-          <TouchableOpacity
-            style={[
-              styles.submitButton,
-              {
-                backgroundColor: isFormValid
-                  ? appTheme.colors.primary
-                  : appTheme.colors.surface,
-              },
-            ]}
-            onPress={handleSubmit}
-            disabled={!isFormValid || isSubmitting}
-            activeOpacity={0.7}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator size="small" color={appTheme.colors.textInverse} />
-            ) : (
-              <Text
-                style={[
-                  styles.submitButtonText,
-                  {
-                    color: isFormValid
-                      ? appTheme.colors.textInverse
-                      : appTheme.colors.textMuted,
-                  },
-                ]}
-              >
-                {isEditMode ? 'Save Changes' : 'Add Supplier'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+          {isSubmitting ? (
+            <ActivityIndicator size="small" color={appTheme.colors.textInverse} />
+          ) : (
+            <Text
+              style={[
+                styles.submitButtonText,
+                {
+                  color: isFormValid
+                    ? appTheme.colors.textInverse
+                    : appTheme.colors.textMuted,
+                },
+              ]}
+            >
+              {isEditMode ? 'Save Changes' : 'Add Supplier'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -282,9 +272,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.1)',
-  },
-  keyboardView: {
-    flex: 1,
   },
   scroll: {
     flex: 1,

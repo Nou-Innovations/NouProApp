@@ -16,6 +16,7 @@ import { createDrawerNavigator, useDrawerProgress } from '@react-navigation/draw
 import Animated, { useAnimatedStyle, interpolate, Extrapolation, SharedValue } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
@@ -58,6 +59,8 @@ import BusinessHoursScreen from '@/features/auth/screens/BusinessHoursScreen';
 import UploadBusinessLogoScreen from '@/features/auth/screens/UploadBusinessLogoScreen';
 import ForgotPasswordScreen from '@/features/auth/screens/ForgotPasswordScreen';
 import TwoFactorVerifyScreen from '@/features/auth/screens/TwoFactorVerifyScreen';
+import TermsScreen from '@/features/auth/screens/TermsScreen';
+import PrivacyScreen from '@/features/auth/screens/PrivacyScreen';
 import LaunchScreenWrapper from '@/features/auth/screens/LaunchScreenWrapper';
 
 // Screens - Inbox
@@ -350,6 +353,10 @@ function AuthNavigator() {
       <AuthStack.Screen name="BusinessLocation" component={BusinessLocationScreen} />
       <AuthStack.Screen name="BusinessHours" component={BusinessHoursScreen} />
       <AuthStack.Screen name="UploadBusinessLogo" component={UploadBusinessLogoScreen} />
+
+      {/* Legal */}
+      <AuthStack.Screen name="Terms" component={TermsScreen} />
+      <AuthStack.Screen name="Privacy" component={PrivacyScreen} />
     </AuthStack.Navigator>
   );
 }
@@ -828,16 +835,18 @@ const AppWithTheme = () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NotificationProvider>
-          <View 
-            style={[styles.container, { backgroundColor: LAUNCH_BACKGROUND }]} 
-            onLayout={onLayoutRootView}
-          >
-            <ErrorBoundary>
-              {renderScreen()}
-            </ErrorBoundary>
-          </View>
-        </NotificationProvider>
+        <KeyboardProvider>
+          <NotificationProvider>
+            <View
+              style={[styles.container, { backgroundColor: LAUNCH_BACKGROUND }]}
+              onLayout={onLayoutRootView}
+            >
+              <ErrorBoundary>
+                {renderScreen()}
+              </ErrorBoundary>
+            </View>
+          </NotificationProvider>
+        </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

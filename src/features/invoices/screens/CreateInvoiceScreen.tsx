@@ -8,7 +8,6 @@ import {
   Switch,
   Modal,
   Alert,
-  KeyboardAvoidingView,
   Platform,
   TextInput,
   Image,
@@ -16,6 +15,7 @@ import {
   Easing,
   ActivityIndicator,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import SecondaryHeader from '@/shared/components/layout/headers/SecondaryHeader';

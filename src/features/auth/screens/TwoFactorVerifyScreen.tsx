@@ -4,9 +4,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -18,6 +15,7 @@ import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
 import { AppButton, TextButton } from '@/shared/components/ui';
+import { KeyboardAwareScreen } from '@/shared/components/layout';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'TwoFactorVerify'>;
 
@@ -77,16 +75,10 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
+      <KeyboardAwareScreen
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 40 }]}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 40 }]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
           {/* Back Button */}
           <TouchableOpacity
             style={styles.backButton}
@@ -156,17 +148,13 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
               textStyle={styles.switchModeText}
             />
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  keyboardView: {
     flex: 1,
   },
   scrollView: {

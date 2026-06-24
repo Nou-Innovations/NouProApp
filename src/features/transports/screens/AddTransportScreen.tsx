@@ -10,10 +10,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  ScrollView,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -22,6 +19,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { KeyboardAwareScreen } from '@/shared/components/layout';
 import AppBottomSheet from '@/shared/components/ui/AppBottomSheet';
 import ListItemCard from '@/shared/components/ui/ListItemCard';
 import type { VehicleType } from '@/shared/types/transport';
@@ -109,17 +107,10 @@ export default function AddTransportScreen() {
         }}
       />
 
-      <KeyboardAvoidingView 
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+      <KeyboardAwareScreen
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
       >
-        <ScrollView
-          style={styles.content}
-          contentContainerStyle={styles.contentContainer}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
           {/* Hero Section */}
           <View style={styles.heroSection}>
             <Text style={[styles.title, { color: appTheme.colors.text }]}>
@@ -217,33 +208,32 @@ export default function AddTransportScreen() {
               />
             </View>
           </View>
-        </ScrollView>
+      </KeyboardAwareScreen>
 
-        {/* Bottom Action Button */}
-        <View style={[styles.bottomActions, { 
-          borderTopColor: appTheme.colors.borderColor,
-          backgroundColor: appTheme.colors.background,
-        }]}>
-          <TouchableOpacity
-            style={[
-              styles.submitButton,
-              {
-                backgroundColor: isFormValid ? appTheme.colors.primary : appTheme.colors.surface,
-              }
-            ]}
-            onPress={handleSubmit}
-            disabled={!isFormValid || isSubmitting}
-            activeOpacity={0.7}
-          >
-            <Text style={[
-              styles.submitButtonText,
-              { color: isFormValid ? '#FFFFFF' : appTheme.colors.textMuted }
-            ]}>
-              {isSubmitting ? 'Adding...' : 'Add'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+      {/* Bottom Action Button */}
+      <View style={[styles.bottomActions, {
+        borderTopColor: appTheme.colors.borderColor,
+        backgroundColor: appTheme.colors.background,
+      }]}>
+        <TouchableOpacity
+          style={[
+            styles.submitButton,
+            {
+              backgroundColor: isFormValid ? appTheme.colors.primary : appTheme.colors.surface,
+            }
+          ]}
+          onPress={handleSubmit}
+          disabled={!isFormValid || isSubmitting}
+          activeOpacity={0.7}
+        >
+          <Text style={[
+            styles.submitButtonText,
+            { color: isFormValid ? '#FFFFFF' : appTheme.colors.textMuted }
+          ]}>
+            {isSubmitting ? 'Adding...' : 'Add'}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Vehicle Type Selection Bottom Sheet */}
       <AppBottomSheet
@@ -274,9 +264,6 @@ export default function AddTransportScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  keyboardView: {
     flex: 1,
   },
   content: {

@@ -442,11 +442,15 @@ export type AuthStackParamList = {
     fromProfileSwitcher?: boolean;
     pendingAuth?: import('./navigation').PendingAuthData;
   };
-  UploadBusinessLogo: { 
+  UploadBusinessLogo: {
     businessData: FullBusinessData;
     fromProfileSwitcher?: boolean;
     pendingAuth?: import('./navigation').PendingAuthData;
   };
+
+  // Legal
+  Terms: undefined;
+  Privacy: undefined;
 };
 
 // ========== Screen Props Types ==========

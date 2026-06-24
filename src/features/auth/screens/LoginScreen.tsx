@@ -2,10 +2,7 @@ import React, { useState } from 'react';
 import {
   View,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
   StyleSheet,
-  ScrollView,
   Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +16,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import { AppButton, TextButton } from '@/shared/components/ui';
+import { KeyboardAwareScreen } from '@/shared/components/layout';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -91,18 +89,10 @@ export default function LoginScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={0}
+      <KeyboardAwareScreen
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 40 }]}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 40 }]}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-        >
           {/* Back Button */}
           <TouchableOpacity
             style={styles.backButton}
@@ -189,8 +179,7 @@ export default function LoginScreen({ navigation }: Props) {
               variant={isFormValid && !loading ? 'primary' : 'disabled'}
             />
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
 
       {/* Fixed Bottom - Register Link (stays at bottom even with keyboard) */}
       <View style={[
@@ -217,9 +206,6 @@ export default function LoginScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  keyboardView: {
     flex: 1,
   },
   scrollView: {

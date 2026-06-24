@@ -11,11 +11,8 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
-  Platform,
-  KeyboardAvoidingView,
   Image,
   TextInput,
   Animated,
@@ -41,6 +38,7 @@ import { getVehicleIcon, getVehicleStatusLabel, VEHICLE_STATUS_COLORS } from '@/
 import { formatCurrency } from '@/shared/utils/format';
 import { AppModal, AppBottomSheet, AppBottomSheetScrollView, SHEET_BOTTOM_PADDING, AppSearchBar, DateSelector, TimeSelector, ListItemCard, AppButton, ButtonRow } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { KeyboardAwareScreen } from '@/shared/components/layout';
 import { canUseAdvancedPermissions , checkPaywall, PaywallCheck } from '@/shared/utils/permissions';
 import { createDelivery } from '@/features/deliveries/deliveries.service';
 import { useDeliveriesStore } from '@/features/deliveries/deliveries.store';
@@ -493,11 +491,7 @@ export default function CreateDeliveryScreen() {
         }}
       />
 
-      <KeyboardAvoidingView
-        style={styles.content}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScreen style={styles.scrollContent}>
           {/* Client / Location Selection */}
           {isTransfer ? (
             <AppTextField
@@ -653,8 +647,7 @@ export default function CreateDeliveryScreen() {
           />
 
           <View style={{ height: 120 }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
 
       {/* Bottom Button */}
       <View style={[styles.bottomContainer, { backgroundColor: appTheme.colors.cardBackground, borderTopColor: appTheme.colors.borderColor }]}>

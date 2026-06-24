@@ -7,9 +7,6 @@ import React, { useState } from 'react';
 import {
   View,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +22,7 @@ import AppBottomSheet, { AppBottomSheetScrollView, SHEET_BOTTOM_PADDING } from '
 import ListItemCard from '@/shared/components/ui/ListItemCard';
 import PhoneNumberField from '@/shared/components/ui/PhoneNumberField';
 import { BUSINESS_CATEGORIES, getCategoryLabel } from '@/shared/constants/categories';
+import { KeyboardAwareScreen } from '@/shared/components/layout';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'BusinessBasicInfo'>;
 
@@ -101,17 +99,10 @@ export default function BusinessBasicInfoScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={0}
+      <KeyboardAwareScreen
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 40 }]}
       >
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 40 }]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
           {/* Header Section */}
           <View style={styles.headerSection}>
             <Text style={[styles.title, { color: appTheme.colors.text }]}>
@@ -227,21 +218,20 @@ export default function BusinessBasicInfoScreen({ navigation, route }: Props) {
               leftIcon="globe-outline"
             />
           </View>
-        </ScrollView>
+      </KeyboardAwareScreen>
 
-        {/* Bottom Button */}
-        <View style={[
-          styles.bottomContainer,
-          { paddingBottom: insets.bottom + 16 }
-        ]}>
-          <AppButton
-            title="Continue"
-            onPress={handleContinue}
-            variant={isFormValid ? 'primary' : 'disabled'}
-            disabled={!isFormValid}
-          />
-        </View>
-      </KeyboardAvoidingView>
+      {/* Bottom Button */}
+      <View style={[
+        styles.bottomContainer,
+        { paddingBottom: insets.bottom + 16 }
+      ]}>
+        <AppButton
+          title="Continue"
+          onPress={handleContinue}
+          variant={isFormValid ? 'primary' : 'disabled'}
+          disabled={!isFormValid}
+        />
+      </View>
 
       {/* Business Type Bottom Sheet */}
       <AppBottomSheet
@@ -314,9 +304,6 @@ export default function BusinessBasicInfoScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  keyboardView: {
     flex: 1,
   },
   scrollView: {

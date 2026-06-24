@@ -7,9 +7,6 @@ import React, { useState } from 'react';
 import {
   View,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
   Alert,
 } from 'react-native';
@@ -22,6 +19,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import AppButton from '@/shared/components/ui/AppButton';
+import { KeyboardAwareScreen } from '@/shared/components/layout';
 import { useRegistrationStore } from '@/shared/store/registrationStore';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'CreatePassword'>;
@@ -112,17 +110,10 @@ export default function CreatePasswordScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={0}
+      <KeyboardAwareScreen
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 40 }]}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 40 }]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
           {/* Back Button */}
           <TouchableOpacity
             style={styles.backButton}
@@ -208,30 +199,26 @@ export default function CreatePasswordScreen({ navigation, route }: Props) {
               )}
             </View>
           </View>
-        </ScrollView>
+      </KeyboardAwareScreen>
 
-        {/* Bottom Button */}
-        <View style={[
-          styles.bottomContainer,
-          { paddingBottom: insets.bottom + 16 }
-        ]}>
-          <AppButton
-            title="Continue"
-            onPress={handleContinue}
-            variant={isFormValid ? 'primary' : 'disabled'}
-            disabled={!isFormValid}
-          />
-        </View>
-      </KeyboardAvoidingView>
+      {/* Bottom Button */}
+      <View style={[
+        styles.bottomContainer,
+        { paddingBottom: insets.bottom + 16 }
+      ]}>
+        <AppButton
+          title="Continue"
+          onPress={handleContinue}
+          variant={isFormValid ? 'primary' : 'disabled'}
+          disabled={!isFormValid}
+        />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  keyboardView: {
     flex: 1,
   },
   scrollView: {
