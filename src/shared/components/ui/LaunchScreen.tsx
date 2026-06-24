@@ -472,15 +472,14 @@ const styles = StyleSheet.create({
   // Tagline
   taglineWrap: {
     position: 'absolute',
-    top: '45%',
-    left: 20,
-    right: 20,
+    top: '43%',
+    left: 8,
+    right: 8,
     alignItems: 'center',
   },
   tagline: {
     color: COLORS.text,
-    fontSize: 56,
-    lineHeight: 60,
+    fontSize: 80,
     textAlign: 'center',
     fontFamily: theme.fonts?.primary?.extraBold || 'InterCustom-ExtraBold',
   },
