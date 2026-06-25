@@ -90,6 +90,7 @@ export interface PendingAuthData {
 export type PersonalTabParamList = {
   Home: undefined;
   Inbox: undefined;
+  PersonalNotifications: undefined; // Notifications tab (mode-aware NotificationsScreen)
   Activities: undefined;
   PersonalProfile: undefined;
 };

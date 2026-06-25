@@ -29,7 +29,6 @@ import { PrimaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { useNotifications } from '@/shared/context/NotificationContext';
 // ARCHITECTURE: Data comes from hook, not inline mock arrays
 import { useFeed } from '@/features/feed';
 import { followBusiness, unfollowBusiness } from '@/features/follow/follow.service';
@@ -48,8 +47,7 @@ export default function HomeScreen() {
   const currentUser = useProfileStore((state) => state.currentUser);
   const isNewUser = useProfileStore((state) => state.isNewUser);
   const clearNewUserFlag = useProfileStore((state) => state.clearNewUserFlag);
-  const { unreadCount } = useNotifications();
-  
+
   // Optimistic follow state overrides (companyId -> isFollowing)
   const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>({});
   
@@ -78,10 +76,6 @@ export default function HomeScreen() {
   } = useFeed();
 
   // Navigation handlers
-  const navigateToNotifications = useCallback(() => {
-    navigation.navigate('Notifications');
-  }, [navigation]);
-
   const openDrawer = useCallback(() => {
     navigation.dispatch(DrawerActions.toggleDrawer());
   }, [navigation]);
@@ -143,14 +137,6 @@ export default function HomeScreen() {
     <PrimaryHeader
       title="Home"
       leftAction={{ icon: 'menu', onPress: openDrawer, accessibilityLabel: 'Open menu' }}
-      actions={[
-        {
-          icon: 'notifications-outline',
-          onPress: navigateToNotifications,
-          badge: unreadCount,
-          accessibilityLabel: 'Notifications',
-        },
-      ]}
     />
   );
 

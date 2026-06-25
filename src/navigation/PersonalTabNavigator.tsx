@@ -5,6 +5,7 @@
  * Navigation structure:
  * - Home: Feed & updates from businesses, suggestions
  * - Inbox: Personal messages and conversations
+ * - Notifications: mode-aware NotificationsScreen (shows the unread badge, like pro mode)
  * - Activity: All orders/tasks placed as a person
  * - Profile: Personal settings, switch/manage business profiles
  */
@@ -16,6 +17,7 @@ import {
   Home,
   Mail,
   List,
+  Bell,
 } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -28,6 +30,7 @@ import HomeScreen from '@/modes/personal/screens/HomeScreen';
 import PersonalInboxScreen from '@/modes/personal/screens/PersonalInboxScreen';
 import ActivityScreen from '@/modes/personal/screens/ActivityScreen';
 import PersonalProfileScreen from '@/modes/personal/screens/PersonalProfileScreen';
+import NotificationsScreen from '@/features/notifications/screens/NotificationsScreen';
 
 const Tab = createBottomTabNavigator<PersonalTabParamList>();
 
@@ -93,20 +96,11 @@ export function PersonalTabNavigator() {
             </Text>
           ),
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ position: 'relative' }}>
-              <Home size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-              {unreadCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>
-                    {unreadCount > 9 ? '9+' : unreadCount.toString()}
-                  </Text>
-                </View>
-              )}
-            </View>
+            <Home size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />
-      
+
       {/* Inbox Tab */}
       <Tab.Screen
         name="Inbox"
@@ -136,6 +130,27 @@ export function PersonalTabNavigator() {
         }}
       />
       
+      {/* Notifications Tab - mode-aware NotificationsScreen (matches pro mode's nav-bar bell) */}
+      <Tab.Screen
+        name="PersonalNotifications"
+        component={NotificationsScreen}
+        options={{
+          tabBarLabel: ({ focused, color }) => (
+            <Text style={{
+              fontSize: theme.fontSize.xs,
+              fontFamily: focused ? theme.fonts.primary.extraBold : theme.fonts.primary.medium,
+              color,
+            }}>
+              Notifications
+            </Text>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <Bell size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+          ),
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 9 ? '9+' : unreadCount) : undefined,
+        }}
+      />
+
       {/* Activities Tab */}
       <Tab.Screen
         name="Activities"
