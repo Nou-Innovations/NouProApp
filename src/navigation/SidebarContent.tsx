@@ -15,7 +15,8 @@
  * - Logout footer
  */
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { DrawerContentScrollView, DrawerContentComponentProps } from '@react-navigation/drawer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
@@ -193,13 +194,13 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     if (getCapabilities(ub.role).isStaff) {
       const request = roleRequests.get(ub.business.id);
       if (request?.status === 'PENDING') {
-        Alert.alert(
+        AppAlert.alert(
           'Request pending',
           `Your admin-access request for ${ub.business.name} is still awaiting review.`
         );
         return;
       }
-      Alert.alert(
+      AppAlert.alert(
         'Access restricted',
         `You're a Staff member in ${ub.business.name}. Only Admins can open Business mode.`,
         [
@@ -223,7 +224,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
         requestedRole: 'admin',
         message: 'Requesting admin access to help manage business operations',
       });
-      Alert.alert(
+      AppAlert.alert(
         'Request sent',
         `Your admin-access request for ${ub.business.name} has been sent to the owner. You'll be notified when it's reviewed.`
       );
@@ -235,22 +236,26 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     } catch (error: any) {
       const msg = error?.message ?? '';
       if (msg.includes('already exists') || msg.includes('pending')) {
-        Alert.alert('Request already sent', 'You already have a pending admin-access request for this business.');
+        AppAlert.alert('Request already sent', 'You already have a pending admin-access request for this business.');
       } else if (msg.includes('cooldown') || msg.includes('recently rejected')) {
-        Alert.alert('Request cooldown', 'Your previous request was recently reviewed. Please wait before requesting again.');
+        AppAlert.alert('Request cooldown', 'Your previous request was recently reviewed. Please wait before requesting again.');
       } else {
-        Alert.alert('Request failed', 'Failed to send the admin-access request. Please try again.');
+        AppAlert.alert('Request failed', 'Failed to send the admin-access request. Please try again.');
       }
     }
   };
 
   // Add a business: let the user choose between creating a new one or joining an existing one.
   const handleAddAccount = () => {
-    Alert.alert('Add account', 'Create a new business or join an existing one.', [
-      { text: 'Create new business', onPress: () => go('BusinessBasicInfo', { fromProfileSwitcher: true }) },
-      { text: 'Join existing business', onPress: () => go('SelectCompany') },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    AppAlert.actionSheet({
+      title: 'Add account',
+      message: 'Create a new business or join an existing one.',
+      options: [
+        { label: 'Create new business', onPress: () => go('BusinessBasicInfo', { fromProfileSwitcher: true }) },
+        { label: 'Join existing business', onPress: () => go('SelectCompany') },
+        { label: 'Cancel', cancel: true },
+      ],
+    });
   };
 
   // "Help the community" card (footer) → feedback hub. Lives here so it's reachable from
@@ -258,7 +263,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
   const handleHelpCommunity = () => go('FeedbackCategories');
 
   const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+    AppAlert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Log Out', style: 'destructive', onPress: () => authAPI.logout() },
     ]);

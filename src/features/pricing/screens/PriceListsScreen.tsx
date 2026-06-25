@@ -6,7 +6,8 @@
  * upgrade modal when tapping "Create". Backed by priceLists.service.
  */
 import React, { useCallback, useState } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect, DrawerActions } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -36,7 +37,7 @@ export default function PriceListsScreen() {
       const data = await getPriceLists(companyId);
       setLists(data);
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to load price lists');
+      AppAlert.alert('Error', e?.message || 'Failed to load price lists');
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,7 @@ export default function PriceListsScreen() {
   const openEdit = (l: PriceList) => navigation.navigate('CreatePriceList', { manage: true, listId: l.id });
 
   const confirmDelete = (l: PriceList) => {
-    Alert.alert('Delete price list', `Delete "${l.name}"? Customers on it revert to base pricing.`, [
+    AppAlert.alert('Delete price list', `Delete "${l.name}"? Customers on it revert to base pricing.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -70,7 +71,7 @@ export default function PriceListsScreen() {
             await deletePriceList(companyId, l.id);
             setLists((prev) => prev.filter((x) => x.id !== l.id));
           } catch (e: any) {
-            Alert.alert('Error', e?.message || 'Failed to delete price list');
+            AppAlert.alert('Error', e?.message || 'Failed to delete price list');
           }
         },
       },

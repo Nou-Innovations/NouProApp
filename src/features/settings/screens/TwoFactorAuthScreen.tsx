@@ -1,15 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Switch,
-  Alert,
-  TextInput,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, TextInput, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
@@ -55,7 +46,7 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
         setIsSettingUp(true);
       } catch (error: any) {
         const message = error?.response?.data?.message || 'Failed to set up 2FA. Please try again.';
-        Alert.alert('Error', message);
+        AppAlert.alert('Error', message);
       } finally {
         setIsLoading(false);
       }
@@ -67,7 +58,7 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
 
   const handleDisable2FA = async () => {
     if (!disablePassword.trim()) {
-      Alert.alert('Error', 'Please enter your password');
+      AppAlert.alert('Error', 'Please enter your password');
       return;
     }
 
@@ -79,10 +70,10 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
       setVerificationCode('');
       setDisablePassword('');
       setShowDisablePrompt(false);
-      Alert.alert('Success', 'Two-factor authentication has been disabled.');
+      AppAlert.alert('Success', 'Two-factor authentication has been disabled.');
     } catch (error: any) {
       const message = error?.response?.data?.message || 'Failed to disable 2FA.';
-      Alert.alert('Error', message);
+      AppAlert.alert('Error', message);
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +81,7 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
 
   const handleVerifyCode = async () => {
     if (verificationCode.length < 6) {
-      Alert.alert('Error', 'Please enter a valid 6-digit verification code');
+      AppAlert.alert('Error', 'Please enter a valid 6-digit verification code');
       return;
     }
 
@@ -105,7 +96,7 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
       setShowBackupCodesModal(true);
     } catch (error: any) {
       const message = error?.response?.data?.message || 'Invalid code. Please try again.';
-      Alert.alert('Error', message);
+      AppAlert.alert('Error', message);
     } finally {
       setIsLoading(false);
     }
@@ -120,12 +111,12 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
 
   const handleCopySecret = async () => {
     await Clipboard.setStringAsync(secretKey.replace(/-/g, ''));
-    Alert.alert('Copied', 'Secret key copied to clipboard');
+    AppAlert.alert('Copied', 'Secret key copied to clipboard');
   };
 
   const handleCopyBackupCodes = async () => {
     await Clipboard.setStringAsync(backupCodes.join('\n'));
-    Alert.alert('Copied', 'Backup codes copied to clipboard');
+    AppAlert.alert('Copied', 'Backup codes copied to clipboard');
   };
 
   const renderSetupFlow = () => (

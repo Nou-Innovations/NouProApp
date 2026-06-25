@@ -5,15 +5,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  Image,
-} from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -59,7 +52,7 @@ export default function CreateGroupChatScreen() {
   const handlePickImage = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission needed', 'Please allow access to your photo library to set a group picture.');
+      AppAlert.alert('Permission needed', 'Please allow access to your photo library to set a group picture.');
       return;
     }
 
@@ -77,7 +70,7 @@ export default function CreateGroupChatScreen() {
 
   const handleCreateGroup = useCallback(async () => {
     if (!groupName.trim()) {
-      Alert.alert('Group name required', 'Please enter a name for the group.');
+      AppAlert.alert('Group name required', 'Please enter a name for the group.');
       return;
     }
 
@@ -130,11 +123,11 @@ export default function CreateGroupChatScreen() {
           unreadCount: 0,
         });
       } else {
-        Alert.alert('Error', 'No user context available. Please log in again.');
+        AppAlert.alert('Error', 'No user context available. Please log in again.');
       }
     } catch (error) {
       console.error('Failed to create group chat:', error);
-      Alert.alert('Error', 'Failed to create group chat. Please try again.');
+      AppAlert.alert('Error', 'Failed to create group chat. Please try again.');
     } finally {
       setIsCreating(false);
     }

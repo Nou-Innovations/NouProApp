@@ -4,11 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/shared/types/navigation';
@@ -75,13 +72,13 @@ export default function EmailVerificationScreen({ navigation, route }: Props) {
   const handleResendCode = async () => {
     try {
       await authAPI.sendEmailOTP(userData.email!);
-      Alert.alert(
+      AppAlert.alert(
         'Code Sent',
         `A new verification code has been sent to ${userData.email}`,
         [{ text: 'OK' }]
       );
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to resend code. Please try again.');
+      AppAlert.alert('Error', err?.message || 'Failed to resend code. Please try again.');
     }
     setError('');
     setCode('');
@@ -96,7 +93,7 @@ export default function EmailVerificationScreen({ navigation, route }: Props) {
         verificationMethod: 'phone',
       });
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to send SMS code. Please try again.');
+      AppAlert.alert('Error', err?.message || 'Failed to send SMS code. Please try again.');
     }
   };
 

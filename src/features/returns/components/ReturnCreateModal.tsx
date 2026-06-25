@@ -4,7 +4,8 @@
  * with quantity, condition (resellable/damaged) and disposition (restock/writeoff).
  */
 import React, { useState } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { Plus } from 'lucide-react-native';
 import { Icon } from '@/shared/utils/icons';
 import { AppButton, TextButton } from '@/shared/components/ui';
@@ -51,7 +52,7 @@ export function ReturnCreateModal({ visible, onClose, orderId, onCreated }: Retu
 
   const submit = async () => {
     if (items.length === 0) {
-      Alert.alert('Add at least one item', 'A return needs one or more items.');
+      AppAlert.alert('Add at least one item', 'A return needs one or more items.');
       return;
     }
     setSubmitting(true);
@@ -66,7 +67,7 @@ export function ReturnCreateModal({ visible, onClose, orderId, onCreated }: Retu
       onCreated?.();
       onClose();
     } catch {
-      Alert.alert('Could not create return', 'Please try again.');
+      AppAlert.alert('Could not create return', 'Please try again.');
     } finally {
       setSubmitting(false);
     }

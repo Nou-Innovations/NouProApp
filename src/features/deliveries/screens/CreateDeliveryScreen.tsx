@@ -7,17 +7,8 @@
  */
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  Image,
-  TextInput,
-  Animated,
-  Easing,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Animated, Easing } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
@@ -375,15 +366,15 @@ export default function CreateDeliveryScreen() {
   const handleCreate = () => {
     // Validation
     if (!isTransfer && !selectedClient) {
-      Alert.alert('Missing Information', 'Please select a client.');
+      AppAlert.alert('Missing Information', 'Please select a client.');
       return;
     }
     if (isTransfer && !selectedLocation) {
-      Alert.alert('Missing Information', 'Please select a destination location.');
+      AppAlert.alert('Missing Information', 'Please select a destination location.');
       return;
     }
     if (selectedItems.length === 0) {
-      Alert.alert('Missing Information', 'Please add at least one item.');
+      AppAlert.alert('Missing Information', 'Please add at least one item.');
       return;
     }
 
@@ -391,7 +382,7 @@ export default function CreateDeliveryScreen() {
       ? `Transfer to ${selectedLocation?.name}\n\n${totalItemsCount} items • ${formatCurrency(orderTotal)}`
       : `Delivery to ${selectedClient?.name}\n\n${totalItemsCount} items • ${formatCurrency(orderTotal)}`;
 
-    Alert.alert(
+    AppAlert.alert(
       `Confirm ${isTransfer ? 'Transfer' : 'Delivery'}`,
       summary,
       [
@@ -400,7 +391,7 @@ export default function CreateDeliveryScreen() {
           text: 'Create',
           onPress: async () => {
             if (!activeBusiness?.id) {
-              Alert.alert('Error', 'No active business selected');
+              AppAlert.alert('Error', 'No active business selected');
               return;
             }
             setIsCreating(true);
@@ -450,7 +441,7 @@ export default function CreateDeliveryScreen() {
               setShowSuccessDialog(true);
             } catch (error) {
               console.error('Error creating delivery:', error);
-              Alert.alert('Error', 'Failed to create delivery. Please try again.');
+              AppAlert.alert('Error', 'Failed to create delivery. Please try again.');
             } finally {
               setIsCreating(false);
             }

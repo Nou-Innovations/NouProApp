@@ -71,7 +71,9 @@ export interface AppBottomSheetProps {
   visible: boolean;
   onClose: () => void;
   title?: string;
-  
+  /** Optional description line shown under the title (e.g. for action-sheet menus). */
+  subtitle?: string;
+
   // Children mode (original behavior)
   children?: React.ReactNode;
   
@@ -116,6 +118,7 @@ export default function AppBottomSheet({
   visible,
   onClose,
   title,
+  subtitle,
   children,
   items,
   onSelectItem,
@@ -373,15 +376,21 @@ export default function AppBottomSheet({
               <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>
                 {title ?? ''}
               </Text>
-              <TouchableOpacity 
-                onPress={handleClose} 
-                style={styles.closeBtn} 
+              <TouchableOpacity
+                onPress={handleClose}
+                style={styles.closeBtn}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <X size={28} color={theme.colors.iconColor} strokeWidth={2} />
               </TouchableOpacity>
             </View>
           )}
+
+          {subtitle ? (
+            <Text style={[styles.subtitle, { color: theme.colors.textLight }]}>
+              {subtitle}
+            </Text>
+          ) : null}
 
           {/* Content area */}
           {items ? (
@@ -460,6 +469,14 @@ const styles = StyleSheet.create({
     fontFamily: 'InterCustom-Bold',
     flex: 1,
     paddingRight: 24,
+  },
+  subtitle: {
+    fontSize: 14,
+    fontFamily: 'InterCustom-Medium',
+    lineHeight: 20,
+    paddingHorizontal: 12,
+    marginTop: -8,
+    marginBottom: 12,
   },
   closeBtn: { 
     width: 40, 

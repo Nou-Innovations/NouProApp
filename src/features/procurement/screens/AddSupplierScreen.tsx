@@ -5,15 +5,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -62,7 +55,7 @@ export default function AddSupplierScreen() {
         setNotes(supplier.notes || '');
       })
       .catch(() => {
-        Alert.alert('Error', 'Failed to load supplier data');
+        AppAlert.alert('Error', 'Failed to load supplier data');
         navigation.goBack();
       })
       .finally(() => setIsLoadingSupplier(false));
@@ -72,12 +65,12 @@ export default function AddSupplierScreen() {
 
   const handleSubmit = async () => {
     if (!activeBusiness?.id) {
-      Alert.alert('Error', 'No active business selected');
+      AppAlert.alert('Error', 'No active business selected');
       return;
     }
 
     if (!isFormValid) {
-      Alert.alert('Error', 'Please enter a supplier name');
+      AppAlert.alert('Error', 'Please enter a supplier name');
       return;
     }
 
@@ -97,19 +90,19 @@ export default function AddSupplierScreen() {
       if (isEditMode && editSupplierId) {
         const updated = await procurementService.updateSupplier(activeBusiness.id, editSupplierId, data);
         updateSupplierInStore(editSupplierId, updated);
-        Alert.alert('Success', 'Supplier updated successfully!', [
+        AppAlert.alert('Success', 'Supplier updated successfully!', [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
       } else {
         const supplier = await procurementService.createSupplier(activeBusiness.id, data);
         addSupplier(supplier);
-        Alert.alert('Success', 'Supplier added successfully!', [
+        AppAlert.alert('Success', 'Supplier added successfully!', [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
       }
     } catch (error) {
       console.error('Error saving supplier:', error);
-      Alert.alert('Error', `Failed to ${isEditMode ? 'update' : 'add'} supplier. Please try again.`);
+      AppAlert.alert('Error', `Failed to ${isEditMode ? 'update' : 'add'} supplier. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }

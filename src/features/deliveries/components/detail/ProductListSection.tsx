@@ -9,7 +9,8 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { Icon } from '@/shared/utils/icons';
 import theme from '@/shared/theme';
 import LocationDropdown from '@/shared/components/ui/LocationDropdown';
@@ -49,7 +50,7 @@ export function ProductListSection({
   const handleItemStatusChange = (itemId: string) => {
     if (!showItemStatusMenu || !onItemStatusChange) return;
 
-    Alert.alert(
+    AppAlert.alert(
       'Update Item Status',
       'Select new status:',
       [

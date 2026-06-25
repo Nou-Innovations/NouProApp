@@ -18,6 +18,7 @@ export { default as AppBottomSheet, AppBottomSheetScrollView, AppBottomSheetFlat
 export type { AppBottomSheetProps, AppBottomSheetItem } from './AppBottomSheet';
 export { default as AppModal } from './AppModal';
 export type { AppModalProps, AppModalVariant } from './AppModal';
+export { default as AppDialogHost } from './AppDialogHost';
 export { default as ImageViewerModal } from './ImageViewerModal';
 
 // Standard UI components

@@ -1,12 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LogOut, Trash2, LucideIcon } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -65,7 +59,7 @@ export default function PersonalProfileSettingsScreen({ navigation }: PersonalPr
   const [showAreYouSureDialog, setShowAreYouSureDialog] = useState(false);
 
   const handleLogout = () => {
-    Alert.alert(
+    AppAlert.alert(
       'Log Out',
       'Are you sure you want to log out?',
       [
@@ -92,7 +86,7 @@ export default function PersonalProfileSettingsScreen({ navigation }: PersonalPr
 
   const confirmDeleteAccount = () => {
     setShowDeleteDialog(false);
-    Alert.alert('Delete Account', 'Account deletion process started...');
+    AppAlert.alert('Delete Account', 'Account deletion process started...');
   };
 
   return (

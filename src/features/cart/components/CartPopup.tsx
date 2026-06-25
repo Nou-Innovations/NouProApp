@@ -1,12 +1,6 @@
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Animated,
-  Dimensions,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useOrderStore, useCarts } from '@/shared/store/orderStore';
 import { AppButton, TextButton } from '@/shared/components/ui';
@@ -50,7 +44,7 @@ const CartPopup: React.FC<CartPopupProps> = ({
   };
 
   const handleCancel = () => {
-    Alert.alert(
+    AppAlert.alert(
       "Clear Cart",
       "Do you want to clear everything?",
       [
@@ -70,7 +64,7 @@ const CartPopup: React.FC<CartPopupProps> = ({
   };
 
   const handleAddToCart = () => {
-    Alert.alert(
+    AppAlert.alert(
       "Added to cart!",
       "Order successfully added to your cart.\nCheck your cart to review your order.",
       [

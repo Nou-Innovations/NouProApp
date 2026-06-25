@@ -28,6 +28,7 @@ import theme from '@/shared/theme';
 import { ThemeProvider, useTheme } from '@/shared/theme/ThemeProvider';
 import { NotificationProvider } from '@/shared/context/NotificationContext';
 import ErrorBoundary from '@/shared/components/ui/ErrorBoundary';
+import { AppDialogHost } from '@/shared/components/ui';
 
 // Stores
 import { useProfileStore } from '@/shared/store/profileStore';
@@ -812,12 +813,23 @@ const AppWithTheme = () => {
     return null;
   }
 
-  // Render based on current screen
+  // Render based on current screen.
+  //
+  // Auth gate FIRST: whenever there is no signed-in user — fresh launch, logout,
+  // or an expired session — render the auth/Launch flow immediately. This is what
+  // sends logout back to the splash screen. `currentScreen` is updated by an effect
+  // and therefore lags one render behind `isSignedIn`; without this guard, logout
+  // re-renders the main app tree once against a now-null user (stores already
+  // reset), which left a blank screen instead of returning to Launch.
   const renderScreen = () => {
+    if (!isSignedIn) {
+      return <AuthNavigatorWithContainer />;
+    }
+
     switch (currentScreen) {
       case 'auth':
         return <AuthNavigatorWithContainer />;
-      
+
       case 'main':
         return (
           <CompanyStoreInitializer>
@@ -845,6 +857,8 @@ const AppWithTheme = () => {
                 {renderScreen()}
               </ErrorBoundary>
             </View>
+            {/* App-wide imperative dialogs (AppAlert) render here, above all screens. */}
+            <AppDialogHost />
           </NotificationProvider>
         </KeyboardProvider>
       </SafeAreaProvider>

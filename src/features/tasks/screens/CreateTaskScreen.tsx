@@ -4,15 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -70,11 +63,11 @@ export default function CreateTaskScreen() {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a task title');
+      AppAlert.alert('Error', 'Please enter a task title');
       return;
     }
     if (!businessId) {
-      Alert.alert('Error', 'No business selected');
+      AppAlert.alert('Error', 'No business selected');
       return;
     }
 
@@ -92,7 +85,7 @@ export default function CreateTaskScreen() {
       });
       setShowSuccessDialog(true);
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to create task');
+      AppAlert.alert('Error', error?.message || 'Failed to create task');
     } finally {
       setIsSaving(false);
     }

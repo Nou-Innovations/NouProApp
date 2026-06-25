@@ -27,6 +27,8 @@ export interface AppModalProps {
   onClose: () => void;
   primaryButtonLoading?: boolean;
   secondaryButtonDisabled?: boolean;
+  /** Optional custom content rendered between the message and the action buttons (e.g. a prompt text field). */
+  children?: React.ReactNode;
 }
 
 /**
@@ -49,6 +51,7 @@ export default function AppModal({
   onClose,
   primaryButtonLoading = false,
   secondaryButtonDisabled = false,
+  children,
 }: AppModalProps) {
   const { theme: appTheme } = useTheme();
   
@@ -143,7 +146,10 @@ export default function AppModal({
               {message}
             </Text>
           ) : null}
-          
+
+          {/* Custom content (e.g. prompt text field) */}
+          {children ? <View style={styles.childrenContainer}>{children}</View> : null}
+
           {/* Primary Action */}
           <View style={styles.primaryActions}>
             <AppButton
@@ -227,6 +233,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: MODAL_TYPOGRAPHY.body.lineHeight,
     marginBottom: 24,
+  },
+  childrenContainer: {
+    width: '100%',
+    marginBottom: 16,
   },
   primaryActions: {
     width: '100%',

@@ -4,14 +4,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -62,7 +56,7 @@ export default function TaskDetailScreen() {
       const data = await getTask(businessId, taskId);
       setTask(data);
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to load task');
+      AppAlert.alert('Error', error?.message || 'Failed to load task');
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +73,7 @@ export default function TaskDetailScreen() {
       const updated = await updateTaskStatus(businessId, taskId, newStatus);
       setTask(updated);
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to update status');
+      AppAlert.alert('Error', error?.message || 'Failed to update status');
     } finally {
       setIsUpdating(false);
     }
@@ -92,7 +86,7 @@ export default function TaskDetailScreen() {
       setShowDeleteDialog(false);
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to delete task');
+      AppAlert.alert('Error', error?.message || 'Failed to delete task');
       setIsDeleting(false);
     }
   };

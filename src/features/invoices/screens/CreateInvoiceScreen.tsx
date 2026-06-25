@@ -1,20 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Modal,
-  Alert,
-  Platform,
-  TextInput,
-  Image,
-  Animated,
-  Easing,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, Modal, Platform, TextInput, Image, Animated, Easing, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
@@ -230,7 +216,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
         if (inv.referenceNumber) setReferenceNumber(inv.referenceNumber);
       } catch (err) {
         console.error('[CreateInvoice] Failed to load invoice for editing:', err);
-        Alert.alert('Error', 'Failed to load invoice data. Please try again.');
+        AppAlert.alert('Error', 'Failed to load invoice data. Please try again.');
         navigation.goBack();
       } finally {
         setIsLoadingInvoice(false);
@@ -516,11 +502,11 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
 
   const handleSaveDraft = async () => {
     if (!validateForm()) {
-      Alert.alert('Validation Error', 'Please fix the errors before saving');
+      AppAlert.alert('Validation Error', 'Please fix the errors before saving');
       return;
     }
     if (!activeBusiness?.id) {
-      Alert.alert('Error', 'No active business selected. Please select a business first.');
+      AppAlert.alert('Error', 'No active business selected. Please select a business first.');
       return;
     }
     setIsSaving(true);
@@ -536,7 +522,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
       setShowSuccessDialog(true);
     } catch (error: any) {
       const message = error?.response?.data?.error?.message || `Failed to save ${documentType.toLowerCase()}. Please try again.`;
-      Alert.alert('Error', message);
+      AppAlert.alert('Error', message);
     } finally {
       setIsSaving(false);
     }
@@ -544,7 +530,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
 
   const handlePreview = () => {
     if (!validateForm()) {
-      Alert.alert('Validation Error', 'Please fix the errors before previewing');
+      AppAlert.alert('Validation Error', 'Please fix the errors before previewing');
       return;
     }
     setShowPreview(true);
@@ -552,11 +538,11 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
 
   const handleSend = async () => {
     if (!validateForm()) {
-      Alert.alert('Validation Error', 'Please fix the errors before sending');
+      AppAlert.alert('Validation Error', 'Please fix the errors before sending');
       return;
     }
     if (!activeBusiness?.id) {
-      Alert.alert('Error', 'No active business selected. Please select a business first.');
+      AppAlert.alert('Error', 'No active business selected. Please select a business first.');
       return;
     }
     setIsSending(true);
@@ -572,7 +558,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
       setShowSuccessDialog(true);
     } catch (error: any) {
       const message = error?.response?.data?.error?.message || `Failed to send ${documentType.toLowerCase()}. Please try again.`;
-      Alert.alert('Error', message);
+      AppAlert.alert('Error', message);
     } finally {
       setIsSending(false);
     }

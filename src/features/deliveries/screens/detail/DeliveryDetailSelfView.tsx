@@ -17,18 +17,8 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  TextInput,
-  Alert,
-  Animated,
-  Easing,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Animated, Easing } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -333,9 +323,9 @@ export function DeliveryDetailSelfView({ delivery }: DeliveryDetailSelfViewProps
 
   const handleMoreOptionSelect = (item: { id: string }) => {
     if (item.id === 'share') {
-      Alert.alert('Share', `Share transfer ${delivery.id}`);
+      AppAlert.alert('Share', `Share transfer ${delivery.id}`);
     } else if (item.id === 'delete') {
-      Alert.alert(
+      AppAlert.alert(
         'Delete Transfer',
         `Are you sure you want to delete transfer ${delivery.id}?`,
         [
@@ -413,7 +403,7 @@ export function DeliveryDetailSelfView({ delivery }: DeliveryDetailSelfViewProps
           canEditStatus
           canEditPayment
           onOpenScheduleModal={async () => {
-            Alert.alert(
+            AppAlert.alert(
               'Reschedule Transfer',
               'Choose when to reschedule:',
               [
@@ -426,7 +416,7 @@ export function DeliveryDetailSelfView({ delivery }: DeliveryDetailSelfViewProps
                     const result = await actions.updateSchedule(tomorrow);
                     if (result) {
                       setExpectedDeliveryTime(tomorrow);
-                      Alert.alert('Rescheduled', 'Transfer rescheduled to tomorrow.');
+                      AppAlert.alert('Rescheduled', 'Transfer rescheduled to tomorrow.');
                     }
                   },
                 },
@@ -438,7 +428,7 @@ export function DeliveryDetailSelfView({ delivery }: DeliveryDetailSelfViewProps
                     const result = await actions.updateSchedule(later);
                     if (result) {
                       setExpectedDeliveryTime(later);
-                      Alert.alert('Rescheduled', 'Transfer rescheduled to 2 hours later.');
+                      AppAlert.alert('Rescheduled', 'Transfer rescheduled to 2 hours later.');
                     }
                   },
                 },

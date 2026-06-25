@@ -3,7 +3,8 @@
  * transfer. Shortfalls/damage are turned into Issues by the backend.
  */
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { QrCode } from 'lucide-react-native';
 import { Icon } from '@/shared/utils/icons';
 import { AppButton, TextButton } from '@/shared/components/ui';
@@ -36,7 +37,7 @@ export function TransferReceiveModal({ visible, onClose, transfer, onReceived }:
     if (match) {
       setRows((prev) => ({ ...prev, [match.productId]: { received: String(match.quantity ?? 0), damaged: prev[match.productId]?.damaged ?? '0' } }));
     } else {
-      Alert.alert('Not found', 'That code does not match an item on this transfer.');
+      AppAlert.alert('Not found', 'That code does not match an item on this transfer.');
     }
   };
 
@@ -67,7 +68,7 @@ export function TransferReceiveModal({ visible, onClose, transfer, onReceived }:
       onReceived?.(updated);
       onClose();
     } catch {
-      Alert.alert('Could not receive', 'Please try again.');
+      AppAlert.alert('Could not receive', 'Please try again.');
     } finally {
       setSubmitting(false);
     }

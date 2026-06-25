@@ -7,14 +7,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
@@ -67,27 +61,27 @@ export default function PurchaseRequestDetailScreen() {
     try {
       const updated = await handleApprove(requestId);
       setPr(updated);
-      Alert.alert('Approved', 'Purchase request has been approved.');
+      AppAlert.alert('Approved', 'Purchase request has been approved.');
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to approve.');
+      AppAlert.alert('Error', e?.message || 'Failed to approve.');
     } finally {
       setActionLoading(false);
     }
   }, [requestId, handleApprove]);
 
   const onReject = useCallback(() => {
-    Alert.prompt(
+    AppAlert.prompt(
       'Reject Request',
       'Please provide a reason for rejection:',
       async (reason) => {
-        if (!reason?.trim()) { Alert.alert('Error', 'A reason is required.'); return; }
+        if (!reason?.trim()) { AppAlert.alert('Error', 'A reason is required.'); return; }
         setActionLoading(true);
         try {
           const updated = await handleReject(requestId, reason.trim());
           setPr(updated);
-          Alert.alert('Rejected', 'Purchase request has been rejected.');
+          AppAlert.alert('Rejected', 'Purchase request has been rejected.');
         } catch (e: any) {
-          Alert.alert('Error', e?.message || 'Failed to reject.');
+          AppAlert.alert('Error', e?.message || 'Failed to reject.');
         } finally {
           setActionLoading(false);
         }
@@ -100,7 +94,7 @@ export default function PurchaseRequestDetailScreen() {
     setActionLoading(true);
     try {
       const po = await handleConvert(requestId);
-      Alert.alert('Converted', `Purchase order ${po.id} created.`, [
+      AppAlert.alert('Converted', `Purchase order ${po.id} created.`, [
         {
           text: 'View PO',
           onPress: () => (navigation as any).navigate('PurchaseOrderDetail', { orderId: po.id }),
@@ -109,7 +103,7 @@ export default function PurchaseRequestDetailScreen() {
       ]);
       setPr((prev) => (prev ? { ...prev, status: 'CONVERTED', purchaseOrderId: po.id } : prev));
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to convert.');
+      AppAlert.alert('Error', e?.message || 'Failed to convert.');
     } finally {
       setActionLoading(false);
     }

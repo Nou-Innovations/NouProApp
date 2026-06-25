@@ -7,9 +7,8 @@
  * writes go through `setStock`.
  */
 import React, { useMemo, useState } from 'react';
-import {
-  View, Text, StyleSheet, FlatList, Modal, TouchableOpacity, ActivityIndicator, Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, Modal, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -59,7 +58,7 @@ export default function StockScreen() {
 
   const openEditor = (p: UIProduct) => {
     if (!selectedLocationId) {
-      Alert.alert('Select a location', 'Choose a location above to adjust stock.');
+      AppAlert.alert('Select a location', 'Choose a location above to adjust stock.');
       return;
     }
     setEditing(p);
@@ -70,7 +69,7 @@ export default function StockScreen() {
     if (!editing || !selectedLocationId) return;
     const qty = Number(qtyInput);
     if (Number.isNaN(qty) || qty < 0) {
-      Alert.alert('Invalid quantity', 'Enter a number of 0 or more.');
+      AppAlert.alert('Invalid quantity', 'Enter a number of 0 or more.');
       return;
     }
     setSaving(true);
@@ -80,7 +79,7 @@ export default function StockScreen() {
       setEditing(null);
       refresh();
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to update stock');
+      AppAlert.alert('Error', e?.message || 'Failed to update stock');
     } finally {
       setSaving(false);
     }

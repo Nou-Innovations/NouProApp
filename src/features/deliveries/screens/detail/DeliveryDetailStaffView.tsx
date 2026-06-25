@@ -19,18 +19,8 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  Alert,
-  Animated,
-  Easing,
-  Linking,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Animated, Easing, Linking } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -154,7 +144,7 @@ export function DeliveryDetailStaffView({ delivery }: DeliveryDetailStaffViewPro
   // Handle item loaded toggle (only if elevated permissions)
   const handleItemLoadedToggle = (itemId: string) => {
     if (!hasElevatedPermissions) {
-      Alert.alert(
+      AppAlert.alert(
         'Permission Denied',
         'Only team leaders and admins can update loaded status.'
       );
@@ -171,7 +161,7 @@ export function DeliveryDetailStaffView({ delivery }: DeliveryDetailStaffViewPro
   // Status modal handlers
   const handleShowStatusModal = () => {
     if (!hasElevatedPermissions) {
-      Alert.alert(
+      AppAlert.alert(
         'Permission Denied',
         'Only team leaders and admins can update delivery status.'
       );
@@ -201,13 +191,13 @@ export function DeliveryDetailStaffView({ delivery }: DeliveryDetailStaffViewPro
 
   const handleMoreOptionSelect = (item: { id: string }) => {
     if (item.id === 'share') {
-      Alert.alert('Share', `Share delivery ${delivery.id}`);
+      AppAlert.alert('Share', `Share delivery ${delivery.id}`);
     }
   };
 
   // Handle report issue (creates note + optionally sets status to FAILED)
   const handleReportIssue = (noteText: string) => {
-    Alert.alert(
+    AppAlert.alert(
       'Issue Reported',
       'Do you want to mark this delivery as failed?',
       [
@@ -238,7 +228,7 @@ export function DeliveryDetailStaffView({ delivery }: DeliveryDetailStaffViewPro
     if (delivery.clientPhone) {
       Linking.openURL(`tel:${delivery.clientPhone}`);
     } else {
-      Alert.alert('No Phone Number', 'No phone number available for this destination.');
+      AppAlert.alert('No Phone Number', 'No phone number available for this destination.');
     }
   };
 

@@ -6,7 +6,8 @@
  * "Assign customers" entry point appear. Backed by priceLists.service.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Switch, Modal, FlatList, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Modal, FlatList, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
@@ -65,7 +66,7 @@ const CreatePriceListScreen: React.FC<Props> = ({ navigation, route }) => {
         setIsDefault(list.isDefault);
         setItems(list.items || []);
       } catch (e: any) {
-        Alert.alert('Error', e?.message || 'Failed to load price list');
+        AppAlert.alert('Error', e?.message || 'Failed to load price list');
       }
     }
   }, [companyId, route.params?.listId]);
@@ -83,7 +84,7 @@ const CreatePriceListScreen: React.FC<Props> = ({ navigation, route }) => {
   });
 
   const handleSave = async () => {
-    if (!companyId) { Alert.alert('Error', 'No active business found.'); return; }
+    if (!companyId) { AppAlert.alert('Error', 'No active business found.'); return; }
     setSaving(true);
     try {
       if (listId) {
@@ -93,10 +94,10 @@ const CreatePriceListScreen: React.FC<Props> = ({ navigation, route }) => {
         const created = await createPriceList(companyId, corePayload());
         // Stay on the screen in edit mode so overrides/customers can be added now.
         setListId(created.id);
-        Alert.alert('Price list created', 'Now add product overrides or assign customers.');
+        AppAlert.alert('Price list created', 'Now add product overrides or assign customers.');
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to save price list');
+      AppAlert.alert('Error', e?.message || 'Failed to save price list');
     } finally {
       setSaving(false);
     }
@@ -104,7 +105,7 @@ const CreatePriceListScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const removeOverride = (item: PriceListItem) => {
     if (!listId) return;
-    Alert.alert('Remove override', `Remove the custom price for "${productName(item.productId)}"?`, [
+    AppAlert.alert('Remove override', `Remove the custom price for "${productName(item.productId)}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -114,7 +115,7 @@ const CreatePriceListScreen: React.FC<Props> = ({ navigation, route }) => {
             await removePriceListItem(companyId, listId, item.id);
             setItems((prev) => prev.filter((x) => x.id !== item.id));
           } catch (e: any) {
-            Alert.alert('Error', e?.message || 'Failed to remove override');
+            AppAlert.alert('Error', e?.message || 'Failed to remove override');
           }
         },
       },
@@ -213,7 +214,7 @@ const CreatePriceListScreen: React.FC<Props> = ({ navigation, route }) => {
             setPickerOpen(false);
             setSearch('');
           } catch (e: any) {
-            Alert.alert('Error', e?.message || 'Failed to add override');
+            AppAlert.alert('Error', e?.message || 'Failed to add override');
           }
         }}
       />
@@ -271,7 +272,7 @@ const OverridePicker: React.FC<{
                 onPress={() => {
                   const v = Number(priceById[item.id]);
                   if (Number.isNaN(v) || priceById[item.id] === undefined || priceById[item.id] === '') {
-                    Alert.alert('Enter a price', 'Type a fixed price for this product first.');
+                    AppAlert.alert('Enter a price', 'Type a fixed price for this product first.');
                     return;
                   }
                   onAdd(item.id, v);

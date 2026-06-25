@@ -16,16 +16,8 @@
  */
 
 import React, { useCallback } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Image,
-  StyleSheet,
-  Linking,
-  Alert,
-  Platform,
-} from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, Linking, Platform } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import type { Message, OrderEventMessage, OrderEventStatus, VoiceMessage, ProfileMessage } from '@/shared/types/inbox';
@@ -208,21 +200,21 @@ export function MessageBubble({
     try {
       const canOpen = await Linking.canOpenURL(url);
       if (canOpen) {
-        Alert.alert(
+        AppAlert.alert(
           'Open Link',
           `Open ${url}?`,
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open', onPress: () => Linking.openURL(url) },
-            { text: 'Copy', onPress: () => Alert.alert('Copied', 'Link copied to clipboard') },
+            { text: 'Copy', onPress: () => AppAlert.alert('Copied', 'Link copied to clipboard') },
           ]
         );
       } else {
-        Alert.alert('Error', 'Cannot open this link');
+        AppAlert.alert('Error', 'Cannot open this link');
       }
     } catch (error) {
       console.error('Error opening link:', error);
-      Alert.alert('Error', 'Could not open link');
+      AppAlert.alert('Error', 'Could not open link');
     }
   };
   

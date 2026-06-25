@@ -4,13 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { OwnerCapabilities, ProductAvailability } from '@/shared/types/productDetails';
@@ -46,7 +41,7 @@ const ProductOwnerActions: React.FC<ProductOwnerActionsProps> = ({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   const handleArchive = () => {
-    Alert.alert(
+    AppAlert.alert(
       'Archive Product',
       'This product will be hidden from your catalog but preserved for order history. Continue?',
       [
@@ -57,7 +52,7 @@ const ProductOwnerActions: React.FC<ProductOwnerActionsProps> = ({
   };
 
   const handleDelete = () => {
-    Alert.alert(
+    AppAlert.alert(
       'Delete Product',
       'This action cannot be undone. Are you sure you want to delete this product?',
       [
@@ -72,7 +67,7 @@ const ProductOwnerActions: React.FC<ProductOwnerActionsProps> = ({
       ? 'This will hide the product from your public catalog.'
       : 'This will show the product in your public catalog.';
     
-    Alert.alert(
+    AppAlert.alert(
       isListed ? 'Unlist Product' : 'List Product',
       message,
       [

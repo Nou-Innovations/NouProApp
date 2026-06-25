@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
@@ -32,7 +33,7 @@ const CreateBrandScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleSave = async () => {
     const companyId = activeBusiness?.id;
     if (!companyId) {
-      Alert.alert('Error', 'No active business found.');
+      AppAlert.alert('Error', 'No active business found.');
       return;
     }
 
@@ -55,7 +56,7 @@ const CreateBrandScreen: React.FC<Props> = ({ navigation, route }) => {
         navigation.navigate('CreateProduct', { selectedBrand: brandName.trim() });
       }
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to save brand');
+      AppAlert.alert('Error', err?.message || 'Failed to save brand');
     } finally {
       setIsSaving(false);
     }

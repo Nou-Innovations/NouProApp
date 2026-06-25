@@ -2,7 +2,8 @@
  * RoutesScreen — list of delivery routes / trips, segmented by status.
  */
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, ScrollView } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -47,7 +48,7 @@ export default function RoutesScreen() {
       const created = await createRoute(companyId, { status: 'Planned', stops: [] });
       (navigation as any).navigate('RouteDetail', { routeId: created.id });
     } catch {
-      Alert.alert('Could not create route', 'Please try again.');
+      AppAlert.alert('Could not create route', 'Please try again.');
     } finally {
       setCreating(false);
     }

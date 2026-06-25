@@ -11,7 +11,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { useProfileStore } from '@/shared/store/profileStore';
 import {
   updateDelivery,
@@ -35,7 +35,7 @@ export function useDeliveryActions(deliveryId: string) {
   const withErrorHandling = useCallback(
     async <T>(fn: () => Promise<T>, errorMsg: string): Promise<T | null> => {
       if (!companyId) {
-        Alert.alert('Error', 'No business selected. Please select a business first.');
+        AppAlert.alert('Error', 'No business selected. Please select a business first.');
         return null;
       }
       setLoading(true);
@@ -46,7 +46,7 @@ export function useDeliveryActions(deliveryId: string) {
       } catch (err: any) {
         const message = err?.message || errorMsg;
         setError(message);
-        Alert.alert('Error', message);
+        AppAlert.alert('Error', message);
         return null;
       } finally {
         setLoading(false);

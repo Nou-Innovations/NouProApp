@@ -1,20 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Image,
-  FlatList,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Share,
-  Alert,
-  Keyboard,
-  Linking,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, TouchableOpacity, Image, FlatList, TextInput, KeyboardAvoidingView, Platform, StyleSheet, Share, Keyboard, Linking, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import * as Location from 'expo-location';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -410,7 +396,7 @@ export default function ChatScreen() {
       const status = payload?.status || 'Unknown';
       const total = payload?.totalAmount;
       const shortId = orderId.length > 6 ? orderId.slice(-6) : orderId;
-      Alert.alert(
+      AppAlert.alert(
         `Order #${shortId}`,
         `Status: ${status}${total ? `\nTotal: Rs ${Number(total).toLocaleString()}` : ''}`,
         [{ text: 'OK' }]
@@ -431,9 +417,9 @@ export default function ChatScreen() {
 
       // Inform user whether delivery was also created
       if (result.delivery) {
-        Alert.alert('Order Confirmed', `Order #${orderId} accepted and delivery created.`);
+        AppAlert.alert('Order Confirmed', `Order #${orderId} accepted and delivery created.`);
       } else {
-        Alert.alert(
+        AppAlert.alert(
           'Order Confirmed (Partial)',
           `Order #${orderId} accepted, but delivery could not be auto-created. Please create a delivery manually.`
         );
@@ -453,14 +439,14 @@ export default function ChatScreen() {
         return msg;
       }));
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to confirm order');
+      AppAlert.alert('Error', err?.message || 'Failed to confirm order');
     }
   };
 
   // Handle declining a B2B order
   const handleDeclineOrder = async (orderId: string) => {
     if (!activeBusiness?.id) return;
-    Alert.alert(
+    AppAlert.alert(
       'Decline Order',
       `Are you sure you want to decline order #${orderId}?`,
       [
@@ -471,7 +457,7 @@ export default function ChatScreen() {
           onPress: async () => {
             try {
               await declineOrder(activeBusiness.id, orderId, 'Declined by seller');
-              Alert.alert('Order Declined', `Order #${orderId} has been rejected.`);
+              AppAlert.alert('Order Declined', `Order #${orderId} has been rejected.`);
               setMessages(prevMessages => prevMessages.map(msg => {
                 if (msg.type === 'order_event' && msg.payload?.orderId === orderId) {
                   return {
@@ -485,7 +471,7 @@ export default function ChatScreen() {
                 return msg;
               }));
             } catch (err: any) {
-              Alert.alert('Error', err?.message || 'Failed to decline order');
+              AppAlert.alert('Error', err?.message || 'Failed to decline order');
             }
           },
         },
@@ -522,7 +508,7 @@ export default function ChatScreen() {
           editedAt: new Date().toISOString(),
         } as Partial<Message>);
       } catch (err: any) {
-        Alert.alert('Error', err?.message || 'Failed to edit message');
+        AppAlert.alert('Error', err?.message || 'Failed to edit message');
       }
       setEditingMessageId(null);
       setInputText('');
@@ -625,7 +611,7 @@ export default function ChatScreen() {
             msg.id === tempId ? { ...msg, status: 'failed' } as Message : msg
           )
         );
-        Alert.alert('Error', 'Failed to send message. Please try again.');
+        AppAlert.alert('Error', 'Failed to send message. Please try again.');
       }
     } else if (__DEV__) {
       // No active context - simulate delivery for mock/dev mode only
@@ -709,7 +695,7 @@ export default function ChatScreen() {
         );
       } catch (err: any) {
         console.error('[Voice] Failed to send voice message:', err);
-        Alert.alert('Error', 'Failed to send voice message');
+        AppAlert.alert('Error', 'Failed to send voice message');
       }
       // Reset recorder state
       cancelRecording();
@@ -788,11 +774,11 @@ export default function ChatScreen() {
           updateOrderMessage(msg.id, { paymentStatus: 'PAID' });
         }
       } else if (type === 'invoice') {
-        Alert.alert('Invoice', 'Show invoice/receipt for order ' + msg.orderId);
+        AppAlert.alert('Invoice', 'Show invoice/receipt for order ' + msg.orderId);
       }
     } catch (err: any) {
       console.error('Order action failed:', err);
-      Alert.alert('Error', err?.message || 'Failed to update order');
+      AppAlert.alert('Error', err?.message || 'Failed to update order');
     }
   };
 
@@ -859,11 +845,11 @@ export default function ChatScreen() {
 
   const handleOpenDocument = async (fileName: string, fileUrl?: string) => {
     if (!fileUrl) {
-      Alert.alert('Error', 'No file URL available for this document');
+      AppAlert.alert('Error', 'No file URL available for this document');
       return;
     }
 
-    Alert.alert(
+    AppAlert.alert(
       fileName,
       'What would you like to do?',
       [
@@ -877,11 +863,11 @@ export default function ChatScreen() {
               if (await Sharing.isAvailableAsync()) {
                 await Sharing.shareAsync(uri);
               } else {
-                Alert.alert('Downloaded', `${fileName} saved to ${uri}`);
+                AppAlert.alert('Downloaded', `${fileName} saved to ${uri}`);
               }
             } catch (error) {
               console.error('Download error:', error);
-              Alert.alert('Error', 'Failed to download document');
+              AppAlert.alert('Error', 'Failed to download document');
             }
           },
         },
@@ -932,7 +918,7 @@ export default function ChatScreen() {
             msg.id === messageId ? originalMessage : msg
           )
         );
-        Alert.alert('Error', 'Failed to delete message. Please try again.');
+        AppAlert.alert('Error', 'Failed to delete message. Please try again.');
       }
     }
     // If no API context, the optimistic update stays (mock mode)
@@ -1037,7 +1023,7 @@ export default function ChatScreen() {
   };
 
   const handleEstimateConfirm = async (estimateId: string) => {
-    Alert.alert(
+    AppAlert.alert(
       'Confirm Estimate',
       'Convert this estimate to an invoice?',
       [
@@ -1047,12 +1033,12 @@ export default function ChatScreen() {
           onPress: async () => {
             try {
               const invoice = await convertEstimateToInvoice(estimateId);
-              Alert.alert('Success', 'Estimate has been converted to invoice', [
+              AppAlert.alert('Success', 'Estimate has been converted to invoice', [
                 { text: 'View Invoice', onPress: () => (navigation as any).navigate('InvoiceDetails', { invoiceId: invoice.id || estimateId }) },
                 { text: 'OK' },
               ]);
             } catch (err: any) {
-              Alert.alert('Error', err?.message || 'Failed to convert estimate');
+              AppAlert.alert('Error', err?.message || 'Failed to convert estimate');
             }
           },
         },
@@ -1079,7 +1065,7 @@ export default function ChatScreen() {
           }
           return msg;
         }));
-        Alert.alert('Delivery Confirmed', 'Delivery has been marked as complete.');
+        AppAlert.alert('Delivery Confirmed', 'Delivery has been marked as complete.');
       } else if (actionId === 'confirm_payment') {
         await import('@/shared/services/orders').then(m =>
           m.updateOrderPaymentStatus(businessId, orderId, 'PAID')
@@ -1094,12 +1080,12 @@ export default function ChatScreen() {
           }
           return msg;
         }));
-        Alert.alert('Payment Confirmed', 'Payment has been marked as received.');
+        AppAlert.alert('Payment Confirmed', 'Payment has been marked as received.');
       } else {
-        Alert.alert('Action', `Action "${actionId}" for order ${orderId}`);
+        AppAlert.alert('Action', `Action "${actionId}" for order ${orderId}`);
       }
     } catch (err) {
-      Alert.alert('Error', 'Failed to perform action. Please try again.');
+      AppAlert.alert('Error', 'Failed to perform action. Please try again.');
     }
   };
 
@@ -1165,7 +1151,7 @@ export default function ChatScreen() {
             console.error('Upload failed:', uploadError);
             // Mark message as failed instead of sending broken local URI
             setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' } as Message : m));
-            Alert.alert('Upload Error', 'Failed to upload file. Please try again.');
+            AppAlert.alert('Upload Error', 'Failed to upload file. Please try again.');
             return;
           }
           
@@ -1202,7 +1188,7 @@ export default function ChatScreen() {
               msg.id === tempId ? { ...msg, status: 'failed' } as Message : msg
             )
           );
-          Alert.alert('Error', 'Failed to send document. Please try again.');
+          AppAlert.alert('Error', 'Failed to send document. Please try again.');
         }
       } else if (__DEV__) {
         // Mock mode - simulate delivery (dev only)
@@ -1216,7 +1202,7 @@ export default function ChatScreen() {
       }
     } catch (error) {
       console.error('Document picking error:', error);
-      Alert.alert('Error', 'Failed to pick document. Please try again.');
+      AppAlert.alert('Error', 'Failed to pick document. Please try again.');
     } finally {
       setIsPickingDocument(false);
     }
@@ -1228,7 +1214,7 @@ export default function ChatScreen() {
       // Request permission
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
+        AppAlert.alert(
           'Permission Required',
           'Please allow access to your photos to share images.',
           [
@@ -1297,7 +1283,7 @@ export default function ChatScreen() {
             console.error('Upload failed:', uploadError);
             // Mark message as failed instead of sending broken local URI
             setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' } as Message : m));
-            Alert.alert('Upload Error', 'Failed to upload image. Please try again.');
+            AppAlert.alert('Upload Error', 'Failed to upload image. Please try again.');
             return;
           }
           
@@ -1334,7 +1320,7 @@ export default function ChatScreen() {
               msg.id === tempId ? { ...msg, status: 'failed' } as Message : msg
             )
           );
-          Alert.alert('Error', 'Failed to send image. Please try again.');
+          AppAlert.alert('Error', 'Failed to send image. Please try again.');
         }
       } else if (__DEV__) {
         // Mock mode - simulate delivery (dev only)
@@ -1348,7 +1334,7 @@ export default function ChatScreen() {
       }
     } catch (error) {
       console.error('Media picking error:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      AppAlert.alert('Error', 'Failed to pick image. Please try again.');
     }
   };
   
@@ -1360,7 +1346,7 @@ export default function ChatScreen() {
       // Request location permissions
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
+        AppAlert.alert(
           'Permission Required',
           'Location permission is required to share your location. Please enable it in Settings.',
           [
@@ -1460,7 +1446,7 @@ export default function ChatScreen() {
               msg.id === tempId ? { ...msg, status: 'failed' } as Message : msg
             )
           );
-          Alert.alert('Error', 'Failed to share location. Please try again.');
+          AppAlert.alert('Error', 'Failed to share location. Please try again.');
         }
       } else if (__DEV__) {
         // Mock mode - simulate delivery (dev only)
@@ -1474,7 +1460,7 @@ export default function ChatScreen() {
       }
     } catch (error) {
       console.error('Location sharing error:', error);
-      Alert.alert('Error', 'Failed to get your location. Please try again.');
+      AppAlert.alert('Error', 'Failed to get your location. Please try again.');
     } finally {
       setIsSharingLocation(false);
     }
@@ -1530,7 +1516,7 @@ export default function ChatScreen() {
         prev.map(m => m.id === tempId ? { ...sentMessage, isOutgoing: true } as Message : m)
       );
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to share profile');
+      AppAlert.alert('Error', err?.message || 'Failed to share profile');
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' } as Message : m));
     }
   };
@@ -1544,9 +1530,9 @@ export default function ChatScreen() {
       } else if (activeBusiness?.id) {
         await forwardMessage(activeBusiness.id, id, forwardingMessageId, targetChatId);
       }
-      Alert.alert('Forwarded', `Message forwarded to ${targetChatName}`);
+      AppAlert.alert('Forwarded', `Message forwarded to ${targetChatName}`);
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to forward message');
+      AppAlert.alert('Error', err?.message || 'Failed to forward message');
     }
     setForwardingMessageId(null);
   };
@@ -1901,7 +1887,7 @@ export default function ChatScreen() {
           if (item.id === 'leave-group') {
             setShowParticipantOptionsSheet(false);
             setShowParticipantsSheet(false);
-            Alert.alert(
+            AppAlert.alert(
               'Leave Group',
               'Are you sure you want to leave this group?',
               [
@@ -1920,7 +1906,7 @@ export default function ChatScreen() {
                       useInboxStore.getState().updateChat(id, { participants: [] });
                       navigation.goBack();
                     } catch (err: any) {
-                      Alert.alert('Error', err?.message || 'Failed to leave group');
+                      AppAlert.alert('Error', err?.message || 'Failed to leave group');
                     }
                   }
                 },
@@ -1933,7 +1919,7 @@ export default function ChatScreen() {
             }
           } else if (item.id === 'remove-from-group') {
             setShowParticipantOptionsSheet(false);
-            Alert.alert(
+            AppAlert.alert(
               'Remove Member',
               `Are you sure you want to remove ${selectedParticipant?.name} from this group?`,
               [
@@ -1954,7 +1940,7 @@ export default function ChatScreen() {
                       setShowParticipantsSheet(false);
                       setSelectedParticipant(null);
                     } catch (err: any) {
-                      Alert.alert('Error', err?.message || 'Failed to remove member');
+                      AppAlert.alert('Error', err?.message || 'Failed to remove member');
                       setSelectedParticipant(null);
                     }
                   }

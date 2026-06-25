@@ -1,14 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-  FlatList,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl, FlatList } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
@@ -174,7 +166,7 @@ const ProductsScreen: React.FC = () => {
     if (errors.length > 0) {
       // Re-fetch from server to correct the optimistic state
       refresh();
-      Alert.alert(
+      AppAlert.alert(
         'Save Partially Failed',
         `${errors.length} of ${entries.length} product update(s) failed. The list has been refreshed from the server.`,
         [{ text: 'OK' }]

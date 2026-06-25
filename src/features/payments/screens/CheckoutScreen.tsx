@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { View, Alert, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -32,19 +33,19 @@ export default function CheckoutScreen() {
         }
       }
 
-      Alert.alert('Payment Successful', 'Your payment has been processed successfully.', [
+      AppAlert.alert('Payment Successful', 'Your payment has been processed successfully.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch {
       // Payment may still have succeeded via webhook; navigate back optimistically
-      Alert.alert('Payment Processing', 'Your payment is being processed. You will be notified once confirmed.', [
+      AppAlert.alert('Payment Processing', 'Your payment is being processed. You will be notified once confirmed.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     }
   }, [checkoutId, paymentType, navigation]);
 
   const handleCancelled = useCallback(() => {
-    Alert.alert('Payment Cancelled', 'The payment was cancelled.', [
+    AppAlert.alert('Payment Cancelled', 'The payment was cancelled.', [
       { text: 'OK', onPress: () => navigation.goBack() },
     ]);
   }, [navigation]);
@@ -59,7 +60,7 @@ export default function CheckoutScreen() {
   }, []);
 
   const handleClose = useCallback(() => {
-    Alert.alert(
+    AppAlert.alert(
       'Cancel Payment?',
       'Are you sure you want to cancel this payment?',
       [

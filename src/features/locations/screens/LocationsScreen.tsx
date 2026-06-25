@@ -5,16 +5,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Linking,
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useIsFocused, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -62,7 +54,7 @@ const LocationCard: React.FC<LocationCardProps> = ({
   const { theme: appTheme } = useTheme();
 
   const handleOptionsPress = () => {
-    Alert.alert(
+    AppAlert.alert(
       location.name,
       'Choose an action',
       [
@@ -142,7 +134,7 @@ export default function LocationsScreen() {
       setLocations(response);
     } catch (error) {
       console.error('Error fetching locations:', error);
-      Alert.alert('Error', 'Failed to load locations. Please try again.');
+      AppAlert.alert('Error', 'Failed to load locations. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -160,7 +152,7 @@ export default function LocationsScreen() {
 
   const handleSwitchProfile = () => {
     handleCloseSheet();
-    Alert.alert('Switch Profile', 'Switching profiles is not available for locations yet.');
+    AppAlert.alert('Switch Profile', 'Switching profiles is not available for locations yet.');
   };
 
   const handleEditLocation = (location: Location) => {
@@ -170,11 +162,11 @@ export default function LocationsScreen() {
 
   const handleDeleteLocation = (location: Location) => {
     if (location.is_primary) {
-      Alert.alert('Cannot Delete', 'You cannot delete the primary location.');
+      AppAlert.alert('Cannot Delete', 'You cannot delete the primary location.');
       return;
     }
     
-    Alert.alert(
+    AppAlert.alert(
       'Delete Location',
       `Are you sure you want to delete "${location.name}"? This action cannot be undone.`,
       [
@@ -189,7 +181,7 @@ export default function LocationsScreen() {
               setLocations(prev => prev.filter(l => l.id !== location.id));
             } catch (error) {
               console.error('Error deleting location:', error);
-              Alert.alert('Error', 'Failed to delete location. Please try again.');
+              AppAlert.alert('Error', 'Failed to delete location. Please try again.');
             }
           },
         },

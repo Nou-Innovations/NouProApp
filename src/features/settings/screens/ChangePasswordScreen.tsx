@@ -1,12 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -52,22 +46,22 @@ export default function ChangePasswordScreen({ navigation }: ChangePasswordScree
 
   const handleChangePassword = async () => {
     if (!currentPassword.trim()) {
-      Alert.alert('Error', 'Please enter your current password');
+      AppAlert.alert('Error', 'Please enter your current password');
       return;
     }
 
     if (!isPasswordValid) {
-      Alert.alert('Error', 'Please ensure your new password meets all requirements');
+      AppAlert.alert('Error', 'Please ensure your new password meets all requirements');
       return;
     }
 
     if (!passwordsMatch) {
-      Alert.alert('Error', 'New passwords do not match');
+      AppAlert.alert('Error', 'New passwords do not match');
       return;
     }
 
     if (currentPassword === newPassword) {
-      Alert.alert('Error', 'New password must be different from current password');
+      AppAlert.alert('Error', 'New password must be different from current password');
       return;
     }
 
@@ -77,14 +71,14 @@ export default function ChangePasswordScreen({ navigation }: ChangePasswordScree
       const response = await authAPI.changePassword(currentPassword, newPassword);
       
       const message = response?.data?.message || response?.message || 'Password changed successfully';
-      Alert.alert(
+      AppAlert.alert(
         'Success',
         message,
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (error: any) {
       const errorMessage = error?.response?.message || error?.message || 'An unexpected error occurred. Please try again.';
-      Alert.alert('Error', errorMessage);
+      AppAlert.alert('Error', errorMessage);
       console.error('Password change error:', error);
     } finally {
       setIsLoading(false);

@@ -1,13 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
@@ -53,12 +46,12 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
   const handleAddPayment = () => {
     const amount = parseFloat(newPaymentAmount);
     if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid payment amount.');
+      AppAlert.alert('Invalid Amount', 'Please enter a valid payment amount.');
       return;
     }
     
     if (amount > toPay) {
-      Alert.alert('Amount Too High', `The payment amount exceeds the remaining balance of ${formatCurrency(toPay)}.`);
+      AppAlert.alert('Amount Too High', `The payment amount exceeds the remaining balance of ${formatCurrency(toPay)}.`);
       return;
     }
     
@@ -95,7 +88,7 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
 
   const handleDone = async () => {
     if (!activeBusiness?.id) {
-      Alert.alert('Error', 'No active business selected');
+      AppAlert.alert('Error', 'No active business selected');
       return;
     }
     try {
@@ -103,7 +96,7 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
       navigation.goBack();
     } catch (error) {
       console.error('Error saving payments:', error);
-      Alert.alert('Error', 'Failed to save payments. Please try again.');
+      AppAlert.alert('Error', 'Failed to save payments. Please try again.');
     }
   };
 

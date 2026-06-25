@@ -3,7 +3,8 @@
  * Reusable: pass entityType + entityId and it creates the issue.
  */
 import React, { useState } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Image, Alert } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Image } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { Icon } from '@/shared/utils/icons';
 import { AppButton } from '@/shared/components/ui';
 import theme from '@/shared/theme';
@@ -47,7 +48,7 @@ export function ReportIssueModal({ visible, onClose, entityType, entityId, onRep
       onReported?.();
       onClose();
     } catch {
-      Alert.alert('Could not report', 'Please try again.');
+      AppAlert.alert('Could not report', 'Please try again.');
     } finally {
       setSubmitting(false);
     }

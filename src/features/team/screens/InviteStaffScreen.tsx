@@ -1,14 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Alert,
-  TextInput,
-  ScrollView,
-  Share,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, Share, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -122,7 +114,7 @@ export default function InviteStaffScreen() {
         url: inviteLink,
       });
     } catch (error) {
-      Alert.alert('Share Link', inviteLink);
+      AppAlert.alert('Share Link', inviteLink);
     }
   };
 
@@ -141,7 +133,7 @@ export default function InviteStaffScreen() {
   // Handle final submit
   const handleSubmit = async () => {
     if (!activeBusiness?.id) {
-      Alert.alert('Error', 'No active business selected');
+      AppAlert.alert('Error', 'No active business selected');
       return;
     }
     
@@ -163,7 +155,7 @@ export default function InviteStaffScreen() {
     }
 
     if (!currentLocation?.id) {
-      Alert.alert('Error', 'No location selected. Please select a location first.');
+      AppAlert.alert('Error', 'No location selected. Please select a location first.');
       return;
     }
 
@@ -181,14 +173,14 @@ export default function InviteStaffScreen() {
       
       const totalInvites = validEmails.length;
       
-      Alert.alert(
+      AppAlert.alert(
         'Success',
         `${totalInvites} invitation${totalInvites !== 1 ? 's' : ''} sent successfully!`,
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (error) {
       console.error('Error sending invites:', error);
-      Alert.alert('Error', 'Failed to send invitations. Please try again.');
+      AppAlert.alert('Error', 'Failed to send invitations. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

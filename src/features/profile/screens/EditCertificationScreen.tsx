@@ -1,14 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -77,7 +69,7 @@ export default function EditCertificationScreen() {
           };
         }
       } catch {
-        Alert.alert('Error', 'Failed to load certification');
+        AppAlert.alert('Error', 'Failed to load certification');
       } finally {
         setIsLoading(false);
       }
@@ -99,11 +91,11 @@ export default function EditCertificationScreen() {
 
   const handleSave = async () => {
     if (!name.trim() || !issuingOrganization.trim()) {
-      Alert.alert('Error', 'Name and issuing organization are required');
+      AppAlert.alert('Error', 'Name and issuing organization are required');
       return;
     }
     if (credentialUrl.trim() && !credentialUrl.trim().startsWith('http')) {
-      Alert.alert('Error', 'Credential URL must start with http:// or https://');
+      AppAlert.alert('Error', 'Credential URL must start with http:// or https://');
       return;
     }
     setIsSaving(true);
@@ -119,7 +111,7 @@ export default function EditCertificationScreen() {
       setSuccessMessage('Certification updated successfully!');
       setShowSuccessDialog(true);
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to update certification');
+      AppAlert.alert('Error', error?.message || 'Failed to update certification');
     } finally {
       setIsSaving(false);
     }
@@ -132,7 +124,7 @@ export default function EditCertificationScreen() {
       setShowDeleteDialog(false);
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to delete certification');
+      AppAlert.alert('Error', error?.message || 'Failed to delete certification');
       setIsDeleting(false);
     }
   };

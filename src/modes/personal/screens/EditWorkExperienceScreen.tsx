@@ -1,13 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -122,7 +115,7 @@ export default function EditWorkExperienceScreen() {
       setSuccessMessage('Work experience updated successfully!');
       setShowSuccessDialog(true);
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to update experience');
+      AppAlert.alert('Error', error?.message || 'Failed to update experience');
     }
   };
 
@@ -139,7 +132,7 @@ export default function EditWorkExperienceScreen() {
     } catch (error: any) {
       setIsRemoving(false);
       const msg = error?.message || 'Failed to remove experience. Please try again.';
-      Alert.alert('Error', msg);
+      AppAlert.alert('Error', msg);
     }
   };
 

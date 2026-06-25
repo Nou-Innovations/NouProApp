@@ -16,21 +16,8 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  TextInput,
-  Alert,
-  Animated,
-  Easing,
-  FlatList,
-  Dimensions,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Animated, Easing, FlatList, Dimensions, Platform } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -314,14 +301,14 @@ export function DeliveryDetailSupplierView({
       if (onAccept) {
         onAccept();
       } else {
-        Alert.alert('Order Accepted', 'The order has been accepted.');
+        AppAlert.alert('Order Accepted', 'The order has been accepted.');
       }
     }
   };
 
   // Handle reject order
   const handleReject = () => {
-    Alert.alert(
+    AppAlert.alert(
       'Reject Order',
       'Are you sure you want to reject this order?',
       [
@@ -336,7 +323,7 @@ export function DeliveryDetailSupplierView({
               if (onReject) {
                 onReject();
               } else {
-                Alert.alert('Order Rejected', 'The order has been rejected.');
+                AppAlert.alert('Order Rejected', 'The order has been rejected.');
               }
             }
           },
@@ -440,7 +427,7 @@ export function DeliveryDetailSupplierView({
     if (result) {
       setExpectedDeliveryTime(schedulingDate);
       closeSchedulingModal();
-      Alert.alert('Delivery Rescheduled', `Delivery has been rescheduled. Client has been notified.`);
+      AppAlert.alert('Delivery Rescheduled', `Delivery has been rescheduled. Client has been notified.`);
     }
   };
 
@@ -480,12 +467,12 @@ export function DeliveryDetailSupplierView({
       shareDeliveryNote(delivery, {
         businessName: activeBusiness?.name,
         currencySymbol: activeBusiness?.settings?.currency || '$',
-      }).catch(() => Alert.alert('Error', 'Could not generate the delivery note.'));
+      }).catch(() => AppAlert.alert('Error', 'Could not generate the delivery note.'));
     } else if (item.id === 'report_issue') {
       setShowMoreOptions(false);
       setShowReportIssue(true);
     } else if (item.id === 'delete') {
-      Alert.alert(
+      AppAlert.alert(
         'Delete Delivery',
         `Are you sure you want to delete delivery ${delivery.id}?`,
         [

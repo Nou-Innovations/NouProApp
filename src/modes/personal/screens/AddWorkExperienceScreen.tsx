@@ -1,13 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -91,12 +84,12 @@ export default function AddWorkExperienceScreen() {
 
   const handleSave = async () => {
     if (!companyName.trim()) {
-      Alert.alert('Error', 'Please enter a company name');
+      AppAlert.alert('Error', 'Please enter a company name');
       return;
     }
 
     if (!role.trim()) {
-      Alert.alert('Error', 'Please enter your role');
+      AppAlert.alert('Error', 'Please enter your role');
       return;
     }
 
@@ -116,7 +109,7 @@ export default function AddWorkExperienceScreen() {
       });
       setShowSuccessDialog(true);
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to add experience');
+      AppAlert.alert('Error', error?.message || 'Failed to add experience');
     } finally {
       setIsSaving(false);
     }

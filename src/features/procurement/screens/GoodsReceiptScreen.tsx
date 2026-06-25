@@ -7,14 +7,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
@@ -104,7 +98,7 @@ export default function GoodsReceiptScreen() {
     // Validation
     const hasInvalid = parsedItems.some((item) => item.receivedQty < 0);
     if (hasInvalid) {
-      Alert.alert('Validation', 'Received quantities cannot be negative.');
+      AppAlert.alert('Validation', 'Received quantities cannot be negative.');
       return;
     }
 
@@ -116,7 +110,7 @@ export default function GoodsReceiptScreen() {
     const grn = await submitReceipt(purchaseOrderId, payload);
 
     if (grn) {
-      Alert.alert('Success', `Goods receipt ${grn.id} created successfully.`, [
+      AppAlert.alert('Success', `Goods receipt ${grn.id} created successfully.`, [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     }

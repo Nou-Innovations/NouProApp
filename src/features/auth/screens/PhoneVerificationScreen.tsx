@@ -4,11 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/shared/types/navigation';
@@ -85,13 +82,13 @@ export default function PhoneVerificationScreen({ navigation, route }: Props) {
   const handleResendCode = async () => {
     try {
       await authAPI.sendPhoneOTP(userData.phone, userData.countryCode);
-      Alert.alert(
+      AppAlert.alert(
         'Code Sent',
         `A new verification code has been sent to ${maskedPhone}`,
         [{ text: 'OK' }]
       );
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to resend code. Please try again.');
+      AppAlert.alert('Error', err?.message || 'Failed to resend code. Please try again.');
     }
     setError('');
     setCode('');
@@ -100,7 +97,7 @@ export default function PhoneVerificationScreen({ navigation, route }: Props) {
 
   const handleSendOnEmail = async () => {
     if (!userData.email) {
-      Alert.alert(
+      AppAlert.alert(
         'Email Required',
         'You need to provide an email address to receive the code via email.',
         [
@@ -121,7 +118,7 @@ export default function PhoneVerificationScreen({ navigation, route }: Props) {
         verificationMethod: 'email',
       });
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to send email code. Please try again.');
+      AppAlert.alert('Error', err?.message || 'Failed to send email code. Please try again.');
     }
   };
 

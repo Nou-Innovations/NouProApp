@@ -3,7 +3,8 @@
  * and review its ordered stops.
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -67,7 +68,7 @@ export default function RouteDetailScreen() {
       const updated = await updateRoute(companyId, routeId, { name: trimmed });
       setData((prev) => (prev ? { ...prev, ...updated } : updated));
     } catch {
-      Alert.alert('Could not save', 'Please try again.');
+      AppAlert.alert('Could not save', 'Please try again.');
     } finally {
       setSavingName(false);
     }
@@ -82,7 +83,7 @@ export default function RouteDetailScreen() {
       const updated = await updateRoute(companyId, routeId, { status: action.next });
       setData((prev) => (prev ? { ...prev, ...updated } : updated));
     } catch {
-      Alert.alert('Could not update', 'Please try again.');
+      AppAlert.alert('Could not update', 'Please try again.');
     } finally {
       setSubmitting(false);
     }

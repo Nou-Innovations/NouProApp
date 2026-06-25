@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Text, StyleSheet, ScrollView } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
@@ -30,7 +31,7 @@ export default function CreateOpportunityScreen({ navigation, route }: Props) {
 
   const submit = async () => {
     if (!title.trim()) {
-      Alert.alert('Title required', 'Add a short title for your request.');
+      AppAlert.alert('Title required', 'Add a short title for your request.');
       return;
     }
     setSaving(true);
@@ -46,7 +47,7 @@ export default function CreateOpportunityScreen({ navigation, route }: Props) {
       navigation.goBack();
     } catch (e: any) {
       const isPaywall = e?.code === 'PAYWALL' || /upgrade/i.test(e?.message || '');
-      Alert.alert(isPaywall ? 'Upgrade required' : 'Error', e?.message || 'Failed to post opportunity');
+      AppAlert.alert(isPaywall ? 'Upgrade required' : 'Error', e?.message || 'Failed to post opportunity');
     } finally {
       setSaving(false);
     }

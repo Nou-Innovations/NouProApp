@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  Switch,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -140,7 +134,7 @@ export default function EditPersonalProfileScreen() {
       if (!hasChanges || isNavigatingAwayRef.current) return;
 
       e.preventDefault();
-      Alert.alert(
+      AppAlert.alert(
         'Discard changes?',
         'You have unsaved changes. Are you sure you want to leave?',
         [
@@ -168,11 +162,11 @@ export default function EditPersonalProfileScreen() {
 
     // Validation
     if (!personalInfo.firstName.trim()) {
-      Alert.alert('Required', 'First name is required.');
+      AppAlert.alert('Required', 'First name is required.');
       return;
     }
     if (personalInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalInfo.email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      AppAlert.alert('Invalid Email', 'Please enter a valid email address.');
       return;
     }
 
@@ -222,7 +216,7 @@ export default function EditPersonalProfileScreen() {
       setShowSuccessDialog(true);
     } catch (error) {
       console.error('Save profile error:', error);
-      Alert.alert('Error', 'Failed to save profile. Please try again.');
+      AppAlert.alert('Error', 'Failed to save profile. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -244,17 +238,17 @@ export default function EditPersonalProfileScreen() {
           await apiPatch('/auth/me', { avatar: uploadResult.imageUri });
         } catch (syncError) {
           console.error('Profile pic sync error:', syncError);
-          Alert.alert(
+          AppAlert.alert(
             'Warning',
             'Profile picture updated locally but failed to sync with server.'
           );
         }
       } else {
-        Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
+        AppAlert.alert('Error', 'Failed to upload profile picture. Please try again.');
       }
     } catch (error) {
       console.error('Avatar upload error:', error);
-      Alert.alert('Error', 'An error occurred while uploading the photo.');
+      AppAlert.alert('Error', 'An error occurred while uploading the photo.');
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -550,7 +544,7 @@ export default function EditPersonalProfileScreen() {
   );
 
   const handleLogout = () => {
-    Alert.alert(
+    AppAlert.alert(
       'Log Out',
       'Are you sure you want to log out?',
       [
@@ -577,7 +571,7 @@ export default function EditPersonalProfileScreen() {
 
   const confirmDeleteAccount = () => {
     setShowDeleteDialog(false);
-    Alert.alert('Delete Account', 'Account deletion process started...');
+    AppAlert.alert('Delete Account', 'Account deletion process started...');
   };
 
   const renderAccountSection = () => (

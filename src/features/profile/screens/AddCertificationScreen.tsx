@@ -1,13 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -38,15 +31,15 @@ export default function AddCertificationScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter the certification name');
+      AppAlert.alert('Error', 'Please enter the certification name');
       return;
     }
     if (!issuingOrganization.trim()) {
-      Alert.alert('Error', 'Please enter the issuing organization');
+      AppAlert.alert('Error', 'Please enter the issuing organization');
       return;
     }
     if (credentialUrl.trim() && !credentialUrl.trim().startsWith('http')) {
-      Alert.alert('Error', 'Credential URL must start with http:// or https://');
+      AppAlert.alert('Error', 'Credential URL must start with http:// or https://');
       return;
     }
 
@@ -62,7 +55,7 @@ export default function AddCertificationScreen() {
       });
       setShowSuccessDialog(true);
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to add certification');
+      AppAlert.alert('Error', error?.message || 'Failed to add certification');
     } finally {
       setIsSaving(false);
     }

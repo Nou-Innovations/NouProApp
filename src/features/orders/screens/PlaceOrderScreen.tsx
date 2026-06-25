@@ -6,13 +6,8 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  Alert,
-} from 'react-native';
+import { View, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -48,14 +43,14 @@ export default function PlaceOrderScreen({ route }: Props) {
 
   const handleConfirm = async () => {
     if (activeMode !== 'business' || !activeBusiness?.id) {
-      Alert.alert(
+      AppAlert.alert(
         'Business account required',
         'Only business accounts can place orders. Switch to your business profile to continue.'
       );
       return;
     }
     if (items.length === 0) {
-      Alert.alert('Empty cart', 'There is nothing to order.');
+      AppAlert.alert('Empty cart', 'There is nothing to order.');
       return;
     }
 
@@ -71,7 +66,7 @@ export default function PlaceOrderScreen({ route }: Props) {
       );
 
       if (order) {
-        Alert.alert('Order placed', 'Your order has been sent to the supplier.', [
+        AppAlert.alert('Order placed', 'Your order has been sent to the supplier.', [
           {
             text: 'View orders',
             // Orders is a hidden tab in BusinessTabNavigator — target it via the drawer's
@@ -85,7 +80,7 @@ export default function PlaceOrderScreen({ route }: Props) {
         ]);
       } else {
         const err = useOrderStore.getState().error;
-        Alert.alert('Could not place order', err || 'Please try again.');
+        AppAlert.alert('Could not place order', err || 'Please try again.');
       }
     } finally {
       setSubmitting(false);

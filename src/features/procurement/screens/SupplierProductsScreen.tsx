@@ -7,15 +7,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
@@ -75,7 +68,7 @@ export default function SupplierProductsScreen() {
 
   // ── Add product placeholder ──
   const handleAddProduct = useCallback(() => {
-    Alert.alert('Add Product', 'Add supplier product functionality coming soon.');
+    AppAlert.alert('Add Product', 'Add supplier product functionality coming soon.');
   }, []);
 
   // ── Render product card ──

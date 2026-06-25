@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import {
-  View, Text, Image, TouchableOpacity, Dimensions, StyleSheet, Linking, StatusBar, ScrollView, Alert, Share, ActivityIndicator, Modal, TextInput,
-} from 'react-native';
+import { View, Text, Image, TouchableOpacity, Dimensions, StyleSheet, Linking, StatusBar, ScrollView, Share, ActivityIndicator, Modal, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn } from '@/shared/components/ui/Skeleton';
 import { get as apiGet } from '@/shared/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -321,19 +320,19 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
   // Business ↔ business connect flow (request / accept), mirroring the user connect flow
   const handleBusinessConnect = () => {
     if (!activeBusiness) {
-      Alert.alert('Business Mode required', 'Switch to a business to connect with another business.');
+      AppAlert.alert('Business Mode required', 'Switch to a business to connect with another business.');
       return;
     }
     if (bizConn?.status === 'accepted') {
-      Alert.alert('Already Connected', `${activeBusiness.name} is already connected with ${business.name}.`);
+      AppAlert.alert('Already Connected', `${activeBusiness.name} is already connected with ${business.name}.`);
       return;
     }
     if (bizConn?.status === 'pending' && bizConn.direction === 'sent') {
-      Alert.alert('Request Pending', 'Your connection request is already pending.');
+      AppAlert.alert('Request Pending', 'Your connection request is already pending.');
       return;
     }
     if (bizConn?.status === 'pending' && bizConn.direction === 'received') {
-      Alert.alert('Accept Request', `Accept connection request from ${business.name}?`, [
+      AppAlert.alert('Accept Request', `Accept connection request from ${business.name}?`, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Accept',
@@ -343,7 +342,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
               await acceptBusinessConnectionRequest(bizConn.id);
               fetchBusinessData();
             } catch {
-              Alert.alert('Error', 'Failed to accept connection request.');
+              AppAlert.alert('Error', 'Failed to accept connection request.');
             } finally {
               setConnectLoading(false);
             }
@@ -353,7 +352,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       return;
     }
 
-    Alert.alert('Connect', `Send a connection request from ${activeBusiness.name} to ${business.name}?`, [
+    AppAlert.alert('Connect', `Send a connection request from ${activeBusiness.name} to ${business.name}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Connect',
@@ -363,7 +362,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
             await sendBusinessConnectionRequest(activeBusiness.id, business.id);
             fetchBusinessData();
           } catch (err: any) {
-            Alert.alert('Error', err?.response?.error || 'Failed to send connection request.');
+            AppAlert.alert('Error', err?.response?.error || 'Failed to send connection request.');
           } finally {
             setConnectLoading(false);
           }
@@ -411,7 +410,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
   const handleMoreOptions = () => setMoreOptionsVisible(true);
 
   const handleRequestToJoin = () => {
-    Alert.alert(
+    AppAlert.alert(
       'Request to Join',
       `Send a request to join ${business?.name || 'this company'}?`,
       [
@@ -421,10 +420,10 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
           onPress: async () => {
             try {
               await requestToJoinCompany(businessId);
-              Alert.alert('Request Sent', `Your request to join ${business?.name || 'the company'} has been sent.`);
+              AppAlert.alert('Request Sent', `Your request to join ${business?.name || 'the company'} has been sent.`);
             } catch (err: any) {
               const msg = err?.response?.data?.error?.message || 'Failed to send request. Please try again.';
-              Alert.alert('Error', msg);
+              AppAlert.alert('Error', msg);
             }
           },
         },
@@ -447,9 +446,9 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     setReportSheetVisible(false);
     try {
       await reportEntity('business', businessId, item.id as ReportReason);
-      Alert.alert('Report received', 'Thanks for flagging this. Our team will review it.', [{ text: 'OK' }]);
+      AppAlert.alert('Report received', 'Thanks for flagging this. Our team will review it.', [{ text: 'OK' }]);
     } catch {
-      Alert.alert('Could not report', 'Something went wrong. Please try again.');
+      AppAlert.alert('Could not report', 'Something went wrong. Please try again.');
     }
   };
 
@@ -792,13 +791,13 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
   const submitPublicOrder = async () => {
     if (!publicOrderLocation) return;
     if (!guestName.trim() || !guestPhone.trim()) {
-      Alert.alert('Missing info', 'Please enter your name and phone number.');
+      AppAlert.alert('Missing info', 'Please enter your name and phone number.');
       return;
     }
     const cart = getCart(business.id);
     const items = (cart?.items || []).map((i: any) => ({ productId: i.productId, quantity: i.quantity }));
     if (items.length === 0) {
-      Alert.alert('Empty cart', 'Add at least one product before placing an order.');
+      AppAlert.alert('Empty cart', 'Add at least one product before placing an order.');
       return;
     }
     setIsPlacingOrder(true);
@@ -813,10 +812,10 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       legacyClearCart();
       clearOrderCart(business.id);
       setShowPublicCheckout(false);
-      Alert.alert('Order placed!', `Your order #${order.id} has been sent to ${business.name}.`);
+      AppAlert.alert('Order placed!', `Your order #${order.id} has been sent to ${business.name}.`);
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message || err?.response?.error || err?.message || 'Failed to place order. Please try again.';
-      Alert.alert('Error', msg);
+      AppAlert.alert('Error', msg);
     } finally {
       setIsPlacingOrder(false);
     }
@@ -829,7 +828,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       return;
     }
     if (!isBusinessMode || !activeBusiness) {
-      Alert.alert('Error', 'You must be in Business Mode to place orders.');
+      AppAlert.alert('Error', 'You must be in Business Mode to place orders.');
       return;
     }
     
@@ -847,7 +846,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
         // Also clear the legacy cart (used by CartPopup/CartItemCard/CartBottomSection)
         legacyClearCart();
         
-        Alert.alert(
+        AppAlert.alert(
           'Order Placed!',
           `Your order #${order.id} has been sent to ${business.name}.`,
           [
@@ -869,10 +868,10 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
           ]
         );
       } else {
-        Alert.alert('Error', 'Failed to place order. Please try again.');
+        AppAlert.alert('Error', 'Failed to place order. Please try again.');
       }
     } catch (err) {
-      Alert.alert('Error', 'Failed to place order. Please try again.');
+      AppAlert.alert('Error', 'Failed to place order. Please try again.');
     } finally {
       setIsPlacingOrder(false);
     }

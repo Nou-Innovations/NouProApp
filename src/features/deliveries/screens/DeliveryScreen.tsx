@@ -1,14 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  RefreshControl,
-  FlatList,
-  ScrollView,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, RefreshControl, FlatList, ScrollView } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, DrawerActions } from '@react-navigation/native';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
@@ -151,7 +143,7 @@ export default function DeliveryScreen() {
 
   const handleCreateNew = () => {
     if (!hasManagePermission) {
-      Alert.alert('Access Denied', 'Only admins can create new deliveries.');
+      AppAlert.alert('Access Denied', 'Only admins can create new deliveries.');
       return;
     }
     

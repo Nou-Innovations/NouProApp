@@ -4,14 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -65,12 +59,12 @@ export default function AddTransportScreen() {
   // Handle submit
   const handleSubmit = async () => {
     if (!activeBusiness?.id) {
-      Alert.alert('Error', 'No active business selected');
+      AppAlert.alert('Error', 'No active business selected');
       return;
     }
 
     if (!isFormValid) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      AppAlert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
@@ -83,14 +77,14 @@ export default function AddTransportScreen() {
         license_plate: licensePlate.trim() || undefined,
       });
 
-      Alert.alert(
+      AppAlert.alert(
         'Success',
         'Vehicle added successfully!',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (error) {
       console.error('Error adding vehicle:', error);
-      Alert.alert('Error', 'Failed to add vehicle. Please try again.');
+      AppAlert.alert('Error', 'Failed to add vehicle. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

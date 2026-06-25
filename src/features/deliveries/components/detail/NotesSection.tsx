@@ -6,7 +6,8 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { Icon } from '@/shared/utils/icons';
 import theme from '@/shared/theme';
 
@@ -88,7 +89,7 @@ export function NotesSection({
     if (onAddNote) {
       onAddNote(noteText.trim());
     } else {
-      Alert.alert('Note Sent', 'Your note has been sent.');
+      AppAlert.alert('Note Sent', 'Your note has been sent.');
     }
     setNoteText('');
   };

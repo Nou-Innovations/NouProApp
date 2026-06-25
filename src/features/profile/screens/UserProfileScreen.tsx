@@ -4,7 +4,8 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Alert, Share } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Share } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn } from '@/shared/components/ui/Skeleton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
@@ -131,7 +132,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     // otherwise create it). The old code navigated to a synthetic `user-${id}` chat that did
     // not exist on the backend, so the chat screen could neither load nor send.
     if (!currentUserId) {
-      Alert.alert('Sign in required', 'Please log in again to send a message.');
+      AppAlert.alert('Sign in required', 'Please log in again to send a message.');
       return;
     }
     if (messageLoading) return;
@@ -163,7 +164,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
       });
     } catch (e) {
       console.error('Failed to open chat:', e);
-      Alert.alert('Error', 'Could not open the conversation. Please try again.');
+      AppAlert.alert('Error', 'Could not open the conversation. Please try again.');
     } finally {
       setMessageLoading(false);
     }
@@ -183,16 +184,16 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
       // Handle connect based on current status
       const status = user?.connectionStatus;
       if (status?.status === 'accepted') {
-        Alert.alert('Already Connected', `You are already connected with ${user?.name}.`);
+        AppAlert.alert('Already Connected', `You are already connected with ${user?.name}.`);
         return;
       }
       if (status?.status === 'pending' && status.direction === 'sent') {
-        Alert.alert('Request Pending', 'Your connection request is already pending.');
+        AppAlert.alert('Request Pending', 'Your connection request is already pending.');
         return;
       }
       if (status?.status === 'pending' && status.direction === 'received') {
         // Accept the request
-        Alert.alert('Accept Request', `Accept connection request from ${user?.name}?`, [
+        AppAlert.alert('Accept Request', `Accept connection request from ${user?.name}?`, [
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Accept',
@@ -203,7 +204,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
                 // Refresh profile to update connection status
                 fetchUserProfile();
               } catch (err) {
-                Alert.alert('Error', 'Failed to accept connection request.');
+                AppAlert.alert('Error', 'Failed to accept connection request.');
               } finally {
                 setConnectLoading(false);
               }
@@ -214,7 +215,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
       }
 
       // Send new request
-      Alert.alert('Connect', `Send a connection request to ${user?.name}?`, [
+      AppAlert.alert('Connect', `Send a connection request to ${user?.name}?`, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Connect',
@@ -225,7 +226,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
               fetchUserProfile();
             } catch (err: any) {
               const msg = err?.response?.error || 'Failed to send connection request.';
-              Alert.alert('Error', msg);
+              AppAlert.alert('Error', msg);
             } finally {
               setConnectLoading(false);
             }
@@ -263,7 +264,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
   }));
 
   const handleBlockUser = () => {
-    Alert.alert('Block User', `Are you sure you want to block ${user?.name || 'this user'}?`, [
+    AppAlert.alert('Block User', `Are you sure you want to block ${user?.name || 'this user'}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Block',
@@ -273,7 +274,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
             await blockUser(userId);
             navigation.goBack();
           } catch {
-            Alert.alert('Could not block', 'Something went wrong. Please try again.');
+            AppAlert.alert('Could not block', 'Something went wrong. Please try again.');
           }
         },
       },
@@ -284,9 +285,9 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     setReportSheetVisible(false);
     try {
       await reportEntity('user', userId, item.id as ReportReason);
-      Alert.alert('Report received', 'Thanks for flagging this. Our team will review it.', [{ text: 'OK' }]);
+      AppAlert.alert('Report received', 'Thanks for flagging this. Our team will review it.', [{ text: 'OK' }]);
     } catch {
-      Alert.alert('Could not report', 'Something went wrong. Please try again.');
+      AppAlert.alert('Could not report', 'Something went wrong. Please try again.');
     }
   };
 

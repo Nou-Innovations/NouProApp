@@ -1,13 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -204,7 +197,7 @@ export default function TeamManagementScreen() {
     const user = users.find(u => u.id === staff.id);
     // Convert StaffCard camelCase roles back to API snake_case
     const apiRole = newRole === 'superAdmin' ? 'super_admin' : newRole;
-    Alert.alert(
+    AppAlert.alert(
       'Change Role',
       `Change ${staff.name}'s role to ${newRole === 'superAdmin' ? 'Super Admin' : newRole === 'admin' ? 'Admin' : 'Staff'}?`,
       [
@@ -220,7 +213,7 @@ export default function TeamManagementScreen() {
               fetchUsers();
             } catch (error) {
               console.error('Error updating role:', error);
-              Alert.alert('Error', 'Failed to update role. Please try again.');
+              AppAlert.alert('Error', 'Failed to update role. Please try again.');
             }
           }
         }
@@ -238,7 +231,7 @@ export default function TeamManagementScreen() {
   
   // Handle report from StaffCard
   const handleReportStaff = (staff: StaffMember) => {
-    Alert.alert(
+    AppAlert.alert(
       'Report User',
       `Report ${staff.name}?`,
       [
@@ -247,7 +240,7 @@ export default function TeamManagementScreen() {
           text: 'Report', 
           style: 'destructive',
           onPress: () => {
-            Alert.alert('Report', 'Report functionality is not available yet.');
+            AppAlert.alert('Report', 'Report functionality is not available yet.');
           }
         }
       ]
@@ -257,7 +250,7 @@ export default function TeamManagementScreen() {
   const handleRemoveUser = (user: User) => {
     if (!activeBusiness?.id) return;
 
-    Alert.alert(
+    AppAlert.alert(
       'Remove User',
       `Are you sure you want to remove ${user.name} from the team? This action cannot be undone.`,
       [
@@ -273,7 +266,7 @@ export default function TeamManagementScreen() {
               fetchUsers(); // Refresh the list
             } catch (error) {
               console.error('Error removing user:', error);
-              Alert.alert('Error', 'Failed to remove user');
+              AppAlert.alert('Error', 'Failed to remove user');
             }
           }
         }
@@ -294,7 +287,7 @@ export default function TeamManagementScreen() {
   
   // Handle accepting a join request - show role selection
   const handleAcceptRequest = (request: JoinRequest) => {
-    Alert.alert(
+    AppAlert.alert(
       'Select Role',
       `What role should ${request.userName} have?`,
       [
@@ -311,7 +304,7 @@ export default function TeamManagementScreen() {
               fetchUsers();
             } catch (error) {
               console.error('Error accepting request:', error);
-              Alert.alert('Error', 'Failed to accept request. Please try again.');
+              AppAlert.alert('Error', 'Failed to accept request. Please try again.');
             }
           }
         },
@@ -327,7 +320,7 @@ export default function TeamManagementScreen() {
               fetchUsers();
             } catch (error) {
               console.error('Error accepting request:', error);
-              Alert.alert('Error', 'Failed to accept request. Please try again.');
+              AppAlert.alert('Error', 'Failed to accept request. Please try again.');
             }
           }
         }
@@ -337,7 +330,7 @@ export default function TeamManagementScreen() {
   
   // Handle rejecting a join request
   const handleRejectRequest = (request: JoinRequest) => {
-    Alert.alert(
+    AppAlert.alert(
       'Reject Request',
       `Reject ${request.userName}'s request to join the team?`,
       [
@@ -354,7 +347,7 @@ export default function TeamManagementScreen() {
               setShowSuccessDialog(true);
             } catch (error) {
               console.error('Error rejecting request:', error);
-              Alert.alert('Error', 'Failed to reject request. Please try again.');
+              AppAlert.alert('Error', 'Failed to reject request. Please try again.');
             }
           }
         }
@@ -364,7 +357,7 @@ export default function TeamManagementScreen() {
   
   // Handle canceling a pending invite
   const handleCancelInvite = (invite: PendingInvite) => {
-    Alert.alert(
+    AppAlert.alert(
       'Cancel Invite',
       `Cancel the invitation sent to ${invite.email}?`,
       [
@@ -381,7 +374,7 @@ export default function TeamManagementScreen() {
               setShowSuccessDialog(true);
             } catch (error) {
               console.error('Error cancelling invite:', error);
-              Alert.alert('Error', 'Failed to cancel invite. Please try again.');
+              AppAlert.alert('Error', 'Failed to cancel invite. Please try again.');
             }
           }
         }
@@ -391,7 +384,7 @@ export default function TeamManagementScreen() {
   
   // Handle resending a pending invite
   const handleResendInvite = (invite: PendingInvite) => {
-    Alert.alert(
+    AppAlert.alert(
       'Resend Invite',
       `Resend invitation to ${invite.email}?`,
       [
@@ -406,7 +399,7 @@ export default function TeamManagementScreen() {
               setShowSuccessDialog(true);
             } catch (error) {
               console.error('Error resending invite:', error);
-              Alert.alert('Error', 'Failed to resend invite. Please try again.');
+              AppAlert.alert('Error', 'Failed to resend invite. Please try again.');
             }
           }
         }
@@ -695,7 +688,7 @@ export default function TeamManagementScreen() {
           }}
           title="Report User"
           onPress={() => {
-            Alert.alert('Report User', 'To report this user, please contact support at support@noupro.app');
+            AppAlert.alert('Report User', 'To report this user, please contact support at support@noupro.app');
             setShowJoinRequestOptions(false);
             setSelectedJoinRequest(null);
           }}

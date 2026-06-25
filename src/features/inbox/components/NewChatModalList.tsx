@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, ReactNode } from 'react';
-import { View, StyleSheet, Text, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { useNavigation } from '@react-navigation/native';
 import AppBottomSheet, { AppBottomSheetScrollView, SHEET_BOTTOM_PADDING } from '@/shared/components/ui/AppBottomSheet';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
@@ -375,11 +376,11 @@ export default function NewChatModalList({
           unreadCount: 0,
         });
       } else {
-        Alert.alert('Error', 'No user context available. Please log in again.');
+        AppAlert.alert('Error', 'No user context available. Please log in again.');
       }
     } catch (error) {
       console.error('Failed to create chat:', error);
-      Alert.alert('Error', 'Failed to create chat. Please try again.');
+      AppAlert.alert('Error', 'Failed to create chat. Please try again.');
     } finally {
       setIsCreating(false);
     }

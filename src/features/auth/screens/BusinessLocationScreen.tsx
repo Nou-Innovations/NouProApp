@@ -4,14 +4,8 @@
  */
 
 import React, { useState, useRef } from 'react';
-import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-  Modal,
-  Alert,
-} from 'react-native';
+import { View, TouchableOpacity, StyleSheet, TextInput, Modal } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import MapView, { Marker, Region } from 'react-native-maps';
@@ -74,7 +68,7 @@ export default function BusinessLocationScreen({ navigation, route }: Props) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Please enable location services to use this feature.');
+        AppAlert.alert('Permission Denied', 'Please enable location services to use this feature.');
         setIsLoadingLocation(false);
         return;
       }
@@ -108,7 +102,7 @@ export default function BusinessLocationScreen({ navigation, route }: Props) {
       mapRef.current?.animateToRegion(newRegion, 500);
     } catch (error) {
       console.error('Error getting location:', error);
-      Alert.alert('Error', 'Failed to get current location.');
+      AppAlert.alert('Error', 'Failed to get current location.');
     } finally {
       setIsLoadingLocation(false);
     }
@@ -148,11 +142,11 @@ export default function BusinessLocationScreen({ navigation, route }: Props) {
         setMarkerPosition({ latitude, longitude });
         mapRef.current?.animateToRegion(newRegion, 500);
       } else {
-        Alert.alert('Not Found', 'Could not find the address. Please try a different search.');
+        AppAlert.alert('Not Found', 'Could not find the address. Please try a different search.');
       }
     } catch (error) {
       console.error('Error geocoding address:', error);
-      Alert.alert('Error', 'Failed to search for address.');
+      AppAlert.alert('Error', 'Failed to search for address.');
     } finally {
       setIsLoadingLocation(false);
     }
@@ -168,7 +162,7 @@ export default function BusinessLocationScreen({ navigation, route }: Props) {
       });
       setShowMapModal(false);
     } else {
-      Alert.alert('No Location Selected', 'Please select a location on the map or search for an address.');
+      AppAlert.alert('No Location Selected', 'Please select a location on the map or search for an address.');
     }
   };
 

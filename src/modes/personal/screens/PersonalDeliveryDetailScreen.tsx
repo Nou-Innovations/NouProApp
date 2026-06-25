@@ -5,15 +5,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -116,7 +109,7 @@ export default function PersonalDeliveryDetailScreen() {
     const hasBusiness = userBusinesses.some(ub => ub.business.id === businessId);
 
     if (!hasBusiness) {
-      Alert.alert(
+      AppAlert.alert(
         'Access Denied',
         'You do not have access to view full details for this business.',
         [{ text: 'OK' }]
@@ -125,7 +118,7 @@ export default function PersonalDeliveryDetailScreen() {
     }
 
     if (!hasFullAccess) {
-      Alert.alert(
+      AppAlert.alert(
         'Limited Access',
         'As a staff member, you only have access to the delivery information shown here. Contact your admin for more details.',
         [{ text: 'OK' }]
@@ -143,7 +136,7 @@ export default function PersonalDeliveryDetailScreen() {
       }
     } catch (err) {
       console.error('Error switching to business:', err);
-      Alert.alert('Error', 'Could not switch to business profile');
+      AppAlert.alert('Error', 'Could not switch to business profile');
     }
   };
 

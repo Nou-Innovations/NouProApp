@@ -1,12 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Switch } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from 'App';
@@ -168,7 +162,7 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleSave = async () => {
     const companyId = activeBusiness?.id;
     if (!companyId) {
-      Alert.alert('Error', 'No active business found. Please select a business first.');
+      AppAlert.alert('Error', 'No active business found. Please select a business first.');
       return;
     }
     
@@ -212,7 +206,7 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
       navigation.goBack();
     } catch (err: any) {
       const message = err?.message || (isEditMode ? 'Failed to update product' : 'Failed to create product');
-      Alert.alert('Error', message);
+      AppAlert.alert('Error', message);
     } finally {
       setIsSaving(false);
     }
@@ -223,7 +217,7 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
       const serverUrl = await uploadImage(localUri);
       setProductImages(prev => [...prev, serverUrl]);
     } catch (err: any) {
-      Alert.alert('Upload Error', err?.message || 'Failed to upload image');
+      AppAlert.alert('Upload Error', err?.message || 'Failed to upload image');
     }
   };
 

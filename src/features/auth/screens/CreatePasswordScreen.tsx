@@ -4,12 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/shared/types/navigation';
@@ -60,7 +56,7 @@ export default function CreatePasswordScreen({ navigation, route }: Props) {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
       if (!password && !confirmPassword) return; // Nothing to lose
       e.preventDefault();
-      Alert.alert(
+      AppAlert.alert(
         'Discard changes?',
         'You have unsaved data. Are you sure you want to go back?',
         [

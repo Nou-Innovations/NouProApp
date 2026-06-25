@@ -12,12 +12,8 @@
  */
 
 import React from 'react';
-import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { AppButton, ButtonRow } from '@/shared/components/ui';
@@ -103,7 +99,7 @@ export default function ProfileActionButtons({
       onMoreOptionsPress();
     } else {
       // Default: show alert with options
-      Alert.alert(
+      AppAlert.alert(
         'Options',
         'Select an action',
         [

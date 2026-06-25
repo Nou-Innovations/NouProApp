@@ -11,7 +11,8 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -144,16 +145,16 @@ export default function OrderDetailsScreen({ route }: Props) {
     try {
       await confirmOrder(businessId, orderId);
       await refresh();
-      Alert.alert('Order accepted', 'A delivery has been created for this order.');
+      AppAlert.alert('Order accepted', 'A delivery has been created for this order.');
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Could not accept the order.');
+      AppAlert.alert('Error', err?.message || 'Could not accept the order.');
     } finally {
       setBusy(false);
     }
   };
 
   const handleReject = () => {
-    Alert.alert('Reject order', 'Are you sure you want to reject this order?', [
+    AppAlert.alert('Reject order', 'Are you sure you want to reject this order?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Reject',
@@ -165,7 +166,7 @@ export default function OrderDetailsScreen({ route }: Props) {
             await declineOrder(businessId, orderId, 'Rejected by seller');
             await refresh();
           } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Could not reject the order.');
+            AppAlert.alert('Error', err?.message || 'Could not reject the order.');
           } finally {
             setBusy(false);
           }
@@ -181,7 +182,7 @@ export default function OrderDetailsScreen({ route }: Props) {
       setTransitions(t);
       setTransitionsVisible(true);
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Could not load status options.');
+      AppAlert.alert('Error', err?.message || 'Could not load status options.');
     }
   };
 
@@ -193,14 +194,14 @@ export default function OrderDetailsScreen({ route }: Props) {
       await updateOrderStatus(businessId, orderId, status as OrderStatus, 'Updated by seller');
       await refresh();
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Could not update status.');
+      AppAlert.alert('Error', err?.message || 'Could not update status.');
     } finally {
       setBusy(false);
     }
   };
 
   const handleMarkPaid = () => {
-    Alert.alert('Mark as paid', 'Record this order as fully paid?', [
+    AppAlert.alert('Mark as paid', 'Record this order as fully paid?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Mark paid',
@@ -211,7 +212,7 @@ export default function OrderDetailsScreen({ route }: Props) {
             await updateOrderPaymentStatus(businessId, orderId, 'PAID');
             await refresh();
           } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Could not update payment.');
+            AppAlert.alert('Error', err?.message || 'Could not update payment.');
           } finally {
             setBusy(false);
           }
@@ -227,7 +228,7 @@ export default function OrderDetailsScreen({ route }: Props) {
       setHistory(h);
       setHistoryVisible(true);
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Could not load history.');
+      AppAlert.alert('Error', err?.message || 'Could not load history.');
     }
   };
 
@@ -243,7 +244,7 @@ export default function OrderDetailsScreen({ route }: Props) {
         openChat();
         break;
       case 'notes':
-        Alert.alert('Order notes', order.notes || 'No notes on this order.');
+        AppAlert.alert('Order notes', order.notes || 'No notes on this order.');
         break;
       case 'history':
         openHistory();

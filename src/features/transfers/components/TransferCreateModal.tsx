@@ -3,7 +3,8 @@
  * business's own locations. Bottom-sheet modal mirroring ReportIssueModal.
  */
 import React, { useState, useMemo } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { Plus } from 'lucide-react-native';
 import { Icon } from '@/shared/utils/icons';
 import { AppButton, TextButton } from '@/shared/components/ui';
@@ -52,18 +53,18 @@ export function TransferCreateModal({ visible, onClose, onCreated }: TransferCre
 
   const submit = async () => {
     if (!fromId || !toId) {
-      Alert.alert('Missing locations', 'Pick both a source and a destination location.');
+      AppAlert.alert('Missing locations', 'Pick both a source and a destination location.');
       return;
     }
     if (fromId === toId) {
-      Alert.alert('Same location', 'Source and destination must be different.');
+      AppAlert.alert('Same location', 'Source and destination must be different.');
       return;
     }
     const cleanItems = items
       .map((it) => ({ name: it.name.trim(), quantity: parseInt(it.quantity, 10) || 0 }))
       .filter((it) => it.name.length > 0 && it.quantity > 0);
     if (cleanItems.length === 0) {
-      Alert.alert('No items', 'Add at least one item with a name and quantity.');
+      AppAlert.alert('No items', 'Add at least one item with a name and quantity.');
       return;
     }
 
@@ -81,7 +82,7 @@ export function TransferCreateModal({ visible, onClose, onCreated }: TransferCre
       onCreated?.();
       onClose();
     } catch {
-      Alert.alert('Could not create transfer', 'Please try again.');
+      AppAlert.alert('Could not create transfer', 'Please try again.');
     } finally {
       setSubmitting(false);
     }

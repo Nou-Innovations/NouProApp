@@ -9,18 +9,8 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-  RefreshControl,
-  Alert,
-  Modal,
-  Pressable,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl, Modal, Pressable, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -333,7 +323,7 @@ export default function NotificationsScreen() {
       (notification.type === 'staff_request' || notification.type === 'join_accepted') &&
       (!notification.requestData.currentRole || notification.requestData.currentRole === 'none')
     ) {
-      Alert.alert(
+      AppAlert.alert(
         'Select Role',
         `What role should ${notification.requestData.userName} have?`,
         [
@@ -401,7 +391,7 @@ export default function NotificationsScreen() {
       await fetchNotifications();
     } catch (error) {
       console.error('Error updating notification status:', error);
-      Alert.alert('Error', 'Failed to update request. Please try again.');
+      AppAlert.alert('Error', 'Failed to update request. Please try again.');
     }
   };
 

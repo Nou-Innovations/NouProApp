@@ -7,15 +7,8 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SectionList,
-  RefreshControl,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, SectionList, RefreshControl, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -67,7 +60,7 @@ export default function MyDeliveriesScreen() {
     try {
       await advance(delivery.id, action.next);
     } catch {
-      Alert.alert('Could not update', 'Please try again.');
+      AppAlert.alert('Could not update', 'Please try again.');
     }
   };
 
@@ -78,7 +71,7 @@ export default function MyDeliveriesScreen() {
       await advance(podTarget, 'Delivered', pod);
       setPodTarget(null);
     } catch {
-      Alert.alert('Could not complete', 'Please try again.');
+      AppAlert.alert('Could not complete', 'Please try again.');
     } finally {
       setSubmitting(false);
     }

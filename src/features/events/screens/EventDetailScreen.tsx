@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
@@ -29,16 +30,16 @@ export default function EventDetailScreen({ navigation, route }: Props) {
 
   const doRsvp = async (status: 'going' | 'interested') => {
     if (!myId) {
-      Alert.alert('No business', 'Switch to a business to RSVP.');
+      AppAlert.alert('No business', 'Switch to a business to RSVP.');
       return;
     }
     setBusy(true);
     try {
       await rsvpEvent(eventId, myId, status);
-      Alert.alert('RSVP saved', status === 'going' ? "You're going!" : 'Marked as interested.');
+      AppAlert.alert('RSVP saved', status === 'going' ? "You're going!" : 'Marked as interested.');
       refresh();
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to RSVP');
+      AppAlert.alert('Error', e?.message || 'Failed to RSVP');
     } finally {
       setBusy(false);
     }

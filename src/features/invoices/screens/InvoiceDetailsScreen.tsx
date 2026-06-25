@@ -1,18 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  Share,
-  StyleSheet,
-  Linking,
-  Platform,
-  Modal,
-  TextInput,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Share, StyleSheet, Linking, Platform, Modal, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -207,7 +195,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
   const callClient = () => {
     const phone = invoice?.clientPhone;
     if (!phone) {
-      Alert.alert('No Phone Number', 'No phone number available for this client.');
+      AppAlert.alert('No Phone Number', 'No phone number available for this client.');
       return;
     }
     Linking.openURL(`tel:${phone}`);
@@ -216,7 +204,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
   const emailClient = () => {
     const email = invoice?.clientEmail;
     if (!email) {
-      Alert.alert('No Email', 'No email address available for this client.');
+      AppAlert.alert('No Email', 'No email address available for this client.');
       return;
     }
     Linking.openURL(`mailto:${email}`);
@@ -244,7 +232,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
       });
     } catch (err) {
       console.error('Failed to create invoice checkout:', err);
-      Alert.alert('Error', 'Failed to start payment. Please try again.');
+      AppAlert.alert('Error', 'Failed to start payment. Please try again.');
     } finally {
       setIsPayingNow(false);
     }
@@ -267,13 +255,13 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
       setShowSuccessDialog(true);
     } catch (err) {
       console.error('Failed to send document:', err);
-      Alert.alert('Error', `Failed to send the ${isEstimate ? 'estimate' : 'invoice'}. Please try again.`);
+      AppAlert.alert('Error', `Failed to send the ${isEstimate ? 'estimate' : 'invoice'}. Please try again.`);
     }
   };
 
   const downloadPDF = async () => {
     if (!businessId) {
-      Alert.alert('Error', 'No active business selected');
+      AppAlert.alert('Error', 'No active business selected');
       return;
     }
 
@@ -289,7 +277,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
     const hasBranding = shouldShowNouProBranding(activeBusiness?.plan || null);
     if (hasBranding) {
       // Show confirmation that PDF will include branding, with option to upgrade
-      Alert.alert(
+      AppAlert.alert(
         'Download PDF',
         'This PDF will include NouPro branding. Upgrade to Pro to remove branding from your documents.',
         [
@@ -377,7 +365,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
       console.error('Error generating PDF:', error);
       setIsDownloading(false);
       setShowDownloadModal(false);
-      Alert.alert('Error', 'Failed to generate PDF. Please try again.');
+      AppAlert.alert('Error', 'Failed to generate PDF. Please try again.');
     }
   };
 
@@ -391,11 +379,11 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
           dialogTitle: `${isEstimate ? 'Estimate' : 'Invoice'} ${documentNumber}`,
         });
       } else {
-        Alert.alert('Saved', `PDF saved to your device as ${documentNumber}.pdf`);
+        AppAlert.alert('Saved', `PDF saved to your device as ${documentNumber}.pdf`);
       }
     } catch (err) {
       console.error('Error sharing PDF:', err);
-      Alert.alert('Error', 'Failed to share the PDF. Please try again.');
+      AppAlert.alert('Error', 'Failed to share the PDF. Please try again.');
     }
   };
 
@@ -418,7 +406,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
       
       // Share completed
     } catch (error) {
-      Alert.alert('Error', 'Failed to share document. Please try again.');
+      AppAlert.alert('Error', 'Failed to share document. Please try again.');
     }
   };
 
@@ -428,7 +416,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
 
   const navigateToClientProfile = () => {
     // Navigate to client profile - will implement based on available navigation
-    Alert.alert('Client Profile', 'Navigate to client profile functionality would be implemented here');
+    AppAlert.alert('Client Profile', 'Navigate to client profile functionality would be implemented here');
   };
 
   // Check if current user is the invoice creator (can modify payment status)
@@ -436,7 +424,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
 
   const handlePaymentButtonPress = () => {
     if (!isInvoiceOwner) {
-      Alert.alert('Permission Denied', 'Only the business that created this invoice can change the payment status.');
+      AppAlert.alert('Permission Denied', 'Only the business that created this invoice can change the payment status.');
       return;
     }
     // Only show options if invoice is unpaid
@@ -457,7 +445,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
       setSuccessMessage('Invoice marked as fully paid!');
       setShowSuccessDialog(true);
     } catch (err) {
-      Alert.alert('Error', 'Failed to mark as paid. Please try again.');
+      AppAlert.alert('Error', 'Failed to mark as paid. Please try again.');
     }
   };
 
@@ -474,10 +462,10 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
 
   const handleConvertToInvoice = () => {
     if (!isInvoiceOwner) {
-      Alert.alert('Permission Denied', 'Only the business that created this estimate can convert it to an invoice.');
+      AppAlert.alert('Permission Denied', 'Only the business that created this estimate can convert it to an invoice.');
       return;
     }
-    Alert.alert(
+    AppAlert.alert(
       'Convert to Invoice',
       'Are you sure you want to convert this estimate to an invoice?',
       [
@@ -486,7 +474,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
           text: 'Convert',
           onPress: async () => {
             if (!businessId) {
-              Alert.alert('Error', 'No active business selected');
+              AppAlert.alert('Error', 'No active business selected');
               return;
             }
             try {
@@ -496,7 +484,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
               setShowSuccessDialog(true);
             } catch (error) {
               console.error('Error converting estimate:', error);
-              Alert.alert('Error', 'Failed to convert estimate. Please try again.');
+              AppAlert.alert('Error', 'Failed to convert estimate. Please try again.');
             }
           },
         },
@@ -580,7 +568,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
       shareDocument();
     } else if (item.id === 'delete') {
       // Handle delete action with confirmation
-      Alert.alert(
+      AppAlert.alert(
         `Delete ${isEstimate ? 'Estimate' : 'Invoice'}`,
         `Are you sure you want to delete ${isEstimate ? 'estimate' : 'invoice'} ${documentNumber}?`,
         [
@@ -591,11 +579,11 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
             onPress: async () => {
               try {
                 await deleteInvoice(invoiceId);
-                Alert.alert('Deleted', `${isEstimate ? 'Estimate' : 'Invoice'} has been deleted`);
+                AppAlert.alert('Deleted', `${isEstimate ? 'Estimate' : 'Invoice'} has been deleted`);
                 navigation.goBack();
               } catch (err) {
                 console.error('Failed to delete invoice:', err);
-                Alert.alert('Error', 'Failed to delete the document. Please try again.');
+                AppAlert.alert('Error', 'Failed to delete the document. Please try again.');
               }
             },
           },
@@ -930,12 +918,12 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
                     try {
                       const amount = parseFloat(paymentAmount);
                       if (isNaN(amount) || amount <= 0) {
-                        Alert.alert('Error', 'Please enter a valid payment amount.');
+                        AppAlert.alert('Error', 'Please enter a valid payment amount.');
                         return;
                       }
                       const newPaidAmount = (invoice?.paidAmount || 0) + amount;
                       if (newPaidAmount > grandTotal) {
-                        Alert.alert('Error', `Payment of ${fmtCurrency(amount)} would exceed the remaining balance of ${fmtCurrency(grandTotal - (invoice?.paidAmount || 0))}.`);
+                        AppAlert.alert('Error', `Payment of ${fmtCurrency(amount)} would exceed the remaining balance of ${fmtCurrency(grandTotal - (invoice?.paidAmount || 0))}.`);
                         return;
                       }
                       const isFullyPaid = newPaidAmount >= grandTotal;
@@ -950,7 +938,7 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
                       setSuccessMessage('Payment recorded successfully!');
                       setShowSuccessDialog(true);
                     } catch (err) {
-                      Alert.alert('Error', 'Failed to record payment. Please try again.');
+                      AppAlert.alert('Error', 'Failed to record payment. Please try again.');
                     }
                   }}
                 />

@@ -1,10 +1,6 @@
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useOrderStore } from '@/shared/store/orderStore';
 import { AppButton, TextButton } from '@/shared/components/ui';
@@ -34,7 +30,7 @@ const CartBottomSection: React.FC<CartBottomSectionProps> = ({ businessId, onPla
   };
 
   const handleClearCart = () => {
-    Alert.alert(
+    AppAlert.alert(
       "Clear Cart",
       "Do you want to clear everything?",
       [

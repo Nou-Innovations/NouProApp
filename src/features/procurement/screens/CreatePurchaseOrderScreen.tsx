@@ -7,15 +7,8 @@
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -136,16 +129,16 @@ export default function CreatePurchaseOrderScreen() {
   // ── Save as draft ──
   const handleSaveDraft = useCallback(async () => {
     const err = validate();
-    if (err) { Alert.alert('Validation', err); return; }
+    if (err) { AppAlert.alert('Validation', err); return; }
 
     setIsSubmitting(true);
     try {
       await procurementService.createPurchaseOrder(businessId, buildPayload());
-      Alert.alert('Success', 'Purchase order saved as draft.', [
+      AppAlert.alert('Success', 'Purchase order saved as draft.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to create purchase order.');
+      AppAlert.alert('Error', e?.message || 'Failed to create purchase order.');
     } finally {
       setIsSubmitting(false);
     }
@@ -154,17 +147,17 @@ export default function CreatePurchaseOrderScreen() {
   // ── Send to supplier (create + change status to SENT) ──
   const handleSend = useCallback(async () => {
     const err = validate();
-    if (err) { Alert.alert('Validation', err); return; }
+    if (err) { AppAlert.alert('Validation', err); return; }
 
     setIsSubmitting(true);
     try {
       const po = await procurementService.createPurchaseOrder(businessId, buildPayload());
       await procurementService.updatePurchaseOrderStatus(businessId, po.id, 'SENT');
-      Alert.alert('Success', 'Purchase order sent to supplier.', [
+      AppAlert.alert('Success', 'Purchase order sent to supplier.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to send purchase order.');
+      AppAlert.alert('Error', e?.message || 'Failed to send purchase order.');
     } finally {
       setIsSubmitting(false);
     }

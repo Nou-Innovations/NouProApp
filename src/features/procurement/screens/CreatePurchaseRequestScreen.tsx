@@ -7,15 +7,8 @@
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -137,16 +130,16 @@ export default function CreatePurchaseRequestScreen() {
   // ── Save as draft ──
   const handleSaveDraft = useCallback(async () => {
     const err = validate();
-    if (err) { Alert.alert('Validation', err); return; }
+    if (err) { AppAlert.alert('Validation', err); return; }
 
     setIsSubmitting(true);
     try {
       await procurementService.createPurchaseRequest(businessId, buildPayload());
-      Alert.alert('Success', 'Purchase request saved as draft.', [
+      AppAlert.alert('Success', 'Purchase request saved as draft.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to create purchase request.');
+      AppAlert.alert('Error', e?.message || 'Failed to create purchase request.');
     } finally {
       setIsSubmitting(false);
     }
@@ -155,17 +148,17 @@ export default function CreatePurchaseRequestScreen() {
   // ── Submit ──
   const handleSubmit = useCallback(async () => {
     const err = validate();
-    if (err) { Alert.alert('Validation', err); return; }
+    if (err) { AppAlert.alert('Validation', err); return; }
 
     setIsSubmitting(true);
     try {
       const pr = await procurementService.createPurchaseRequest(businessId, buildPayload());
       await procurementService.submitPurchaseRequest(businessId, pr.id);
-      Alert.alert('Success', 'Purchase request submitted for approval.', [
+      AppAlert.alert('Success', 'Purchase request submitted for approval.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to submit purchase request.');
+      AppAlert.alert('Error', e?.message || 'Failed to submit purchase request.');
     } finally {
       setIsSubmitting(false);
     }

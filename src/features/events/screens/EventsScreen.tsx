@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -20,7 +21,7 @@ export default function EventsScreen() {
 
   const handleCreate = () => {
     if (!activeBusiness?.id) {
-      Alert.alert('No business', 'Switch to a business to host an event.');
+      AppAlert.alert('No business', 'Switch to a business to host an event.');
       return;
     }
     // Hosting is a paid feature — show an explanatory upgrade modal for Free plans.

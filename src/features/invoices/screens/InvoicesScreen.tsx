@@ -1,13 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  FlatList,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect, useRoute, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -116,7 +109,7 @@ export default function InvoicesScreen() {
           return;
         }
       }
-      Alert.alert('Access Denied', 'Only admins can create invoices and estimates.');
+      AppAlert.alert('Access Denied', 'Only admins can create invoices and estimates.');
       return;
     }
     

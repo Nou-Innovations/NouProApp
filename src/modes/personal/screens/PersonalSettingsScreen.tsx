@@ -6,18 +6,8 @@
  */
 
 import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Switch,
-  Alert,
-  Animated,
-  Modal,
-  Dimensions,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Animated, Modal, Dimensions } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -25,6 +15,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
+import { authAPI } from '@/shared/services/api';
 import Avatar from '@/shared/components/ui/Avatar';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import * as Sentry from '@sentry/react-native';
@@ -74,7 +65,7 @@ export default function PersonalSettingsScreen() {
           setNotificationsEnabled(true);
           updateCurrentUser({ notifications_on: true });
         } else {
-          Alert.alert(
+          AppAlert.alert(
             'Notifications Disabled',
             'Please enable notifications in your device settings to receive push notifications.',
             [{ text: 'OK' }],
@@ -111,7 +102,14 @@ export default function PersonalSettingsScreen() {
   };
 
   const handlePrivacyPolicy = () => {
-    Alert.alert('Privacy Policy', 'Navigate to privacy policy screen');
+    AppAlert.alert('Privacy Policy', 'Navigate to privacy policy screen');
+  };
+
+  const handleLogout = () => {
+    AppAlert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log Out', style: 'destructive', onPress: () => authAPI.logout() },
+    ]);
   };
 
   // Profile switcher modal functions
@@ -354,7 +352,7 @@ export default function PersonalSettingsScreen() {
         style={[styles.settingRow, { borderBottomColor: appTheme.colors.borderColor }]}
         onPress={() => {
           Sentry.captureException(new Error('NouPro Sentry test error ' + new Date().toISOString()));
-          Alert.alert(
+          AppAlert.alert(
             'Test error sent',
             'Check your Sentry dashboard (nou-innovations) under Issues in ~1 minute — a "NouPro Sentry test error" should appear.'
           );
@@ -365,6 +363,17 @@ export default function PersonalSettingsScreen() {
           <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Send test error to Sentry (temporary)</Text>
         </View>
         <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+      </TouchableOpacity>
+
+      {/* Log Out */}
+      <TouchableOpacity
+        style={[styles.settingRow, styles.logoutRow]}
+        onPress={handleLogout}
+      >
+        <View style={styles.settingLeft}>
+          <Icon name="log-out-outline" size={24} color={appTheme.colors.error} />
+          <Text style={[styles.settingText, { color: appTheme.colors.error }]}>Log Out</Text>
+        </View>
       </TouchableOpacity>
 
     </View>
@@ -708,6 +717,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     marginHorizontal: 12,
     borderBottomWidth: 0.5,
+  },
+  logoutRow: {
+    marginTop: theme.spacing.md,
+    borderBottomWidth: 0,
   },
   settingLeft: {
     flexDirection: 'row',

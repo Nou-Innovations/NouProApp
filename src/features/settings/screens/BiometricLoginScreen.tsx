@@ -1,14 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Switch,
-  Alert,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
@@ -116,7 +108,7 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
           if (currentUser?.id) {
             await SecureStore.setItemAsync(BIOMETRIC_USER_KEY, currentUser.id);
           }
-          Alert.alert(
+          AppAlert.alert(
             'Success',
             `${getBiometricName()} has been enabled for your account.`,
             [{ text: 'OK' }]
@@ -124,7 +116,7 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
         } else if (result.error === 'user_cancel') {
           // User cancelled, do nothing
         } else {
-          Alert.alert(
+          AppAlert.alert(
             'Authentication Failed',
             'Unable to verify your identity. Please try again.',
             [{ text: 'OK' }]
@@ -132,7 +124,7 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
         }
       } catch (error) {
         console.error('Biometric authentication error:', error);
-        Alert.alert(
+        AppAlert.alert(
           'Error',
           'An error occurred while setting up biometric login. Please try again.',
           [{ text: 'OK' }]
@@ -142,7 +134,7 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
       }
     } else {
       // Disabling
-      Alert.alert(
+      AppAlert.alert(
         `Disable ${getBiometricName()}`,
         `Are you sure you want to disable ${getBiometricName()} login?`,
         [
@@ -188,7 +180,7 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
       <TouchableOpacity
         style={[styles.settingsButton, { backgroundColor: appTheme.colors.primary }]}
         onPress={() => {
-          Alert.alert(
+          AppAlert.alert(
             'Open Settings',
             `Go to your device's Settings > ${Platform.OS === 'ios' ? 'Face ID & Passcode' : 'Security'} to set up ${getBiometricName()}.`,
             [{ text: 'OK' }]

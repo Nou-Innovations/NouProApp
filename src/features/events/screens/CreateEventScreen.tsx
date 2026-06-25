@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Modal, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Modal, Switch } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
@@ -52,7 +53,7 @@ export default function CreateEventScreen({ navigation, route }: Props) {
 
   const submit = async () => {
     if (!title.trim()) {
-      Alert.alert('Title required', 'Add a title for your event.');
+      AppAlert.alert('Title required', 'Add a title for your event.');
       return;
     }
     setSaving(true);
@@ -69,7 +70,7 @@ export default function CreateEventScreen({ navigation, route }: Props) {
       navigation.goBack();
     } catch (e: any) {
       const isPaywall = e?.code === 'PAYWALL' || /upgrade/i.test(e?.message || '');
-      Alert.alert(isPaywall ? 'Upgrade required' : 'Error', e?.message || 'Failed to create event');
+      AppAlert.alert(isPaywall ? 'Upgrade required' : 'Error', e?.message || 'Failed to create event');
     } finally {
       setSaving(false);
     }

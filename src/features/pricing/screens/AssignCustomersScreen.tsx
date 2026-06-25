@@ -6,7 +6,8 @@
  * is already on another list moves them (server upsert). Backed by priceLists.service.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator, Alert, Switch } from 'react-native';
+import { View, StyleSheet, FlatList, ActivityIndicator, Switch } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
@@ -43,7 +44,7 @@ const AssignCustomersScreen: React.FC<Props> = ({ navigation, route }) => {
       setAssigned(new Set((list.assignments || []).map((a) => a.buyerBusinessId)));
       setCustomers(conns);
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to load customers');
+      AppAlert.alert('Error', e?.message || 'Failed to load customers');
     } finally {
       setLoading(false);
     }
@@ -69,7 +70,7 @@ const AssignCustomersScreen: React.FC<Props> = ({ navigation, route }) => {
         if (next) s.delete(buyerBusinessId); else s.add(buyerBusinessId);
         return s;
       });
-      Alert.alert('Error', e?.message || 'Failed to update assignment');
+      AppAlert.alert('Error', e?.message || 'Failed to update assignment');
     } finally {
       setBusy((b) => {
         const s = new Set(b);

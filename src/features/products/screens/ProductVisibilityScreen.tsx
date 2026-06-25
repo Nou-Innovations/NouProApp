@@ -7,7 +7,8 @@
  * shared api layer); we optimistically flip and revert on failure.
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Switch, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Switch, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -42,7 +43,7 @@ export default function ProductVisibilityScreen() {
       await toggleProductListed(companyId, p.id, next);
     } catch (e: any) {
       updateProductLocal(p.id, { is_listed: !next }); // revert
-      Alert.alert('Could not update', e?.message || 'Failed to update visibility.');
+      AppAlert.alert('Could not update', e?.message || 'Failed to update visibility.');
     } finally {
       setBusyId(null);
     }

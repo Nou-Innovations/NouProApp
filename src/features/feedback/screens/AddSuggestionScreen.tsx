@@ -1,12 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Platform,
-  Alert,
-} from 'react-native';
+import { View, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -65,7 +59,7 @@ export default function AddSuggestionScreen() {
     } catch (error) {
       const message =
         error instanceof ApiError ? error.message : 'Failed to submit suggestion. Please try again.';
-      Alert.alert('Error', message);
+      AppAlert.alert('Error', message);
     } finally {
       setIsSubmitting(false);
     }

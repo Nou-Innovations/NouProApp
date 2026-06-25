@@ -16,7 +16,8 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -99,7 +100,7 @@ export function DeliveryDetailClientView({
 
   // Handle reject order -- confirm then call API and notify parent
   const handleReject = () => {
-    Alert.alert(
+    AppAlert.alert(
       'Reject Order',
       'Are you sure you want to reject this order?',
       [
@@ -127,9 +128,9 @@ export function DeliveryDetailClientView({
 
   const handleMoreOptionSelect = (item: { id: string }) => {
     if (item.id === 'share') {
-      Alert.alert('Share', `Share delivery ${delivery.id}`);
+      AppAlert.alert('Share', `Share delivery ${delivery.id}`);
     } else if (item.id === 'cancel') {
-      Alert.alert(
+      AppAlert.alert(
         'Cancel Request',
         'Are you sure you want to cancel this order request?',
         [

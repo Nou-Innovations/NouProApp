@@ -1,18 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Image,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  Switch,
-  ActivityIndicator,
-  Modal,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput, Switch, ActivityIndicator, Modal, Platform } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -311,28 +299,28 @@ export default function CompanyEditScreen() {
     if (type === 'open') {
       // Open time must be before close time
       if (timeString >= currentSlot.close) {
-        Alert.alert('Invalid Time', 'Opening time must be before closing time.');
+        AppAlert.alert('Invalid Time', 'Opening time must be before closing time.');
         return;
       }
       // For slots after the first, open time must be after previous slot's close time
       if (slotIndex > 0) {
         const prevSlot = allSlots[slotIndex - 1];
         if (timeString <= prevSlot.close) {
-          Alert.alert('Invalid Time', `Opening time must be after the previous slot ends (${prevSlot.close}).`);
+          AppAlert.alert('Invalid Time', `Opening time must be after the previous slot ends (${prevSlot.close}).`);
           return;
         }
       }
     } else {
       // Close time must be after open time
       if (timeString <= currentSlot.open) {
-        Alert.alert('Invalid Time', 'Closing time must be after opening time.');
+        AppAlert.alert('Invalid Time', 'Closing time must be after opening time.');
         return;
       }
       // For slots before the last, close time must be before next slot's open time
       if (slotIndex < allSlots.length - 1) {
         const nextSlot = allSlots[slotIndex + 1];
         if (timeString >= nextSlot.open) {
-          Alert.alert('Invalid Time', `Closing time must be before the next slot starts (${nextSlot.open}).`);
+          AppAlert.alert('Invalid Time', `Closing time must be before the next slot starts (${nextSlot.open}).`);
           return;
         }
       }
@@ -376,7 +364,7 @@ export default function CompanyEditScreen() {
     
     // Ensure we don't go past midnight
     if (newOpenDate.getHours() >= 23) {
-      Alert.alert('Cannot Add Slot', 'No more time available in the day to add another slot.');
+      AppAlert.alert('Cannot Add Slot', 'No more time available in the day to add another slot.');
       return;
     }
     
@@ -486,12 +474,12 @@ export default function CompanyEditScreen() {
         setShowSuccessDialog(true);
       } else {
         const storeErr = useBusinessStore.getState().error;
-        Alert.alert('Error', `Failed to save changes.\n\n${storeErr || 'Please try again.'}`);
+        AppAlert.alert('Error', `Failed to save changes.\n\n${storeErr || 'Please try again.'}`);
       }
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       console.error('[CompanyEdit] Save failed:', err);
-      Alert.alert('Error', `Failed to save changes.\n\n${detail}`);
+      AppAlert.alert('Error', `Failed to save changes.\n\n${detail}`);
     } finally {
       setIsSaving(false);
     }
@@ -499,7 +487,7 @@ export default function CompanyEditScreen() {
 
   const handleCancel = () => {
     if (hasChanges) {
-      Alert.alert(
+      AppAlert.alert(
         'Unsaved Changes',
         'You have unsaved changes. Are you sure you want to go back?',
         [

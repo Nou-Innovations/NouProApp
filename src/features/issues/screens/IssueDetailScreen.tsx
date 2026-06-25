@@ -2,7 +2,8 @@
  * IssueDetailScreen — view an issue and advance its status / resolve it.
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -56,7 +57,7 @@ export default function IssueDetailScreen() {
       });
       setIssue((prev) => (prev ? { ...prev, ...updated } : updated));
     } catch {
-      Alert.alert('Could not update', 'Please try again.');
+      AppAlert.alert('Could not update', 'Please try again.');
     } finally {
       setSubmitting(false);
     }

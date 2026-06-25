@@ -12,7 +12,8 @@
  * Reached from the Business sidebar → Design System → Message Gallery.
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -319,7 +320,7 @@ export default function MessageGalleryScreen() {
   >(null);
 
   // Demo handlers — taps just confirm the interaction fired.
-  const notify = (m: string) => Alert.alert('Demo', m);
+  const notify = (m: string) => AppAlert.alert('Demo', m);
   const handlers = {
     onOrderPress: (id: string) => notify(`Open order ${id}`),
     onConfirmOrder: (id: string) => notify(`Confirm order ${id}`),

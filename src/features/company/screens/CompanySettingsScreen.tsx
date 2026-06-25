@@ -1,13 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Switch,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import {
@@ -123,7 +116,7 @@ export default function CompanySettingsScreen() {
       });
     } catch {
       setPricePrivacyEnabled(!newValue); // Revert on failure
-      Alert.alert('Error', 'Failed to update price privacy setting.');
+      AppAlert.alert('Error', 'Failed to update price privacy setting.');
     }
   };
 
@@ -153,7 +146,7 @@ export default function CompanySettingsScreen() {
   };
 
   const handlePrivacyPolicy = () => {
-    Alert.alert('Privacy Policy', 'Navigate to privacy policy screen');
+    AppAlert.alert('Privacy Policy', 'Navigate to privacy policy screen');
   };
 
   const handleProfile = () => {
@@ -183,7 +176,7 @@ export default function CompanySettingsScreen() {
         || error?.response?.data?.message
         || error?.message
         || 'Failed to leave company. Please try again.';
-      Alert.alert('Cannot Leave Company', msg);
+      AppAlert.alert('Cannot Leave Company', msg);
     }
   };
 

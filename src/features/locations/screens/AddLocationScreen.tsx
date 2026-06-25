@@ -4,17 +4,8 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  Dimensions,
-  Modal,
-  Switch,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Dimensions, Modal, Switch } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import MapView, { Marker, Region } from 'react-native-maps';
@@ -110,7 +101,7 @@ export default function AddLocationScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Please enable location services to use this feature.');
+        AppAlert.alert('Permission Denied', 'Please enable location services to use this feature.');
         setIsLoadingLocation(false);
         return;
       }
@@ -146,7 +137,7 @@ export default function AddLocationScreen() {
       mapRef.current?.animateToRegion(newRegion, 500);
     } catch (error) {
       console.error('Error getting location:', error);
-      Alert.alert('Error', 'Failed to get current location.');
+      AppAlert.alert('Error', 'Failed to get current location.');
     } finally {
       setIsLoadingLocation(false);
     }
@@ -199,11 +190,11 @@ export default function AddLocationScreen() {
         setMarkerPosition({ latitude, longitude });
         mapRef.current?.animateToRegion(newRegion, 500);
       } else {
-        Alert.alert('Not Found', 'Could not find the address. Please try a different search.');
+        AppAlert.alert('Not Found', 'Could not find the address. Please try a different search.');
       }
     } catch (error) {
       console.error('Error geocoding address:', error);
-      Alert.alert('Error', 'Failed to search for address.');
+      AppAlert.alert('Error', 'Failed to search for address.');
     } finally {
       setIsLoadingLocation(false);
     }
@@ -219,7 +210,7 @@ export default function AddLocationScreen() {
       });
       setShowMapModal(false);
     } else {
-      Alert.alert('No Location Selected', 'Please select a location on the map or search for an address.');
+      AppAlert.alert('No Location Selected', 'Please select a location on the map or search for an address.');
     }
   };
 
@@ -232,12 +223,12 @@ export default function AddLocationScreen() {
   // Handle submit
   const handleSubmit = async () => {
     if (!activeBusiness?.id) {
-      Alert.alert('Error', 'No active business selected');
+      AppAlert.alert('Error', 'No active business selected');
       return;
     }
 
     if (!isFormValid) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      AppAlert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
@@ -257,14 +248,14 @@ export default function AddLocationScreen() {
         is_primary: false,
       });
 
-      Alert.alert(
+      AppAlert.alert(
         'Success',
         'Location created successfully!',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (error) {
       console.error('Error creating location:', error);
-      Alert.alert('Error', 'Failed to create location. Please try again.');
+      AppAlert.alert('Error', 'Failed to create location. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

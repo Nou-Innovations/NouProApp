@@ -6,7 +6,8 @@
  * edit mode; the row's options button deletes (admin only on the backend).
  */
 import React, { useCallback, useState } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect, DrawerActions } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -32,7 +33,7 @@ export default function BrandsScreen() {
       const data = await getBrands(companyId);
       setBrands(data);
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to load brands');
+      AppAlert.alert('Error', e?.message || 'Failed to load brands');
     } finally {
       setLoading(false);
     }
@@ -56,7 +57,7 @@ export default function BrandsScreen() {
     });
 
   const confirmDelete = (b: Brand) => {
-    Alert.alert('Delete brand', `Delete "${b.name}"? Products keep their data but lose this brand.`, [
+    AppAlert.alert('Delete brand', `Delete "${b.name}"? Products keep their data but lose this brand.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -66,7 +67,7 @@ export default function BrandsScreen() {
             await deleteBrand(companyId, b.id);
             setBrands((prev) => prev.filter((x) => x.id !== b.id));
           } catch (e: any) {
-            Alert.alert('Error', e?.message || 'Failed to delete brand');
+            AppAlert.alert('Error', e?.message || 'Failed to delete brand');
           }
         },
       },

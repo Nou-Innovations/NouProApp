@@ -7,15 +7,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -93,7 +86,7 @@ export default function PurchaseOrderDetailScreen() {
         const newHistory = await procurementService.getPurchaseOrderHistory(businessId, orderId).catch(() => []);
         setHistory(newHistory);
       } catch (e: any) {
-        Alert.alert('Error', e?.message || 'Failed to update status.');
+        AppAlert.alert('Error', e?.message || 'Failed to update status.');
       } finally {
         setActionLoading(false);
       }
@@ -103,14 +96,14 @@ export default function PurchaseOrderDetailScreen() {
 
   // ── Action handlers ──
   const onSend = useCallback(() => {
-    Alert.alert('Send PO', 'Send this purchase order to the supplier?', [
+    AppAlert.alert('Send PO', 'Send this purchase order to the supplier?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Send', onPress: () => changeStatus('SENT') },
     ]);
   }, [changeStatus]);
 
   const onConfirm = useCallback(() => {
-    Alert.alert('Confirm PO', 'Mark this purchase order as confirmed?', [
+    AppAlert.alert('Confirm PO', 'Mark this purchase order as confirmed?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Confirm', onPress: () => changeStatus('CONFIRMED') },
     ]);
@@ -121,16 +114,16 @@ export default function PurchaseOrderDetailScreen() {
   }, [navigation, orderId]);
 
   const onCancel = useCallback(() => {
-    Alert.prompt(
+    AppAlert.prompt(
       'Cancel PO',
       'Please provide a reason for cancellation:',
       async (reason) => {
         if (!reason?.trim()) {
-          Alert.alert('Error', 'A reason is required.');
+          AppAlert.alert('Error', 'A reason is required.');
           return;
         }
         await changeStatus('CANCELED', reason.trim());
-        Alert.alert('Canceled', 'Purchase order has been canceled.');
+        AppAlert.alert('Canceled', 'Purchase order has been canceled.');
       },
       'plain-text'
     );

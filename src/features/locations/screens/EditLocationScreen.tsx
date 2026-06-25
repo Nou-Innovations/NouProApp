@@ -4,18 +4,8 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  Dimensions,
-  Modal,
-  ActivityIndicator,
-  Switch,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Dimensions, Modal, ActivityIndicator, Switch } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import MapView, { Marker, Region } from 'react-native-maps';
@@ -145,7 +135,7 @@ export default function EditLocationScreen() {
       }
     } catch (error) {
       console.error('Error loading location:', error);
-      Alert.alert('Error', 'Failed to load location details.', [
+      AppAlert.alert('Error', 'Failed to load location details.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } finally {
@@ -187,7 +177,7 @@ export default function EditLocationScreen() {
     try {
       const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Please enable location services to use this feature.');
+        AppAlert.alert('Permission Denied', 'Please enable location services to use this feature.');
         setIsLoadingLocation(false);
         return;
       }
@@ -221,7 +211,7 @@ export default function EditLocationScreen() {
       mapRef.current?.animateToRegion(newRegion, 500);
     } catch (error) {
       console.error('Error getting location:', error);
-      Alert.alert('Error', 'Failed to get current location.');
+      AppAlert.alert('Error', 'Failed to get current location.');
     } finally {
       setIsLoadingLocation(false);
     }
@@ -259,11 +249,11 @@ export default function EditLocationScreen() {
         setMarkerPosition({ latitude, longitude });
         mapRef.current?.animateToRegion(newRegion, 500);
       } else {
-        Alert.alert('Not Found', 'Could not find the address. Please try a different search.');
+        AppAlert.alert('Not Found', 'Could not find the address. Please try a different search.');
       }
     } catch (error) {
       console.error('Error geocoding address:', error);
-      Alert.alert('Error', 'Failed to search for address.');
+      AppAlert.alert('Error', 'Failed to search for address.');
     } finally {
       setIsLoadingLocation(false);
     }
@@ -278,7 +268,7 @@ export default function EditLocationScreen() {
       });
       setShowMapModal(false);
     } else {
-      Alert.alert('No Location Selected', 'Please select a location on the map or search for an address.');
+      AppAlert.alert('No Location Selected', 'Please select a location on the map or search for an address.');
     }
   };
 
@@ -313,7 +303,7 @@ export default function EditLocationScreen() {
         is_public: operatingMode === 'INDEPENDENT' ? isPublic : false,
       });
 
-      Alert.alert(
+      AppAlert.alert(
         'Success',
         'Location updated successfully!',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
@@ -321,7 +311,7 @@ export default function EditLocationScreen() {
     } catch (error: any) {
       console.error('Error updating location:', error);
       const message = error?.response?.data?.message || error?.message || 'Failed to update location. Please try again.';
-      Alert.alert('Error', message);
+      AppAlert.alert('Error', message);
     } finally {
       setIsSubmitting(false);
     }

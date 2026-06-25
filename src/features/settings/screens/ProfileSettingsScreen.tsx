@@ -1,12 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LogOut, Trash2, LucideIcon } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -102,12 +96,12 @@ export default function ProfileSettingsScreen({ navigation }: ProfileSettingsScr
 
   const confirmDeleteCompany = () => {
     setShowDeleteDialog(false);
-    Alert.alert('Delete Company', 'Company deletion process started...');
+    AppAlert.alert('Delete Company', 'Company deletion process started...');
   };
 
   const confirmLeaveWorkplace = () => {
     setShowLeaveDialog(false);
-    Alert.alert('Leave Workplace', 'You have left the workplace.');
+    AppAlert.alert('Leave Workplace', 'You have left the workplace.');
     navigation.goBack();
   };
 

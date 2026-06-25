@@ -4,11 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
@@ -91,7 +88,7 @@ export default function UploadBusinessLogoScreen({ navigation, route }: Props) {
       if (!fromProfileSwitcher) {
         useProfileStore.setState({ accessToken: null });
       }
-      Alert.alert(
+      AppAlert.alert(
         'Failed to create business',
         'Something went wrong. Please try again.',
         [{ text: 'OK' }]

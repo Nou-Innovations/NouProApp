@@ -6,23 +6,8 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  Alert,
-  Share,
-  ActivityIndicator,
-  Animated,
-  Modal,
-  Dimensions,
-  FlatList,
-  Linking,
-  StatusBar,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Share, ActivityIndicator, Animated, Modal, Dimensions, FlatList, Linking, StatusBar } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -149,7 +134,7 @@ export default function BusinessProfileOwnScreen() {
 
   const handleEditProfile = () => {
     if (!canEdit) {
-      Alert.alert('Access Denied', 'You do not have permission to edit business settings.');
+      AppAlert.alert('Access Denied', 'You do not have permission to edit business settings.');
       return;
     }
     // @ts-ignore

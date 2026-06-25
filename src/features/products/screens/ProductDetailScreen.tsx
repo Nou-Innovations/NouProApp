@@ -20,17 +20,8 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  Dimensions,
-  Share,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Dimensions, Share } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
@@ -459,9 +450,9 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const handleReportReason = async (item: AppBottomSheetItem) => {
     try {
       await reportProduct(productId, item.id as ProductReportReason, undefined, activeCompanyId || undefined);
-      Alert.alert('Report received', 'Thanks for flagging this. Our team will review it.', [{ text: 'OK' }]);
+      AppAlert.alert('Report received', 'Thanks for flagging this. Our team will review it.', [{ text: 'OK' }]);
     } catch {
-      Alert.alert('Could not report', 'Something went wrong. Please try again.');
+      AppAlert.alert('Could not report', 'Something went wrong. Please try again.');
     }
   };
 
@@ -489,7 +480,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     try {
       await toggleProductListed(activeCompanyId, clientProductId, next);
     } catch {
-      Alert.alert('Could not update', 'Failed to update your store listing. Please try again.');
+      AppAlert.alert('Could not update', 'Failed to update your store listing. Please try again.');
     }
   };
 
@@ -501,14 +492,14 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       await carryProduct(activeCompanyId, dto.product.id);
       fetchProduct();
     } catch {
-      Alert.alert('Could not add', 'Failed to add this product to your store. Please try again.');
+      AppAlert.alert('Could not add', 'Failed to add this product to your store. Please try again.');
     }
   };
 
   // Owner action - Navigate to CreateProduct screen with product data for editing
   const handleEdit = () => {
     if (!dto) {
-      Alert.alert('Edit Product', 'Product details not loaded yet.');
+      AppAlert.alert('Edit Product', 'Product details not loaded yet.');
       return;
     }
     // Flatten the DTO into the shape CreateProductScreen expects
@@ -537,7 +528,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   // Owner action - Reorder from supplier
   const handleReorder = () => {
     if (supplierPricingData.length === 0) {
-      Alert.alert(
+      AppAlert.alert(
         'No Suppliers Linked',
         'This product has no linked suppliers. Add a supplier first.',
         [
@@ -591,7 +582,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       },
       quantity
     );
-    Alert.alert('Added to Cart', `${quantity} x ${dto.product.name} added to cart`, [
+    AppAlert.alert('Added to Cart', `${quantity} x ${dto.product.name} added to cart`, [
       { text: 'Continue shopping', style: 'cancel' },
       {
         text: 'View Cart',

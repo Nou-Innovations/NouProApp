@@ -10,17 +10,8 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  ScrollView,
-  Image,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, Image, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { Icon } from '@/shared/utils/icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -187,7 +178,7 @@ export function ProfileSwitcher({
         message: 'Requesting admin access to help manage business operations',
       });
       
-      Alert.alert(
+      AppAlert.alert(
         'Request Sent',
         `Your admin access request for ${selectedBusiness.business.name} has been sent to the business owner. You'll be notified when it's reviewed.`,
         [{ text: 'OK', onPress: () => setShowAccessDialog(false) }]
@@ -203,14 +194,14 @@ export function ProfileSwitcher({
       
       // Handle specific error cases
       if (error.message?.includes('already exists') || error.message?.includes('pending')) {
-        Alert.alert('Request Already Sent', 'You already have a pending admin access request for this business.');
+        AppAlert.alert('Request Already Sent', 'You already have a pending admin access request for this business.');
       } else if (error.message?.includes('cooldown') || error.message?.includes('recently rejected')) {
-        Alert.alert(
+        AppAlert.alert(
           'Request Cooldown',
           'Your previous request was recently reviewed. Please wait before requesting again.'
         );
       } else {
-        Alert.alert('Request Failed', 'Failed to send admin access request. Please try again.');
+        AppAlert.alert('Request Failed', 'Failed to send admin access request. Please try again.');
       }
       
       setShowAccessDialog(false);

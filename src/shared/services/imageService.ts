@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { API_CONFIG } from '@/shared/config/api';
 import { useProfileStore } from '@/shared/store/profileStore';
 
@@ -169,7 +169,7 @@ export const imageService = {
     try {
       const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
       if (cameraPermission.status !== 'granted') {
-        Alert.alert(
+        AppAlert.alert(
           'Camera Access Needed',
           'Please allow camera access in Settings to take a photo. You can also pick an existing photo from your gallery instead.',
           [{ text: 'OK' }]
@@ -193,7 +193,7 @@ export const imageService = {
     try {
       const mediaLibraryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (mediaLibraryPermission.status !== 'granted') {
-        Alert.alert(
+        AppAlert.alert(
           'Photo Access Needed',
           'Please allow photo library access in Settings to choose a picture.',
           [{ text: 'OK' }]
@@ -331,7 +331,7 @@ export const imageService = {
    * Show image picker options (Camera or Gallery)
    */
   showImagePickerOptions(onCamera: () => void, onGallery: () => void): void {
-    Alert.alert(
+    AppAlert.alert(
       'Change Profile Picture',
       'Choose an option',
       [

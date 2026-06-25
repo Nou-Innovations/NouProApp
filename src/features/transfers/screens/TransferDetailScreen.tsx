@@ -2,7 +2,8 @@
  * TransferDetailScreen — view a transfer and advance it through its approval lifecycle.
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -93,7 +94,7 @@ export default function TransferDetailScreen() {
         setHistory(Array.isArray(rows) ? rows : []);
       } catch { /* history is best-effort */ }
     } catch {
-      Alert.alert('Could not update', 'Please try again.');
+      AppAlert.alert('Could not update', 'Please try again.');
     } finally {
       setSubmitting(false);
     }

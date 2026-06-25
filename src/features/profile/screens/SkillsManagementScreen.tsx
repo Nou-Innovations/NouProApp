@@ -1,14 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -76,7 +68,7 @@ export default function SkillsManagementScreen() {
 
   const handleAddSkill = async (skillName: string) => {
     if (mySkills.length >= 50) {
-      Alert.alert('Limit Reached', 'You can add up to 50 skills');
+      AppAlert.alert('Limit Reached', 'You can add up to 50 skills');
       return;
     }
     setIsAdding(true);
@@ -86,7 +78,7 @@ export default function SkillsManagementScreen() {
       setSearchResults([]);
       await fetchMySkills();
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to add skill');
+      AppAlert.alert('Error', error?.message || 'Failed to add skill');
     } finally {
       setIsAdding(false);
     }
@@ -97,7 +89,7 @@ export default function SkillsManagementScreen() {
       await removeSkill(skillId);
       setMySkills((prev) => prev.filter((s) => s.skillId !== skillId));
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to remove skill');
+      AppAlert.alert('Error', error?.message || 'Failed to remove skill');
     }
   };
 

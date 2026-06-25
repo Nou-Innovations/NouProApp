@@ -6,15 +6,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  TextInput,
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -56,14 +49,14 @@ export default function RoleRequestsScreen() {
       setRequests(data);
     } catch (error) {
       console.error('Error fetching role requests:', error);
-      Alert.alert('Error', 'Failed to load role requests');
+      AppAlert.alert('Error', 'Failed to load role requests');
     } finally {
       setIsLoading(false);
     }
   };
   
   const handleApprove = async (request: RoleRequestWithUser) => {
-    Alert.alert(
+    AppAlert.alert(
       'Approve Request',
       `Grant admin access to ${request.userName}? They will be able to manage team, products, and invoices.`,
       [
@@ -87,7 +80,7 @@ export default function RoleRequestsScreen() {
               setRequests(prev => prev.filter(r => r.id !== request.id));
             } catch (error) {
               console.error('Error approving request:', error);
-              Alert.alert('Error', 'Failed to approve request');
+              AppAlert.alert('Error', 'Failed to approve request');
             } finally {
               setIsSubmitting(false);
             }
@@ -126,7 +119,7 @@ export default function RoleRequestsScreen() {
       setRequests(prev => prev.filter(r => r.id !== selectedRequest.id));
     } catch (error) {
       console.error('Error rejecting request:', error);
-      Alert.alert('Error', 'Failed to decline request');
+      AppAlert.alert('Error', 'Failed to decline request');
     } finally {
       setIsSubmitting(false);
     }
@@ -224,27 +217,6 @@ export default function RoleRequestsScreen() {
           variant="default"
           title="Decline Request"
           message={`Are you sure you want to decline ${selectedRequest?.userName}'s admin access request?`}
-          customContent={
-            <View style={styles.rejectionInputContainer}>
-              <Text style={[styles.rejectionLabel, { color: appTheme.colors.textSecondary }]}>
-                Optional reason (visible to requester):
-              </Text>
-              <TextInput
-                style={[styles.rejectionInput, { 
-                  backgroundColor: appTheme.colors.surface,
-                  color: appTheme.colors.text,
-                  borderColor: appTheme.colors.border,
-                }]}
-                placeholder="e.g., Need more experience first"
-                placeholderTextColor={appTheme.colors.textMuted}
-                value={rejectionReason}
-                onChangeText={setRejectionReason}
-                multiline
-                numberOfLines={3}
-                maxLength={200}
-              />
-            </View>
-          }
           primaryButtonText={isSubmitting ? 'Declining...' : 'Decline Request'}
           secondaryButtonText="Cancel"
           onPrimaryAction={handleSubmitRejection}
@@ -252,8 +224,28 @@ export default function RoleRequestsScreen() {
             setShowRejectDialog(false);
             setSelectedRequest(null);
           }}
-        />
-        
+        >
+          <View style={styles.rejectionInputContainer}>
+            <Text style={[styles.rejectionLabel, { color: appTheme.colors.textSecondary }]}>
+              Optional reason (visible to requester):
+            </Text>
+            <TextInput
+              style={[styles.rejectionInput, {
+                backgroundColor: appTheme.colors.surface,
+                color: appTheme.colors.text,
+                borderColor: appTheme.colors.borderColor,
+              }]}
+              placeholder="e.g., Need more experience first"
+              placeholderTextColor={appTheme.colors.textMuted}
+              value={rejectionReason}
+              onChangeText={setRejectionReason}
+              multiline
+              numberOfLines={3}
+              maxLength={200}
+            />
+          </View>
+        </AppModal>
+
         {/* Success Dialog */}
         <AppModal
           visible={showSuccessDialog}

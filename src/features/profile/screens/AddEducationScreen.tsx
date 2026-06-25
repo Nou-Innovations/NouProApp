@@ -1,13 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -38,7 +31,7 @@ export default function AddEducationScreen() {
 
   const handleSave = async () => {
     if (!institution.trim()) {
-      Alert.alert('Error', 'Please enter an institution name');
+      AppAlert.alert('Error', 'Please enter an institution name');
       return;
     }
 
@@ -56,7 +49,7 @@ export default function AddEducationScreen() {
       setShowSuccessDialog(true);
     } catch (error: any) {
       const msg = error?.message || 'Failed to add education';
-      Alert.alert('Error', msg);
+      AppAlert.alert('Error', msg);
     } finally {
       setIsSaving(false);
     }

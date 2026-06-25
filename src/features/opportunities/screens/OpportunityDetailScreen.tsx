@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TextInput, TouchableOpacity } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
@@ -25,17 +26,17 @@ export default function OpportunityDetailScreen({ navigation, route }: Props) {
 
   const handleRespond = async () => {
     if (!myId) {
-      Alert.alert('No business', 'Switch to a business to respond.');
+      AppAlert.alert('No business', 'Switch to a business to respond.');
       return;
     }
     setSending(true);
     try {
       await respondToOpportunity(opportunityId, myId, message.trim() || undefined);
       setMessage('');
-      Alert.alert('Sent', 'Your response was sent to the business.');
+      AppAlert.alert('Sent', 'Your response was sent to the business.');
       refresh();
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to send response');
+      AppAlert.alert('Error', e?.message || 'Failed to send response');
     } finally {
       setSending(false);
     }

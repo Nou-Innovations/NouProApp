@@ -5,17 +5,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  TextInput,
-  ScrollView,
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, ScrollView } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -95,7 +86,7 @@ const TransportCard: React.FC<TransportCardProps> = ({
   const { theme: appTheme } = useTheme();
 
   const handleOptionsPress = () => {
-    Alert.alert(
+    AppAlert.alert(
       transport.name,
       'Choose an action',
       [
@@ -229,7 +220,7 @@ export default function TransportsScreen() {
       setTransports(response);
     } catch (error) {
       console.error('Error fetching transports:', error);
-      Alert.alert('Error', 'Failed to load vehicles. Please try again.');
+      AppAlert.alert('Error', 'Failed to load vehicles. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -282,7 +273,7 @@ export default function TransportsScreen() {
   const handleSaveEdit = async () => {
     if (!companyId || !selectedTransport) return;
     if (!editName.trim()) {
-      Alert.alert('Error', 'Vehicle name is required');
+      AppAlert.alert('Error', 'Vehicle name is required');
       return;
     }
 
@@ -307,7 +298,7 @@ export default function TransportsScreen() {
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating transport:', error);
-      Alert.alert('Error', 'Failed to update vehicle. Please try again.');
+      AppAlert.alert('Error', 'Failed to update vehicle. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -332,7 +323,7 @@ export default function TransportsScreen() {
       setSelectedTransport(updated);
     } catch (error) {
       console.error('Error assigning staff:', error);
-      Alert.alert('Error', 'Failed to assign staff. Please try again.');
+      AppAlert.alert('Error', 'Failed to assign staff. Please try again.');
     }
   };
 
@@ -347,13 +338,13 @@ export default function TransportsScreen() {
       setSelectedTransport(updated);
     } catch (error) {
       console.error('Error unassigning staff:', error);
-      Alert.alert('Error', 'Failed to unassign staff. Please try again.');
+      AppAlert.alert('Error', 'Failed to unassign staff. Please try again.');
     }
   };
 
   // --- Delete ---
   const handleDeleteTransport = (transport: Transport) => {
-    Alert.alert(
+    AppAlert.alert(
       'Delete Vehicle',
       `Are you sure you want to delete "${transport.name}"? This action cannot be undone.`,
       [
@@ -368,7 +359,7 @@ export default function TransportsScreen() {
               setTransports(prev => prev.filter(t => t.id !== transport.id));
             } catch (error) {
               console.error('Error deleting transport:', error);
-              Alert.alert('Error', 'Failed to delete transport. Please try again.');
+              AppAlert.alert('Error', 'Failed to delete transport. Please try again.');
             }
           },
         },

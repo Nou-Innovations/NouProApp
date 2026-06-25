@@ -5,16 +5,8 @@
  */
 
 import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-  Animated,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated } from 'react-native';
+import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, DrawerActions } from '@react-navigation/native';
 import { Check, Crown, Zap, Building2, Rocket, Users, MapPin, X } from 'lucide-react-native';
@@ -275,7 +267,7 @@ export default function SubscriptionPlansScreen() {
           plan: 'free',
         });
 
-        Alert.alert('Success', 'Downgraded to Free plan', [
+        AppAlert.alert('Success', 'Downgraded to Free plan', [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
       } else {
@@ -295,7 +287,7 @@ export default function SubscriptionPlansScreen() {
       }
     } catch (error) {
       console.error('Subscription update error:', error);
-      Alert.alert(
+      AppAlert.alert(
         'Error',
         error instanceof Error ? error.message : 'Failed to process subscription. Please try again.'
       );
