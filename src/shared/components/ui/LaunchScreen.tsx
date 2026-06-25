@@ -383,7 +383,7 @@ export default function LaunchScreen({
 
         {/* Tagline */}
         <Animated.View style={[styles.taglineWrap, taglineStyle]}>
-          <Text style={styles.tagline} adjustsFontSizeToFit numberOfLines={2}>Everything{'\n'}in control</Text>
+          <Text style={styles.tagline}>Take{'\n'}control</Text>
         </Animated.View>
       </View>
 
@@ -479,8 +479,8 @@ const styles = StyleSheet.create({
   },
   tagline: {
     color: COLORS.text,
-    fontSize: 72,
-    lineHeight: 66,
+    fontSize: 80,
+    lineHeight: 72,
     textAlign: 'center',
     fontFamily: theme.fonts?.primary?.extraBold || 'InterCustom-ExtraBold',
   },
