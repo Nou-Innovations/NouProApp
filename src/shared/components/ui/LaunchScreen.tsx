@@ -480,6 +480,7 @@ const styles = StyleSheet.create({
   tagline: {
     color: COLORS.text,
     fontSize: 72,
+    lineHeight: 66,
     textAlign: 'center',
     fontFamily: theme.fonts?.primary?.extraBold || 'InterCustom-ExtraBold',
   },
