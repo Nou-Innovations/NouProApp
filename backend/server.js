@@ -1,4 +1,7 @@
 const express = require('express');
+// Patches Express 4 so rejected promises in async route handlers propagate to the
+// global error handler (otherwise an unhandled rejection makes the request hang).
+require('express-async-errors');
 const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -334,6 +337,28 @@ const suggestionLimiter = rateLimit({
   max: 5,
   keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req.ip),
   message: { success: false, error: 'Too many suggestions, please slow down' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+});
+
+// Rate limiters for the unauthenticated public storefront routes (keyed by IP, since
+// there is no req.user). Reads are looser; guest order creation is stricter to curb spam.
+const publicReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  message: { success: false, message: 'Too many requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+});
+
+const publicOrderLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  message: { success: false, message: 'Too many requests' },
   standardHeaders: true,
   legacyHeaders: false,
   validate: { xForwardedForHeader: false },
@@ -2694,10 +2719,17 @@ app.patch('/api/companies/:companyId/subscription', requireAuth, async (req, res
 });
 
 // Legacy company routes (for backwards compatibility)
-app.get('/api/companies', async (req, res) => {
+app.get('/api/companies', optionalAuth, async (req, res) => {
   const businesses = await repos.businessRepo.list();
+  // SECURITY (R3): authenticated callers get the full list; anonymous callers (e.g. the
+  // public product feed) only see publicly-visible businesses — ones with a published page
+  // OR feed-publishing capability (mirrors the /api/products?scope=public rule). This keeps
+  // the public feed working while preventing anonymous enumeration of private businesses.
+  const visible = req.user
+    ? businesses
+    : businesses.filter(b => b.isPublished || deriveCapabilities(b).canPublishProductsOnFeed);
   // SECURITY (P0-4): Strip internal/sensitive fields (incl. billing + payment IDs) from public listing
-  const publicBusinesses = businesses.map(stripSensitiveBusinessFields);
+  const publicBusinesses = visible.map(stripSensitiveBusinessFields);
   res.json(successResponse(publicBusinesses));
 });
 
@@ -11538,26 +11570,10 @@ app.delete('/api/companies/:companyId/members/me', requireAuth, async (req, res)
 });
 
 // Resend invite (mock)
-// POST /api/companies/:companyId/users/:userId/resend-invite
-app.post('/api/companies/:companyId/users/:userId/resend-invite', requireAuth, async (req, res) => {
-  try {
-    const { companyId, userId } = req.params;
-    if (!(await requireBusinessAdmin(req, res, companyId))) return;
-    const bm = await findBusinessMember(companyId, userId);
-    if (!bm) return res.status(404).json(errorResponse('Invite not found'));
-
-    if (bm.status !== 'invited') {
-      return res.status(400).json(errorResponse('User is not in invited status'));
-    }
-
-    const inviteToken = nextId('invite');
-    const inviteLink = `/invite?companyId=${companyId}&userId=${userId}&token=${inviteToken}`;
-
-    return res.json(successResponse({ invite: { token: inviteToken, link: inviteLink } }));
-  } catch (err) {
-    return sendError(res, err);
-  }
-});
+// NOTE (R4): the POST /resend-invite route was removed — it never persisted a token or
+// sent an email (the invite-by-email flow was a stub). The working invite path is the
+// Copy-link → join-request → admin-approve flow. Real staff-invite emails are deferred;
+// see APP_AUDIT_2026-06-26.md §5.
 
 // ============================================================================
 // ROLE UPGRADE REQUESTS (staff → admin)
@@ -11676,11 +11692,9 @@ app.patch('/api/companies/:companyId/role-requests/:requestId', requireAuth, asy
       return res.status(401).json(errorResponse('Authentication required'));
     }
 
-    // Verify admin
-    const adminMember = await findBusinessMember(businessId, userId);
-    if (!adminMember || adminMember.role === 'staff') {
-      return res.status(403).json(errorResponse('Only admins can approve requests'));
-    }
+    // Verify admin. Use the canonical guard, which checks BOTH role !== 'staff' AND
+    // status === 'accepted' (R5: a suspended/non-accepted admin must not approve requests).
+    if (!(await requireBusinessAdmin(req, res, businessId))) return;
 
     // Find request in DB
     const request = await repos.roleRequestRepo.getById(requestId);
@@ -13687,7 +13701,7 @@ app.post('/api/products/:productId/report', requireAuth, async (req, res) => {
 //
 
 // Get public location storefront (products, info) - no auth required
-app.get('/api/public/locations/:locationId', async (req, res) => {
+app.get('/api/public/locations/:locationId', publicReadLimiter, async (req, res) => {
   try {
     const location = await prisma.location.findUnique({ where: { id: req.params.locationId } });
     if (!location) {
@@ -13720,7 +13734,7 @@ app.get('/api/public/locations/:locationId', async (req, res) => {
 });
 
 // Get products for public storefront - no auth required
-app.get('/api/public/locations/:locationId/products', async (req, res) => {
+app.get('/api/public/locations/:locationId/products', publicReadLimiter, async (req, res) => {
   try {
     // SECURITY: Public endpoint — do not trust viewerBusinessId from query params
     const viewerBusinessId = null;
@@ -13755,7 +13769,7 @@ app.get('/api/public/locations/:locationId/products', async (req, res) => {
 // Create an order from a business's public storefront (no auth — a guest /
 // personal-mode customer ordering from a publicly visible location).
 // Body: { customerName, customerPhone, customerAddress?, items: [{ productId, quantity }], notes? }
-app.post('/api/public/locations/:locationId/orders', async (req, res) => {
+app.post('/api/public/locations/:locationId/orders', publicOrderLimiter, async (req, res) => {
   try {
     const location = await prisma.location.findUnique({ where: { id: req.params.locationId } });
     if (!location) {

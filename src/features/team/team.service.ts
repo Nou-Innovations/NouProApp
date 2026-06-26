@@ -188,9 +188,8 @@ export async function leaveCompany(companyId: string): Promise<void> {
   await del(`/companies/${companyId}/members/me`);
 }
 
-export async function resendInvite(companyId: string, userId: string): Promise<void> {
-  await post(`/companies/${companyId}/users/${userId}/resend-invite`, {});
-}
+// NOTE (R4): resendInvite was removed — the invite-by-email flow never actually sent
+// email, so resending did nothing. Deferred until real staff-invite emails are built.
 
 // ============================================================================
 // JOIN REQUESTS & PENDING INVITES (for notifications & team management)
@@ -312,7 +311,6 @@ const teamService = {
   acceptJoinRequest,
   rejectJoinRequest,
   cancelInvite,
-  resendInvite,
   leaveCompany,
   // Join Requests & Pending Invites
   getJoinRequests,

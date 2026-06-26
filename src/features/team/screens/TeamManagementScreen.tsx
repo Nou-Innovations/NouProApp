@@ -6,8 +6,9 @@ import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { AppSearchBar, StaffCard, StaffMember, StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard, EmptyState, SectionTitle, ButtonRow } from '@/shared/components/ui';
+import { AppSearchBar, StaffCard, StaffMember, StaffCardRole, Avatar, AppModal, AppBottomSheet, ListItemCard, EmptyState, SectionTitle, ButtonRow, type AppBottomSheetItem } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
+import { reportEntity, REPORT_REASONS, type ReportReason } from '@/features/profile/profile.service';
 import LocationDropdown from '@/shared/components/ui/LocationDropdown';
 import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
@@ -18,7 +19,6 @@ import {
   getAccessibleLocations,
   getCapabilities,
   removeTeamMember,
-  resendInvite,
   updateTeamMemberRole,
   type AccessibleLocation,
 
@@ -80,6 +80,10 @@ export default function TeamManagementScreen() {
   // Bottom sheet state for Pending Invites
   const [selectedPendingInvite, setSelectedPendingInvite] = useState<PendingInvite | null>(null);
   const [showPendingInviteOptions, setShowPendingInviteOptions] = useState(false);
+
+  // Report-user bottom sheet state
+  const [reportTarget, setReportTarget] = useState<StaffMember | null>(null);
+  const [reportSheetVisible, setReportSheetVisible] = useState(false);
 
   // Check permissions using profileStore
   const isSuperAdmin = isSuperAdminRole();
@@ -229,22 +233,28 @@ export default function TeamManagementScreen() {
     }
   };
   
-  // Handle report from StaffCard
+  // Handle report from StaffCard — opens the reason picker
   const handleReportStaff = (staff: StaffMember) => {
-    AppAlert.alert(
-      'Report User',
-      `Report ${staff.name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Report', 
-          style: 'destructive',
-          onPress: () => {
-            AppAlert.alert('Report', 'Report functionality is not available yet.');
-          }
-        }
-      ]
-    );
+    setReportTarget(staff);
+    setReportSheetVisible(true);
+  };
+
+  const reportReasonItems: AppBottomSheetItem[] = REPORT_REASONS.map((r) => ({
+    id: r.id,
+    title: r.label,
+  }));
+
+  const handleReportReason = async (item: AppBottomSheetItem) => {
+    const target = reportTarget;
+    setReportSheetVisible(false);
+    setReportTarget(null);
+    if (!target) return;
+    try {
+      await reportEntity('user', target.id, item.id as ReportReason);
+      AppAlert.alert('Report received', 'Thanks for flagging this. Our team will review it.', [{ text: 'OK' }]);
+    } catch {
+      AppAlert.alert('Could not report', 'Something went wrong. Please try again.');
+    }
   };
 
   const handleRemoveUser = (user: User) => {
@@ -375,31 +385,6 @@ export default function TeamManagementScreen() {
             } catch (error) {
               console.error('Error cancelling invite:', error);
               AppAlert.alert('Error', 'Failed to cancel invite. Please try again.');
-            }
-          }
-        }
-      ]
-    );
-  };
-  
-  // Handle resending a pending invite
-  const handleResendInvite = (invite: PendingInvite) => {
-    AppAlert.alert(
-      'Resend Invite',
-      `Resend invitation to ${invite.email}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Resend', 
-          onPress: async () => {
-            if (!activeBusiness?.id) return;
-            try {
-              await resendInvite(activeBusiness.id, invite.id);
-              setSuccessMessage(`Invitation resent to ${invite.email}`);
-              setShowSuccessDialog(true);
-            } catch (error) {
-              console.error('Error resending invite:', error);
-              AppAlert.alert('Error', 'Failed to resend invite. Please try again.');
             }
           }
         }
@@ -723,6 +708,19 @@ export default function TeamManagementScreen() {
           showDivider={false}
         />
       </AppBottomSheet>
+
+      {/* Report User Reason Bottom Sheet */}
+      <AppBottomSheet
+        visible={reportSheetVisible}
+        onClose={() => {
+          setReportSheetVisible(false);
+          setReportTarget(null);
+        }}
+        title={reportTarget ? `Report ${reportTarget.name}` : 'Report user'}
+        items={reportReasonItems}
+        mode="buttons"
+        onSelectItem={handleReportReason}
+      />
     </SafeAreaView>
   );
 }
