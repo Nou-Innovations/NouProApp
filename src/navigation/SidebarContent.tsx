@@ -7,14 +7,17 @@
  * Colors are theme-aware (derived from the app theme `surface`/`text`/... tokens) so
  * the sidebar matches the rest of the app in both light and dark mode.
  *
- * Sections:
- * - Profile header → collapsing account switcher (tap to expand the list of accounts)
- * - Account list (when expanded): Personal + every connected business (switch / request
- *   access for staff-only memberships) + "Add account"
- * - Navigation: grouped Business Workspace sections (business mode) or a simple menu (personal)
- * - Logout footer
+ * Layout (top → bottom):
+ * - Profile header → the Personal account (tap returns to Personal mode). No dropdown.
+ * - Search (business mode only)
+ * - Workspace → retractable list of the companies you belong to. A company with multiple
+ *   branches expands inline (a left-indent rule under its name) so you can pick a branch;
+ *   a single-branch company is selected directly. The active company/branch is highlighted.
+ * - Tools (business mode) → "Tools" title + collapsible groups; the tool for the current
+ *   screen is highlighted, and its group auto-opens. Personal mode shows a simple menu.
+ * - Help the community + Logout footer
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { DrawerContentScrollView, DrawerContentComponentProps } from '@react-navigation/drawer';
@@ -22,11 +25,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
+import SectionTitle from '@/shared/components/ui/SectionTitle';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
+import { useProfileStore } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import { useNotifications } from '@/shared/context/NotificationContext';
-import { authAPI } from '@/shared/services/api';
+import { authAPI, get as apiGet } from '@/shared/services/api';
 import { getCapabilities } from '@/shared/auth/capabilities';
 import roleRequestService from '@/features/team/roleRequest.service';
 import { RoleRequest } from '@/shared/types/roleRequest';
@@ -38,25 +42,24 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const LEADING_SLOT = 36; // fixed leading column so all row labels align
+const WORKSPACE_KEY = 'Workspace'; // openSections key for the Workspace section
 
-// High-contrast selection palette for the account switcher: the active business with branches
-// renders as a white "paper" section, and the selected branch/account renders as a black "ink"
-// row. These are intentionally literal (same in light + dark mode) per the requested design.
-const INK = '#1C1917'; // black section background
-const INK_TEXT = '#FFFFFF'; // text/icons on the black section
-const PAPER = '#FFFFFF'; // white section background (business that has branches)
-const PAPER_TEXT = '#1C1917'; // text on the white section
-const PAPER_MUTED = '#57534E'; // muted text/icons on the white section
+// A trimmed branch shape used by the Workspace switcher (the store keeps the full object).
+type SidebarBranch = { id: string; name: string; is_primary?: boolean };
 
-type ShortcutItem = {
-  key: string;
-  label: string;
-  icon: string;
-  onPress: () => void;
-};
+// Walk a navigation state down to the deepest focused route name. Used to highlight the
+// tool that matches the current screen (drawer → "Tabs" → focused tab route).
+function deepestRouteName(state: any): string | undefined {
+  if (!state || typeof state.index !== 'number' || !Array.isArray(state.routes)) return undefined;
+  const route = state.routes[state.index];
+  if (route?.state) return deepestRouteName(route.state) ?? route?.name;
+  return route?.name;
+}
+
+type ToolItem = { label: string; icon: string; route?: string; onPress: () => void; badge?: number };
 
 export default function SidebarContent(props: DrawerContentComponentProps) {
-  const { theme: appTheme } = useTheme();
+  const { theme: appTheme, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const nav = props.navigation as any;
 
@@ -69,16 +72,18 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     icon: appTheme.colors.iconColor,
     iconMuted: appTheme.colors.iconMuted,
     highlight: appTheme.colors.highlightedRow,
-    activeHighlight: appTheme.colors.highlightedRow,
+    chip: appTheme.colors.buttonBackground,
     accent: appTheme.colors.accent,
     danger: appTheme.colors.error,
   };
+  // Selected row fill — one subtle step darker than the sidebar surface (not the old harsh
+  // black). The selected icon + tick are tinted with the accent on top of this.
+  const selectedBg = isDarkMode ? '#1A1714' : '#EFE9E1';
 
   const currentUser = useProfileStore((state) => state.currentUser);
   const activeMode = useProfileStore((state) => state.activeMode);
   const activeBusinessId = useProfileStore((state) => state.activeBusinessId);
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
-  const currentUserRole = useProfileStore((state) => state.currentUserRole);
   const userBusinesses = useProfileStore((state) => state.userBusinesses);
   const switchToPersonal = useProfileStore((state) => state.switchToPersonal);
   const switchToBusiness = useProfileStore((state) => state.switchToBusiness);
@@ -93,19 +98,32 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
   // Unread counts surfaced as badges on the workspace rows (Deliveries/Invoices moved here from tabs)
   const { deliveriesUnreadCount, invoicesUnreadCount } = useNotifications();
 
-  // Collapsible business sections (all collapsed by default) + top search field.
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  // Collapsible sections. Workspace is open by default; tool groups start collapsed (the group
+  // holding the current screen auto-opens below).
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({ [WORKSPACE_KEY]: true });
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Profile header doubles as a collapsing account switcher (collapsed by default).
-  const [accountsOpen, setAccountsOpen] = useState(false);
+  // Per-company expand state inside the Workspace section (companies with multiple branches).
+  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
+
+  // Pending branch selection applied after switching into a not-yet-active company, once its
+  // branches have loaded (avoids the fetchLocations reset clobbering the choice). See effect below.
+  const [pendingLocation, setPendingLocation] = useState<{ businessId: string; locationId: string } | null>(null);
+
+  // Pre-loaded branch lists for companies that aren't the active one (the active one uses the
+  // live `locations` from businessStore). Lets any multi-branch company expand inline.
+  const [companyLocations, setCompanyLocations] = useState<Map<string, SidebarBranch[]>>(new Map());
+  const loadedBranchIds = useRef<Set<string>>(new Set());
+
   // Pending/decided admin-access requests for staff-only memberships, keyed by business id.
   const [roleRequests, setRoleRequests] = useState<Map<string, RoleRequest>>(new Map());
 
-  // When the account list opens, load access-request statuses for any staff-only memberships
-  // so the rows can show "Request pending / declined / tap to request access".
+  const workspaceOpen = !!openSections[WORKSPACE_KEY];
+
+  // When the Workspace opens, load access-request statuses for any staff-only memberships
+  // so their rows can show "Request pending / declined / tap to request access".
   useEffect(() => {
-    if (!accountsOpen) return;
+    if (!workspaceOpen) return;
     const staffBusinesses = userBusinesses.filter((ub) => ub.role === 'staff');
     if (staffBusinesses.length === 0) return;
 
@@ -126,7 +144,74 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     return () => {
       cancelled = true;
     };
-  }, [accountsOpen, userBusinesses]);
+  }, [workspaceOpen, userBusinesses]);
+
+  // When the Workspace opens, pre-load branch lists for the companies we can switch into
+  // (non-staff, not currently active). The active company uses the live `locations` instead.
+  useEffect(() => {
+    if (!workspaceOpen) return;
+    const targets = userBusinesses.filter(
+      (ub) =>
+        !getCapabilities(ub.role).isStaff &&
+        ub.business.id !== activeBusinessId &&
+        !loadedBranchIds.current.has(ub.business.id)
+    );
+    if (targets.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      for (const ub of targets) {
+        loadedBranchIds.current.add(ub.business.id);
+        let branches: SidebarBranch[] = [];
+        try {
+          const raw = await apiGet<Record<string, any>[]>(`/companies/${ub.business.id}/locations`);
+          branches = raw.map((loc) => ({ id: loc.id, name: loc.name || '', is_primary: loc.is_primary }));
+        } catch {
+          branches = [];
+        }
+        if (cancelled) return;
+        setCompanyLocations((prev) => new Map(prev).set(ub.business.id, branches));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceOpen, userBusinesses, activeBusinessId]);
+
+  // Auto-expand the active business when it has multiple branches, so the current selection shows.
+  useEffect(() => {
+    if (activeMode === 'business' && activeBusinessId && locations.length > 1) {
+      setExpandedCompanies((prev) => (prev.has(activeBusinessId) ? prev : new Set(prev).add(activeBusinessId)));
+    }
+  }, [activeMode, activeBusinessId, locations.length]);
+
+  // Apply a pending branch selection once we've switched into the company and its branches loaded.
+  useEffect(() => {
+    if (!pendingLocation) return;
+    if (activeBusinessId !== pendingLocation.businessId) return;
+    if (locations.length === 0) return; // wait for fetchLocations to populate
+    const found = locations.find((l) => l.id === pendingLocation.locationId);
+    if (found) setLocation(found);
+    setPendingLocation(null);
+  }, [pendingLocation, locations, activeBusinessId, setLocation]);
+
+  // The tool matching the current screen (so its row highlights as selected).
+  const activeRoute = deepestRouteName(props.state);
+
+  // Holds the latest tool groups so the auto-open effect can read them without re-subscribing.
+  const sectionsRef = useRef<{ title: string; items: ToolItem[] }[] | null>(null);
+
+  // Auto-open the tool group that contains the current screen (without closing others).
+  useEffect(() => {
+    if (!activeRoute) return;
+    const groups = sectionsRef.current;
+    if (!groups) return;
+    const group = groups.find((s) => s.items.some((it) => it.route === activeRoute));
+    if (group) {
+      setOpenSections((prev) => (prev[group.title] ? prev : { ...prev, [group.title]: true }));
+    }
+  }, [activeRoute]);
 
   if (!currentUser) {
     return null;
@@ -158,10 +243,21 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
   // Open the reusable "Coming soon" placeholder for not-yet-built features.
   const comingSoon = (title: string) => go('ComingSoon', { title });
 
-  // Expand/collapse a business section with a smooth height animation.
+  // Expand/collapse a section (Workspace or a tool group) with a smooth height animation.
   const toggleSection = (key: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Expand/collapse a single company's branch list inside the Workspace.
+  const toggleCompany = (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedCompanies((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   // Run a company search from the sidebar's top search field.
@@ -176,12 +272,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     }
   };
 
-  // Expand/collapse the account switcher embedded in the profile header.
-  const handleToggleAccounts = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setAccountsOpen((open) => !open);
-  };
-
+  // The pinned profile header is the Personal account: tapping it returns to Personal mode.
   const handleSelectPersonal = () => {
     if (activeMode !== 'personal') {
       switchToPersonal();
@@ -213,6 +304,19 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
 
     if (ub.business.id !== activeBusinessId || activeMode !== 'business') {
       await switchToBusiness(ub.business.id);
+    }
+    closeDrawer();
+  };
+
+  // Select a specific branch (or "All locations" when branchId is null) of a company. If the
+  // company isn't active yet, switch into it first and apply the branch once it has loaded.
+  const selectLocation = (ub: UserBusiness, branchId: string | null) => {
+    const id = ub.business.id;
+    if (activeMode === 'business' && activeBusinessId === id) {
+      setLocation(branchId ? locations.find((l) => l.id === branchId) ?? null : null);
+    } else {
+      switchToBusiness(id);
+      if (branchId) setPendingLocation({ businessId: id, locationId: branchId });
     }
     closeDrawer();
   };
@@ -269,124 +373,103 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     ]);
   };
 
-  // Active identity shown in the (collapsed) profile header — business when in business mode, else personal.
-  const activeIdentity =
-    activeMode === 'business' && activeBusiness
-      ? {
-          name: activeBusiness.name,
-          subtitle: getRoleDisplayName(currentUserRole),
-          avatarId: activeBusiness.id,
-          avatarUri: activeBusiness.logo_url ?? null,
-          borderRadius: 13,
-        }
-      : {
-          name: currentUser.name,
-          subtitle: currentUser.email ?? 'Personal',
-          avatarId: currentUser.id,
-          avatarUri: currentUser.avatar_url,
-          borderRadius: 26,
-        };
+  const isBusiness = activeMode === 'business' && !!activeBusiness;
 
-  const shortcuts: ShortcutItem[] = [
+  const shortcuts: ToolItem[] = [
     {
-      key: 'profile',
       label: 'Profile',
       icon: activeMode === 'business' ? 'business-outline' : 'person-outline',
       onPress: handleOpenProfile,
     },
     {
-      key: 'settings',
       label: 'Settings',
       icon: 'settings-outline',
       onPress: () => go(activeMode === 'business' ? 'ProfileSettings' : 'PersonalProfileSettings'),
     },
     {
-      key: 'subscription',
       label: 'Subscription',
       icon: 'card-outline',
       // Business: in-shell SubscriptionHub tab. Personal: plain RootStack SubscriptionPlans (back button).
       onPress: () => go(activeMode === 'business' ? 'SubscriptionHub' : 'SubscriptionPlans'),
     },
+    { label: 'Tasks', icon: 'checkbox-outline', onPress: () => go('Tasks') },
   ];
 
-  if (activeMode === 'business' && activeBusiness) {
-    shortcuts.push({
-      key: 'team',
-      label: 'Team',
-      icon: 'people-outline',
-      onPress: () => go('TeamManagement', { businessId: activeBusiness.id }),
-    });
-  }
-
-  shortcuts.push({ key: 'tasks', label: 'Tasks', icon: 'checkbox-outline', onPress: () => go('Tasks') });
-
   // Business Workspace grouped navigation (Business mode only). Built items navigate;
-  // not-yet-built items open the "Coming soon" placeholder.
-  const businessSections =
-    activeMode === 'business' && activeBusiness
-      ? [
-          {
-            title: 'Logistics',
-            items: [
-              { label: 'Overview', icon: 'grid-outline', onPress: () => go('LogisticsOverview') },
-              { label: 'All deliveries', icon: 'truck-outline', onPress: () => go('Deliveries'), badge: deliveriesUnreadCount },
-              { label: 'Transfers', icon: 'swap-horizontal-outline', onPress: () => go('Transfers') },
-              { label: 'Orders', icon: 'cart-outline', onPress: () => go('Orders') },
-              { label: 'My deliveries', icon: 'person-outline', onPress: () => go('MyDeliveries') },
-              { label: 'Routes', icon: 'map-outline', onPress: () => go('Routes') },
-              { label: 'Issues', icon: 'alert-circle-outline', onPress: () => go('Issues') },
-              { label: 'Returns', icon: 'arrow-undo-outline', onPress: () => go('Returns') },
-              { label: 'Analytics', icon: 'bar-chart-outline', onPress: () => go('DeliveriesAnalytics') },
-            ],
-          },
-          {
-            title: 'Products',
-            items: [
-              { label: 'Products', icon: 'cube-outline', onPress: () => go('Products') },
-              { label: 'Categories', icon: 'grid-outline', onPress: () => go('Categories') },
-              { label: 'Brands', icon: 'bookmark-outline', onPress: () => go('Brands') },
-              { label: 'Stock', icon: 'archive-outline', onPress: () => go('Stock') },
-              { label: 'Price lists', icon: 'cash-outline', onPress: () => go('PriceLists') },
-              { label: 'Visibility', icon: 'eye-outline', onPress: () => go('ProductVisibility') },
-              { label: 'Collections', icon: 'folder-outline', onPress: () => comingSoon('Collections') },
-              { label: 'Recipes', icon: 'restaurant-outline', onPress: () => comingSoon('Recipes') },
-              { label: 'Discounts', icon: 'pricetag-outline', onPress: () => comingSoon('Discounts') },
-            ],
-          },
-          {
-            title: 'Accounting',
-            items: [
-              { label: 'Invoices', icon: 'receipt-text-outline', onPress: () => go('Invoices'), badge: invoicesUnreadCount },
-              { label: 'Estimates', icon: 'document-text-outline', onPress: () => go('Invoices', { initialTab: 'estimates' }) },
-              { label: 'Scan invoice', icon: 'scan-outline', onPress: () => comingSoon('Scan invoice') },
-            ],
-          },
-          {
-            title: 'Business',
-            items: [
-              { label: 'Public profile', icon: 'business-outline', onPress: () => go('ViewBusinessProfile', { businessId: activeBusiness.id }) },
-              { label: 'Customers', icon: 'people-outline', onPress: () => comingSoon('Customers') },
-              { label: 'Team', icon: 'person-add-outline', onPress: () => go('TeamManagement', { businessId: activeBusiness.id }) },
-              { label: 'Locations', icon: 'location-outline', onPress: () => go('Locations') },
-              { label: 'Analytics', icon: 'bar-chart-outline', onPress: () => comingSoon('Analytics') },
-              { label: 'Variance', icon: 'pie-chart-outline', onPress: () => comingSoon('Variance') },
-              { label: 'Subscription', icon: 'card-outline', onPress: () => go('SubscriptionHub') },
-              { label: 'Settings', icon: 'settings-outline', onPress: () => go('CompanySettings') },
-            ],
-          },
-          {
-            title: 'Design System',
-            items: [
-              { label: 'Bottom Sheet Gallery', icon: 'apps-outline', onPress: () => go('BottomSheetGallery') },
-              { label: 'Message Gallery', icon: 'chatbubbles-outline', onPress: () => go('MessageGallery') },
-              { label: 'Button Gallery', icon: 'radio-button-on-outline', onPress: () => go('ButtonGallery') },
-            ],
-          },
-        ]
-      : null;
+  // not-yet-built items open the "Coming soon" placeholder. `route` matches the live screen.
+  const businessSections: { title: string; items: ToolItem[] }[] | null = isBusiness
+    ? [
+        {
+          title: 'Logistics',
+          items: [
+            { label: 'Overview', icon: 'grid-outline', route: 'LogisticsOverview', onPress: () => go('LogisticsOverview') },
+            { label: 'All deliveries', icon: 'truck-outline', route: 'Deliveries', onPress: () => go('Deliveries'), badge: deliveriesUnreadCount },
+            { label: 'Transfers', icon: 'swap-horizontal-outline', route: 'Transfers', onPress: () => go('Transfers') },
+            { label: 'Orders', icon: 'cart-outline', route: 'Orders', onPress: () => go('Orders') },
+            { label: 'My deliveries', icon: 'person-outline', route: 'MyDeliveries', onPress: () => go('MyDeliveries') },
+            { label: 'Routes', icon: 'map-outline', route: 'Routes', onPress: () => go('Routes') },
+            { label: 'Issues', icon: 'alert-circle-outline', route: 'Issues', onPress: () => go('Issues') },
+            { label: 'Returns', icon: 'arrow-undo-outline', route: 'Returns', onPress: () => go('Returns') },
+            { label: 'Analytics', icon: 'bar-chart-outline', route: 'DeliveriesAnalytics', onPress: () => go('DeliveriesAnalytics') },
+          ],
+        },
+        {
+          title: 'Products',
+          items: [
+            { label: 'Products', icon: 'cube-outline', route: 'Products', onPress: () => go('Products') },
+            { label: 'Categories', icon: 'grid-outline', route: 'Categories', onPress: () => go('Categories') },
+            { label: 'Brands', icon: 'bookmark-outline', route: 'Brands', onPress: () => go('Brands') },
+            { label: 'Stock', icon: 'archive-outline', route: 'Stock', onPress: () => go('Stock') },
+            { label: 'Price lists', icon: 'cash-outline', route: 'PriceLists', onPress: () => go('PriceLists') },
+            { label: 'Visibility', icon: 'eye-outline', route: 'ProductVisibility', onPress: () => go('ProductVisibility') },
+            { label: 'Collections', icon: 'folder-outline', onPress: () => comingSoon('Collections') },
+            { label: 'Recipes', icon: 'restaurant-outline', onPress: () => comingSoon('Recipes') },
+            { label: 'Discounts', icon: 'pricetag-outline', onPress: () => comingSoon('Discounts') },
+          ],
+        },
+        {
+          title: 'Accounting',
+          items: [
+            { label: 'Invoices', icon: 'receipt-text-outline', route: 'Invoices', onPress: () => go('Invoices'), badge: invoicesUnreadCount },
+            { label: 'Estimates', icon: 'document-text-outline', onPress: () => go('Invoices', { initialTab: 'estimates' }) },
+            { label: 'Scan invoice', icon: 'scan-outline', onPress: () => comingSoon('Scan invoice') },
+          ],
+        },
+        {
+          title: 'Business',
+          items: [
+            { label: 'Public profile', icon: 'business-outline', onPress: () => go('ViewBusinessProfile', { businessId: activeBusiness!.id }) },
+            { label: 'Customers', icon: 'people-outline', onPress: () => comingSoon('Customers') },
+            { label: 'Team', icon: 'person-add-outline', route: 'TeamManagement', onPress: () => go('TeamManagement', { businessId: activeBusiness!.id }) },
+            { label: 'Locations', icon: 'location-outline', route: 'Locations', onPress: () => go('Locations') },
+            { label: 'Analytics', icon: 'bar-chart-outline', onPress: () => comingSoon('Analytics') },
+            { label: 'Variance', icon: 'pie-chart-outline', onPress: () => comingSoon('Variance') },
+            { label: 'Subscription', icon: 'card-outline', route: 'SubscriptionHub', onPress: () => go('SubscriptionHub') },
+            { label: 'Settings', icon: 'settings-outline', route: 'CompanySettings', onPress: () => go('CompanySettings') },
+          ],
+        },
+        {
+          title: 'Design System',
+          items: [
+            { label: 'Bottom Sheet Gallery', icon: 'apps-outline', route: 'BottomSheetGallery', onPress: () => go('BottomSheetGallery') },
+            { label: 'Message Gallery', icon: 'chatbubbles-outline', route: 'MessageGallery', onPress: () => go('MessageGallery') },
+            { label: 'Button Gallery', icon: 'radio-button-on-outline', route: 'ButtonGallery', onPress: () => go('ButtonGallery') },
+          ],
+        },
+      ]
+    : null;
+
+  // Feed the latest tool groups to the auto-open effect declared above the early return.
+  sectionsRef.current = businessSections;
 
   const SectionLabel = ({ text }: { text: string }) => (
     <Text style={[styles.sectionLabel, { color: C.textMuted }]}>{text}</Text>
+  );
+
+  const RoleBadge = ({ text }: { text: string }) => (
+    <View style={[styles.roleBadge, { backgroundColor: C.chip }]}>
+      <Text style={[styles.roleBadgeText, { color: C.textMuted }]}>{text}</Text>
+    </View>
   );
 
   const Row = ({
@@ -406,7 +489,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        active && { backgroundColor: C.activeHighlight },
+        active && { backgroundColor: selectedBg },
         pressed && !active && { backgroundColor: C.highlight },
       ]}
     >
@@ -421,59 +504,8 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     </Pressable>
   );
 
-  // Richer row used by the account switcher: avatar + name + optional role badge and
-  // status pill (staff). The selected account renders as a high-contrast black row.
-  const AccountRow = ({
-    avatar,
-    name,
-    badgeText,
-    selected,
-    pill,
-    onPress,
-  }: {
-    avatar: React.ReactNode;
-    name: string;
-    badgeText?: string | null;
-    selected?: boolean;
-    pill?: { icon: string; text: string } | null;
-    onPress: () => void;
-  }) => (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.accountRow,
-        selected && { backgroundColor: INK },
-        pressed && !selected && { backgroundColor: C.highlight },
-      ]}
-    >
-      <View style={styles.leading}>{avatar}</View>
-      <View style={styles.accountInfo}>
-        <View style={styles.accountNameRow}>
-          <Text
-            style={[styles.accountName, { color: selected ? INK_TEXT : C.text, fontWeight: selected ? '700' : '600' }]}
-            numberOfLines={1}
-          >
-            {name}
-          </Text>
-          {badgeText ? (
-            <View style={[styles.roleBadge, { backgroundColor: selected ? 'rgba(255,255,255,0.18)' : C.highlight }]}>
-              <Text style={[styles.roleBadgeText, { color: selected ? INK_TEXT : C.textMuted }]}>{badgeText}</Text>
-            </View>
-          ) : null}
-        </View>
-        {pill ? (
-          <View style={[styles.statusPill, { backgroundColor: selected ? 'rgba(255,255,255,0.18)' : C.highlight }]}>
-            <Icon name={pill.icon} size={13} color={selected ? INK_TEXT : C.textMuted} strokeWidth={2} />
-            <Text style={[styles.statusText, { color: selected ? INK_TEXT : C.textMuted }]}>{pill.text}</Text>
-          </View>
-        ) : null}
-      </View>
-      {selected ? <Icon name="checkmark" size={20} color={INK_TEXT} strokeWidth={2.5} /> : null}
-    </Pressable>
-  );
-
-  // A branch (location) row shown inside the white business section. The selected branch is black.
-  const BranchRow = ({
+  // A branch (location) row inside an expanded company. Selected = subtle fill + accent icon/tick.
+  const BranchItem = ({
     icon,
     label,
     selected,
@@ -488,20 +520,137 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.branchRow,
-        selected && { backgroundColor: INK },
-        pressed && !selected && { backgroundColor: '#F4F0EB' },
+        selected && { backgroundColor: selectedBg },
+        pressed && !selected && { backgroundColor: C.highlight },
       ]}
     >
-      <Icon name={icon} size={18} color={selected ? INK_TEXT : PAPER_MUTED} strokeWidth={2} />
+      <Icon name={icon} size={18} color={selected ? C.accent : C.iconMuted} strokeWidth={2} />
       <Text
-        style={[styles.branchLabel, { color: selected ? INK_TEXT : PAPER_TEXT, fontWeight: selected ? '700' : '500' }]}
+        style={[styles.branchLabel, { color: C.text, fontWeight: selected ? '700' : '500' }]}
         numberOfLines={1}
       >
         {label}
       </Text>
-      {selected ? <Icon name="checkmark" size={18} color={INK_TEXT} strokeWidth={2.5} /> : null}
+      {selected ? <Icon name="checkmark" size={18} color={C.accent} strokeWidth={2.5} /> : null}
     </Pressable>
   );
+
+  // One company in the Workspace list.
+  const renderCompany = (ub: UserBusiness) => {
+    const id = ub.business.id;
+    const isStaff = getCapabilities(ub.role).isStaff;
+    const isActiveBiz = isBusiness && activeBusinessId === id;
+    const badgeText = ub.role === 'super_admin' ? 'OWNER' : ub.role.toUpperCase();
+    const avatar = (
+      <Avatar userId={id} userName={ub.business.name} imageUri={ub.business.logo_url ?? null} size={36} borderRadius={9} />
+    );
+
+    // Staff-only membership: can't enter business mode — show a request-access pill.
+    if (isStaff) {
+      const request = roleRequests.get(id);
+      let pill: { icon: string; text: string };
+      if (request?.status === 'PENDING') pill = { icon: 'time-outline', text: 'Request pending' };
+      else if (request?.status === 'REJECTED') pill = { icon: 'close-circle-outline', text: 'Request declined' };
+      else pill = { icon: 'lock-closed-outline', text: 'Tap to request access' };
+      return (
+        <Pressable
+          key={id}
+          onPress={() => handleSelectBusiness(ub)}
+          style={({ pressed }) => [styles.companyRow, pressed && { backgroundColor: C.highlight }]}
+        >
+          <View style={styles.leading}>{avatar}</View>
+          <View style={styles.companyInfo}>
+            <View style={styles.companyNameRow}>
+              <Text style={[styles.companyName, { color: C.text }]} numberOfLines={1}>
+                {ub.business.name}
+              </Text>
+              <RoleBadge text={badgeText} />
+            </View>
+            <View style={[styles.statusPill, { backgroundColor: C.chip }]}>
+              <Icon name={pill.icon} size={13} color={C.textMuted} strokeWidth={2} />
+              <Text style={[styles.statusText, { color: C.textMuted }]}>{pill.text}</Text>
+            </View>
+          </View>
+        </Pressable>
+      );
+    }
+
+    const branches: SidebarBranch[] = isActiveBiz ? (locations as SidebarBranch[]) : companyLocations.get(id) ?? [];
+    const hasMultiple = branches.length > 1;
+
+    // Multiple branches → expandable header; pick a branch (or "All locations") from the list.
+    if (hasMultiple) {
+      const expanded = expandedCompanies.has(id);
+      return (
+        <View key={id}>
+          <Pressable
+            onPress={() => toggleCompany(id)}
+            style={({ pressed }) => [styles.companyRow, pressed && { backgroundColor: C.highlight }]}
+          >
+            <View style={styles.leading}>{avatar}</View>
+            <View style={styles.companyInfo}>
+              <View style={styles.companyNameRow}>
+                <Text style={[styles.companyName, { color: C.text }]} numberOfLines={1}>
+                  {ub.business.name}
+                </Text>
+                <RoleBadge text={badgeText} />
+              </View>
+            </View>
+            <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={20} color={C.iconMuted} strokeWidth={2} />
+          </Pressable>
+          {expanded ? (
+            <>
+              <View style={[styles.companyDivider, { backgroundColor: C.divider }]} />
+              <View style={[styles.branchIndent, { borderLeftColor: C.divider }]}>
+                <BranchItem
+                  icon="grid-outline"
+                  label="All locations"
+                  selected={isActiveBiz && currentLocationId === null}
+                  onPress={() => selectLocation(ub, null)}
+                />
+                {branches.map((b) => (
+                  <BranchItem
+                    key={b.id}
+                    icon="location"
+                    label={b.name}
+                    selected={isActiveBiz && currentLocationId === b.id}
+                    onPress={() => selectLocation(ub, b.id)}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+        </View>
+      );
+    }
+
+    // Single (or zero) branch → tap selects the company directly.
+    return (
+      <Pressable
+        key={id}
+        onPress={() => handleSelectBusiness(ub)}
+        style={({ pressed }) => [
+          styles.companyRow,
+          isActiveBiz && { backgroundColor: selectedBg },
+          pressed && !isActiveBiz && { backgroundColor: C.highlight },
+        ]}
+      >
+        <View style={styles.leading}>{avatar}</View>
+        <View style={styles.companyInfo}>
+          <View style={styles.companyNameRow}>
+            <Text
+              style={[styles.companyName, { color: C.text, fontWeight: isActiveBiz ? '700' : '600' }]}
+              numberOfLines={1}
+            >
+              {ub.business.name}
+            </Text>
+            <RoleBadge text={badgeText} />
+          </View>
+        </View>
+        {isActiveBiz ? <Icon name="checkmark" size={20} color={C.accent} strokeWidth={2.5} /> : null}
+      </Pressable>
+    );
+  };
 
   return (
     <DrawerContentScrollView
@@ -519,155 +668,30 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
       ]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Profile header — tap to expand the account switcher */}
+      {/* Profile header — the Personal account. Tap returns to Personal mode. */}
       <Pressable
-        onPress={handleToggleAccounts}
+        onPress={handleSelectPersonal}
         style={({ pressed }) => [styles.profileCard, pressed && { backgroundColor: C.highlight }]}
       >
         <Avatar
-          userId={activeIdentity.avatarId}
-          userName={activeIdentity.name}
-          imageUri={activeIdentity.avatarUri}
+          userId={currentUser.id}
+          userName={currentUser.name}
+          imageUri={currentUser.avatar_url}
           size={52}
-          borderRadius={activeIdentity.borderRadius}
+          borderRadius={26}
         />
         <View style={styles.profileInfo}>
           <Text style={[styles.profileName, { color: C.text }]} numberOfLines={1}>
-            {activeIdentity.name}
+            {currentUser.name}
           </Text>
-          {activeIdentity.subtitle ? (
-            <Text style={[styles.profileEmail, { color: C.textMuted }]} numberOfLines={1}>
-              {activeIdentity.subtitle}
-            </Text>
-          ) : null}
+          <Text style={[styles.profileEmail, { color: C.textMuted }]} numberOfLines={1}>
+            {currentUser.email ?? 'Personal'}
+          </Text>
         </View>
-        <Icon name={accountsOpen ? 'chevron-up' : 'chevron-down'} size={20} color={C.iconMuted} strokeWidth={2} />
       </Pressable>
 
-      {/* Account switcher (expanded): Personal + every connected business + add account */}
-      {accountsOpen ? (
-        <View style={styles.accountList}>
-          <View style={styles.accountListHeader}>
-            <Text style={[styles.sectionLabel, { color: C.textMuted, marginBottom: 0 }]}>ACCOUNTS</Text>
-            <Pressable
-              onPress={handleAddAccount}
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.addAccountBtn,
-                pressed && { backgroundColor: C.highlight },
-              ]}
-            >
-              <Icon name="add" size={20} color={C.icon} strokeWidth={2.5} />
-            </Pressable>
-          </View>
-
-          {/* Personal account */}
-          <AccountRow
-            avatar={
-              <Avatar
-                userId={currentUser.id}
-                userName={currentUser.name}
-                imageUri={currentUser.avatar_url}
-                size={36}
-                borderRadius={18}
-              />
-            }
-            name={currentUser.name}
-            selected={activeMode === 'personal'}
-            onPress={handleSelectPersonal}
-          />
-
-          {/* Business accounts */}
-          {userBusinesses.map((ub) => {
-            const isStaff = getCapabilities(ub.role).isStaff;
-            const isActiveBiz = activeMode === 'business' && activeBusinessId === ub.business.id;
-            const badgeText = ub.role === 'super_admin' ? 'OWNER' : ub.role.toUpperCase();
-
-            // Active business with 2+ branches → white section listing its branches, with the
-            // selected branch (or "All locations") shown as a black row. Only the active business
-            // has its locations loaded, so only it can expand into branches.
-            if (isActiveBiz && locations.length > 1) {
-              // The company's main (primary) branch is its default account — selected when no
-              // specific branch has been chosen yet. Falls back to the first location if none is flagged.
-              const mainLocationId = (locations.find((l) => l.is_primary) ?? locations[0])?.id;
-              return (
-                <View key={ub.business.id} style={styles.branchContainer}>
-                  <View style={styles.branchHeader}>
-                    <Avatar
-                      userId={ub.business.id}
-                      userName={ub.business.name}
-                      imageUri={ub.business.logo_url ?? null}
-                      size={30}
-                      borderRadius={8}
-                    />
-                    <Text style={styles.branchHeaderName} numberOfLines={1}>
-                      {ub.business.name}
-                    </Text>
-                    <View style={styles.branchHeaderBadge}>
-                      <Text style={styles.branchHeaderBadgeText}>{badgeText}</Text>
-                    </View>
-                  </View>
-                  {locations.map((loc) => (
-                    <BranchRow
-                      key={loc.id}
-                      icon="location"
-                      label={loc.name}
-                      selected={currentLocationId === loc.id || (currentLocationId === null && loc.id === mainLocationId)}
-                      onPress={() => setLocation(loc)}
-                    />
-                  ))}
-                </View>
-              );
-            }
-
-            // Otherwise a single switch row. Staff-only memberships show a request-access pill.
-            let pill: { icon: string; text: string } | null = null;
-            if (isStaff) {
-              const request = roleRequests.get(ub.business.id);
-              if (request?.status === 'PENDING') {
-                pill = { icon: 'time-outline', text: 'Request pending' };
-              } else if (request?.status === 'REJECTED') {
-                pill = { icon: 'close-circle-outline', text: 'Request declined' };
-              } else {
-                pill = { icon: 'lock-closed-outline', text: 'Tap to request access' };
-              }
-            }
-            return (
-              <AccountRow
-                key={ub.business.id}
-                avatar={
-                  <Avatar
-                    userId={ub.business.id}
-                    userName={ub.business.name}
-                    imageUri={ub.business.logo_url ?? null}
-                    size={36}
-                    borderRadius={9}
-                  />
-                }
-                name={ub.business.name}
-                badgeText={badgeText}
-                selected={isActiveBiz}
-                pill={pill}
-                onPress={() => handleSelectBusiness(ub)}
-              />
-            );
-          })}
-
-          {/* Add account */}
-          <Pressable
-            onPress={handleAddAccount}
-            style={({ pressed }) => [styles.accountRow, pressed && { backgroundColor: C.highlight }]}
-          >
-            <View style={styles.leading}>
-              <Icon name="add" size={20} color={C.icon} strokeWidth={2.5} />
-            </View>
-            <Text style={[styles.accountName, { color: C.text, fontWeight: '600' }]}>Add account</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
       {/* Search (business mode) */}
-      {businessSections ? (
+      {isBusiness ? (
         <AppSearchBar
           containerStyle={styles.searchContainer}
           placeholder="Search"
@@ -679,57 +703,90 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
         />
       ) : null}
 
+      {/* Workspace — the companies you belong to (retractable) */}
+      <View style={styles.section}>
+        <Pressable
+          onPress={() => toggleSection(WORKSPACE_KEY)}
+          style={({ pressed }) => [styles.sectionHeader, pressed && { backgroundColor: C.highlight }]}
+        >
+          <SectionTitle>Workspace</SectionTitle>
+          <View style={styles.workspaceHeaderActions}>
+            <Pressable
+              onPress={handleAddAccount}
+              hitSlop={8}
+              style={({ pressed }) => [styles.addAccountBtn, pressed && { backgroundColor: C.chip }]}
+            >
+              <Icon name="add" size={20} color={C.icon} strokeWidth={2.5} />
+            </Pressable>
+            <Icon name={workspaceOpen ? 'chevron-up' : 'chevron-down'} size={20} color={C.iconMuted} strokeWidth={2} />
+          </View>
+        </Pressable>
+        {workspaceOpen ? (
+          <View style={styles.workspaceBody}>
+            {userBusinesses.length === 0 ? (
+              <Text style={[styles.emptyHint, { color: C.textMuted }]}>
+                No companies yet. Tap + to create or join one.
+              </Text>
+            ) : (
+              userBusinesses.map(renderCompany)
+            )}
+          </View>
+        ) : null}
+      </View>
+
       <View style={[styles.divider, { backgroundColor: C.divider }]} />
 
-      {/* Navigation: collapsible Business Workspace sections (business mode) or simple menu (personal) */}
+      {/* Tools (business mode) or a simple menu (personal mode) */}
       {businessSections ? (
-        businessSections.map((section) => {
-          const open = !!openSections[section.title];
-          return (
-            <View key={section.title} style={styles.section}>
-              <Pressable
-                onPress={() => toggleSection(section.title)}
-                style={({ pressed }) => [styles.sectionHeader, pressed && { backgroundColor: C.highlight }]}
-              >
-                <Text style={[styles.sectionHeaderText, { color: C.text }]}>{section.title}</Text>
-                <Icon
-                  name={open ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={C.iconMuted}
-                  strokeWidth={2}
-                />
-              </Pressable>
-              {open ? (
-                <View style={styles.sectionItems}>
-                  {section.items.map((item: { label: string; icon: string; onPress: () => void; badge?: number }) => (
-                    <Row
-                      key={item.label}
-                      onPress={item.onPress}
-                      label={item.label}
-                      leading={<Icon name={item.icon} size={22} color={C.icon} strokeWidth={2} />}
-                      trailing={
-                        <View style={styles.trailingGroup}>
-                          {item.badge && item.badge > 0 ? (
-                            <View style={[styles.badge, { backgroundColor: C.accent }]}>
-                              <Text style={styles.badgeText}>{item.badge > 9 ? '9+' : item.badge}</Text>
+        <>
+          <SectionTitle style={styles.toolsTitle}>Tools</SectionTitle>
+          {businessSections.map((section) => {
+            const open = !!openSections[section.title];
+            return (
+              <View key={section.title} style={styles.section}>
+                <Pressable
+                  onPress={() => toggleSection(section.title)}
+                  style={({ pressed }) => [styles.sectionHeader, pressed && { backgroundColor: C.highlight }]}
+                >
+                  <Text style={[styles.sectionHeaderText, { color: C.text }]}>{section.title}</Text>
+                  <Icon name={open ? 'chevron-up' : 'chevron-down'} size={20} color={C.iconMuted} strokeWidth={2} />
+                </Pressable>
+                {open ? (
+                  <View style={[styles.sectionItems, { borderLeftColor: C.divider }]}>
+                    {section.items.map((item) => {
+                      const active = !!item.route && item.route === activeRoute;
+                      return (
+                        <Row
+                          key={item.label}
+                          onPress={item.onPress}
+                          label={item.label}
+                          active={active}
+                          leading={<Icon name={item.icon} size={22} color={active ? C.accent : C.icon} strokeWidth={2} />}
+                          trailing={
+                            <View style={styles.trailingGroup}>
+                              {item.badge && item.badge > 0 ? (
+                                <View style={[styles.badge, { backgroundColor: C.accent }]}>
+                                  <Text style={styles.badgeText}>{item.badge > 9 ? '9+' : item.badge}</Text>
+                                </View>
+                              ) : null}
+                              <Icon name="chevron-forward" size={18} color={active ? C.accent : C.iconMuted} strokeWidth={2} />
                             </View>
-                          ) : null}
-                          <Icon name="chevron-forward" size={18} color={C.iconMuted} strokeWidth={2} />
-                        </View>
-                      }
-                    />
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          );
-        })
+                          }
+                        />
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </>
       ) : (
         <>
           <SectionLabel text="MENU" />
           {shortcuts.map((item) => (
             <Row
-              key={item.key}
+              key={item.label}
               onPress={item.onPress}
               label={item.label}
               leading={<Icon name={item.icon} size={22} color={C.icon} strokeWidth={2} />}
@@ -824,8 +881,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  workspaceHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  workspaceBody: {
+    marginTop: 2,
+  },
+  emptyHint: {
+    fontSize: 14,
+    fontWeight: '500',
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+  },
+  toolsTitle: {
+    marginLeft: 8,
+    marginBottom: 2,
+  },
   sectionItems: {
-    paddingLeft: 8,
+    marginLeft: 20,
+    paddingLeft: 12,
+    marginTop: 2,
+    borderLeftWidth: 1.5,
   },
   sectionLabel: {
     fontSize: 11,
@@ -851,18 +929,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 10,
   },
-  accountList: {
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  accountListHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    minHeight: 32,
-    marginBottom: 2,
-  },
   addAccountBtn: {
     width: 30,
     height: 30,
@@ -870,24 +936,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  accountRow: {
+  companyRow: {
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 52,
     paddingHorizontal: 8,
     borderRadius: 12,
   },
-  accountInfo: {
+  companyInfo: {
     flex: 1,
     marginLeft: 10,
   },
-  accountNameRow: {
+  companyNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  accountName: {
+  companyName: {
     fontSize: 16,
+    fontWeight: '600',
     flexShrink: 1,
   },
   roleBadge: {
@@ -914,37 +981,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  branchContainer: {
-    backgroundColor: PAPER,
-    borderRadius: 14,
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    marginVertical: 2,
+  companyDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 54,
+    marginRight: 8,
+    marginTop: 2,
+    marginBottom: 4,
   },
-  branchHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 8,
-  },
-  branchHeaderName: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '700',
-    color: PAPER_TEXT,
-  },
-  branchHeaderBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: '#FAF8F5',
-  },
-  branchHeaderBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    color: PAPER_MUTED,
+  branchIndent: {
+    marginLeft: 26,
+    paddingLeft: 10,
+    marginBottom: 2,
+    borderLeftWidth: 1.5,
   },
   branchRow: {
     flexDirection: 'row',
