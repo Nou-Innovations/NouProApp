@@ -178,13 +178,6 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     };
   }, [workspaceOpen, userBusinesses, activeBusinessId]);
 
-  // Auto-expand the active business when it has multiple branches, so the current selection shows.
-  useEffect(() => {
-    if (activeMode === 'business' && activeBusinessId && locations.length > 1) {
-      setExpandedCompanies((prev) => (prev.has(activeBusinessId) ? prev : new Set(prev).add(activeBusinessId)));
-    }
-  }, [activeMode, activeBusinessId, locations.length]);
-
   // Apply a pending branch selection once we've switched into the company and its branches loaded.
   useEffect(() => {
     if (!pendingLocation) return;
@@ -570,8 +563,9 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     const hasMultiple = branches.length > 1;
 
     // Multiple branches → expandable header; pick a specific branch from the list.
+    // The active company stays open so its selected branch + options are always visible.
     if (hasMultiple) {
-      const expanded = expandedCompanies.has(id);
+      const expanded = isActiveBiz || expandedCompanies.has(id);
       return (
         <View key={id}>
           <Pressable
@@ -686,33 +680,27 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
         />
       ) : null}
 
-      {/* Workspace — the companies you belong to (retractable) */}
+      {/* Workspaces — the companies you belong to (retractable) */}
       <View style={styles.section}>
         <Pressable
           onPress={() => toggleSection(WORKSPACE_KEY)}
           style={({ pressed }) => [styles.sectionHeader, pressed && { backgroundColor: C.highlight }]}
         >
-          <Text style={[styles.sectionLabel, { color: C.textMuted, marginBottom: 0 }]}>WORKSPACE</Text>
-          <View style={styles.workspaceHeaderActions}>
-            <Pressable
-              onPress={handleAddAccount}
-              hitSlop={8}
-              style={({ pressed }) => [styles.addAccountBtn, pressed && { backgroundColor: C.chip }]}
-            >
-              <Icon name="add" size={20} color={C.icon} strokeWidth={2.5} />
-            </Pressable>
-            <Icon name={workspaceOpen ? 'chevron-up' : 'chevron-down'} size={20} color={C.iconMuted} strokeWidth={2} />
-          </View>
+          <Text style={[styles.sectionLabel, { color: C.textMuted, marginBottom: 0, marginLeft: 0 }]}>WORKSPACES</Text>
+          <Icon name={workspaceOpen ? 'chevron-up' : 'chevron-down'} size={20} color={C.iconMuted} strokeWidth={2} />
         </Pressable>
         {workspaceOpen ? (
           <View style={styles.workspaceBody}>
-            {userBusinesses.length === 0 ? (
-              <Text style={[styles.emptyHint, { color: C.textMuted }]}>
-                No companies yet. Tap + to create or join one.
-              </Text>
-            ) : (
-              userBusinesses.map(renderCompany)
-            )}
+            {userBusinesses.map(renderCompany)}
+            <Pressable
+              onPress={handleAddAccount}
+              style={({ pressed }) => [styles.companyRow, pressed && { backgroundColor: C.highlight }]}
+            >
+              <View style={styles.leading}>
+                <Icon name="add" size={20} color={C.icon} strokeWidth={2.5} />
+              </View>
+              <Text style={[styles.companyName, { color: C.text, fontWeight: '600' }]}>Add a workspace</Text>
+            </Pressable>
           </View>
         ) : null}
       </View>
@@ -864,19 +852,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  workspaceHeaderActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
   workspaceBody: {
     marginTop: 2,
-  },
-  emptyHint: {
-    fontSize: 14,
-    fontWeight: '500',
-    paddingHorizontal: 10,
-    paddingVertical: 12,
   },
   sectionItems: {
     marginLeft: 20,
@@ -907,13 +884,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     marginLeft: 10,
-  },
-  addAccountBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   companyRow: {
     flexDirection: 'row',
