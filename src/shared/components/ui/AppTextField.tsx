@@ -101,10 +101,13 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
   countLabelSingular = 'item',
   countLabelPlural,
   onPress,
+  // Pulled out of textInputProps so the eye toggle can control visibility
+  secureTextEntry,
   ...textInputProps
 }) => {
   const { theme: appTheme } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const inputRef = useRef<TextInput>(null);
   
   // Animation value for focus state transitions (0 = unfocused, 1 = focused)
@@ -126,6 +129,9 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
   // Determine if field has content
   const hasValue = value.length > 0;
   const hasMultiSelectValue = multiSelect && selectedCount > 0;
+
+  // Show an eye toggle on the right for secure (password) fields
+  const showPasswordToggle = !!secureTextEntry && !isMultiline && !isDropdown && !multiSelect;
   
   // Check if required field is missing value (for dropdown/multiSelect, check selectedCount)
   const isRequiredEmpty = required && (
@@ -206,6 +212,11 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
   // Calculate left padding based on icon presence
   const getLeftPadding = () => {
     return leftIcon ? tfConfig.icon.containerWidth : tfConfig.paddingHorizontal;
+  };
+
+  // Calculate right padding so text doesn't run under the eye toggle
+  const getRightPadding = () => {
+    return showPasswordToggle ? tfConfig.icon.containerWidth : tfConfig.paddingHorizontal;
   };
   
   // Generate the count display text for multi-select
@@ -348,7 +359,7 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
             borderColor: animatedBorderColor,
             backgroundColor: appTheme.colors.inputBackground,
             paddingLeft: getLeftPadding(),
-            paddingRight: tfConfig.paddingHorizontal,
+            paddingRight: getRightPadding(),
             opacity: disabled ? 0.5 : 1,
           },
         ]}
@@ -356,8 +367,8 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
         {/* Left Icon */}
         {leftIcon && (
           <View style={[
-            styles.iconContainer, 
-            { 
+            styles.iconContainer,
+            {
               width: tfConfig.icon.containerWidth,
               justifyContent: isMultiline ? 'flex-start' : 'center',
               paddingTop: isMultiline ? tfConfig.multiline.paddingVertical : 0,
@@ -387,6 +398,7 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
           multiline={isMultiline}
           numberOfLines={isMultiline ? numberOfLines : 1}
           textAlignVertical={isMultiline ? 'top' : 'center'}
+          secureTextEntry={secureTextEntry && !isPasswordVisible}
           style={[
             styles.input,
             {
@@ -400,6 +412,24 @@ const AppTextField: React.FC<AppTextFieldProps> = ({
           ]}
           {...textInputProps}
         />
+
+        {/* Password visibility toggle (eye icon) */}
+        {showPasswordToggle && (
+          <TouchableOpacity
+            style={[styles.rightIconButton, { width: tfConfig.icon.containerWidth }]}
+            onPress={() => setIsPasswordVisible((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Icon
+              name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
+              size={tfConfig.icon.size}
+              color={getIconColor()}
+              strokeWidth={getIconStrokeWidth()}
+            />
+          </TouchableOpacity>
+        )}
       </AnimatedTouchableOpacity>
     </View>
   );
@@ -419,6 +449,14 @@ const styles = StyleSheet.create({
   iconContainer: {
     position: 'absolute',
     left: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rightIconButton: {
+    position: 'absolute',
+    right: 0,
     top: 0,
     bottom: 0,
     justifyContent: 'center',
