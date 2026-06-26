@@ -25,7 +25,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
-import SectionTitle from '@/shared/components/ui/SectionTitle';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
@@ -466,12 +465,6 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     <Text style={[styles.sectionLabel, { color: C.textMuted }]}>{text}</Text>
   );
 
-  const RoleBadge = ({ text }: { text: string }) => (
-    <View style={[styles.roleBadge, { backgroundColor: C.chip }]}>
-      <Text style={[styles.roleBadgeText, { color: C.textMuted }]}>{text}</Text>
-    </View>
-  );
-
   const Row = ({
     onPress,
     leading,
@@ -524,14 +517,14 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
         pressed && !selected && { backgroundColor: C.highlight },
       ]}
     >
-      <Icon name={icon} size={18} color={selected ? C.accent : C.iconMuted} strokeWidth={2} />
+      <Icon name={icon} size={18} color={selected ? C.accent : C.iconMuted} strokeWidth={selected ? 2.75 : 2} />
       <Text
         style={[styles.branchLabel, { color: C.text, fontWeight: selected ? '700' : '500' }]}
         numberOfLines={1}
       >
         {label}
       </Text>
-      {selected ? <Icon name="checkmark" size={18} color={C.accent} strokeWidth={2.5} /> : null}
+      {selected ? <Icon name="checkmark" size={18} color={C.accent} strokeWidth={2.75} /> : null}
     </Pressable>
   );
 
@@ -540,7 +533,6 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     const id = ub.business.id;
     const isStaff = getCapabilities(ub.role).isStaff;
     const isActiveBiz = isBusiness && activeBusinessId === id;
-    const badgeText = ub.role === 'super_admin' ? 'OWNER' : ub.role.toUpperCase();
     const avatar = (
       <Avatar userId={id} userName={ub.business.name} imageUri={ub.business.logo_url ?? null} size={36} borderRadius={9} />
     );
@@ -564,7 +556,6 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
               <Text style={[styles.companyName, { color: C.text }]} numberOfLines={1}>
                 {ub.business.name}
               </Text>
-              <RoleBadge text={badgeText} />
             </View>
             <View style={[styles.statusPill, { backgroundColor: C.chip }]}>
               <Icon name={pill.icon} size={13} color={C.textMuted} strokeWidth={2} />
@@ -578,7 +569,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     const branches: SidebarBranch[] = isActiveBiz ? (locations as SidebarBranch[]) : companyLocations.get(id) ?? [];
     const hasMultiple = branches.length > 1;
 
-    // Multiple branches → expandable header; pick a branch (or "All locations") from the list.
+    // Multiple branches → expandable header; pick a specific branch from the list.
     if (hasMultiple) {
       const expanded = expandedCompanies.has(id);
       return (
@@ -593,7 +584,6 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
                 <Text style={[styles.companyName, { color: C.text }]} numberOfLines={1}>
                   {ub.business.name}
                 </Text>
-                <RoleBadge text={badgeText} />
               </View>
             </View>
             <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={20} color={C.iconMuted} strokeWidth={2} />
@@ -602,12 +592,6 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
             <>
               <View style={[styles.companyDivider, { backgroundColor: C.divider }]} />
               <View style={[styles.branchIndent, { borderLeftColor: C.divider }]}>
-                <BranchItem
-                  icon="grid-outline"
-                  label="All locations"
-                  selected={isActiveBiz && currentLocationId === null}
-                  onPress={() => selectLocation(ub, null)}
-                />
                 {branches.map((b) => (
                   <BranchItem
                     key={b.id}
@@ -644,10 +628,9 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
             >
               {ub.business.name}
             </Text>
-            <RoleBadge text={badgeText} />
           </View>
         </View>
-        {isActiveBiz ? <Icon name="checkmark" size={20} color={C.accent} strokeWidth={2.5} /> : null}
+        {isActiveBiz ? <Icon name="checkmark" size={20} color={C.accent} strokeWidth={2.75} /> : null}
       </Pressable>
     );
   };
@@ -709,7 +692,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
           onPress={() => toggleSection(WORKSPACE_KEY)}
           style={({ pressed }) => [styles.sectionHeader, pressed && { backgroundColor: C.highlight }]}
         >
-          <SectionTitle>Workspace</SectionTitle>
+          <Text style={[styles.sectionLabel, { color: C.textMuted, marginBottom: 0 }]}>WORKSPACE</Text>
           <View style={styles.workspaceHeaderActions}>
             <Pressable
               onPress={handleAddAccount}
@@ -739,7 +722,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
       {/* Tools (business mode) or a simple menu (personal mode) */}
       {businessSections ? (
         <>
-          <SectionTitle style={styles.toolsTitle}>Tools</SectionTitle>
+          <SectionLabel text="TOOLS" />
           {businessSections.map((section) => {
             const open = !!openSections[section.title];
             return (
@@ -761,7 +744,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
                           onPress={item.onPress}
                           label={item.label}
                           active={active}
-                          leading={<Icon name={item.icon} size={22} color={active ? C.accent : C.icon} strokeWidth={2} />}
+                          leading={<Icon name={item.icon} size={22} color={active ? C.accent : C.icon} strokeWidth={active ? 2.75 : 2} />}
                           trailing={
                             <View style={styles.trailingGroup}>
                               {item.badge && item.badge > 0 ? (
@@ -895,10 +878,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 12,
   },
-  toolsTitle: {
-    marginLeft: 8,
-    marginBottom: 2,
-  },
   sectionItems: {
     marginLeft: 20,
     paddingLeft: 12,
@@ -956,16 +935,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     flexShrink: 1,
-  },
-  roleBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  roleBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
   statusPill: {
     flexDirection: 'row',
