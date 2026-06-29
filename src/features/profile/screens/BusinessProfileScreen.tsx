@@ -25,23 +25,12 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import MapView, { Marker } from 'react-native-maps';
 import { requestToJoinCompany } from '@/features/notifications/notifications.service';
-import { AppBottomSheet, type AppBottomSheetItem } from '@/shared/components/ui';
+import { AppBottomSheet, type AppBottomSheetItem, BusinessHoursTable } from '@/shared/components/ui';
 import { reportEntity, REPORT_REASONS, type ReportReason } from '@/features/profile/profile.service';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const COVER_HEIGHT = SCREEN_WIDTH * (4 / 3); // 3:4 aspect ratio - matching BusinessProfileOwnScreen
 const TAB_BAR_HEIGHT = 50;
-
-// Mock business hours data - matching BusinessProfileOwnScreen
-const mockBusinessHours = [
-  { day: 'Monday', open: '09:00 AM', close: '06:00 PM' },
-  { day: 'Tuesday', open: '09:00 AM', close: '06:00 PM' },
-  { day: 'Wednesday', open: '09:00 AM', close: '06:00 PM' },
-  { day: 'Thursday', open: '09:00 AM', close: '06:00 PM' },
-  { day: 'Friday', open: '09:00 AM', close: '06:00 PM' },
-  { day: 'Saturday', open: 'Closed', close: '' },
-  { day: 'Sunday', open: 'Closed', close: '' },
-];
 
 // Mock map location
 const mockMapLocation = {
@@ -128,7 +117,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       description: business?.description || '',
       website: business?.website || '',
       phone: business?.phone || business?.locations?.[0]?.phone || '',
-      businessHours: mockBusinessHours,
+      businessHours: business?.businessHours ?? business?.settings?.businessHours ?? [],
       mapLocation: business?.locations?.[0]
         ? { latitude: business.locations[0].latitude || -20.232, longitude: business.locations[0].longitude || 57.498 }
         : mockMapLocation,
@@ -699,19 +688,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
           {/* Business Hours */}
           <View style={styles.businessHoursSection}>
             <Text style={[styles.infoLabel, { color: appTheme.colors.text }]}>Business Hours</Text>
-            {mockBusinessHours.map((hours) => (
-              <View key={hours.day} style={styles.hoursRow}>
-                <Text style={[styles.hoursDay, { color: appTheme.colors.text }]}>
-                  {hours.day}
-                </Text>
-                <Text style={[
-                  styles.hoursTime, 
-                  { color: hours.open === 'Closed' ? appTheme.colors.textLight : appTheme.colors.secondary }
-                ]}>
-                  {hours.open === 'Closed' ? 'Closed' : `${hours.open} - ${hours.close}`}
-                </Text>
-              </View>
-            ))}
+            <BusinessHoursTable hours={aboutInfo.businessHours} />
           </View>
         </View>
       </View>

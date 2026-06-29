@@ -43,8 +43,20 @@ export interface Business {
   next_billing_date?: string; // ISO date
   connections_count?: number; // Number of business connections
   settings?: BusinessSettings;
+  // Public-facing opening hours. The editor saves these inside `settings`, but the API also
+  // surfaces them top-level (settings itself is stripped from public responses).
+  businessHours?: BusinessHours[];
   created_at: string; // ISO timestamp
   updated_at?: string;
+}
+
+/**
+ * One day's opening hours (a day may have multiple time slots, e.g. a lunch break).
+ */
+export interface BusinessHours {
+  day: string;
+  isOpen: boolean;
+  timeSlots: { open: string; close: string }[];
 }
 
 /**
@@ -60,11 +72,7 @@ export interface BusinessSettings {
   timezone?: string;
   allowLocationPriceOverride?: boolean;
   allowLocationTaxOverride?: boolean;
-  businessHours?: {
-    day: string;
-    isOpen: boolean;
-    timeSlots: { open: string; close: string }[];
-  }[];
+  businessHours?: BusinessHours[];
 }
 
 /**

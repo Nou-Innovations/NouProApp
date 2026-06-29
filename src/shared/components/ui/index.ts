@@ -38,6 +38,7 @@ export type { StaffMember, StaffCardRole } from './StaffCard';
 export { default as IconButton } from './IconButton';
 export { default as ImagePlaceholder } from './ImagePlaceholder';
 export { default as ImageOrPlaceholder } from './ImageOrPlaceholder';
+export { default as BusinessHoursTable } from './BusinessHoursTable';
 export { default as Pill } from './Pill';
 export { default as CountBadge, formatBadgeCount } from './CountBadge';
 export type { CountBadgeProps } from './CountBadge';

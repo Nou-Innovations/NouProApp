@@ -664,6 +664,9 @@ function stripSensitiveBusinessFields(business) {
     subscriptionTier, settings, billingPeriod, currentPeriodEnd,
     peachCustomerId, peachCardRegistrationId, ...safe
   } = business;
+  // Business hours are public-facing profile data (customers want to see when you're open),
+  // but they live inside the otherwise-private `settings` blob. Surface just that part.
+  if (settings && settings.businessHours) safe.businessHours = settings.businessHours;
   return safe;
 }
 

@@ -17,7 +17,7 @@ import theme from '@/shared/theme';
 import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import Avatar from '@/shared/components/ui/Avatar';
-import { AppButton, EmptyState, Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn } from '@/shared/components/ui';
+import { AppButton, EmptyState, Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn, BusinessHoursTable } from '@/shared/components/ui';
 import BrandCard from '@/features/brands/components/BrandCard';
 import ProductCard from '@/features/products/components/ProductCard';
 import ProfileActionButtons from '@/features/profile/components/ProfileActionButtons';
@@ -553,10 +553,10 @@ export default function BusinessProfileOwnScreen() {
             </View>
           )}
 
-          {/* Business Hours - placeholder until DB field is added */}
+          {/* Business Hours */}
           <View style={styles.businessHoursSection}>
             <Text style={[styles.infoLabel, { color: appTheme.colors.text }]}>Business Hours</Text>
-            <Text style={[styles.infoValue, { color: appTheme.colors.textLight }]}>Not configured</Text>
+            <BusinessHoursTable hours={activeBusiness?.businessHours ?? activeBusiness?.settings?.businessHours} />
           </View>
         </View>
       </View>
