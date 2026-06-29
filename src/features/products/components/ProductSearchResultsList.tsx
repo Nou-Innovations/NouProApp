@@ -4,12 +4,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
   ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
-import { SectionTitle } from '@/shared/components/ui';
+import { SectionTitle, ImageOrPlaceholder } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 import type { UIProduct } from '@/shared/types/product';
 
@@ -125,10 +124,7 @@ const ProductSearchResultsList: React.FC<ProductSearchResultsListProps> = ({
               style={styles.itemContainer}
               onPress={() => navigation.navigate('ProductDetail', { productId: product.id })}
             >
-              <Image 
-                source={{ uri: product.productPicture || 'https://via.placeholder.com/40' }} 
-                style={styles.productImage} 
-              />
+              <ImageOrPlaceholder uri={product.productPicture} style={styles.productImage} />
               <View style={styles.itemContent}>
                 <HighlightText text={product.name} highlight={searchQuery} />
                 <Text style={styles.itemPrice}>
@@ -162,10 +158,7 @@ const ProductSearchResultsList: React.FC<ProductSearchResultsListProps> = ({
               style={styles.itemContainer}
               onPress={() => navigation.navigate('BrandSelection', { initialBrand: brand.name })}
             >
-              <Image 
-                source={{ uri: brand.logo || 'https://via.placeholder.com/40' }} 
-                style={styles.brandImage} 
-              />
+              <ImageOrPlaceholder uri={brand.logo} style={styles.brandImage} />
               <View style={styles.itemContent}>
                 <HighlightText text={brand.name} highlight={searchQuery} />
                 <Text style={styles.itemSubtext}>{brand.products.length} products</Text>
@@ -194,10 +187,7 @@ const ProductSearchResultsList: React.FC<ProductSearchResultsListProps> = ({
               style={styles.itemContainer}
               onPress={() => navigation.navigate('ProductDetail' as never, { productId: product.id } as never)}
             >
-              <Image 
-                source={{ uri: product.productPicture || 'https://via.placeholder.com/40' }} 
-                style={styles.productImage} 
-              />
+              <ImageOrPlaceholder uri={product.productPicture} style={styles.productImage} />
               <View style={styles.itemContent}>
                 <HighlightText text={product.name} highlight={searchQuery} />
                 <Text style={styles.itemPrice}>
@@ -231,10 +221,7 @@ const ProductSearchResultsList: React.FC<ProductSearchResultsListProps> = ({
               style={styles.itemContainer}
               onPress={() => navigation.navigate('BrandSelection', { initialBrand: brand.name })}
             >
-              <Image 
-                source={{ uri: brand.logo || 'https://via.placeholder.com/40' }} 
-                style={styles.brandImage} 
-              />
+              <ImageOrPlaceholder uri={brand.logo} style={styles.brandImage} />
               <View style={styles.itemContent}>
                 <HighlightText text={brand.name} highlight={searchQuery} />
                 <Text style={styles.itemSubtext}>{brand.products.length} products</Text>

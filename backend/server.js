@@ -12406,7 +12406,9 @@ app.get('/api/feed', optionalAuth, async (req, res) => {
     });
   } catch (err) {
     logger.error('[Feed] Error:', err);
-    res.json({ success: true, data: [], nextCursor: null, message: 'Success' });
+    // Surface the failure instead of masking it as an empty 200 — an empty success
+    // envelope is indistinguishable from "no posts" and hides outages from the client.
+    res.status(500).json(errorResponse('Failed to fetch feed', 'FEED_ERROR'));
   }
 });
 
@@ -13936,7 +13938,8 @@ app.post('/api/automation/orders', async (req, res) => {
   try {
     const dryRun = req.query.dryRun === 'true' || req.body.dryRun === true;
     const { orderAutomation } = require('./src/services');
-    const results = await orderAutomation.runAutomation({ dryRun });
+    // Manual trigger keeps full behavior (incl. auto-cancel) and also sends stuck-order alerts.
+    const results = await orderAutomation.runAutomation({ dryRun, notify: true, repos });
     res.json(successResponse(results, 'Automation completed'));
   } catch (err) {
     logger.error('Error running order automation:', err);
@@ -14429,6 +14432,17 @@ if (process.env.NODE_ENV !== 'test') {
   setInterval(() => {
     recurringService.runDue().catch((err) => logger.error('[recurring] runDue failed:', err.message));
   }, RECURRING_INTERVAL_MS);
+
+  // Order automation: once a day, alert each business's admins about stuck pending orders.
+  // Alerts only — auto-cancel stays manual (via POST /api/automation/orders). Daily cadence
+  // avoids re-alerting the same stuck order every hour.
+  const ORDER_AUTOMATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // daily
+  setInterval(() => {
+    const { orderAutomation } = require('./src/services');
+    orderAutomation
+      .runAutomation({ autoCancel: false, notify: true, repos })
+      .catch((err) => logger.error('[orderAutomation] scheduled run failed:', err.message));
+  }, ORDER_AUTOMATION_INTERVAL_MS);
 }
 
 server.listen(PORT, HOST, () => {

@@ -11,7 +11,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Image, FlatList, ActivityIndicator, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
@@ -22,6 +22,7 @@ import { getPublicProducts } from '../products.service';
 import { useProfileStore } from '@/shared/store/profileStore';
 import type { UIProduct } from '@/shared/types/product';
 import { getCategoryLabel } from '@/shared/constants/categories';
+import { ImageOrPlaceholder } from '@/shared/components/ui';
 
 type FilterKey = 'myProducts' | 'myBrands' | 'allProducts' | 'allBrands';
 
@@ -116,10 +117,7 @@ export default function ProductsSearchScreen({ navigation, route }: { navigation
       onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
       activeOpacity={0.7}
     >
-      <Image
-        source={{ uri: item.productPicture || 'https://via.placeholder.com/50' }}
-        style={styles.productImage}
-      />
+      <ImageOrPlaceholder uri={item.productPicture} style={styles.productImage} />
       <View style={styles.rowContent}>
         <Text style={[styles.itemName, { color: appTheme.colors.text }]} numberOfLines={1}>{item.name}</Text>
         <Text style={[styles.itemSub, { color: appTheme.colors.secondary }]} numberOfLines={1}>
@@ -136,10 +134,7 @@ export default function ProductsSearchScreen({ navigation, route }: { navigation
       onPress={() => navigation.navigate('BrandSelection', { initialBrand: item.name })}
       activeOpacity={0.7}
     >
-      <Image
-        source={{ uri: item.logo || 'https://via.placeholder.com/50' }}
-        style={styles.brandImage}
-      />
+      <ImageOrPlaceholder uri={item.logo} style={styles.brandImage} />
       <View style={styles.rowContent}>
         <Text style={[styles.itemName, { color: appTheme.colors.text }]} numberOfLines={1}>{item.name}</Text>
         <Text style={[styles.itemSub, { color: appTheme.colors.secondary }]}>{item.products.length} products</Text>

@@ -37,6 +37,7 @@ export { default as StaffCard } from './StaffCard';
 export type { StaffMember, StaffCardRole } from './StaffCard';
 export { default as IconButton } from './IconButton';
 export { default as ImagePlaceholder } from './ImagePlaceholder';
+export { default as ImageOrPlaceholder } from './ImageOrPlaceholder';
 export { default as Pill } from './Pill';
 export { default as ExploreChips } from './ExploreChips';
 export { default as ButtonRow } from './ButtonRow';

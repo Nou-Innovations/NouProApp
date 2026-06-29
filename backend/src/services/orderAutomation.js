@@ -20,13 +20,29 @@ let prisma = null;
 if (dataSource === 'prisma') {
   prisma = require('../db/prisma').prisma;
 }
-const { 
-  ORDER_STATUS, 
+const {
+  ORDER_STATUS,
   ORDER_STATUS_META,
   changeOrderStatus,
   isFinalStatus,
   requiresReason,
 } = require('./orderStatus');
+const pushService = require('./pushService');
+
+/**
+ * Resolve the accepted admin/super-admin user IDs for a business (the people who
+ * should be alerted about stuck orders).
+ * @param {string} businessId
+ * @returns {Promise<string[]>}
+ */
+async function getBusinessAdminUserIds(businessId) {
+  if (!prisma) return [];
+  const admins = await prisma.businessMember.findMany({
+    where: { businessId, status: 'accepted', role: { in: ['admin', 'super_admin'] } },
+    select: { userId: true },
+  });
+  return admins.map((m) => m.userId);
+}
 
 // ============================================================================
 // CONFIGURATION (can be made configurable per business later)
@@ -252,49 +268,93 @@ async function getInactiveOrdersByStatus(hoursThreshold = 24) {
 
 /**
  * Run all automation tasks
- * 
+ *
  * @param {Object} options
- * @param {boolean} options.dryRun - If true, don't make changes
+ * @param {boolean} [options.dryRun=false]   - If true, don't make changes / send notifications
+ * @param {boolean} [options.autoCancel=true] - If true, auto-cancel stale NEW orders (Task 1).
+ *                                               The scheduled run passes false so cancellation
+ *                                               stays a manual-only action.
+ * @param {boolean} [options.notify=false]    - If true, send stuck-order push alerts (Task 4).
+ * @param {Object}  [options.repos=null]      - Repository container, required to send notifications.
  * @returns {Promise<Object>} Combined results
  */
-async function runAutomation({ dryRun = false } = {}) {
-  logger.debug(`[OrderAutomation] Starting automation run (dryRun: ${dryRun})`);
+async function runAutomation({ dryRun = false, autoCancel = true, notify = false, repos = null } = {}) {
+  logger.debug(`[OrderAutomation] Starting automation run (dryRun: ${dryRun}, autoCancel: ${autoCancel}, notify: ${notify})`);
   const startTime = Date.now();
-  
+
   const results = {
     timestamp: new Date().toISOString(),
     dryRun,
     autoCancelNewOrders: null,
     stuckPendingOrders: null,
     inactiveOrders: null,
+    notificationsSent: null,
     duration: 0,
   };
-  
+
   try {
-    // Task 1: Auto-cancel stale NEW orders
-    results.autoCancelNewOrders = await autoCancelStaleOrders({ dryRun });
-    logger.debug(`[OrderAutomation] Auto-cancel: ${results.autoCancelNewOrders.canceled}/${results.autoCancelNewOrders.total} orders`);
-    
+    // Task 1: Auto-cancel stale NEW orders (skipped unless explicitly enabled).
+    if (autoCancel) {
+      results.autoCancelNewOrders = await autoCancelStaleOrders({ dryRun });
+      logger.debug(`[OrderAutomation] Auto-cancel: ${results.autoCancelNewOrders.canceled}/${results.autoCancelNewOrders.total} orders`);
+    }
+
     // Task 2: Report stuck PENDING orders (for notifications)
     results.stuckPendingOrders = await getStuckPendingReport();
     logger.debug(`[OrderAutomation] Stuck pending: ${results.stuckPendingOrders.total} orders`);
-    
+
     // Task 3: Report all inactive orders by status (for dashboard/monitoring)
     results.inactiveOrders = await getInactiveOrdersByStatus(24);
     logger.debug(`[OrderAutomation] Inactive orders (24h): ${results.inactiveOrders.total}`);
-    
-    // TODO: Task 4: Send notifications for stuck pending orders
-    // This would integrate with your notification system
-    
+
+    // Task 4: Notify each business's admins about their stuck pending orders.
+    if (notify && !dryRun && repos) {
+      results.notificationsSent = await notifyStuckPendingOrders(results.stuckPendingOrders, repos);
+      logger.debug(`[OrderAutomation] Stuck-order alerts: notified ${results.notificationsSent.businessesNotified} business(es)`);
+    }
+
   } catch (error) {
     logger.error('[OrderAutomation] Error during automation:', error);
     results.error = error.message;
   }
-  
+
   results.duration = Date.now() - startTime;
   logger.debug(`[OrderAutomation] Completed in ${results.duration}ms`);
-  
+
   return results;
+}
+
+/**
+ * Task 4 implementation: send a stuck-order push alert to each affected business's admins.
+ * @param {Object} stuckReport - Output of getStuckPendingReport() ({ total, byBusiness })
+ * @param {Object} repos - Repository container (needed by pushService)
+ * @returns {Promise<{businessesNotified: number}>}
+ */
+async function notifyStuckPendingOrders(stuckReport, repos) {
+  let businessesNotified = 0;
+  const thresholdHours = DEFAULT_SETTINGS.pendingReminderAfterHours;
+  const byBusiness = stuckReport?.byBusiness || {};
+
+  for (const [businessId, orders] of Object.entries(byBusiness)) {
+    try {
+      const userIds = await getBusinessAdminUserIds(businessId);
+      if (userIds.length === 0) continue;
+
+      const n = orders.length;
+      await pushService.sendToUsers({
+        userIds,
+        title: 'Orders need attention',
+        body: `You have ${n} order${n === 1 ? '' : 's'} pending for over ${thresholdHours}h.`,
+        category: 'orders',
+        data: { type: 'stuck_orders', businessId },
+      }, repos);
+      businessesNotified++;
+    } catch (err) {
+      logger.error(`[OrderAutomation] Failed to notify business ${businessId}:`, err.message);
+    }
+  }
+
+  return { businessesNotified };
 }
 
 // ============================================================================

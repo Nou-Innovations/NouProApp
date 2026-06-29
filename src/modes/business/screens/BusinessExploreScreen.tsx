@@ -18,7 +18,6 @@ import {
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
@@ -26,7 +25,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
-import { EmptyState, ExploreChips, SectionTitle, TextButton } from '@/shared/components/ui';
+import { EmptyState, ExploreChips, SectionTitle, TextButton, ImageOrPlaceholder } from '@/shared/components/ui';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import BusinessListCard from '@/features/profile/components/BusinessListCard';
 import { useExploreDiscovery } from '@/features/explore';
@@ -245,10 +244,7 @@ export default function BusinessExploreScreen() {
       onPress={() => goProduct(item.id)}
       activeOpacity={0.85}
     >
-      <Image
-        source={{ uri: item.productPicture || 'https://via.placeholder.com/140' }}
-        style={[styles.productImg, { backgroundColor: appTheme.colors.imagePlaceholder }]}
-      />
+      <ImageOrPlaceholder uri={item.productPicture} style={styles.productImg} iconSize={32} />
       <Text numberOfLines={2} style={[styles.productName, { color: appTheme.colors.text }]}>{item.name}</Text>
       <Text numberOfLines={1} style={[styles.productMeta, { color: appTheme.colors.textMuted }]}>{item.brand || ''}</Text>
       <Text numberOfLines={1} style={[styles.productPrice, { color: appTheme.colors.primary }]}>
@@ -264,7 +260,7 @@ export default function BusinessExploreScreen() {
       onPress={() => goProduct(item.id)}
       activeOpacity={0.7}
     >
-      <Image source={{ uri: item.productPicture || 'https://via.placeholder.com/56' }} style={styles.productRowImg} />
+      <ImageOrPlaceholder uri={item.productPicture} style={styles.productRowImg} />
       <View style={{ flex: 1, marginLeft: 12 }}>
         <Text numberOfLines={1} style={[styles.productName, { color: appTheme.colors.text }]}>{item.name}</Text>
         <Text numberOfLines={1} style={[styles.productMeta, { color: appTheme.colors.textMuted }]}>{item.brand || ''}</Text>
