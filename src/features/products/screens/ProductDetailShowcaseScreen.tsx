@@ -15,7 +15,8 @@ import {
   Image,
   TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from 'App';
 import { Icon } from '@/shared/utils/icons';
@@ -57,6 +58,7 @@ const ProductDetailShowcaseScreen: React.FC<Props> = ({ navigation }) => {
   const [color, setColor] = useState(0);
   const [qty, setQty] = useState(1);
   const [tab, setTab] = useState<Tab>('description');
+  const insets = useSafeAreaInsets();
 
   const Stars = ({ count, size: s = 14 }: { count: number; size?: number }) => (
     <View style={styles.starsRow}>
@@ -68,28 +70,10 @@ const ProductDetailShowcaseScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.root}>
-      {/* Header */}
-      <SafeAreaView edges={['top']} style={styles.headerSafe}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name="arrow-back" size={24} color={BLACK} />
-          </TouchableOpacity>
-          <View style={styles.headerRight}>
-            <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Icon name="heart-outline" size={24} color={BLACK} />
-            </TouchableOpacity>
-            <View>
-              <Icon name="cart-outline" size={24} color={BLACK} />
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>2</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      </SafeAreaView>
+      <StatusBar style="dark" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Hero */}
+        {/* Hero — full-bleed, extends to the top behind the floating header */}
         <Image source={{ uri: HERO_IMAGE }} style={styles.hero} resizeMode="cover" />
 
         <View style={styles.body}>
@@ -248,20 +232,47 @@ const ProductDetailShowcaseScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Floating header — transparent, over the hero */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+        <TouchableOpacity
+          style={styles.headerBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Icon name="arrow-back" size={24} color={BLACK} />
+        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.headerBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="heart-outline" size={24} color={BLACK} />
+          </TouchableOpacity>
+          <View style={styles.headerBtn}>
+            <Icon name="cart-outline" size={24} color={BLACK} />
+            <View style={styles.cartBadge}>
+              <Text style={styles.cartBadgeText}>2</Text>
+            </View>
+          </View>
+        </View>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: WHITE },
-  headerSafe: { backgroundColor: WHITE },
   header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingBottom: 12,
   },
+  headerBtn: { alignItems: 'center', justifyContent: 'center' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   cartBadge: {
     position: 'absolute',
