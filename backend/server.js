@@ -215,6 +215,11 @@ const DS = deliveryStatusService.DELIVERY_STATUS;
 const ACTIVE_DELIVERY_STATUSES = [DS.NOT_ASSIGNED, DS.ASSIGNED, DS.PACKED, DS.OUT_FOR_DELIVERY];
 
 const app = express();
+// On Render the app sits behind a proxy fleet (Cloudflare → Render LB), so the raw socket
+// IP rotates and is not the client. Trust the proxy chain so req.ip reflects the real client
+// IP from X-Forwarded-For — without this, every IP-keyed rate limiter (auth brute-force, 2FA,
+// public storefront) keys on a rotating proxy IP and never actually limits anyone.
+app.set('trust proxy', true);
 const server = http.createServer(app);
 
 // Configuration from environment variables with sensible defaults
@@ -344,24 +349,32 @@ const suggestionLimiter = rateLimit({
 
 // Rate limiters for the unauthenticated public storefront routes (keyed by IP, since
 // there is no req.user). Reads are looser; guest order creation is stricter to curb spam.
+// Key anonymous (no req.user) limiters by the true client IP. Behind Cloudflare,
+// `CF-Connecting-IP` is the real client and cannot be spoofed (CF overwrites any
+// client-supplied value); fall back to req.ip (real via `trust proxy`) off-CDN.
+const publicClientIpKey = (req) =>
+  ipKeyGenerator(req.headers['cf-connecting-ip'] || req.ip);
+
 const publicReadLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
-  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  keyGenerator: publicClientIpKey,
   message: { success: false, message: 'Too many requests' },
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
+  // trustProxy:false just silences express-rate-limit's permissive-trust-proxy notice
+  // (we key on CF-Connecting-IP, so the permissive `trust proxy` setting isn't relied on here).
+  validate: { xForwardedForHeader: false, trustProxy: false },
 });
 
 const publicOrderLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
-  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  keyGenerator: publicClientIpKey,
   message: { success: false, message: 'Too many requests' },
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
+  validate: { xForwardedForHeader: false, trustProxy: false },
 });
 
 // File upload setup with security hardening.
@@ -766,7 +779,7 @@ function verifyOrderLocationAccess(order, locationId, location) {
 const VALID_MESSAGE_TYPES = new Set([
   'text', 'image', 'pdf', 'location', 'voice',
   'video_call', 'invoice', 'estimate', 'delivery', 'event',
-  'profile',
+  'profile', 'contact',
 ]);
 
 const MAX_MESSAGE_LENGTH = 10000; // 10k characters
@@ -9487,6 +9500,12 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, requir
       newMessage.profileName = metadata?.profileName;
       newMessage.profileAvatar = metadata?.profileAvatar;
       newMessage.profileType = metadata?.profileType || 'user';
+    } else if (type === 'contact') {
+      newMessage.content = content;
+      newMessage.contactName = metadata?.contactName;
+      newMessage.contactPhone = metadata?.contactPhone;
+      newMessage.contactAvatar = metadata?.contactAvatar;
+      newMessage.contactId = metadata?.contactId;
     } else {
       // Fallback for other valid types (invoice, estimate, delivery, event, video_call)
       newMessage.content = content;
@@ -9725,6 +9744,10 @@ app.post('/api/companies/:companyId/chats/:chatId/messages/:messageId/forward', 
       ...(originalMessage.profileName && { profileName: originalMessage.profileName }),
       ...(originalMessage.profileAvatar && { profileAvatar: originalMessage.profileAvatar }),
       ...(originalMessage.profileType && { profileType: originalMessage.profileType }),
+      ...(originalMessage.contactName && { contactName: originalMessage.contactName }),
+      ...(originalMessage.contactPhone && { contactPhone: originalMessage.contactPhone }),
+      ...(originalMessage.contactAvatar && { contactAvatar: originalMessage.contactAvatar }),
+      ...(originalMessage.contactId && { contactId: originalMessage.contactId }),
       ...(originalMessage.latitude != null && { latitude: originalMessage.latitude }),
       ...(originalMessage.longitude != null && { longitude: originalMessage.longitude }),
       ...(originalMessage.address && { address: originalMessage.address }),
@@ -10167,6 +10190,12 @@ app.post('/api/users/:userId/chats/:chatId/messages', requireAuth, messageLimite
       newMessage.profileName = metadata?.profileName;
       newMessage.profileAvatar = metadata?.profileAvatar;
       newMessage.profileType = metadata?.profileType || 'user';
+    } else if (resolvedType === 'contact') {
+      newMessage.content = content;
+      newMessage.contactName = metadata?.contactName;
+      newMessage.contactPhone = metadata?.contactPhone;
+      newMessage.contactAvatar = metadata?.contactAvatar;
+      newMessage.contactId = metadata?.contactId;
     }
 
     // Add reply context if replying (efficient single-message lookup)
@@ -10404,6 +10433,10 @@ app.post('/api/users/:userId/chats/:chatId/messages/:messageId/forward', require
       ...(originalMessage.profileName && { profileName: originalMessage.profileName }),
       ...(originalMessage.profileAvatar && { profileAvatar: originalMessage.profileAvatar }),
       ...(originalMessage.profileType && { profileType: originalMessage.profileType }),
+      ...(originalMessage.contactName && { contactName: originalMessage.contactName }),
+      ...(originalMessage.contactPhone && { contactPhone: originalMessage.contactPhone }),
+      ...(originalMessage.contactAvatar && { contactAvatar: originalMessage.contactAvatar }),
+      ...(originalMessage.contactId && { contactId: originalMessage.contactId }),
       ...(originalMessage.latitude != null && { latitude: originalMessage.latitude }),
       ...(originalMessage.longitude != null && { longitude: originalMessage.longitude }),
       ...(originalMessage.address && { address: originalMessage.address }),
