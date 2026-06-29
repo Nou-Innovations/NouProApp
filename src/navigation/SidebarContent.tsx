@@ -114,6 +114,9 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
   // live `locations` from businessStore). Lets any multi-branch company expand inline.
   const [companyLocations, setCompanyLocations] = useState<Map<string, SidebarBranch[]>>(new Map());
   const loadedBranchIds = useRef<Set<string>>(new Set());
+  // The active company we've already auto-expanded, so the user can collapse it afterwards
+  // without it springing back open (it re-expands only when you switch into another company).
+  const autoExpandedRef = useRef<string | null>(null);
 
   // Pending/decided admin-access requests for staff-only memberships, keyed by business id.
   const [roleRequests, setRoleRequests] = useState<Map<string, RoleRequest>>(new Map());
@@ -188,6 +191,15 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     if (found) setLocation(found);
     setPendingLocation(null);
   }, [pendingLocation, locations, activeBusinessId, setLocation]);
+
+  // Default the active company to expanded the first time you switch into it. It stays
+  // collapsible afterwards (the ref prevents it re-opening until you switch companies).
+  useEffect(() => {
+    if (activeMode === 'business' && activeBusinessId && autoExpandedRef.current !== activeBusinessId) {
+      autoExpandedRef.current = activeBusinessId;
+      setExpandedCompanies((prev) => (prev.has(activeBusinessId) ? prev : new Set(prev).add(activeBusinessId)));
+    }
+  }, [activeMode, activeBusinessId]);
 
   // The tool matching the current screen (so its row highlights as selected).
   const activeRoute = deepestRouteName(props.state);
@@ -564,9 +576,11 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     const hasMultiple = branches.length > 1;
 
     // Multiple branches → expandable header; pick a specific branch from the list.
-    // The active company stays open so its selected branch + options are always visible.
+    // The active company defaults to open (see effect above) but is still collapsible. When no
+    // specific branch is picked, the primary one shows as the effective selection.
     if (hasMultiple) {
-      const expanded = isActiveBiz || expandedCompanies.has(id);
+      const expanded = expandedCompanies.has(id);
+      const primaryId = (branches.find((b) => b.is_primary) ?? branches[0])?.id;
       return (
         <View key={id}>
           <Pressable
@@ -592,7 +606,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
                     key={b.id}
                     icon="location"
                     label={b.name}
-                    selected={isActiveBiz && currentLocationId === b.id}
+                    selected={isActiveBiz && (currentLocationId === b.id || (currentLocationId === null && b.id === primaryId))}
                     onPress={() => selectLocation(ub, b.id)}
                   />
                 ))}
