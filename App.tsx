@@ -101,6 +101,7 @@ import SelectProductsForBrandScreen from '@/features/brands/screens/SelectProduc
 // Screens - Products
 import CreateProductScreen from '@/features/products/screens/CreateProductScreen';
 import ProductDetailScreen from '@/features/products/screens/ProductDetailScreen';
+import ProductDetailShowcaseScreen from '@/features/products/screens/ProductDetailShowcaseScreen';
 import ProductsSearchScreen from '@/features/products/screens/ProductsSearchScreen';
 
 // Screens - Company & Search
@@ -481,6 +482,7 @@ function AppNavigator() {
         <RootStack.Screen name="CreateBrand" component={CreateBrandScreen} />
         <RootStack.Screen name="CreateProduct" component={CreateProductScreen} />
         <RootStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+        <RootStack.Screen name="ProductDetailShowcase" component={ProductDetailShowcaseScreen} />
         <RootStack.Screen name="ProductsSearch" component={ProductsSearchScreen} />
         <RootStack.Screen name="BrandSelection" component={BrandSelectionScreen} />
         <RootStack.Screen name="SelectProductsForBrand" component={SelectProductsForBrandScreen} />

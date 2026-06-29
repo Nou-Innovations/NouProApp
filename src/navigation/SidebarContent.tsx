@@ -231,7 +231,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     'LogisticsOverview', 'Deliveries', 'Transfers', 'Orders', 'MyDeliveries', 'Routes',
     'Issues', 'Returns', 'DeliveriesAnalytics', 'Products', 'Categories', 'Brands', 'Stock',
     'ProductVisibility', 'PriceLists', 'Invoices', 'TeamManagement', 'Locations', 'CompanySettings', 'SubscriptionHub',
-    'BottomSheetGallery', 'MessageGallery', 'ButtonGallery',
+    'BottomSheetGallery', 'MessageGallery', 'ButtonGallery', 'ProductGallery',
   ]);
 
   // Navigate from the sidebar, closing the drawer first. Workspace pages route into the
@@ -459,6 +459,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
             { label: 'Bottom Sheet Gallery', icon: 'apps-outline', route: 'BottomSheetGallery', onPress: () => go('BottomSheetGallery') },
             { label: 'Message Gallery', icon: 'chatbubbles-outline', route: 'MessageGallery', onPress: () => go('MessageGallery') },
             { label: 'Button Gallery', icon: 'radio-button-on-outline', route: 'ButtonGallery', onPress: () => go('ButtonGallery') },
+            { label: 'Product Screens', icon: 'cube-outline', route: 'ProductGallery', onPress: () => go('ProductGallery') },
           ],
         },
       ]

@@ -149,6 +149,8 @@ export type BusinessTabParamList = {
   MessageGallery: undefined;
   // Design System showroom — live showcase of every button/control (sidebar).
   ButtonGallery: undefined;
+  // Design System showroom — gallery of the app's product screens / states (sidebar).
+  ProductGallery: undefined;
 };
 
 // ========== Root Stack Navigator ==========
@@ -209,6 +211,8 @@ export type RootStackParamList = {
   // Product screens
   CreateProduct: { selectedBrand?: string; selectedBrandId?: string; product?: import('./product').UIProduct };
   ProductDetail: { productId: string };
+  // Design System: static showcase of a new premium product-detail UI (from Figma).
+  ProductDetailShowcase: undefined;
   ProductsSearch: { query?: string; filter?: 'myProducts' | 'myBrands' | 'allProducts' | 'allBrands'; category?: string };
   Categories: undefined;
   Stock: undefined;

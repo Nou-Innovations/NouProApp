@@ -63,6 +63,7 @@ import { SubscriptionPlansScreen } from '@/features/subscription';
 import BottomSheetGalleryScreen from '@/features/designsystem/screens/BottomSheetGalleryScreen';
 import MessageGalleryScreen from '@/features/designsystem/screens/MessageGalleryScreen';
 import ButtonGalleryScreen from '@/features/designsystem/screens/ButtonGalleryScreen';
+import ProductGalleryScreen from '@/features/designsystem/screens/ProductGalleryScreen';
 
 const Tab = createBottomTabNavigator<BusinessTabParamList>();
 
@@ -253,6 +254,7 @@ export function BusinessTabNavigator() {
       <Tab.Screen name="BottomSheetGallery" component={BottomSheetGalleryScreen} options={hiddenTabOptions} />
       <Tab.Screen name="MessageGallery" component={MessageGalleryScreen} options={hiddenTabOptions} />
       <Tab.Screen name="ButtonGallery" component={ButtonGalleryScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="ProductGallery" component={ProductGalleryScreen} options={hiddenTabOptions} />
     </Tab.Navigator>
   );
 }
