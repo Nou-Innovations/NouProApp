@@ -572,7 +572,12 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
       );
     }
 
-    const branches: SidebarBranch[] = isActiveBiz ? (locations as SidebarBranch[]) : companyLocations.get(id) ?? [];
+    // Only show locations that actually belong to this company. businessStore.locations can
+    // briefly hold the previously-active company's locations right after a switch (before
+    // CompanyStoreInitializer refetches), which would leak another company's branches here.
+    const branches: SidebarBranch[] = isActiveBiz
+      ? locations.filter((l) => l.companyId === activeBusinessId)
+      : companyLocations.get(id) ?? [];
 
     // Locations only matter in Business mode. In Personal mode the workspace list is just a way
     // to switch into a company, so every company is a plain row (no branches shown).
