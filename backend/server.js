@@ -3883,7 +3883,6 @@ app.post('/api/companies/:companyId/products/carry', requireAuth, async (req, re
       category: source.category || null,
       barcode: source.barcode || null,
       price: source.price ?? null,
-      stockQuantity: 0,
       isListed: false, // unlisted by default — the client opts in
       isImported: true,
       isCreatedByUser: false,
@@ -13585,21 +13584,19 @@ async function computeViewerStock(productId, viewerBusinessId) {
   // store). The copy is a normal product they own → its stock + listing are theirs.
   let clientProductId;
   let isListed;
-  let copyStock;
   try {
     const copy = await repos.productRepo.getCarriedCopy(viewerBusinessId, productId);
     if (copy) {
       clientProductId = copy.id;
       isListed = copy.isListed ?? false;
-      copyStock = copy.stockQuantity ?? undefined;
     }
   } catch (e) {
     logger.warn('[viewerStock] carried-copy lookup failed:', e?.message || e);
   }
 
-  // Stock left: prefer the carried copy's own stock; otherwise sum the viewer's
-  // Stock rows for this product across their locations.
-  let stockQuantity = copyStock;
+  // Stock left: sum the viewer's Stock rows for this product across their locations
+  // (Stock.qtyOnHand is the single source of truth).
+  let stockQuantity;
   if (stockQuantity == null) {
     try {
       const stockRows = (await repos.stockRepo.getByBusinessId(viewerBusinessId)) || [];

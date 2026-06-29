@@ -210,7 +210,6 @@ async function main() {
         category: pr.category,
         unit: pr.unit,
         status: pr.status,
-        stockQuantity: pr.stockQuantity,
         isListed: pr.isListed,
         isDisplayable: pr.isDisplayable,
         isCreatedByUser: pr.isCreatedByUser,
