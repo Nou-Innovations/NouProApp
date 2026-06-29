@@ -11,7 +11,7 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { Skeleton, SkeletonColumn, SectionTitle } from '@/shared/components/ui';
+import { Skeleton, SkeletonColumn, SectionTitle, CountBadge } from '@/shared/components/ui';
 
 export type PriorityItemType =
   | 'order_pending'
@@ -60,11 +60,7 @@ export function ProPriorityQueue({
   const renderHeader = () => (
     <View style={styles.header}>
       <SectionTitle>Priority Queue</SectionTitle>
-      {items.length > 0 && (
-        <View style={[styles.countBadge, { backgroundColor: appTheme.colors.accent }]}>
-          <Text style={styles.countText}>{items.length}</Text>
-        </View>
-      )}
+      <CountBadge count={items.length} color={appTheme.colors.accent} />
     </View>
   );
 
@@ -195,18 +191,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.sm,
     gap: 8,
-  },
-  countBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    minWidth: 24,
-    alignItems: 'center',
-  },
-  countText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: theme.fonts.primary.bold,
   },
   listContent: {
     paddingHorizontal: theme.spacing.sm,

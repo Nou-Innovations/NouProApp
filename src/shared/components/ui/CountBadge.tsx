@@ -77,7 +77,10 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 11,
+    lineHeight: 11,
     fontFamily: theme.fonts.primary.bold,
     textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
 });

@@ -155,6 +155,7 @@ export function BusinessTabNavigator() {
             <Bell size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
           tabBarBadge: unreadCount > 0 ? formatBadgeCount(unreadCount) : undefined,
+          tabBarBadgeStyle: { backgroundColor: appTheme.colors.badgeBackground, color: '#FFFFFF' },
         }}
       />
 
