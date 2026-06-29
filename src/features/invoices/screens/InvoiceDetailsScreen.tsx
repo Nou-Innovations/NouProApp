@@ -434,10 +434,17 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
   };
 
   const handleMarkFullyPaid = async () => {
+    if (!businessId) return;
     try {
-      const updated = await invoicesService.updateInvoice(invoiceId, {
-        paidAmount: grandTotal,
-        status: 'PAID',
+      const remaining = grandTotal - (invoice?.paidAmount || 0);
+      if (remaining <= 0.001) {
+        setShowPaymentOptions(false);
+        return;
+      }
+      // Record the remaining balance as a real payment; the backend recomputes status to PAID.
+      const updated = await invoicesService.addInvoicePayment(businessId, invoiceId, {
+        amount: remaining,
+        date: new Date().toISOString(),
       });
       setInvoice(normalizeInvoice(updated));
       setPaymentStatus('paid');
@@ -921,20 +928,22 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
                         AppAlert.alert('Error', 'Please enter a valid payment amount.');
                         return;
                       }
-                      const newPaidAmount = (invoice?.paidAmount || 0) + amount;
-                      if (newPaidAmount > grandTotal) {
+                      if (!businessId) return;
+                      if ((invoice?.paidAmount || 0) + amount > grandTotal + 0.001) {
                         AppAlert.alert('Error', `Payment of ${fmtCurrency(amount)} would exceed the remaining balance of ${fmtCurrency(grandTotal - (invoice?.paidAmount || 0))}.`);
                         return;
                       }
-                      const isFullyPaid = newPaidAmount >= grandTotal;
-                      const newStatus = isFullyPaid ? 'PAID' : 'PARTIALLY_PAID';
-                      const updated = await invoicesService.updateInvoice(invoiceId, {
-                        paidAmount: newPaidAmount,
-                        status: newStatus,
+                      // Persist a real Payment row; the backend recomputes paidAmount/status.
+                      const updated = await invoicesService.addInvoicePayment(businessId, invoiceId, {
+                        amount,
+                        date: new Date().toISOString(),
+                        method: paymentMethod,
+                        description: paymentReference || undefined,
                       });
                       setInvoice(normalizeInvoice(updated));
                       setRecordingPayment(false);
                       setPaymentAmount('');
+                      setPaymentReference('');
                       setSuccessMessage('Payment recorded successfully!');
                       setShowSuccessDialog(true);
                     } catch (err) {

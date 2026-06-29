@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -10,107 +10,136 @@ import { Icon } from '@/shared/utils/icons';
 import { format } from 'date-fns';
 import AppButton from '@/shared/components/ui/AppButton';
 import { DateSelector, SectionTitle } from '@/shared/components/ui';
-import { recordInvoicePayments } from '../invoices.service';
+import { getInvoice, addInvoicePayment, deleteInvoicePayment } from '../invoices.service';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { formatInvoiceCurrency } from '@/shared/types/invoice';
+import { formatInvoiceCurrency, Invoice, InvoicePayment } from '@/shared/types/invoice';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ReceivedPayments'>;
 
-interface PartialPayment {
-  id: string;
-  amount: number;
-  date: string;
-}
-
 export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
-  const { invoiceId, totalAmount, paidAmount: initialPaidAmount, currency } = route.params;
+  const { invoiceId, totalAmount: totalParam, paidAmount: paidParam, currency: currencyParam } = route.params;
   const { theme } = useTheme();
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
-  
-  // State
-  const [payments, setPayments] = useState<PartialPayment[]>([]);
-  const [isFullyPaid, setIsFullyPaid] = useState(false);
+
+  // The invoice (with its persisted payments) is the source of truth.
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  // Add-payment form
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [newPaymentAmount, setNewPaymentAmount] = useState('');
   const [newPaymentDate, setNewPaymentDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  
-  // Calculate totals
-  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0) + initialPaidAmount;
+
+  const currency = invoice?.currency ?? currencyParam;
+  const totalAmount = invoice?.totalAmount ?? totalParam ?? 0;
+  const totalPaid = invoice?.paidAmount ?? paidParam ?? 0;
   const toPay = Math.max(0, totalAmount - totalPaid);
-  
-  const formatCurrency = (amount: number) => {
-    return formatInvoiceCurrency(amount, currency);
+  const payments: InvoicePayment[] = invoice?.payments ?? [];
+  const isFullyPaid = totalAmount > 0 && toPay <= 0.001;
+
+  const formatCurrency = (amount: number) => formatInvoiceCurrency(amount, currency);
+
+  const loadInvoice = useCallback(async () => {
+    if (!activeBusiness?.id) return;
+    try {
+      const data = await getInvoice(activeBusiness.id, invoiceId);
+      setInvoice(data);
+    } catch (error) {
+      console.error('Error loading invoice payments:', error);
+      AppAlert.alert('Error', 'Failed to load payments. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [activeBusiness?.id, invoiceId]);
+
+  useEffect(() => {
+    loadInvoice();
+  }, [loadInvoice]);
+
+  const recordPayment = async (amount: number, date: Date) => {
+    if (!activeBusiness?.id) return;
+    setBusy(true);
+    try {
+      const updated = await addInvoicePayment(activeBusiness.id, invoiceId, {
+        amount,
+        date: format(date, 'yyyy-MM-dd'),
+      });
+      setInvoice(updated);
+    } catch (error) {
+      console.error('Error recording payment:', error);
+      AppAlert.alert('Error', 'Failed to record payment. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleAddPayment = () => {
+  const handleAddPayment = async () => {
     const amount = parseFloat(newPaymentAmount);
     if (isNaN(amount) || amount <= 0) {
       AppAlert.alert('Invalid Amount', 'Please enter a valid payment amount.');
       return;
     }
-    
-    if (amount > toPay) {
+    if (amount > toPay + 0.001) {
       AppAlert.alert('Amount Too High', `The payment amount exceeds the remaining balance of ${formatCurrency(toPay)}.`);
       return;
     }
-    
-    const newPayment: PartialPayment = {
-      id: `payment-${Date.now()}`,
-      amount,
-      date: format(newPaymentDate, 'yyyy-MM-dd'),
-    };
-    
-    setPayments([...payments, newPayment]);
+    await recordPayment(amount, newPaymentDate);
     setNewPaymentAmount('');
+    setNewPaymentDate(new Date());
     setShowAddPayment(false);
-    
-    // Check if fully paid
-    if (totalPaid + amount >= totalAmount) {
-      setIsFullyPaid(true);
-    }
   };
 
-  const handleToggleFullyPaid = () => {
-    if (!isFullyPaid) {
-      // Mark as fully paid - add remaining amount as payment
-      if (toPay > 0) {
-        const finalPayment: PartialPayment = {
-          id: `payment-${Date.now()}`,
-          amount: toPay,
-          date: format(new Date(), 'yyyy-MM-dd'),
-        };
-        setPayments([...payments, finalPayment]);
-      }
-    }
-    setIsFullyPaid(!isFullyPaid);
+  const handleMarkFullyPaid = async () => {
+    if (toPay <= 0.001) return;
+    await recordPayment(toPay, new Date());
   };
 
-  const handleDone = async () => {
-    if (!activeBusiness?.id) {
-      AppAlert.alert('Error', 'No active business selected');
-      return;
-    }
-    try {
-      await recordInvoicePayments(activeBusiness.id, invoiceId, payments, isFullyPaid, totalPaid);
-      navigation.goBack();
-    } catch (error) {
-      console.error('Error saving payments:', error);
-      AppAlert.alert('Error', 'Failed to save payments. Please try again.');
-    }
+  const handleDeletePayment = (payment: InvoicePayment) => {
+    if (!activeBusiness?.id) return;
+    AppAlert.alert(
+      'Remove Payment',
+      `Remove the ${formatCurrency(payment.amount)} payment from ${format(new Date(payment.date), 'MMM dd, yyyy')}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setBusy(true);
+            try {
+              const updated = await deleteInvoicePayment(activeBusiness.id, invoiceId, payment.id);
+              setInvoice(updated);
+            } catch (error) {
+              console.error('Error removing payment:', error);
+              AppAlert.alert('Error', 'Failed to remove payment. Please try again.');
+            } finally {
+              setBusy(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
-  const goBack = () => {
-    navigation.goBack();
-  };
+  const goBack = () => navigation.goBack();
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+        <SecondaryHeader title="Received Payments" leftAction={{ icon: 'chevron-left', onPress: goBack }} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
-      <SecondaryHeader
-        title="Received Payments"
-        leftAction={{ icon: 'chevron-left', onPress: goBack }}
-      />
-      
+      <SecondaryHeader title="Received Payments" leftAction={{ icon: 'chevron-left', onPress: goBack }} />
+
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Summary Section */}
         <View style={[styles.summaryCard, { backgroundColor: theme.colors.cardBackground }]}>
@@ -130,44 +159,39 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
           </View>
         </View>
 
-        {/* Fully Paid Toggle */}
-        <TouchableOpacity 
+        {/* Fully Paid action / status */}
+        <TouchableOpacity
           style={[styles.toggleCard, { backgroundColor: theme.colors.cardBackground }]}
-          onPress={handleToggleFullyPaid}
-          activeOpacity={0.7}
+          onPress={handleMarkFullyPaid}
+          activeOpacity={isFullyPaid ? 1 : 0.7}
+          disabled={isFullyPaid || busy}
         >
           <View style={styles.toggleContent}>
-            <Icon 
-              name={isFullyPaid ? 'checkmark-circle' : 'ellipse-outline'} 
-              size={24} 
-              color={isFullyPaid ? theme.colors.success : theme.colors.textSecondary} 
+            <Icon
+              name={isFullyPaid ? 'checkmark-circle' : 'ellipse-outline'}
+              size={24}
+              color={isFullyPaid ? theme.colors.success : theme.colors.textSecondary}
             />
-            <Text style={[styles.toggleLabel, { color: theme.colors.text }]}>Fully Paid</Text>
+            <Text style={[styles.toggleLabel, { color: theme.colors.text }]}>
+              {isFullyPaid ? 'Fully Paid' : 'Mark fully paid'}
+            </Text>
           </View>
-          <View style={[
-            styles.toggleIndicator, 
-            { backgroundColor: isFullyPaid ? theme.colors.success : theme.colors.surface }
-          ]}>
-            <View style={[
-              styles.toggleDot,
-              { backgroundColor: 'white', left: isFullyPaid ? 22 : 2 }
-            ]} />
-          </View>
+          {!isFullyPaid && <Icon name="chevron-forward" size={20} color={theme.colors.textSecondary} />}
         </TouchableOpacity>
 
-        {/* Payments List */}
+        {/* Persisted Payment History */}
         {payments.length > 0 && (
           <View style={[styles.paymentsSection, { backgroundColor: theme.colors.cardBackground }]}>
             <SectionTitle style={{ marginBottom: 12 }}>Payment History</SectionTitle>
             {payments.map((payment, index) => (
-              <View 
-                key={payment.id} 
+              <View
+                key={payment.id}
                 style={[
                   styles.paymentItem,
-                  index < payments.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.colors.borderColor }
+                  index < payments.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.colors.borderColor },
                 ]}
               >
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={[styles.paymentAmount, { color: theme.colors.text }]}>
                     {formatCurrency(payment.amount)}
                   </Text>
@@ -175,7 +199,14 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
                     {format(new Date(payment.date), 'MMM dd, yyyy')}
                   </Text>
                 </View>
-                <Icon name="checkmark-circle" size={20} color={theme.colors.success} />
+                <TouchableOpacity
+                  onPress={() => handleDeletePayment(payment)}
+                  disabled={busy}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.deleteBtn}
+                >
+                  <Icon name="trash-outline" size={20} color={theme.colors.error} />
+                </TouchableOpacity>
               </View>
             ))}
           </View>
@@ -191,15 +222,16 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
                 variant="outline"
                 fullWidth
                 iconLeft="add-circle-outline"
+                disabled={busy}
               />
             ) : (
               <View style={styles.addPaymentForm}>
                 <Text style={[styles.formLabel, { color: theme.colors.text }]}>Partial Payment</Text>
                 <TextInput
-                  style={[styles.input, { 
-                    backgroundColor: theme.colors.surface, 
+                  style={[styles.input, {
+                    backgroundColor: theme.colors.surface,
                     color: theme.colors.text,
-                    borderColor: theme.colors.borderColor 
+                    borderColor: theme.colors.borderColor,
                   }]}
                   placeholder="Enter amount"
                   placeholderTextColor={theme.colors.textSecondary}
@@ -207,12 +239,12 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
                   value={newPaymentAmount}
                   onChangeText={setNewPaymentAmount}
                 />
-                
+
                 <Text style={[styles.formLabel, { color: theme.colors.text, marginTop: 16 }]}>Date</Text>
                 <TouchableOpacity
-                  style={[styles.input, styles.datePickerButton, { 
-                    backgroundColor: theme.colors.surface, 
-                    borderColor: theme.colors.borderColor 
+                  style={[styles.input, styles.datePickerButton, {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.borderColor,
                   }]}
                   onPress={() => setShowDatePicker(!showDatePicker)}
                   activeOpacity={0.7}
@@ -234,12 +266,14 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
                     />
                   </View>
                 )}
-                
+
                 <AppButton
                   title="Add"
                   onPress={handleAddPayment}
                   variant="primary"
                   fullWidth
+                  loading={busy}
+                  disabled={busy}
                   style={styles.addButton}
                 />
               </View>
@@ -250,13 +284,7 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
 
       {/* Done Button */}
       <View style={[styles.bottomBar, { backgroundColor: theme.colors.background, borderTopColor: theme.colors.borderColor }]}>
-        <AppButton
-          title="Done"
-          onPress={handleDone}
-          variant="primary"
-          size="large"
-          fullWidth
-        />
+        <AppButton title="Done" onPress={goBack} variant="primary" fullWidth />
       </View>
     </SafeAreaView>
   );
@@ -265,6 +293,11 @@ export default function ReceivedPaymentsScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollView: {
     flex: 1,
@@ -313,19 +346,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  toggleIndicator: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    position: 'relative',
-  },
-  toggleDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    position: 'absolute',
-    top: 2,
-  },
   paymentsSection: {
     marginHorizontal: 16,
     marginBottom: 16,
@@ -346,15 +366,16 @@ const styles = StyleSheet.create({
   paymentDate: {
     fontSize: 14,
   },
+  deleteBtn: {
+    padding: 4,
+  },
   addPaymentSection: {
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 12,
     padding: 16,
   },
-  addPaymentForm: {
-    
-  },
+  addPaymentForm: {},
   formLabel: {
     fontSize: 14,
     fontWeight: '500',

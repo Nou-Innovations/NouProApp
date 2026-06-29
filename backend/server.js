@@ -8540,11 +8540,48 @@ app.get('/api/companies/:companyId/invoices', requireAuth, async (req, res) => {
 });
 
 // Get a single invoice by ID (authenticated)
+// Map a raw Payment row to the clean shape the app consumes (never leaks Peach ids).
+// The user-entered payment date lives in metadata.paymentDate; fall back to createdAt.
+function serializePayment(p) {
+  return {
+    id: p.id,
+    amount: p.amount,
+    date: (p.metadata && p.metadata.paymentDate) || p.createdAt,
+    method: p.metadata && p.metadata.method,
+    description: p.description || undefined,
+  };
+}
+
+// Fetch an invoice with its successful payments serialized as `payments`. Single source of
+// truth for what the payment-ledger UI sees.
+async function getInvoiceWithPayments(invoiceId) {
+  const invoice = await repos.invoiceRepo.getByIdWithPayments(invoiceId);
+  if (!invoice) return null;
+  const { payments, ...rest } = invoice;
+  return { ...rest, payments: (payments || []).map(serializePayment) };
+}
+
+// Recompute paidAmount + status from the invoice's real SUCCEEDED INVOICE_PAYMENT rows.
+// Used by both the manual-payment routes and the Peach webhook so they never diverge.
+async function recomputeInvoicePaidStatus(invoiceId) {
+  const invoice = await repos.invoiceRepo.getById(invoiceId);
+  if (!invoice) return null;
+  const payments = await repos.paymentRepo.getByInvoiceId(invoiceId);
+  const paidAmount = payments
+    .filter(p => p.status === 'SUCCEEDED' && p.type === 'INVOICE_PAYMENT')
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+  const total = invoice.totalAmount || 0;
+  let status = invoice.status;
+  if (total > 0 && paidAmount >= total) status = 'PAID';
+  else if (paidAmount > 0) status = 'PARTIALLY_PAID';
+  return repos.invoiceRepo.update(invoiceId, { paidAmount, status });
+}
+
 app.get('/api/companies/:companyId/invoices/:invoiceId', requireAuth, async (req, res) => {
   if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
 
   try {
-    const invoice = await repos.invoiceRepo.getById(req.params.invoiceId);
+    const invoice = await getInvoiceWithPayments(req.params.invoiceId);
     if (!invoice || invoice.businessId !== req.params.companyId) {
       return res.status(404).json(errorResponse('Invoice not found', 'NOT_FOUND'));
     }
@@ -8552,6 +8589,82 @@ app.get('/api/companies/:companyId/invoices/:invoiceId', requireAuth, async (req
   } catch (err) {
     logger.error('Error fetching invoice:', err);
     res.status(500).json(errorResponse('Failed to retrieve invoice', 'FETCH_ERROR'));
+  }
+});
+
+// ── Invoice payment ledger (manual received payments) ──
+// Record a payment against an invoice. Creates a real Payment row (type INVOICE_PAYMENT,
+// status SUCCEEDED) and recomputes the invoice's paidAmount/status from all such rows.
+app.post('/api/companies/:companyId/invoices/:invoiceId/payments', requireAuth, async (req, res) => {
+  const { companyId, invoiceId } = req.params;
+  if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+  try {
+    const invoice = await repos.invoiceRepo.getById(invoiceId);
+    if (!invoice || invoice.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Invoice not found', 'NOT_FOUND'));
+    }
+
+    const amount = Number(req.body?.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json(errorResponse('amount must be a positive number', 'VALIDATION_ERROR'));
+    }
+
+    const total = invoice.totalAmount || 0;
+    const currentPaid = invoice.paidAmount || 0;
+    if (total > 0 && currentPaid + amount > total + 0.001) {
+      return res.status(400).json(errorResponse(
+        `Payment exceeds the remaining balance (${(total - currentPaid).toFixed(2)})`,
+        'VALIDATION_ERROR'
+      ));
+    }
+
+    await repos.paymentRepo.create({
+      businessId: companyId,
+      invoiceId,
+      type: 'INVOICE_PAYMENT',
+      status: 'SUCCEEDED',
+      amount,
+      currency: invoice.currency || 'EUR',
+      description: req.body?.description || null,
+      metadata: {
+        paymentDate: req.body?.date || new Date().toISOString(),
+        method: req.body?.method || undefined,
+        manual: true,
+      },
+    });
+
+    await recomputeInvoicePaidStatus(invoiceId);
+    const updated = await getInvoiceWithPayments(invoiceId);
+    res.status(201).json(successResponse(updated, 'Payment recorded'));
+  } catch (err) {
+    logger.error('Error recording invoice payment:', err);
+    res.status(500).json(errorResponse('Failed to record payment', 'PAYMENT_ERROR'));
+  }
+});
+
+// Remove a recorded payment (corrects a mis-entry) and recompute the invoice.
+app.delete('/api/companies/:companyId/invoices/:invoiceId/payments/:paymentId', requireAuth, async (req, res) => {
+  const { companyId, invoiceId, paymentId } = req.params;
+  if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+  try {
+    const invoice = await repos.invoiceRepo.getById(invoiceId);
+    if (!invoice || invoice.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Invoice not found', 'NOT_FOUND'));
+    }
+    const payment = await repos.paymentRepo.getById(paymentId);
+    if (!payment || payment.invoiceId !== invoiceId || payment.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Payment not found', 'NOT_FOUND'));
+    }
+
+    await repos.paymentRepo.delete(paymentId);
+    await recomputeInvoicePaidStatus(invoiceId);
+    const updated = await getInvoiceWithPayments(invoiceId);
+    res.json(successResponse(updated, 'Payment removed'));
+  } catch (err) {
+    logger.error('Error deleting invoice payment:', err);
+    res.status(500).json(errorResponse('Failed to remove payment', 'PAYMENT_ERROR'));
   }
 });
 
@@ -14215,16 +14328,11 @@ async function processSuccessfulPayment(payment, peachResult) {
     logger.debug(`[Payment] Subscription activated: ${payment.businessId} → ${metadata.plan} (${metadata.billingPeriod})`);
   }
 
-  // If this is an invoice payment, update the invoice
+  // If this is an invoice payment, recompute the invoice's paidAmount/status from ALL its
+  // successful payments (not just this one) so multiple/partial payments sum correctly.
   if (payment.type === 'INVOICE_PAYMENT' && payment.invoiceId) {
-    await prisma.invoice.update({
-      where: { id: payment.invoiceId },
-      data: {
-        status: 'PAID',
-        paidAmount: payment.amount,
-      },
-    });
-    logger.debug(`[Payment] Invoice paid: ${payment.invoiceId}`);
+    await recomputeInvoicePaidStatus(payment.invoiceId);
+    logger.debug(`[Payment] Invoice payment recomputed: ${payment.invoiceId}`);
   }
 }
 

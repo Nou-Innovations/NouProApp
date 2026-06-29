@@ -96,25 +96,28 @@ export async function convertEstimateToInvoice(invoiceId: string): Promise<Invoi
   return updateInvoice(invoiceId, { type: 'invoice' });
 }
 
-export interface InvoicePayment {
-  amount: number;
-  date: string;
+/**
+ * Record a payment against an invoice (persisted ledger entry). The backend creates a real
+ * Payment row and recomputes the invoice's paidAmount/status, returning the updated invoice
+ * (including its `payments` history).
+ */
+export async function addInvoicePayment(
+  companyId: string,
+  invoiceId: string,
+  payment: { amount: number; date: string; method?: string; description?: string }
+): Promise<Invoice> {
+  return post<Invoice>(`/companies/${companyId}/invoices/${invoiceId}/payments`, payment);
 }
 
 /**
- * Record invoice payments.
- * Implemented via PATCH status update (PAID or PARTIALLY_PAID).
- * TODO: Add dedicated payment recording endpoint on backend for full payment tracking.
+ * Remove a previously recorded payment (corrects a mis-entry). Returns the recomputed invoice.
  */
-export async function recordInvoicePayments(
-  _companyId: string,
+export async function deleteInvoicePayment(
+  companyId: string,
   invoiceId: string,
-  payments: InvoicePayment[],
-  isFullyPaid: boolean,
-  totalPaidAmount: number
-): Promise<void> {
-  const status = isFullyPaid ? 'PAID' : 'PARTIALLY_PAID';
-  await updateInvoice(invoiceId, { status, paidAmount: totalPaidAmount });
+  paymentId: string
+): Promise<Invoice> {
+  return del<Invoice>(`/companies/${companyId}/invoices/${invoiceId}/payments/${paymentId}`);
 }
 
 /**
@@ -136,7 +139,8 @@ const invoicesService = {
   updateInvoice,
   updateInvoiceStatus,
   convertEstimateToInvoice,
-  recordInvoicePayments,
+  addInvoicePayment,
+  deleteInvoicePayment,
   deleteInvoice,
 };
 

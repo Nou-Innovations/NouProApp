@@ -50,6 +50,15 @@ export interface InvoiceItem {
 // remains `businessId` because Prisma returns it as such.
 // ============================================================================
 
+// A single recorded payment against an invoice (persisted ledger entry).
+export interface InvoicePayment {
+  id: string;
+  amount: number;
+  date: string;        // ISO date the payment was received
+  method?: string;
+  description?: string;
+}
+
 export interface Invoice {
   id: string;
   invoiceNumber?: string;
@@ -66,6 +75,7 @@ export interface Invoice {
   taxAmount: number;
   totalAmount: number;
   paidAmount?: number;
+  payments?: InvoicePayment[];
   discount?: number;
   shipping?: number;
   currency?: string;

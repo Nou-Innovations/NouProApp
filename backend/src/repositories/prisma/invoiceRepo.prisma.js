@@ -16,6 +16,21 @@ async function getById(id) {
   });
 }
 
+// Like getById but includes the invoice's successful payments (newest first) for the
+// payment-ledger views. Kept separate so the bare getById (used by many write paths) is
+// unaffected by the extra relation.
+async function getByIdWithPayments(id) {
+  return prisma.invoice.findUnique({
+    where: { id },
+    include: {
+      payments: {
+        where: { status: 'SUCCEEDED' },
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+  });
+}
+
 async function getByBusinessId(businessId) {
   return prisma.invoice.findMany({
     where: { businessId },
@@ -57,13 +72,14 @@ async function remove(id) {
   }
 }
 
-module.exports = { 
-  list, 
-  getById, 
-  getByBusinessId, 
-  getByLocationId, 
-  create, 
-  update, 
-  delete: remove 
+module.exports = {
+  list,
+  getById,
+  getByIdWithPayments,
+  getByBusinessId,
+  getByLocationId,
+  create,
+  update,
+  delete: remove
 };
 

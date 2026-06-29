@@ -25,6 +25,7 @@ function getRepos() {
     productRepo: require('./prisma/productRepo.prisma'),
     orderRepo: require('./prisma/orderRepo.prisma'),
     invoiceRepo: require('./prisma/invoiceRepo.prisma'),
+    paymentRepo: require('./prisma/paymentRepo.prisma'),
     chatRepo: require('./prisma/chatRepo.prisma'),
     memberRepo: require('./prisma/memberRepo.prisma'),
     deliveryRepo: require('./prisma/deliveryRepo.prisma'),
