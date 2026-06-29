@@ -573,12 +573,15 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     }
 
     const branches: SidebarBranch[] = isActiveBiz ? (locations as SidebarBranch[]) : companyLocations.get(id) ?? [];
-    const hasMultiple = branches.length > 1;
 
-    // Multiple branches → expandable header; pick a specific branch from the list.
-    // The active company defaults to open (see effect above) but is still collapsible. When no
-    // specific branch is picked, the primary one shows as the effective selection.
-    if (hasMultiple) {
+    // The selection always lives on a LOCATION, never on the company. So the active company
+    // always lists its location(s) (even a single one), with the current/primary location
+    // highlighted. A non-active company only expands when it actually has more than one branch.
+    const showLocations = isActiveBiz ? branches.length >= 1 : branches.length > 1;
+
+    // Expandable company header + its location list. Defaults to open (see effect above) but is
+    // still collapsible. When no specific branch is picked, the primary one is the effective one.
+    if (showLocations) {
       const expanded = expandedCompanies.has(id);
       const primaryId = (branches.find((b) => b.is_primary) ?? branches[0])?.id;
       return (
@@ -617,29 +620,22 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
       );
     }
 
-    // Single (or zero) branch → tap selects the company directly.
+    // Non-active company with a single (or no) branch → a plain row; tapping switches into it
+    // (its location then shows selected once it becomes the active company).
     return (
       <Pressable
         key={id}
         onPress={() => handleSelectBusiness(ub)}
-        style={({ pressed }) => [
-          styles.companyRow,
-          isActiveBiz && { backgroundColor: selectedBg },
-          pressed && !isActiveBiz && { backgroundColor: C.highlight },
-        ]}
+        style={({ pressed }) => [styles.companyRow, pressed && { backgroundColor: C.highlight }]}
       >
         <View style={styles.leading}>{avatar}</View>
         <View style={styles.companyInfo}>
           <View style={styles.companyNameRow}>
-            <Text
-              style={[styles.companyName, { color: C.text, fontWeight: isActiveBiz ? '700' : '600' }]}
-              numberOfLines={1}
-            >
+            <Text style={[styles.companyName, { color: C.text, fontWeight: '600' }]} numberOfLines={1}>
               {ub.business.name}
             </Text>
           </View>
         </View>
-        {isActiveBiz ? <Icon name="checkmark" size={20} color={C.accent} strokeWidth={2.75} /> : null}
       </Pressable>
     );
   };
