@@ -574,10 +574,12 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
 
     const branches: SidebarBranch[] = isActiveBiz ? (locations as SidebarBranch[]) : companyLocations.get(id) ?? [];
 
-    // The selection always lives on a LOCATION, never on the company. So the active company
-    // always lists its location(s) (even a single one), with the current/primary location
-    // highlighted. A non-active company only expands when it actually has more than one branch.
-    const showLocations = isActiveBiz ? branches.length >= 1 : branches.length > 1;
+    // Locations only matter in Business mode. In Personal mode the workspace list is just a way
+    // to switch into a company, so every company is a plain row (no branches shown).
+    // The selection always lives on a LOCATION, never on the company: the active company lists
+    // its location(s) (even a single one) with the current/primary one highlighted; other
+    // companies expand only when they actually have more than one branch.
+    const showLocations = isBusiness && (isActiveBiz ? branches.length >= 1 : branches.length > 1);
 
     // Expandable company header + its location list. Defaults to open (see effect above) but is
     // still collapsible. When no specific branch is picked, the primary one is the effective one.
