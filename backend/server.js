@@ -279,43 +279,53 @@ app.use(cors({
 app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static('uploads'));
 
+// Shared client-IP key for all rate limiters. Behind Cloudflare (Render fronts every
+// *.onrender.com with CF), `CF-Connecting-IP` is the true client IP and cannot be spoofed —
+// CF overwrites any client-supplied value. Fall back to req.ip (real via `trust proxy`)
+// when off-CDN. Without this, IP fallbacks key on the spoofable leftmost X-Forwarded-For.
+const clientIpKey = (req) => ipKeyGenerator(req.headers['cf-connecting-ip'] || req.ip);
+// Standard validate block for our limiters: silence the X-Forwarded-For and permissive
+// trust-proxy startup notices (we key on CF-Connecting-IP, so neither check applies).
+const limiterValidate = { xForwardedForHeader: false, trustProxy: false };
+
 // Rate limiter for message-sending endpoints (30 msgs / minute / user)
 // Applied after requireAuth, so req.user.id is always available
 const messageLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
-  keyGenerator: (req) => req.user?.id ?? 'anonymous',
+  keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
   message: { success: false, message: 'Too many messages, please slow down' },
-  validate: { xForwardedForHeader: false },
+  validate: limiterValidate,
 });
 
 // Rate limiter for chat creation endpoints (10 chats / minute / user)
 const chatCreationLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
-  keyGenerator: (req) => req.user?.id ?? 'anonymous',
+  keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
   message: { success: false, message: 'Too many chats created, please slow down' },
-  validate: { xForwardedForHeader: false },
+  validate: limiterValidate,
 });
 
 // Rate limiter for join requests (10 per 15 minutes per user — prevents notification spam)
 const joinRequestLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req.ip),
+  keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
   skip: (req) => !req.user,
   message: { success: false, error: 'Too many join requests, please try again later' },
-  validate: { xForwardedForHeader: false },
+  validate: limiterValidate,
 });
 
 // Rate limiter for auth endpoints (15 attempts / 15 minutes / IP)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,                    // 15 attempts per window
+  keyGenerator: clientIpKey,
   message: { success: false, error: 'Too many attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
+  validate: limiterValidate,
 });
 
 // Rate limiter for authenticated 2FA management endpoints (setup/verify-setup/disable).
@@ -323,11 +333,11 @@ const authLimiter = rateLimit({
 const twoFactorLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req.ip),
+  keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
   message: { success: false, error: 'Too many 2FA attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
+  validate: limiterValidate,
 });
 
 // Allowed community-feedback category ids (server-side source of truth; mirrors the
@@ -340,41 +350,34 @@ const FEEDBACK_CATEGORY_IDS = ['interface', 'add', 'modify', 'ideas', 'other'];
 const suggestionLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 5,
-  keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req.ip),
+  keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
   message: { success: false, error: 'Too many suggestions, please slow down' },
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
+  validate: limiterValidate,
 });
 
-// Rate limiters for the unauthenticated public storefront routes (keyed by IP, since
-// there is no req.user). Reads are looser; guest order creation is stricter to curb spam.
-// Key anonymous (no req.user) limiters by the true client IP. Behind Cloudflare,
-// `CF-Connecting-IP` is the real client and cannot be spoofed (CF overwrites any
-// client-supplied value); fall back to req.ip (real via `trust proxy`) off-CDN.
-const publicClientIpKey = (req) =>
-  ipKeyGenerator(req.headers['cf-connecting-ip'] || req.ip);
-
+// Rate limiters for the unauthenticated public storefront routes (keyed by client IP via
+// clientIpKey, since there is no req.user). Reads are looser; guest order creation is
+// stricter to curb spam.
 const publicReadLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
-  keyGenerator: publicClientIpKey,
+  keyGenerator: clientIpKey,
   message: { success: false, message: 'Too many requests' },
   standardHeaders: true,
   legacyHeaders: false,
-  // trustProxy:false just silences express-rate-limit's permissive-trust-proxy notice
-  // (we key on CF-Connecting-IP, so the permissive `trust proxy` setting isn't relied on here).
-  validate: { xForwardedForHeader: false, trustProxy: false },
+  validate: limiterValidate,
 });
 
 const publicOrderLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
-  keyGenerator: publicClientIpKey,
+  keyGenerator: clientIpKey,
   message: { success: false, message: 'Too many requests' },
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false, trustProxy: false },
+  validate: limiterValidate,
 });
 
 // File upload setup with security hardening.
@@ -6372,9 +6375,9 @@ const purchaseOrderStatusService = require('./src/services/purchaseOrderStatus')
 const procurementLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
-  keyGenerator: (req) => req.user?.id ?? 'anonymous',
+  keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
   message: { success: false, message: 'Too many procurement requests, please slow down' },
-  validate: { xForwardedForHeader: false },
+  validate: limiterValidate,
 });
 
 // ── Supplier CRUD ──
