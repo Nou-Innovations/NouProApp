@@ -587,10 +587,10 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     const showLocations = isBusiness && (isActiveBiz ? branches.length >= 1 : branches.length > 1);
 
     // Expandable company header + its location list. Defaults to open (see effect above) but is
-    // still collapsible. When no specific branch is picked, the primary one is the effective one.
+    // still collapsible. A location is highlighted only when it's actually the selected one —
+    // entering a company does not auto-pick a branch.
     if (showLocations) {
       const expanded = expandedCompanies.has(id);
-      const primaryId = (branches.find((b) => b.is_primary) ?? branches[0])?.id;
       return (
         <View key={id}>
           <Pressable
@@ -616,7 +616,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
                     key={b.id}
                     icon="location"
                     label={b.name}
-                    selected={isActiveBiz && (currentLocationId === b.id || (currentLocationId === null && b.id === primaryId))}
+                    selected={isActiveBiz && currentLocationId === b.id}
                     onPress={() => selectLocation(ub, b.id)}
                   />
                 ))}
