@@ -21,7 +21,14 @@ import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text as RNText, TextInput as RNTextInput } from 'react-native';
+
+// Match the Figma design exactly: render text at the exact px we set and do NOT
+// let the OS "Text Size" / accessibility setting scale fonts (RN defaults to
+// allowFontScaling=true, which makes 14/16px render larger on devices whose text
+// size is above default). Set once at module load, before any Text renders.
+((RNText as any).defaultProps ||= {}).allowFontScaling = false;
+((RNTextInput as any).defaultProps ||= {}).allowFontScaling = false;
 
 // Theme & Context
 import theme from '@/shared/theme';
