@@ -13,7 +13,7 @@ const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const path = require('path');
 const { Server: SocketIOServer } = require('socket.io');
-const { Expo } = require('expo-server-sdk');
+// (Expo push SDK is used inside src/services/pushService — server.js no longer sends directly.)
 const { z } = require('zod');
 
 // Load environment variables (create a .env file in backend/ if needed)
@@ -129,9 +129,6 @@ async function sendPasswordResetEmail(toEmail, resetToken) {
     `,
   });
 }
-
-// Expo push notification client
-const expo = new Expo();
 
 // ============================================================================
 // REPOSITORY LAYER - Import repositories for data access
@@ -13978,55 +13975,10 @@ const getNetworkIP = () => {
 };
 
 // ============================================================================
-// DEVICE TOKENS & PUSH NOTIFICATIONS
+// PUSH NOTIFICATIONS
 // ============================================================================
-
-// Register device token
-app.post('/api/users/:userId/device-tokens', requireAuth, async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { token, platform } = req.body;
-
-    if (req.user?.id !== userId) {
-      return res.status(403).json(errorResponse('Access denied'));
-    }
-    if (!token || !platform) {
-      return res.status(400).json(errorResponse('Token and platform are required'));
-    }
-
-    // Upsert: create or update
-    const deviceToken = await prisma.deviceToken.upsert({
-      where: { token },
-      update: { userId, platform, updatedAt: new Date() },
-      create: { userId, token, platform },
-    });
-
-    res.json(successResponse(deviceToken));
-  } catch (e) {
-    logger.error('Error registering device token:', e);
-    res.status(500).json(errorResponse('Failed to register device token'));
-  }
-});
-
-// Unregister device token
-app.delete('/api/users/:userId/device-tokens/:token', requireAuth, async (req, res) => {
-  try {
-    const { userId, token } = req.params;
-
-    if (req.user?.id !== userId) {
-      return res.status(403).json(errorResponse('Access denied'));
-    }
-
-    await prisma.deviceToken.deleteMany({
-      where: { userId, token: decodeURIComponent(token) },
-    });
-
-    res.json(successResponse({ deleted: true }));
-  } catch (e) {
-    logger.error('Error unregistering device token:', e);
-    res.status(500).json(errorResponse('Failed to unregister device token'));
-  }
-});
+// Device push tokens are registered/unregistered via /api/push-tokens/* (PushToken table).
+// The legacy DeviceToken table + its /api/users/:userId/device-tokens routes were removed.
 
 /**
  * Send push notifications to chat participants who are NOT currently connected via socket.
@@ -14049,41 +14001,18 @@ async function sendPushToOfflineParticipants(chatId, senderName, messagePreview,
       if (s.userId) connectedUserIds.add(s.userId);
     }
 
-    // Get tokens for offline participants only
+    // Notify offline participants only, via pushService (PushToken table; also respects
+    // each user's 'messages' notification preference and prunes dead tokens).
     const offlineParticipantIds = participantIds.filter(pid => !connectedUserIds.has(pid));
     if (offlineParticipantIds.length === 0) return;
 
-    const tokens = await prisma.deviceToken.findMany({
-      where: { userId: { in: offlineParticipantIds } },
-      select: { token: true },
-    });
-
-    if (tokens.length === 0) return;
-
-    // Build push messages
-    const messages = [];
-    for (const { token } of tokens) {
-      if (!Expo.isExpoPushToken(token)) continue;
-      messages.push({
-        to: token,
-        sound: 'default',
-        title: senderName || 'New message',
-        body: messagePreview || 'You have a new message',
-        data: { chatId, chatName: chat.name || senderName },
-      });
-    }
-
-    if (messages.length === 0) return;
-
-    // Send in chunks
-    const chunks = expo.chunkPushNotifications(messages);
-    for (const chunk of chunks) {
-      try {
-        await expo.sendPushNotificationsAsync(chunk);
-      } catch (err) {
-        logger.error('[Push] Error sending chunk:', err);
-      }
-    }
+    await pushService.sendToUsers({
+      userIds: offlineParticipantIds,
+      title: senderName || 'New message',
+      body: messagePreview || 'You have a new message',
+      category: 'messages',
+      data: { chatId, chatName: chat.name || senderName },
+    }, repos);
   } catch (err) {
     logger.error('[Push] Error in sendPushToOfflineParticipants:', err);
   }

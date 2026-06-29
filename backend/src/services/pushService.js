@@ -52,7 +52,15 @@ async function sendToUsers({ userIds, title, body, category, data }, repos) {
     const chunks = expo.chunkPushNotifications(messages);
     for (const chunk of chunks) {
       try {
-        await expo.sendPushNotificationsAsync(chunk);
+        const tickets = await expo.sendPushNotificationsAsync(chunk);
+        // Inline pruning: deactivate tokens Expo immediately reports as dead, so the
+        // PushToken table doesn't accumulate stale tokens (e.g. uninstalled apps).
+        for (let i = 0; i < tickets.length; i++) {
+          const ticket = tickets[i];
+          if (ticket?.status === 'error' && ticket?.details?.error === 'DeviceNotRegistered') {
+            await repos.pushTokenRepo.deactivateByToken(chunk[i].to).catch(() => {});
+          }
+        }
       } catch (err) {
         logger.error('[PushService] Error sending chunk:', err);
       }

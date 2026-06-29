@@ -39,10 +39,20 @@ async function getActiveByUserIds(userIds) {
   });
 }
 
+// Deactivate by token value alone (no userId) — used by receipt pruning, where Expo
+// only tells us the dead token string. Matches the same token across any user rows.
+async function deactivateByToken(token) {
+  await prisma.pushToken.updateMany({
+    where: { token },
+    data: { isActive: false },
+  });
+}
+
 module.exports = {
   upsert,
   deactivate,
   deactivateAll,
   getActiveByUserId,
   getActiveByUserIds,
+  deactivateByToken,
 };

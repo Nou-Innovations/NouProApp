@@ -32,7 +32,6 @@ async function main() {
   console.log('Phase 1: Wiping existing data...');
 
   const deleteOps = [
-    prisma.deviceToken.deleteMany(),
     prisma.pushToken.deleteMany(),
     prisma.notificationPreference.deleteMany(),
     prisma.notificationRead.deleteMany(),
