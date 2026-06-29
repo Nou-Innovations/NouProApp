@@ -8577,6 +8577,9 @@ async function recomputeInvoicePaidStatus(invoiceId) {
   let status = invoice.status;
   if (total > 0 && paidAmount >= total) status = 'PAID';
   else if (paidAmount > 0) status = 'PARTIALLY_PAID';
+  // Fully un-paid again (e.g. the last payment was deleted, or a refund): revert a paid
+  // status back to SENT so the invoice doesn't stay stuck as PAID with paidAmount 0.
+  else if (status === 'PAID' || status === 'PARTIALLY_PAID') status = 'SENT';
   return repos.invoiceRepo.update(invoiceId, { paidAmount, status });
 }
 
