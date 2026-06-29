@@ -8,6 +8,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { userAvatarService } from '@/shared/services/userAvatarService';
 import Avatar from '@/shared/components/ui/Avatar';
+import CountBadge from '@/shared/components/ui/CountBadge';
 
 export type MessageType = 
   | 'text'
@@ -190,11 +191,7 @@ function MessageCard({
   const getStatusIndicator = () => {
     // Only show unread badge if there are unread messages AND chat hasn't been viewed
     if (hasUnreadMessages) {
-      return (
-        <View style={styles.unreadBadge}>
-          <Text style={styles.unreadCount}>{unreadCount}</Text>
-        </View>
-      );
+      return <CountBadge count={unreadCount} />;
     }
 
     // Only show status indicators for outgoing messages (messages sent by the user)
@@ -340,25 +337,6 @@ const styles = StyleSheet.create({
     height: MESSAGE_CARD.statusIndicator.height,
     justifyContent: 'center',
     marginTop: MESSAGE_CARD.gap.rightColumnItems,
-  },
-  unreadBadge: {
-    backgroundColor: theme.colors.badgeBackground,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.xs + 2,
-    flexDirection: 'row',
-  },
-  unreadCount: {
-    color: theme.colors.textInverse,
-    fontFamily: theme.fonts.primary.medium,
-    fontSize: theme.fontSize.xs,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    includeFontPadding: false,
-    lineHeight: theme.lineHeight.xs,
   },
   divider: {
     height: MESSAGE_CARD.divider.height,

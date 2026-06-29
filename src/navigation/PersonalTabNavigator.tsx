@@ -23,6 +23,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import theme from '@/shared/theme';
+import { CountBadge } from '@/shared/components/ui';
 import { PersonalTabParamList } from '@/shared/types/navigation';
 
 // Import screens from modes
@@ -48,7 +49,7 @@ export function PersonalTabNavigator() {
   const renderProfileIcon = (color: string, focused: boolean) => {
     if (currentUser?.avatar_url) {
       return (
-        <View style={[styles.profileIconContainer, focused && styles.profileIconFocused]}>
+        <View style={styles.profileIconContainer}>
           <Image
             source={{ uri: currentUser.avatar_url }}
             style={styles.profileIcon}
@@ -58,7 +59,7 @@ export function PersonalTabNavigator() {
     }
     // Fallback to placeholder with user initial
     return (
-      <View style={[styles.profileIconContainer, styles.profileIconPlaceholder, focused && styles.profileIconFocused]}>
+      <View style={[styles.profileIconContainer, styles.profileIconPlaceholder]}>
         <Text style={styles.profileIconInitial}>
           {currentUser?.name?.charAt(0)?.toUpperCase() || 'U'}
         </Text>
@@ -118,13 +119,7 @@ export function PersonalTabNavigator() {
           tabBarIcon: ({ color, focused }) => (
             <View style={{ position: 'relative' }}>
               <Mail size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-              {inboxUnreadCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>
-                    {inboxUnreadCount > 9 ? '9+' : inboxUnreadCount.toString()}
-                  </Text>
-                </View>
-              )}
+              <CountBadge count={inboxUnreadCount} overlay style={{ top: -4, right: -10 }} />
             </View>
           ),
         }}
@@ -193,35 +188,11 @@ export function PersonalTabNavigator() {
 }
 
 const styles = StyleSheet.create({
-  notificationBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -10,
-    backgroundColor: theme.colors.accent,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  notificationBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: theme.colors.textInverse,
-    textAlign: 'center',
-  },
   profileIconContainer: {
     width: 28,
     height: 28,
     borderRadius: 4,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  profileIconFocused: {
-    borderColor: theme.colors.primary,
-    borderWidth: 1.5,
   },
   profileIcon: {
     width: '100%',

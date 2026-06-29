@@ -27,6 +27,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import theme from '@/shared/theme';
+import { formatBadgeCount } from '@/shared/components/ui';
 import { BusinessTabParamList } from '@/shared/types/navigation';
 
 // Import screens
@@ -83,7 +84,7 @@ export function BusinessTabNavigator() {
   const renderBusinessIcon = (color: string, focused: boolean) => {
     if (activeBusiness?.logo_url) {
       return (
-        <View style={[styles.profileIconContainer, focused && styles.profileIconFocused]}>
+        <View style={styles.profileIconContainer}>
           <Image
             source={{ uri: activeBusiness.logo_url }}
             style={styles.profileIcon}
@@ -93,7 +94,7 @@ export function BusinessTabNavigator() {
     }
     // Fallback to placeholder with business initial
     return (
-      <View style={[styles.profileIconContainer, styles.profileIconPlaceholder, focused && styles.profileIconFocused]}>
+      <View style={[styles.profileIconContainer, styles.profileIconPlaceholder]}>
         <Text style={styles.profileIconInitial}>
           {activeBusiness?.name?.charAt(0)?.toUpperCase() || 'B'}
         </Text>
@@ -153,7 +154,7 @@ export function BusinessTabNavigator() {
           tabBarIcon: ({ color, focused }) => (
             <Bell size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
-          tabBarBadge: unreadCount > 0 ? (unreadCount > 9 ? '9+' : unreadCount) : undefined,
+          tabBarBadge: unreadCount > 0 ? formatBadgeCount(unreadCount) : undefined,
         }}
       />
 
@@ -260,12 +261,6 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 4,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  profileIconFocused: {
-    borderColor: theme.colors.primary,
-    borderWidth: 1.5,
   },
   profileIcon: {
     width: '100%',

@@ -1,11 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, View, StyleSheet } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useNavigation } from '@react-navigation/native';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import { useProfileStore } from '@/shared/store/profileStore';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+import { CountBadge } from '@/shared/components/ui';
 
 export default function NotificationBell() {
   const navigation = useNavigation();
@@ -37,13 +38,7 @@ export default function NotificationBell() {
           size={theme.iconSizes.md} 
           color={appTheme.colors.text} 
         />
-        {unreadCount > 0 && (
-          <View style={[styles.badge, { backgroundColor: appTheme.colors.badgeBackground }]}>
-            <Text style={[styles.badgeText, { color: appTheme.colors.textInverse }]}>
-              {unreadCount > 9 ? '9+' : unreadCount.toString()}
-            </Text>
-          </View>
-        )}
+        <CountBadge count={unreadCount} overlay style={{ top: -theme.spacing.xs, right: -theme.spacing.xs - 2 }} />
       </View>
     </TouchableOpacity>
   );
@@ -56,21 +51,5 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: -theme.spacing.xs,
-    right: -theme.spacing.xs - 2,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.xs,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontFamily: theme.fonts.primary.bold,
-    textAlign: 'center',
   },
 }); 

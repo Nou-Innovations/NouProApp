@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
+import { CountBadge } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useBusinessStore } from '@/shared/store/businessStore';
@@ -735,11 +736,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
                           leading={<Icon name={item.icon} size={22} color={active ? C.accent : C.icon} strokeWidth={active ? 2.75 : 2} />}
                           trailing={
                             <View style={styles.trailingGroup}>
-                              {item.badge && item.badge > 0 ? (
-                                <View style={[styles.badge, { backgroundColor: C.accent }]}>
-                                  <Text style={styles.badgeText}>{item.badge > 9 ? '9+' : item.badge}</Text>
-                                </View>
-                              ) : null}
+                              <CountBadge count={item.badge ?? 0} color={C.accent} />
                               <Icon name="chevron-forward" size={18} color={active ? C.accent : C.iconMuted} strokeWidth={2} />
                             </View>
                           }
@@ -949,19 +946,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
   },
   spacer: {
     flex: 1,

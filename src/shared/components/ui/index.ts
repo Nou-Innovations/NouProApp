@@ -39,6 +39,8 @@ export { default as IconButton } from './IconButton';
 export { default as ImagePlaceholder } from './ImagePlaceholder';
 export { default as ImageOrPlaceholder } from './ImageOrPlaceholder';
 export { default as Pill } from './Pill';
+export { default as CountBadge, formatBadgeCount } from './CountBadge';
+export type { CountBadgeProps } from './CountBadge';
 export { default as ExploreChips } from './ExploreChips';
 export { default as ButtonRow } from './ButtonRow';
 export { default as Chip } from './Chip';
