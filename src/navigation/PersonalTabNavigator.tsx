@@ -23,7 +23,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useNotifications } from '@/shared/context/NotificationContext';
 import theme from '@/shared/theme';
-import { CountBadge, formatBadgeCount } from '@/shared/components/ui';
+import { CountBadge } from '@/shared/components/ui';
 import { PersonalTabParamList } from '@/shared/types/navigation';
 
 // Import screens from modes
@@ -140,10 +140,11 @@ export function PersonalTabNavigator() {
             </Text>
           ),
           tabBarIcon: ({ color, focused }) => (
-            <Bell size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+            <View style={{ position: 'relative' }}>
+              <Bell size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+              <CountBadge count={unreadCount} overlay />
+            </View>
           ),
-          tabBarBadge: unreadCount > 0 ? formatBadgeCount(unreadCount) : undefined,
-          tabBarBadgeStyle: { backgroundColor: appTheme.colors.badgeBackground, color: '#FFFFFF' },
         }}
       />
 

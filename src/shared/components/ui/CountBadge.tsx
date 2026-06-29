@@ -61,11 +61,13 @@ export default function CountBadge({
   );
 }
 
+const SIZE = 20; // fixed badge diameter; lineHeight matches it so the digit centers vertically
+
 const styles = StyleSheet.create({
   badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+    minWidth: SIZE,
+    height: SIZE,
+    borderRadius: SIZE / 2,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: theme.spacing.xs,
@@ -77,7 +79,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 11,
-    lineHeight: 11,
+    lineHeight: SIZE,
     fontFamily: theme.fonts.primary.bold,
     textAlign: 'center',
     textAlignVertical: 'center',
