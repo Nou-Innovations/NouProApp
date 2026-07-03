@@ -377,6 +377,18 @@ const publicOrderLimiter = rateLimit({
   validate: limiterValidate,
 });
 
+// Public payment webhook. Legit Peach retries are low-volume; this only caps abuse
+// (the endpoint triggers an authoritative Peach lookup per call).
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: clientIpKey,
+  message: { success: false, message: 'Too many requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: limiterValidate,
+});
+
 // File upload setup with security hardening.
 //
 // Storage engine is chosen by configuration:
@@ -14226,35 +14238,27 @@ app.get('/api/payments/checkout-result/:checkoutId', requireAuth, async (req, re
       return res.json(successResponse({ status: payment.status, paymentId: payment.id }));
     }
 
-    // Query Peach for the result
-    const result = await peachPayments.getCheckoutResult(checkoutId);
-    const resultCode = result.result?.code;
-
-    if (peachPayments.isSuccessResult(resultCode)) {
-      // Update payment + subscription
-      await processSuccessfulPayment(payment, result);
-      return res.json(successResponse({ status: 'SUCCEEDED', paymentId: payment.id }));
-    } else if (peachPayments.isPendingResult(resultCode)) {
-      return res.json(successResponse({ status: 'PROCESSING', paymentId: payment.id }));
-    } else {
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: 'FAILED', peachTransactionId: result.id },
-      });
-      return res.json(successResponse({ status: 'FAILED', paymentId: payment.id }));
-    }
+    // Ask Peach directly for the authoritative result (shared with the webhook path).
+    const { status } = await finalizePaymentFromPeach(payment);
+    return res.json(successResponse({ status, paymentId: payment.id }));
   } catch (err) {
     logger.error('[CheckoutResult] Error:', err);
     res.status(500).json(errorResponse('Failed to get checkout result'));
   }
 });
 
-// Peach Payments webhook handler
-app.post('/api/webhooks/peach', express.raw({ type: 'application/json' }), async (req, res) => {
+// Peach Payments webhook handler.
+//
+// SECURITY: the request body is UNTRUSTED. It is used ONLY to learn which checkout to
+// inspect — we never act on a result code from the body. finalizePaymentFromPeach()
+// re-fetches the authoritative status directly from Peach before changing anything, so a
+// forged webhook cannot activate a subscription or mark an invoice paid (an abandoned
+// checkout comes back unpaid from Peach).
+// TODO(security): add defense-in-depth by verifying the Peach webhook signature (needs the
+// dashboard webhook secret + a raw-body capture on this route).
+app.post('/api/webhooks/peach', webhookLimiter, async (req, res) => {
   try {
-    const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    logger.debug('[PeachWebhook] Received:', event.type || 'unknown', event.id || '');
-
+    const event = req.body || {};
     const checkoutId = event.payload?.checkoutId || event.checkoutId;
     if (!checkoutId) {
       return res.status(200).json({ received: true });
@@ -14268,46 +14272,65 @@ app.post('/api/webhooks/peach', express.raw({ type: 'application/json' }), async
       return res.status(200).json({ received: true });
     }
 
-    // Skip if already processed
-    if (payment.status === 'SUCCEEDED' || payment.status === 'FAILED') {
-      return res.status(200).json({ received: true });
-    }
-
-    const resultCode = event.payload?.result?.code || event.result?.code;
-
-    if (peachPayments.isSuccessResult(resultCode)) {
-      await processSuccessfulPayment(payment, event.payload || event);
-    } else {
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: 'FAILED',
-          peachTransactionId: event.payload?.id || event.id,
-        },
-      });
-    }
-
+    // No-op if the payment is no longer PENDING; otherwise re-fetch the real status
+    // from Peach and finalize. Never trusts the webhook body's result code.
+    await finalizePaymentFromPeach(payment);
     res.status(200).json({ received: true });
   } catch (err) {
     logger.error('[PeachWebhook] Error:', err);
-    res.status(200).json({ received: true }); // Always 200 to avoid retries
+    res.status(200).json({ received: true }); // Always 200 to avoid Peach retry storms
   }
 });
 
-// Helper: Process a successful payment (update subscription, store card token)
+// Authoritatively finalize a PENDING payment by asking Peach for the real result and
+// acting ONLY on that. Shared by the webhook and the client checkout-result poll so the
+// two paths behave identically and cannot be spoofed by a forged webhook body. Idempotent
+// and safe under concurrency. Returns the resolved status for HTTP callers.
+async function finalizePaymentFromPeach(payment) {
+  if (!payment || payment.status !== 'PENDING') {
+    return { status: payment ? payment.status : 'NOT_FOUND' };
+  }
+
+  const result = await peachPayments.getCheckoutResult(payment.peachCheckoutId);
+  const outcome = peachPayments.decidePaymentOutcome(result.result?.code);
+
+  if (outcome === 'SUCCEEDED') {
+    await processSuccessfulPayment(payment, result);
+    return { status: 'SUCCEEDED' };
+  }
+  if (outcome === 'PENDING') {
+    // 3DS / async result still in flight — leave the row PENDING for a later check.
+    return { status: 'PROCESSING' };
+  }
+  // FAILED — only transition out of PENDING (never clobber a concurrent SUCCEEDED).
+  await prisma.payment.updateMany({
+    where: { id: payment.id, status: 'PENDING' },
+    data: { status: 'FAILED', peachTransactionId: result.id },
+  });
+  return { status: 'FAILED' };
+}
+
+// Helper: Process a successful payment (update subscription, store card token).
+// Idempotent: the PENDING -> SUCCEEDED transition is conditional, so if the webhook and
+// the client poll finalize the same payment concurrently, only one caller runs the side
+// effects (no double subscription activation / double invoice recompute).
 async function processSuccessfulPayment(payment, peachResult) {
   const registrationId = peachResult.registrationId;
   const transactionId = peachResult.id;
   const metadata = payment.metadata || {};
 
-  // Update payment record
-  await prisma.payment.update({
-    where: { id: payment.id },
+  // Claim the payment: flip PENDING -> SUCCEEDED exactly once.
+  const claimed = await prisma.payment.updateMany({
+    where: { id: payment.id, status: 'PENDING' },
     data: {
       status: 'SUCCEEDED',
       peachTransactionId: transactionId,
     },
   });
+  if (claimed.count === 0) {
+    // Another path already finalized this payment — skip the side effects.
+    return;
+  }
 
   // If this is a subscription payment, update the business
   if (payment.type === 'SUBSCRIPTION' && metadata.plan) {

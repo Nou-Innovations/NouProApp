@@ -104,6 +104,19 @@ function isPendingResult(code) {
 }
 
 /**
+ * Classify a Peach result code into a terminal outcome, using the same success/pending
+ * patterns as isSuccessResult/isPendingResult. Shared so the webhook and the client
+ * checkout-result poll classify a payment identically. A missing/unknown code → FAILED.
+ * @param {string} code - Result code from Peach (e.g. "000.100.110")
+ * @returns {'SUCCEEDED'|'PENDING'|'FAILED'}
+ */
+function decidePaymentOutcome(code) {
+  if (isSuccessResult(code)) return 'SUCCEEDED';
+  if (isPendingResult(code)) return 'PENDING';
+  return 'FAILED';
+}
+
+/**
  * Charge a stored card (for recurring/subscription billing)
  * Uses the recurring entity ID which bypasses 3DS for merchant-initiated transactions
  * @param {Object} params
@@ -198,6 +211,7 @@ module.exports = {
   getCheckoutResult,
   isSuccessResult,
   isPendingResult,
+  decidePaymentOutcome,
   chargeStoredCard,
   generateCheckoutHtml,
 };
