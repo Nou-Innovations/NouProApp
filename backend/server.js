@@ -11157,6 +11157,14 @@ app.post('/api/users/:userId/chats/:chatId/remove-participant', requireAuth, asy
     const chat = await repos.chatRepo.getById(chatId);
     if (!chat) return res.status(404).json(errorResponse('Chat not found'));
 
+    // SEC: the requester must be a participant of this chat to remove anyone from it.
+    // Personal chats have no admin concept, so participation is the authority bar.
+    // Mirrors the participant guard on the send routes (server.js:10082 / user-send).
+    const isParticipant = Array.isArray(chat.participants) && chat.participants.includes(userId);
+    if (!isParticipant) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
     const [requester, target] = await Promise.all([
       prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
       prisma.user.findUnique({ where: { id: targetUserId }, select: { name: true } }),
