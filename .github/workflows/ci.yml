@@ -17,6 +17,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      # Crash guard: enforce the existing preflight (scripts/preflight.js) in CI. It
+      # runs tsc and fails ONLY on TS2304 "Cannot find name" — a symbol used but never
+      # imported. Hermes throws these at runtime; they've shipped real crashes before
+      # (bare `ScrollView`, `center`, `useNotifications`). Previously preflight was only
+      # run manually; now every push/PR gates on it. The full `tsc --noEmit` gate stays
+      # deferred until the 156 type-mismatch errors clear.
+      - run: npm run preflight
 
   backend-tests:
     name: Backend smoke tests
@@ -42,4 +49,7 @@ jobs:
 
 # `npm run lint` gates on errors only (currently 0). There is a backlog of warnings
 # (unused vars, explicit any, duplicate imports) being burned down — not enforced yet.
-# A `tsc --noEmit` gate is also intentionally omitted until the ~172-error backlog clears.
+# The FULL `tsc --noEmit` gate is still deferred until the ~156-error type-mismatch
+# backlog clears — but the `npm run preflight` step above already gates the runtime-crash
+# subset (TS2304, "Cannot find name"), which is the class that has actually shipped
+# user-visible crashes. That subset is currently zero, so the guard is green.
