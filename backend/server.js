@@ -6082,22 +6082,10 @@ app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
 
     // Create event message for the order (non-blocking)
     try {
-      await eventMessages.createEventMessage({
-        type: 'order_event',
-        fromBusinessId: isB2B ? created.buyerBusinessId : created.businessId,
-        toBusinessId: isB2B ? created.businessId : null,
-        entityId: created.id,
+      await eventMessages.postOrderEvent({
+        order: created,
         actorId: req.user?.id,
         actorName: req.user?.name || 'Staff',
-        metadata: { 
-          status: created.status, 
-          orderNumber: created.id,
-          customerName: created.customerName,
-          buyerBusinessId: created.buyerBusinessId,
-          buyerBusinessName: created.buyerBusinessName,
-          totalAmount: created.totalAmount,
-          items: created.items,
-        }
       });
     } catch (msgErr) {
       logger.error('Failed to create order event message:', msgErr);
@@ -6304,34 +6292,20 @@ app.patch('/api/companies/:companyId/orders/:orderId/status', requireAuth, async
 
     // Create status update event message (non-blocking)
     try {
-      await eventMessages.createEventMessage({
-        type: 'status_update',
-        fromBusinessId: updated.businessId,
-        toBusinessId: updated.buyerBusinessId || null,
-        entityId: updated.id,
+      await eventMessages.postOrderEvent({
+        order: updated,
         actorId: req.user?.id,
         actorName: req.user?.name || 'Staff',
-        metadata: { 
-          status: status, 
-          previousStatus: previousStatus,
-          orderNumber: updated.id
-        }
+        previousStatus: previousStatus,
       });
     } catch (msgErr) {
       logger.error('Failed to create status update message:', msgErr);
       // Don't fail the status update if message creation fails
     }
 
-    // Push notification for order status change (non-blocking)
-    if (updated.createdBy && updated.createdBy !== req.user?.id) {
-      pushService.sendToUsers({
-        userIds: [updated.createdBy],
-        title: 'Order Update',
-        body: `Order status changed to ${status}`,
-        category: 'orders',
-        data: { type: 'order_status', orderId: updated.id, status },
-      }, repos).catch((err) => logger.error('[Push] Order status push error:', err));
-    }
+    // (Order status push is now handled by eventMessages.postOrderEvent above — it posts
+    // the order card into the buyer<->seller chat and pushes offline participants. The
+    // previous standalone 'Order Update' push was removed to avoid double-notifying.)
 
     res.json(successResponse(updated, 'Order status updated successfully'));
   } catch (err) {
@@ -6597,19 +6571,10 @@ app.post('/api/locations/:locationId/orders', requireAuth, async (req, res) => {
 
     // Create event message for the order (non-blocking)
     try {
-      await eventMessages.createEventMessage({
-        type: 'order_event',
-        fromBusinessId: isB2B ? created.buyerBusinessId : created.businessId,
-        toBusinessId: isB2B ? created.businessId : null,
-        entityId: created.id,
+      await eventMessages.postOrderEvent({
+        order: created,
         actorId: req.user?.id,
         actorName: req.user?.name || 'Staff',
-        metadata: { 
-          status: created.status, 
-          orderNumber: created.id,
-          customerName: created.customerName,
-          locationId: req.params.locationId
-        }
       });
     } catch (msgErr) {
       logger.error('Failed to create order event message:', msgErr);
@@ -14532,21 +14497,10 @@ app.post('/api/public/locations/:locationId/orders', publicOrderLimiter, async (
 
     // Notify the seller (non-blocking).
     try {
-      await eventMessages.createEventMessage({
-        type: 'order_event',
-        fromBusinessId: created.businessId,
-        toBusinessId: null,
-        entityId: created.id,
+      await eventMessages.postOrderEvent({
+        order: created,
         actorId: null,
         actorName: created.customerName || 'Customer',
-        metadata: {
-          status: created.status,
-          orderNumber: created.id,
-          customerName: created.customerName,
-          totalAmount: created.totalAmount,
-          locationId: location.id,
-          source: 'public_storefront',
-        },
       });
     } catch (msgErr) {
       logger.error('Failed to create public order event message:', msgErr);
@@ -14660,6 +14614,10 @@ async function sendPushToOfflineParticipants(chatId, senderName, messagePreview,
     logger.error('[Push] Error in sendPushToOfflineParticipants:', err);
   }
 }
+
+// Now that io + the offline-push helper exist, wire them into the event pipeline so
+// order events (eventMessages.postOrderEvent) broadcast + push live.
+eventMessages.init({ io, sendPushToOfflineParticipants });
 
 // ============================================================================
 // PAYMENT ROUTES (Peach Payments)

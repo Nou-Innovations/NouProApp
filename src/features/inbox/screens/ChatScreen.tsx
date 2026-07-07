@@ -383,29 +383,17 @@ export default function ChatScreen() {
     }, 100);
   };
 
-  // Handle tapping an order card in chat
+  // Handle tapping an order card in chat → open the order (or its delivery if linked).
   const handleOrderPress = (orderId: string) => {
-    // Look up order in local messages to get delivery info
+    if (!orderId) return;
     const orderMessage = messages.find(
       (m): m is OrderEventMessage => m.type === 'order_event' && m.payload?.orderId === orderId
     );
-
-    const payload = orderMessage?.payload;
-    const deliveryId = payload?.delivery?.id;
-
+    const deliveryId = orderMessage?.payload?.delivery?.id;
     if (deliveryId) {
-      // Navigate to delivery detail screen
       (navigation as any).navigate('DeliveryDetail', { deliveryId });
     } else {
-      // Fallback: show order info when no delivery is linked yet
-      const status = payload?.status || 'Unknown';
-      const total = payload?.totalAmount;
-      const shortId = orderId.length > 6 ? orderId.slice(-6) : orderId;
-      AppAlert.alert(
-        `Order #${shortId}`,
-        `Status: ${status}${total ? `\nTotal: Rs ${Number(total).toLocaleString()}` : ''}`,
-        [{ text: 'OK' }]
-      );
+      (navigation as any).navigate('OrderDetails', { orderId });
     }
   };
 

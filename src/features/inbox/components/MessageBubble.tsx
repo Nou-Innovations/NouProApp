@@ -874,7 +874,11 @@ export function MessageBubble({
     case 'contact':
       return renderContactMessage();
     default:
-      return null;
+      // Never render a blank bubble. One-off/legacy event types (status_update,
+      // estimate_confirmed, stock_alert, video_call, delivery, ...) still carry
+      // human-readable text via mapMessageToApi's fallback, so show that as a
+      // text line rather than nothing.
+      return renderTextMessage();
   }
 }
 

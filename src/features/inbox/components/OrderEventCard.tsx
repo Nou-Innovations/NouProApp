@@ -24,7 +24,7 @@ import {
 import { Icon } from '@/shared/utils/icons';
 import { AppButton, ButtonRow } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import type { OrderEventMessage, OrderEventStatus } from '@/shared/types/inbox';
+import type { OrderEventMessage, OrderEventStatus, OrderEventPayload } from '@/shared/types/inbox';
 import { formatCurrency } from '../utils/orderEventMapper';
 import { formatMessageTimestamp } from '../inbox.format';
 import DoubleCheck, { SingleCheck } from './DoubleCheck';
@@ -231,8 +231,29 @@ export function OrderEventCard({
   onDeclineOrder,
 }: OrderEventCardProps) {
   const { isDarkMode } = useTheme();
-  const { payload } = message;
-  
+  // Defensive: a malformed / legacy order_event without a full payload must never
+  // crash the chat. Normalise to safe defaults so every field used below is present.
+  const raw: any = message.payload || {};
+  const payload: OrderEventPayload = {
+    orderId: raw.orderId ?? '',
+    orderRef: raw.orderRef ?? raw.orderId ?? '—',
+    buyer: raw.buyer ?? { id: '', name: 'Buyer', logo: '', location: '' },
+    seller: raw.seller ?? { id: '', name: 'Seller', logo: '', location: '' },
+    status: (raw.status ?? 'NEW') as OrderEventStatus,
+    paymentStatus: raw.paymentStatus ?? 'UNPAID',
+    itemsPreview: Array.isArray(raw.itemsPreview) ? raw.itemsPreview : [],
+    totalItemsCount: raw.totalItemsCount ?? (Array.isArray(raw.itemsPreview) ? raw.itemsPreview.length : 0),
+    subtotal: raw.subtotal ?? raw.totalAmount ?? 0,
+    vatAmount: raw.vatAmount ?? 0,
+    vatPercent: raw.vatPercent ?? 0,
+    deliveryFee: raw.deliveryFee ?? 0,
+    totalAmount: raw.totalAmount ?? 0,
+    currency: raw.currency ?? 'MUR',
+    delivery: raw.delivery ?? { type: 'delivery' as const },
+    createdAt: raw.createdAt ?? '',
+    schemaVersion: raw.schemaVersion ?? '1.0',
+  };
+
   const [expandedRow, setExpandedRow] = useState<ExpandedRow>(null);
   
   // Colors - outgoing cards use primary color like chat bubbles
@@ -291,54 +312,30 @@ export function OrderEventCard({
     return <Icon name={name} size={15} strokeWidth={2} color={color} style={{ marginLeft: 4 }} />;
   };
 
-  // Helper: generate proportional timestamps between createdAt and now
-  const proportionalDate = (index: number, total: number): string => {
-    const start = new Date(payload.createdAt).getTime();
-    const end = Date.now();
-    const step = total > 1 ? (end - start) / (total - 1) : 0;
-    return new Date(start + step * index).toISOString();
+  // Activity timeline — honest labels from the real order status. Only "Order placed"
+  // has a real timestamp (createdAt); per-step timestamps aren't tracked, so the rest
+  // render without a (previously fabricated) date.
+  const getActivityTimeline = (): { label: string; date: string }[] => {
+    const items = [{ label: 'Order placed', date: payload.createdAt || '' }];
+    if (payload.status !== 'NEW') items.push({ label: 'Order confirmed', date: '' });
+    if (payload.status === 'ONGOING' || payload.status === 'DONE') items.push({ label: 'Preparing', date: '' });
+    if (payload.status === 'DONE') items.push({ label: 'Delivered', date: '' });
+    if (payload.status === 'CANCELED') items.push({ label: 'Canceled', date: '' });
+    return items;
   };
 
-  // Activity timeline with proportional timestamps
-  const getActivityTimeline = () => {
-    const labels: string[] = ['Order placed'];
-
-    if (payload.status !== 'NEW') labels.push('Order confirmed');
-    if (payload.status === 'ONGOING' || payload.status === 'DONE') labels.push('Preparing');
-    if (payload.status === 'DONE') labels.push('Delivered');
-    if (payload.status === 'CANCELED') labels.push('Canceled');
-
-    return labels.map((label, i) => ({
-      label,
-      date: proportionalDate(i, labels.length),
-    }));
-  };
-
-  // Payment timeline with proportional timestamps
-  const getPaymentTimeline = () => {
-    const items: { label: string; amount?: number }[] = [];
-
-    if (payload.paymentStatus === 'UNPAID') {
-      items.push({ label: 'Awaiting payment' });
-    } else if (payload.paymentStatus === 'PENDING_CONFIRMATION') {
-      const partialAmount = Math.round(payload.totalAmount * 0.5);
-      items.push({ label: 'Partial payment received', amount: partialAmount });
-      items.push({ label: 'Partial payment submitted', amount: payload.totalAmount - partialAmount });
-      items.push({ label: 'Awaiting confirmation' });
-    } else if (payload.paymentStatus === 'PAID') {
-      const firstPayment = Math.round(payload.totalAmount * 0.3);
-      const secondPayment = Math.round(payload.totalAmount * 0.3);
-      const finalPayment = payload.totalAmount - firstPayment - secondPayment;
-      items.push({ label: 'Partial payment received', amount: firstPayment });
-      items.push({ label: 'Partial payment received', amount: secondPayment });
-      items.push({ label: 'Final payment received', amount: finalPayment });
-      items.push({ label: 'Payment complete' });
+  // Payment timeline — reflects the real payment status only. No fabricated split amounts.
+  const getPaymentTimeline = (): { label: string; amount?: number; date: string }[] => {
+    switch (payload.paymentStatus) {
+      case 'PAID':
+        return [{ label: 'Paid in full', amount: payload.totalAmount, date: '' }];
+      case 'PENDING_CONFIRMATION':
+        return [{ label: 'Payment pending confirmation', date: '' }];
+      case 'PARTIALLY_PAID':
+        return [{ label: 'Partially paid', date: '' }];
+      default:
+        return [{ label: 'Awaiting payment', date: '' }];
     }
-
-    return items.map((item, i) => ({
-      ...item,
-      date: proportionalDate(i, items.length),
-    }));
   };
   
   return (

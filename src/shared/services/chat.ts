@@ -84,6 +84,7 @@ interface SocketIncomingMessage {
   // Invoice / Estimate
   invoiceId?: string;
   estimateId?: string;
+  details?: any;
   // Event
   event?: string;
   // Order event
@@ -216,6 +217,7 @@ class ChatService {
       // Invoice / Estimate
       ...(socketMsg.invoiceId && { invoiceId: socketMsg.invoiceId }),
       ...(socketMsg.estimateId && { estimateId: socketMsg.estimateId }),
+      ...(socketMsg.details && { details: socketMsg.details }),
       // Event
       ...(socketMsg.event && { event: socketMsg.event }),
       // Order event

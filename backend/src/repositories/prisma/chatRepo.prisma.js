@@ -602,8 +602,34 @@ async function editMessage(chatId, messageId, newContent) {
   return mapMessageToApi(updated);
 }
 
+/**
+ * Ensure the given users are participants of a chat (non-destructive).
+ * Adds missing ChatParticipant rows and merges them into Chat.participants,
+ * without resetting existing participants' unread counts.
+ * @param {string} chatId
+ * @param {string[]} userIds
+ */
+async function addParticipants(chatId, userIds) {
+  const ids = (userIds || []).filter(Boolean);
+  if (ids.length === 0) return;
+  return prisma.$transaction(async (tx) => {
+    await tx.chatParticipant.createMany({
+      data: ids.map((userId) => ({ chatId, userId })),
+      skipDuplicates: true,
+    });
+    const chat = await tx.chat.findUnique({ where: { id: chatId } });
+    if (!chat) return;
+    const current = Array.isArray(chat.participants) ? chat.participants : [];
+    const merged = Array.from(new Set([...current, ...ids]));
+    if (merged.length !== current.length) {
+      await tx.chat.update({ where: { id: chatId }, data: { participants: merged } });
+    }
+  });
+}
+
 module.exports = {
   getById,
+  addParticipants,
   getByCompanyId,
   getByBusinessId: getByCompanyId, // Alias for backward compatibility (eventMessages.js)
   getByUserId,

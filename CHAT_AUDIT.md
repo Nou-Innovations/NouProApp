@@ -51,6 +51,16 @@ The bridge is `backend/src/services/eventMessages.js`. It was built to a **diffe
 than the frontend cards expect**, and it has **no access to Socket.IO**, so nothing it produces
 appears in real time. Verified by reading the service directly.
 
+> **STATUS — Phase 2 shipped (2026-07-08, ORDERS only):** A0–A4 + A6/A8 are **fixed for orders** via a
+> dedicated `eventMessages.postOrderEvent()` path: order create + status change now build a full
+> `OrderEventPayload` and post a rich, **live** (socket + push), tappable order card into a canonical
+> deterministic buyer↔seller chat with real **user** participants (dedup + direction fixed); the card
+> is crash-proofed and its fabricated timelines removed; `handleOrderPress` deep-links to
+> `OrderDetails`; `MessageBubble` no longer renders blank bubbles for any type. **Invoices, estimates,
+> and procurement are intentionally unchanged** (still persist-only via `createEventMessage`) — the
+> Invoice model has no client-business link, deferred by owner decision. So A1/A2/A5/A7 remain **open
+> for invoices/procurement only**.
+
 ### A0 · [P0] Event messages never appear live — no socket emit, no push
 `createEventMessage` calls `chatRepo.addMessage` (`eventMessages.js:45`) but **never** calls
 `io.to('chat:'+id).emit('message', …)` and never triggers a push. The service has no `io` handle.

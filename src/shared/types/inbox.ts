@@ -204,6 +204,7 @@ export interface OrderEventItem {
 
 export interface OrderEventDelivery {
   type: 'pickup' | 'delivery';
+  id?: string;
   expectedDate?: string;
   address?: string;
 }
