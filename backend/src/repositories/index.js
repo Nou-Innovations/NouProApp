@@ -33,6 +33,7 @@ function getRepos() {
     userRepo: require('./prisma/userRepo.prisma'),
     notificationReadRepo: require('./prisma/notificationReadRepo.prisma'),
     brandRepo: require('./prisma/brandRepo.prisma'),
+    collectionRepo: require('./prisma/collectionRepo.prisma'),
     transportRepo: require('./prisma/transportRepo.prisma'),
     connectionRepo: require('./prisma/connectionRepo.prisma'),
     blockRepo: require('./prisma/blockRepo.prisma'),

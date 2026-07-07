@@ -86,6 +86,7 @@ model Business {
   products                Product[]
   stocks                  Stock[]
   brands                  Brand[]
+  collections             Collection[]
   transports              Transport[]
   roleRequests            RoleRequest[]
   connectionsSent         BusinessConnection[]  @relation("ConnectionsRequested")
@@ -230,6 +231,43 @@ model Brand {
   @@index([businessId])
 }
 
+// ── Collections (internal product groupings — quota-gated by maxCollections) ──
+//
+// A Collection belongs to a business and groups its own products into a named set
+// (e.g. "Summer 2026"). A product can belong to many collections via CollectionProduct.
+// Internal only — not shown to buyers / not published to any public storefront.
+
+model Collection {
+  id          String              @id
+  businessId  String
+  name        String
+  description String?
+  coverImage  String?
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  business    Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  products    CollectionProduct[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+  @@index([businessId, isActive])
+}
+
+model CollectionProduct {
+  id           String     @id
+  collectionId String
+  productId    String
+  displayOrder Int        @default(0)
+  createdAt    DateTime   @default(now())
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, productId])
+  @@index([collectionId])
+  @@index([productId])
+}
+
 // ── Price Lists (customer-specific pricing — gated by canUseBusinessSpecificPricing) ──
 //
 // A PriceList belongs to a SELLER business. It can carry a list-wide discountPercent
@@ -340,6 +378,7 @@ model Product {
   stocks              Stock[]
   supplierProducts    SupplierProduct[]
   priceListItems      PriceListItem[]
+  collectionProducts  CollectionProduct[]
 
   @@index([businessId])
   @@index([businessId, category])

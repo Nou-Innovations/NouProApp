@@ -129,6 +129,7 @@ export type BusinessTabParamList = {
   Products: undefined;
   Categories: undefined;
   Brands: undefined;
+  Collections: undefined;
   Stock: undefined;
   ProductVisibility: undefined;
   PriceLists: undefined;
@@ -222,6 +223,10 @@ export type RootStackParamList = {
   PriceLists: undefined;
   CreatePriceList: { manage?: boolean; listId?: string } | undefined;
   AssignCustomers: { listId: string };
+
+  // Collection screens (internal product groupings)
+  Collections: undefined;
+  CreateCollection: { manage?: boolean; collectionId?: string } | undefined;
 
   // Brand screens
   Brands: undefined;

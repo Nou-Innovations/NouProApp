@@ -76,14 +76,24 @@ export interface PlanLimits {
   locations: number | 'unlimited';
   products: number | 'unlimited';
   listedProducts: number | 'unlimited';
+  collections: number | 'unlimited';
 }
 
 export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
-  free: { staff: 1, locations: 1, products: 'unlimited', listedProducts: 10 },
-  pro: { staff: 3, locations: 1, products: 'unlimited', listedProducts: 50 },
-  business: { staff: 9, locations: 7, products: 'unlimited', listedProducts: 150 },
-  enterprise: { staff: 'unlimited', locations: 'unlimited', products: 'unlimited', listedProducts: 'unlimited' },
+  free: { staff: 1, locations: 1, products: 'unlimited', listedProducts: 10, collections: 3 },
+  pro: { staff: 3, locations: 1, products: 'unlimited', listedProducts: 50, collections: 25 },
+  business: { staff: 9, locations: 7, products: 'unlimited', listedProducts: 150, collections: 100 },
+  enterprise: { staff: 'unlimited', locations: 'unlimited', products: 'unlimited', listedProducts: 'unlimited', collections: 'unlimited' },
 };
+
+/**
+ * Max collections allowed for a plan. Returns Infinity for 'unlimited'.
+ * Mirrors the backend `maxCollections` capability (Free = 3).
+ */
+export function maxCollectionsForPlan(plan: SubscriptionPlan | null | undefined): number {
+  const limit = PLAN_LIMITS[plan || 'free'].collections;
+  return limit === 'unlimited' ? Infinity : limit;
+}
 
 /**
  * Analytics types

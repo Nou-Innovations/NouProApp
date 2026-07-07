@@ -4507,6 +4507,186 @@ app.delete('/api/companies/:companyId/brands/:brandId', requireAuth, async (req,
 });
 
 // ============================================================================
+// COLLECTION ROUTES (internal product groupings — quota-gated by maxCollections)
+// ============================================================================
+
+// List collections for a company
+app.get('/api/companies/:companyId/collections', requireAuth, async (req, res) => {
+  try {
+    const collections = await repos.collectionRepo.getByBusinessId(req.params.companyId);
+    res.json(successResponse(collections));
+  } catch (e) {
+    logger.error('Error fetching collections:', e);
+    res.status(500).json(errorResponse('Failed to fetch collections'));
+  }
+});
+
+// Single collection (with its products)
+app.get('/api/companies/:companyId/collections/:collectionId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, collectionId } = req.params;
+    const collection = await repos.collectionRepo.getById(collectionId);
+    if (!collection || collection.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Collection not found'));
+    }
+    res.json(successResponse(collection));
+  } catch (e) {
+    logger.error('Error fetching collection:', e);
+    res.status(500).json(errorResponse('Failed to fetch collection'));
+  }
+});
+
+// Create a collection (quota-enforced)
+app.post('/api/companies/:companyId/collections', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    // SECURITY: Require business membership
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+    const { name, description, coverImage, isActive } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json(errorResponse('Collection name is required'));
+    }
+
+    // Enforce per-plan collection quota (Free = 3, paid tiers scale up)
+    const business = await repos.businessRepo.getById(companyId);
+    const capabilities = deriveCapabilities(business);
+    const currentCount = await repos.collectionRepo.countByBusinessId(companyId);
+    if (currentCount >= capabilities.maxCollections) {
+      const requiredPlan = capabilities.maxCollections >= 100 ? 'enterprise'
+        : (capabilities.maxCollections >= 25 ? 'business' : 'pro');
+      return res.status(403).json(paywallResponse(
+        `Collection limit reached (${capabilities.maxCollections}). Upgrade your plan to create more collections.`,
+        'collection_limit_reached',
+        requiredPlan
+      ));
+    }
+
+    const newCollection = await repos.collectionRepo.create({
+      id: 'coll-' + uuidv4().slice(0, 8),
+      businessId: companyId,
+      name: name.trim(),
+      description: description || null,
+      coverImage: coverImage || null,
+      isActive: isActive !== undefined ? isActive : true,
+    });
+
+    res.status(201).json(successResponse(newCollection));
+  } catch (e) {
+    if (e.code === 'P2002') {
+      return res.status(409).json(errorResponse('A collection with this name already exists'));
+    }
+    logger.error('Error creating collection:', e);
+    res.status(500).json(errorResponse('Failed to create collection'));
+  }
+});
+
+// Update a collection
+app.patch('/api/companies/:companyId/collections/:collectionId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, collectionId } = req.params;
+    // SECURITY: Require business membership
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+    const collection = await repos.collectionRepo.getById(collectionId);
+    if (!collection || collection.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Collection not found'));
+    }
+
+    const { name, description, coverImage, isActive } = req.body;
+    const updated = await repos.collectionRepo.update(collectionId, {
+      ...(name !== undefined && { name }),
+      ...(description !== undefined && { description }),
+      ...(coverImage !== undefined && { coverImage }),
+      ...(isActive !== undefined && { isActive }),
+      updatedAt: new Date(),
+    });
+
+    res.json(successResponse(updated));
+  } catch (e) {
+    if (e.code === 'P2002') {
+      return res.status(409).json(errorResponse('A collection with this name already exists'));
+    }
+    logger.error('Error updating collection:', e);
+    res.status(500).json(errorResponse('Failed to update collection'));
+  }
+});
+
+// Delete a collection (admin only)
+app.delete('/api/companies/:companyId/collections/:collectionId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, collectionId } = req.params;
+    // SECURITY: Require business admin to delete collections
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
+
+    const collection = await repos.collectionRepo.getById(collectionId);
+    if (!collection || collection.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Collection not found'));
+    }
+
+    await repos.collectionRepo.delete(collectionId);
+    res.json(successResponse(null, 'Collection deleted successfully'));
+  } catch (e) {
+    logger.error('Error deleting collection:', e);
+    res.status(500).json(errorResponse('Failed to delete collection'));
+  }
+});
+
+// Add products to a collection (batch). Body: { productIds: string[] }
+app.post('/api/companies/:companyId/collections/:collectionId/products', requireAuth, async (req, res) => {
+  try {
+    const { companyId, collectionId } = req.params;
+    // SECURITY: Require business membership
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+    const collection = await repos.collectionRepo.getById(collectionId);
+    if (!collection || collection.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Collection not found'));
+    }
+
+    const { productIds } = req.body;
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json(errorResponse('productIds must be a non-empty array'));
+    }
+
+    // SECURITY: only allow products owned by this business (no cross-tenant inserts)
+    const businessProducts = await repos.productRepo.getByBusinessId(companyId);
+    const ownedIds = new Set(businessProducts.map((p) => p.id));
+    const rows = productIds
+      .filter((pid) => ownedIds.has(pid))
+      .map((pid) => ({ id: 'cp-' + uuidv4().slice(0, 8), collectionId, productId: pid }));
+
+    if (rows.length > 0) await repos.collectionRepo.addProducts(rows);
+
+    const updated = await repos.collectionRepo.getById(collectionId);
+    res.status(201).json(successResponse(updated));
+  } catch (e) {
+    logger.error('Error adding products to collection:', e);
+    res.status(500).json(errorResponse('Failed to add products to collection'));
+  }
+});
+
+// Remove a product from a collection
+app.delete('/api/companies/:companyId/collections/:collectionId/products/:productId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, collectionId, productId } = req.params;
+    // SECURITY: Require business membership
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+    const collection = await repos.collectionRepo.getById(collectionId);
+    if (!collection || collection.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Collection not found'));
+    }
+
+    await repos.collectionRepo.removeProduct(collectionId, productId);
+    res.json(successResponse(null, 'Product removed from collection'));
+  } catch (e) {
+    logger.error('Error removing product from collection:', e);
+    res.status(500).json(errorResponse('Failed to remove product from collection'));
+  }
+});
+
+// ============================================================================
 // PRICE LIST ROUTES (customer-specific pricing)
 // Gated by canUseBusinessSpecificPricing (Business+). The seller owns the lists;
 // they are applied to customer businesses via assignment or manual selection.
@@ -9895,6 +10075,24 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, requir
     if (!senderId) {
       return res.status(401).json(errorResponse('User identity required'));
     }
+
+    // SEC: verify the sender is actually a participant of this chat — not just
+    // any member of the company. Without this, any colleague could post into a
+    // private 1:1 or group chat they don't belong to. Mirrors the user-mode route.
+    const isParticipant = Array.isArray(chat.participants) && chat.participants.includes(senderId);
+    if (!isParticipant) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    // SEC: block enforcement for 1:1 chats (either direction), so blocking
+    // cannot be bypassed by using the company endpoint instead of the user one.
+    if (chat.type === 'direct' && Array.isArray(chat.participants)) {
+      const other = chat.participants.find((p) => p !== senderId);
+      if (other && (await repos.blockRepo.isBlocked(senderId, other))) {
+        return res.status(403).json(errorResponse('You cannot message this user'));
+      }
+    }
+
     // Look up sender's actual role in the business
     const senderMember = await findBusinessMember(companyId, senderId);
     const senderRole = senderMember?.role || 'staff';
@@ -10272,6 +10470,11 @@ app.post('/api/companies/:companyId/chats/:chatId/remove-participant', requireAu
     if (!chat || chat.companyId !== companyId) {
       return res.status(404).json(errorResponse('Chat not found'));
     }
+
+    // SEC: only a business admin may remove other participants from a company
+    // chat. Previously any accepted company member could remove anyone. There is
+    // no per-chat owner in the schema, so business-admin is the authority bar.
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
 
     // Look up names for the system message
     const [requester, target] = await Promise.all([

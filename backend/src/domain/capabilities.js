@@ -93,6 +93,11 @@ function deriveCapabilities(business) {
                       tier === SUBSCRIPTION_TIERS.PRO ? 50 :
                       tier === SUBSCRIPTION_TIERS.BUSINESS ? 150 : 999999,
 
+    // Product collections (internal groupings). Free is capped at 3; paid tiers scale up.
+    maxCollections: tier === SUBSCRIPTION_TIERS.FREE ? 3 :
+                    tier === SUBSCRIPTION_TIERS.PRO ? 25 :
+                    tier === SUBSCRIPTION_TIERS.BUSINESS ? 100 : 999999,
+
     // Price privacy (Business+ only)
     canEnablePricePrivacy: isBusiness || isEnterprise,
 
