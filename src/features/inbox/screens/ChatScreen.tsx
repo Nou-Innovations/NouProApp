@@ -48,7 +48,8 @@ import { formatDateSeparator, getDateKey } from '../inbox.format';
 import { useChatMessages } from '../hooks/useChatMessages';
 import { offlineQueue } from '../services/offlineQueue';
 import { useNetworkStatus } from '@/shared/hooks/useNetworkStatus';
-import type { Message, OrderMessage, OrderEventMessage, TextMessage, EventMessage, DeletedMessage, PdfMessage, LocationMessage, VoiceMessage, ProfileMessage } from '@/shared/types/inbox';
+import type { Message, OrderMessage, OrderEventMessage, TextMessage, EventMessage, DeletedMessage, PdfMessage, LocationMessage, VoiceMessage, ProfileMessage, ContactMessage } from '@/shared/types/inbox';
+import { getTeamMembers, type TeamMember } from '@/features/team/team.service';
 import { confirmOrder, declineOrder } from '@/shared/services/orders';
 import { useDeliveriesStore } from '@/features/deliveries/deliveries.store';
 import { convertEstimateToInvoice } from '@/features/invoices/invoices.service';
@@ -149,6 +150,10 @@ export default function ChatScreen() {
   const [selectedParticipant, setSelectedParticipant] = useState<{ id: string; name: string; avatar: string; role: string; isCurrentUser?: boolean } | null>(null);
   const [showParticipantOptionsSheet, setShowParticipantOptionsSheet] = useState(false);
   const [showAttachmentSheet, setShowAttachmentSheet] = useState(false);
+  // Contact-sharing picker state
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [contacts, setContacts] = useState<TeamMember[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
   // Search state
   const [showSearch, setShowSearch] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState('');
@@ -197,8 +202,8 @@ export default function ChatScreen() {
     // Add current user first
     participantMap.set(currentUserId, {
       id: currentUserId,
-      name: currentUser?.displayName || 'You',
-      avatar: currentUser?.profileImage || '',
+      name: currentUser?.name || 'You',
+      avatar: currentUser?.avatar_url || '',
       role: 'user',
       isCurrentUser: true,
     });
@@ -535,8 +540,8 @@ export default function ChatScreen() {
       isOutgoing: true,
       sender: { 
         id: currentUserId, 
-        name: currentUser?.displayName || 'You', 
-        avatar: currentUser?.profileImage || '', 
+        name: currentUser?.name || 'You', 
+        avatar: currentUser?.avatar_url || '', 
         role: isPersonalMode ? 'user' : 'business' 
       },
       timestamp: new Date().toISOString(),
@@ -660,8 +665,8 @@ export default function ChatScreen() {
           isOutgoing: true,
           sender: {
             id: currentUserId,
-            name: currentUser?.displayName || 'You',
-            avatar: currentUser?.profileImage || '',
+            name: currentUser?.name || 'You',
+            avatar: currentUser?.avatar_url || '',
             role: isPersonalMode ? 'user' : 'business',
           },
           timestamp: new Date().toISOString(),
@@ -1124,8 +1129,8 @@ export default function ChatScreen() {
         isOutgoing: true,
         sender: {
           id: currentUserId,
-          name: currentUser?.displayName || 'You',
-          avatar: currentUser?.profileImage || '',
+          name: currentUser?.name || 'You',
+          avatar: currentUser?.avatar_url || '',
           role: isPersonalMode ? 'user' : 'business',
         },
         timestamp: new Date().toISOString(),
@@ -1256,8 +1261,8 @@ export default function ChatScreen() {
         isOutgoing: true,
         sender: {
           id: currentUserId,
-          name: currentUser?.displayName || 'You',
-          avatar: currentUser?.profileImage || '',
+          name: currentUser?.name || 'You',
+          avatar: currentUser?.avatar_url || '',
           role: isPersonalMode ? 'user' : 'business',
         },
         timestamp: new Date().toISOString(),
@@ -1396,8 +1401,8 @@ export default function ChatScreen() {
         isOutgoing: true,
         sender: {
           id: currentUserId,
-          name: currentUser?.displayName || 'You',
-          avatar: currentUser?.profileImage || '',
+          name: currentUser?.name || 'You',
+          avatar: currentUser?.avatar_url || '',
           role: isPersonalMode ? 'user' : 'business',
         },
         timestamp: new Date().toISOString(),
@@ -1471,8 +1476,8 @@ export default function ChatScreen() {
     if (!currentUser?.id) return;
 
     const profileId = currentUser.id;
-    const profileName = currentUser.displayName || 'Unknown';
-    const profileAvatar = currentUser.profileImage || '';
+    const profileName = currentUser.name || 'Unknown';
+    const profileAvatar = currentUser.avatar_url || '';
     const profileType = 'user';
 
     // Optimistic message
@@ -1488,8 +1493,8 @@ export default function ChatScreen() {
       isOutgoing: true,
       sender: {
         id: currentUserId,
-        name: currentUser?.displayName || 'You',
-        avatar: currentUser?.profileImage || '',
+        name: currentUser?.name || 'You',
+        avatar: currentUser?.avatar_url || '',
         role: isPersonalMode ? 'user' : 'business',
       },
       timestamp: new Date().toISOString(),
@@ -1517,6 +1522,74 @@ export default function ChatScreen() {
       );
     } catch (err: any) {
       AppAlert.alert('Error', err?.message || 'Failed to share profile');
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' } as Message : m));
+    }
+  };
+
+  // Open the contact picker (sourced from the active business's team members)
+  const handleShareContact = async () => {
+    if (!activeBusiness?.id) return;
+    setShowContactPicker(true);
+    setContactsLoading(true);
+    try {
+      const members = await getTeamMembers(activeBusiness.id, 'accepted');
+      setContacts(members);
+    } catch (err: any) {
+      AppAlert.alert('Error', err?.message || 'Failed to load contacts.');
+    } finally {
+      setContactsLoading(false);
+    }
+  };
+
+  // Share the picked contact as a message
+  const handleSelectContact = async (member: TeamMember) => {
+    setShowContactPicker(false);
+    const contactName = member.name;
+    const contactPhone = member.phone || '';
+    const contactAvatar = member.avatar || '';
+    const contactId = member.id;
+
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage: ContactMessage = {
+      id: tempId,
+      chatId: id,
+      type: 'contact',
+      contactName,
+      contactPhone,
+      contactAvatar,
+      contactId,
+      isOutgoing: true,
+      sender: {
+        id: currentUserId,
+        name: currentUser?.name || 'You',
+        avatar: currentUser?.avatar_url || '',
+        role: isPersonalMode ? 'user' : 'business',
+      },
+      timestamp: new Date().toISOString(),
+      status: 'sending',
+    } as ContactMessage;
+
+    setMessages(prev => [optimisticMessage, ...prev]);
+
+    try {
+      let sentMessage: Message;
+      const payload = {
+        type: 'contact' as const,
+        content: contactName,
+        metadata: { contactName, contactPhone, contactAvatar, contactId },
+      };
+      if (isPersonalMode && currentUser?.id) {
+        sentMessage = await sendUserMessage(currentUser.id, id, payload);
+      } else if (activeBusiness?.id) {
+        sentMessage = await sendMessage(activeBusiness.id, id, payload);
+      } else {
+        throw new Error('No valid context');
+      }
+      setMessages(prev =>
+        prev.map(m => m.id === tempId ? { ...sentMessage, isOutgoing: true } as Message : m)
+      );
+    } catch (err: any) {
+      AppAlert.alert('Error', err?.message || 'Failed to share contact');
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' } as Message : m));
     }
   };
@@ -1560,6 +1633,9 @@ export default function ChatScreen() {
       case 'profile':
         handleShareProfile();
         break;
+      case 'contact':
+        handleShareContact();
+        break;
     }
   };
 
@@ -1585,6 +1661,13 @@ export default function ChatScreen() {
       title: 'Share Profile',
       avatar: { type: 'icon' as const, icon: 'user' },
     },
+    // Sharing a contact is sourced from the active business's team, so it's
+    // only offered in business-mode chats.
+    ...(!isPersonalMode ? [{
+      id: 'contact',
+      title: 'Share Contact',
+      avatar: { type: 'icon' as const, icon: 'users' },
+    }] : []),
   ];
 
   // Function to get input colors based on state (matching AppSearchBar)
@@ -1968,6 +2051,39 @@ export default function ChatScreen() {
         items={attachmentOptions}
         onSelectItem={handleAttachmentSelect}
       />
+
+      {/* Contact Picker (share a team member as a contact) */}
+      <AppBottomSheet
+        visible={showContactPicker}
+        onClose={() => setShowContactPicker(false)}
+        title="Share Contact"
+        fullHeight
+      >
+        {contactsLoading ? (
+          <View style={{ paddingVertical: 32, alignItems: 'center' }}>
+            <ActivityIndicator color={appTheme.colors.primary} />
+          </View>
+        ) : contacts.length === 0 ? (
+          <Text style={{ textAlign: 'center', paddingVertical: 24, color: appTheme.colors.textSecondary }}>
+            No contacts to share yet.
+          </Text>
+        ) : (
+          contacts.map((member, idx) => (
+            <ListItemCard
+              key={member.id}
+              avatar={
+                member.avatar
+                  ? { type: 'image', imageUri: member.avatar }
+                  : { type: 'initials', userName: member.name, userId: member.id }
+              }
+              title={member.name}
+              subtitle={member.phone || member.email}
+              onPress={() => handleSelectContact(member)}
+              showDivider={idx < contacts.length - 1}
+            />
+          ))
+        )}
+      </AppBottomSheet>
 
       {/* Forward Chat Picker */}
       <ForwardChatPicker

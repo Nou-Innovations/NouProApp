@@ -247,6 +247,8 @@ export interface ContactMessage extends BaseMessage {
   type: 'contact';
   contactName: string;
   contactPhone: string;
+  contactId?: string;
+  contactAvatar?: string;
   replyingTo?: ReplyContext;
 }
 

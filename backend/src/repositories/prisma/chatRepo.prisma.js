@@ -55,6 +55,11 @@ function mapMessageToApi(msg, requestingUserId = null) {
     mapped.profileName = meta.profileName;
     mapped.profileAvatar = meta.profileAvatar;
     mapped.profileType = meta.profileType || 'user';
+  } else if (msg.type === 'contact') {
+    mapped.contactName = meta.contactName || msg.content;
+    mapped.contactPhone = meta.contactPhone;
+    mapped.contactAvatar = meta.contactAvatar;
+    mapped.contactId = meta.contactId;
   } else if (msg.type === 'invoice') {
     mapped.invoiceId = meta.invoiceId;
     if (meta.details) mapped.details = meta.details;
@@ -311,6 +316,10 @@ async function addMessage(chatId, message, options = {}) {
           ...(message.profileName && { profileName: message.profileName }),
           ...(message.profileAvatar && { profileAvatar: message.profileAvatar }),
           ...(message.profileType && { profileType: message.profileType }),
+          ...(message.contactName && { contactName: message.contactName }),
+          ...(message.contactPhone && { contactPhone: message.contactPhone }),
+          ...(message.contactAvatar && { contactAvatar: message.contactAvatar }),
+          ...(message.contactId && { contactId: message.contactId }),
           ...(message.forwardedFrom && { forwardedFrom: message.forwardedFrom }),
           ...(message.mentions && { mentions: message.mentions }),
         },

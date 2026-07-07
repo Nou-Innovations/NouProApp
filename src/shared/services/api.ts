@@ -127,6 +127,28 @@ const createApiClient = (): AxiosInstance => {
         console.error(`[API] Error ${status}: ${message}`);
       }
 
+      // Auto-retry network/timeout errors (no HTTP response). The main cause is the
+      // Render free-tier cold start: the very first request after the server has been
+      // idle times out while it wakes up, then succeeds on retry. Because the server
+      // never answered (no response), retrying cannot double-submit. Limited to safe
+      // requests: idempotent reads (GET/HEAD/OPTIONS) and login/refresh. Max 2 retries
+      // with backoff so the user just waits a little instead of seeing an error.
+      const retryConfig = error.config as (typeof error.config & { _retryCount?: number }) | undefined;
+      const isNetworkOrTimeout = !error.response && (code === 'ECONNABORTED' || code === 'ERR_NETWORK' || status === 0);
+      if (retryConfig && isNetworkOrTimeout) {
+        const method = (retryConfig.method ?? 'get').toLowerCase();
+        const url = retryConfig.url ?? '';
+        const isSafeToRetry =
+          ['get', 'head', 'options'].includes(method) ||
+          ['/auth/login', '/auth/refresh'].some((p) => url.includes(p));
+        const attempt = retryConfig._retryCount ?? 0;
+        if (isSafeToRetry && attempt < 2) {
+          retryConfig._retryCount = attempt + 1;
+          await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1))); // 1.5s, then 3s
+          return client.request(retryConfig);
+        }
+      }
+
       // Handle 401 errors with token refresh
       if (status === 401) {
         const url = error.config?.url || '';
@@ -265,10 +287,14 @@ export async function patch<T>(url: string, data?: unknown): Promise<T> {
 
 /**
  * DELETE request
+ * @param data Optional request body (axios sends DELETE bodies via `config.data`)
  * @returns The unwrapped `data` field from the response
  */
-export async function del<T = void>(url: string): Promise<T> {
-  const response = await apiClient.delete<ApiResponse<T>>(url);
+export async function del<T = void>(url: string, data?: unknown): Promise<T> {
+  const response = await apiClient.delete<ApiResponse<T>>(
+    url,
+    data !== undefined ? { data } : undefined,
+  );
   return response.data.data;
 }
 
@@ -288,6 +314,19 @@ interface AuthResponseData {
   token: string;
   refreshToken: string;
   businesses: Record<string, unknown>[];
+}
+
+/** Shape of the GDPR account-data export (backend: GET /users/me/export). */
+export interface AccountDataExport {
+  exportedAt: string;
+  profile: Record<string, unknown>;
+  businesses: Record<string, unknown>[];
+  connections: Record<string, unknown>[];
+  workExperience: Record<string, unknown>[];
+  education: Record<string, unknown>[];
+  certifications: Record<string, unknown>[];
+  skills: Record<string, unknown>[];
+  suggestions: Record<string, unknown>[];
 }
 
 export function unwrapAuthResponse(response: { data?: AuthResponseData } & Partial<AuthResponseData>): AuthResponseData {
@@ -323,20 +362,58 @@ export const authAPI = {
     return response.data;
   },
 
-  logout: async (): Promise<void> => {
-    try {
-      // Unregister push token before clearing auth
-      const { unregisterTokenFromBackend } = require('@/shared/services/pushNotifications');
-      await unregisterTokenFromBackend();
-    } catch {
-      // Ignore push token cleanup errors
-    }
-    try {
-      await apiClient.post('/auth/logout');
-    } finally {
-      // Always clear local auth state
-      useProfileStore.getState().logout();
-    }
+  logout: (): void => {
+    // Snapshot the access token BEFORE clearing local state, then sign the user out
+    // of the UI immediately so it returns to the Launch screen without waiting on
+    // the network. The backend cleanup runs in the background using this snapshotted
+    // token, which stays valid until it expires (the access token itself isn't
+    // revoked on logout — only refresh tokens are, via tokenVersion).
+    const { accessToken } = useProfileStore.getState();
+    const authHeaders = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
+
+    // 1) Sign out of the UI right away.
+    useProfileStore.getState().logout();
+
+    // 2) Best-effort backend cleanup, fire-and-forget. Headers are passed explicitly
+    //    because the store token is already cleared (the request interceptor would
+    //    otherwise find none). Errors are ignored — the local session is gone
+    //    regardless, and an unsent push token simply expires on the backend.
+    (async () => {
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        const pushToken = await AsyncStorage.getItem('noupro_push_token');
+        if (pushToken) {
+          await apiClient.delete('/push-tokens/unregister', {
+            data: { token: pushToken },
+            headers: authHeaders,
+          });
+          await AsyncStorage.removeItem('noupro_push_token');
+        }
+      } catch {
+        // ignore
+      }
+      try {
+        await apiClient.post('/auth/logout', undefined, { headers: authHeaders });
+      } catch {
+        // ignore
+      }
+    })().catch(() => {});
+  },
+
+  /**
+   * Permanently delete the signed-in user's account (GDPR erasure / App Store 5.1.1(v)).
+   * Backend anonymizes the user row and removes personal data; business records
+   * (orders, invoices) are retained by law. Caller must run authAPI.logout() on success.
+   * Throws 401 on bad password/2FA code, 409 when business ownership must be
+   * transferred first (message === 'OWNERSHIP_TRANSFER_REQUIRED').
+   */
+  deleteAccount: async (password: string, twoFactorCode?: string): Promise<void> => {
+    await del<void>('/users/me', twoFactorCode ? { password, twoFactorCode } : { password });
+  },
+
+  /** GDPR data export — returns the user's personal data as a JSON bundle. */
+  exportMyData: async (): Promise<AccountDataExport> => {
+    return get<AccountDataExport>('/users/me/export');
   },
 
   refreshToken: async (): Promise<ApiResponse<{ token: string; refreshToken: string }>> => {

@@ -30,6 +30,7 @@ model User {
   industry             String?
   coverPhoto           String?
   profileSlug          String?          @unique
+  deletedAt            DateTime? // set when the account is erased/anonymized (GDPR). NULL = active.
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
   businessMembers      BusinessMember[]

@@ -365,16 +365,6 @@ export const GALLERY_ENTRIES: GalleryEntry[] = [
     demo: { kind: 'demo-bottomsheet' },
   },
   {
-    id: 'legacy-location-pill',
-    name: 'Location selector pill',
-    source: 'modes/business/components/LocationSelectorPill.tsx:51',
-    category: 'Legacy bottom sheets',
-    attributes: { ...FADE_R20, backdrop: 'rgba(0,0,0,0.4)', closeButton: false },
-    recommendation: 'migrate-bottomsheet',
-    note: 'Backdrop 0.4 (off from canonical 0.5).',
-    demo: { kind: 'demo-bottomsheet' },
-  },
-  {
     id: 'legacy-profileswitcher-list',
     name: 'Profile switcher · Profile list',
     source: 'features/profile/components/ProfileSwitcher.tsx:414',

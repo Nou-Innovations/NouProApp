@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, Modal, Platform, TextInput, Image, Animated, Easing, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Platform, TextInput, Image, Animated, Easing, ActivityIndicator } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,11 +7,9 @@ import { Icon } from '@/shared/utils/icons';
 import SecondaryHeader from '@/shared/components/layout/headers/SecondaryHeader';
 import AppButton from '@/shared/components/ui/AppButton';
 import AppTextField from '@/shared/components/ui/AppTextField';
-import ImagePlaceholder from '@/shared/components/ui/ImagePlaceholder';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/shared/types/navigation';
 import AccordionSection from '@/shared/components/ui/AccordionSection';
-import ColorPicker from '@/shared/components/ui/ColorPicker';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { AppModal, AppBottomSheet, AppBottomSheetScrollView, SHEET_BOTTOM_PADDING, AppSearchBar, DateSelector, ListItemCard } from '@/shared/components/ui';
@@ -66,11 +64,6 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const currentUser = useProfileStore((state) => state.currentUser);
   
-  // State for the different sections
-  const [logoUri, setLogoUri] = useState<string | null>(null);
-  const [primaryColor, setPrimaryColor] = useState('#1C1917');
-  const [isColorPickerVisible, setIsColorPickerVisible] = useState(false);
-
   // Client & Dates Section
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
@@ -110,23 +103,12 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
 
-  // Template Settings Section
-  const [footerText, setFooterText] = useState(isInvoice ? 'Payment due within 30 days' : 'This estimate is valid for 30 days');
-
-  // Permissions & Options Section
-  const [isPublic, setIsPublic] = useState(false);
-  const [allowPartialPayments, setAllowPartialPayments] = useState(false);
-  const [autoReminder, setAutoReminder] = useState(false);
-  const [reminderDays, setReminderDays] = useState('3');
-
   // Collapsible sections state
   const [expandedSections, setExpandedSections] = useState({
     clientDates: true,
     lineItems: true,
     summary: true,
     notes: true,
-    template: false,
-    permissions: false,
   });
   
   // Preview modal state
@@ -415,10 +397,6 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
       ...prev,
       [section]: !prev[section],
     }));
-  };
-
-  const handleSelectLogo = (uri: string) => {
-    setLogoUri(uri);
   };
 
   const validateForm = (): boolean => {
@@ -761,109 +739,6 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
             />
           </AccordionSection>
 
-          {/* Template Settings Section — Coming Soon (not yet persisted) */}
-          <AccordionSection 
-            title="Template Settings"
-            isExpanded={expandedSections.template}
-            onToggle={() => toggleSectionExpanded('template')}
-          >
-            <View style={[styles.comingSoonBanner, { backgroundColor: appTheme.colors.surface }]}>
-              <Icon name="construct-outline" size={18} color={appTheme.colors.textLight} />
-              <Text style={[styles.comingSoonText, { color: appTheme.colors.textLight }]}>
-                Coming Soon — Template customisation is not yet available.
-              </Text>
-            </View>
-            <View style={{ opacity: 0.45, pointerEvents: 'none' as any }}>
-              <View style={styles.fieldMargin}>
-                <Text style={[styles.label, { color: appTheme.colors.textLight }]}>Business Logo</Text>
-                <ImagePlaceholder
-                  text="Tap to add logo"
-                  onPress={handleSelectLogo}
-                  imageUri={logoUri}
-                  style={styles.logoPlaceholder}
-                  iconName="image-outline"
-                />
-              </View>
-              
-              <View style={styles.fieldMargin}>
-                <Text style={[styles.label, { color: appTheme.colors.textLight }]}>Primary Color</Text>
-                <TouchableOpacity 
-                  style={[styles.colorPreview, { backgroundColor: primaryColor }]}
-                  onPress={() => setIsColorPickerVisible(true)}
-                />
-              </View>
-              
-              <AppTextField
-                label="Footer Text"
-                value={footerText}
-                onChangeText={setFooterText}
-                placeholder="Enter footer text"
-                containerStyle={styles.fieldMargin}
-              />
-            </View>
-          </AccordionSection>
-
-          {/* Permissions & Options Section — Coming Soon (not yet persisted) */}
-          <AccordionSection 
-            title="Permissions & Options"
-            isExpanded={expandedSections.permissions}
-            onToggle={() => toggleSectionExpanded('permissions')}
-          >
-            <View style={[styles.comingSoonBanner, { backgroundColor: appTheme.colors.surface }]}>
-              <Icon name="construct-outline" size={18} color={appTheme.colors.textLight} />
-              <Text style={[styles.comingSoonText, { color: appTheme.colors.textLight }]}>
-                Coming Soon — These options are not yet available.
-              </Text>
-            </View>
-            <View style={{ opacity: 0.45, pointerEvents: 'none' as any }}>
-              <View style={styles.toggleOption}>
-                <Text style={[styles.toggleLabel, { color: appTheme.colors.text }]}>Make Public (shared link)</Text>
-                <Switch
-                  value={isPublic}
-                  onValueChange={setIsPublic}
-                  trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.success }}
-                  thumbColor="#FFFFFF"
-                  ios_backgroundColor={appTheme.colors.switchTrackOff}
-                />
-              </View>
-              
-              {isInvoice && (
-                <View style={styles.toggleOption}>
-                  <Text style={[styles.toggleLabel, { color: appTheme.colors.text }]}>Allow partial payments</Text>
-                  <Switch
-                    value={allowPartialPayments}
-                    onValueChange={setAllowPartialPayments}
-                    trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.success }}
-                    thumbColor="#FFFFFF"
-                    ios_backgroundColor={appTheme.colors.switchTrackOff}
-                  />
-                </View>
-              )}
-              
-              <View style={styles.toggleOption}>
-                <Text style={[styles.toggleLabel, { color: appTheme.colors.text }]}>Auto-reminder</Text>
-                <Switch
-                  value={autoReminder}
-                  onValueChange={setAutoReminder}
-                  trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.success }}
-                  thumbColor="#FFFFFF"
-                  ios_backgroundColor={appTheme.colors.switchTrackOff}
-                />
-              </View>
-              
-              {autoReminder && (
-                <AppTextField
-                  label="Reminder days before due"
-                  value={reminderDays}
-                  onChangeText={setReminderDays}
-                  keyboardType="numeric"
-                  placeholder="3"
-                  containerStyle={styles.fieldMargin}
-                />
-              )}
-            </View>
-          </AccordionSection>
-
           <View style={styles.footerSpacer} />
         </ScrollView>
 
@@ -1181,39 +1056,6 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
             </AppBottomSheetScrollView>
           </View>
         </AppBottomSheet>
-
-        {/* Color Picker Modal */}
-        {isColorPickerVisible && (
-          <Modal
-            visible={isColorPickerVisible}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setIsColorPickerVisible(false)}
-          >
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setIsColorPickerVisible(false)}
-            >
-              <View style={[styles.modalContainer, { backgroundColor: appTheme.colors.cardBackground }]}>
-                <View style={styles.modalHeader}>
-                  <Text style={[styles.modalTitle, { color: appTheme.colors.text }]}>Select Color</Text>
-                  <TouchableOpacity onPress={() => setIsColorPickerVisible(false)}>
-                    <Icon name="close" size={24} color={appTheme.colors.iconColor} />
-                  </TouchableOpacity>
-                </View>
-                
-                <ColorPicker
-                  onColorSelected={(color) => {
-                    setPrimaryColor(color);
-                    setIsColorPickerVisible(false);
-                  }}
-                  initialColor={primaryColor}
-                />
-              </View>
-            </TouchableOpacity>
-          </Modal>
-        )}
 
         {/* Preview Modal */}
         <Modal

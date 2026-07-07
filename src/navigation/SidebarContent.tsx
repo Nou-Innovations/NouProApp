@@ -427,9 +427,10 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
             { label: 'Stock', icon: 'archive-outline', route: 'Stock', onPress: () => go('Stock') },
             { label: 'Price lists', icon: 'cash-outline', route: 'PriceLists', onPress: () => go('PriceLists') },
             { label: 'Visibility', icon: 'eye-outline', route: 'ProductVisibility', onPress: () => go('ProductVisibility') },
-            { label: 'Collections', icon: 'folder-outline', onPress: () => comingSoon('Collections') },
-            { label: 'Recipes', icon: 'restaurant-outline', onPress: () => comingSoon('Recipes') },
-            { label: 'Discounts', icon: 'pricetag-outline', onPress: () => comingSoon('Discounts') },
+            // COMING-SOON (hidden for v1 store submission — restore when built):
+            // { label: 'Collections', icon: 'folder-outline', onPress: () => comingSoon('Collections') },
+            // { label: 'Recipes', icon: 'restaurant-outline', onPress: () => comingSoon('Recipes') },
+            // { label: 'Discounts', icon: 'pricetag-outline', onPress: () => comingSoon('Discounts') },
           ],
         },
         {
@@ -437,18 +438,21 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
           items: [
             { label: 'Invoices', icon: 'receipt-text-outline', route: 'Invoices', onPress: () => go('Invoices'), badge: invoicesUnreadCount },
             { label: 'Estimates', icon: 'document-text-outline', onPress: () => go('Invoices', { initialTab: 'estimates' }) },
-            { label: 'Scan invoice', icon: 'scan-outline', onPress: () => comingSoon('Scan invoice') },
+            // COMING-SOON (hidden for v1 store submission — restore when built):
+            // { label: 'Scan invoice', icon: 'scan-outline', onPress: () => comingSoon('Scan invoice') },
           ],
         },
         {
           title: 'Business',
           items: [
             { label: 'Public profile', icon: 'business-outline', onPress: () => go('ViewBusinessProfile', { businessId: activeBusiness!.id }) },
-            { label: 'Customers', icon: 'people-outline', onPress: () => comingSoon('Customers') },
+            // COMING-SOON (hidden for v1 store submission — restore when built):
+            // { label: 'Customers', icon: 'people-outline', onPress: () => comingSoon('Customers') },
             { label: 'Team', icon: 'person-add-outline', route: 'TeamManagement', onPress: () => go('TeamManagement', { businessId: activeBusiness!.id }) },
             { label: 'Locations', icon: 'location-outline', route: 'Locations', onPress: () => go('Locations') },
-            { label: 'Analytics', icon: 'bar-chart-outline', onPress: () => comingSoon('Analytics') },
-            { label: 'Variance', icon: 'pie-chart-outline', onPress: () => comingSoon('Variance') },
+            // COMING-SOON (hidden for v1 store submission — restore when built):
+            // { label: 'Analytics', icon: 'bar-chart-outline', onPress: () => comingSoon('Analytics') },
+            // { label: 'Variance', icon: 'pie-chart-outline', onPress: () => comingSoon('Variance') },
             { label: 'Subscription', icon: 'card-outline', route: 'SubscriptionHub', onPress: () => go('SubscriptionHub') },
             { label: 'Settings', icon: 'settings-outline', route: 'CompanySettings', onPress: () => go('CompanySettings') },
           ],

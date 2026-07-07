@@ -49,7 +49,9 @@ const CHIPS = [
 // Preview-only placeholder data so Opportunities & Events render even before any
 // real records exist. Falls back automatically once the backend returns data.
 // Flip USE_MOCK_DISCOVERY to false to disable. IDs are prefixed `mock-` so taps no-op.
-const USE_MOCK_DISCOVERY = true;
+// Disabled for v1 store submission — fabricated cards with dead taps are an App Store
+// rejection risk (Apple 2.1/4.2). Real empty-states show instead. Re-enable for dev previews.
+const USE_MOCK_DISCOVERY = false;
 
 const MOCK_OPPORTUNITIES: Opportunity[] = [
   {

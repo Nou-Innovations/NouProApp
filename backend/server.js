@@ -276,6 +276,25 @@ app.use(cors({
 app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static('uploads'));
 
+// ── Hosted legal pages (App Store Connect + Play Console point here) ──
+// Public, no auth. Served as static HTML from backend/public/legal/. The HTML
+// files are maintained separately; if one is missing we 404 gracefully rather
+// than crash. Registered early so they never fall through to an authed handler.
+const LEGAL_DIR = path.join(__dirname, 'public', 'legal');
+const sendLegalPage = (fileName) => (req, res) => {
+  const filePath = path.join(LEGAL_DIR, fileName);
+  res.sendFile(filePath, (err) => {
+    if (err && !res.headersSent) {
+      res.status(404).type('text/plain').send('Not found');
+    }
+  });
+};
+app.get('/legal/privacy', sendLegalPage('privacy.html'));
+app.get('/legal/terms', sendLegalPage('terms.html'));
+// Google Play's Data Safety form requires a public web page describing account
+// deletion; Apple reviewers also check it. Steps live in the HTML, not here.
+app.get('/legal/delete-account', sendLegalPage('delete-account.html'));
+
 // Shared client-IP key for all rate limiters. Behind Cloudflare (Render fronts every
 // *.onrender.com with CF), `CF-Connecting-IP` is the true client IP and cannot be spoofed —
 // CF overwrites any client-supplied value. Fall back to req.ip (real via `trust proxy`)
@@ -349,6 +368,18 @@ const suggestionLimiter = rateLimit({
   max: 5,
   keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
   message: { success: false, error: 'Too many suggestions, please slow down' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: limiterValidate,
+});
+
+// Rate limiter for GDPR data export (an expensive multi-table read): 5 per hour per user.
+// Applied AFTER requireAuth, so req.user.id is available.
+const dataExportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
+  message: { success: false, error: 'Too many export requests, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
   validate: limiterValidate,
@@ -1960,6 +1991,7 @@ app.get('/api/users/search', requireAuth, async (req, res) => {
           { email: { contains: q, mode: 'insensitive' } },
         ],
         NOT: { id: req.user.id },
+        deletedAt: null, // hide erased/anonymized accounts from people discovery
       },
       select: {
         id: true,
@@ -1974,6 +2006,273 @@ app.get('/api/users/search', requireAuth, async (req, res) => {
     return res.json(successResponse(users));
   } catch (err) {
     return sendError(res, err);
+  }
+});
+
+// ============================================================================
+// ACCOUNT DELETION + DATA EXPORT (GDPR / App Store readiness)
+// ============================================================================
+//
+// NOTE ON ROUTE ORDER: both `/api/users/me` routes below MUST stay registered
+// BEFORE the dynamic `GET /api/users/:userId` route, otherwise Express would
+// treat "me" as a :userId param.
+
+const crypto = require('crypto');
+
+/**
+ * GET /api/users/me/export
+ * GDPR right of access / data portability. Returns the caller's own data
+ * (profile + professional records + memberships + accepted connections).
+ * Deliberately excludes messages/orders/invoices (they involve third parties)
+ * and secrets (passwordHash / 2FA secrets / tokenVersion).
+ */
+app.get('/api/users/me/export', requireAuth, dataExportLimiter, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      // Explicit select — never leak passwordHash / twoFactorSecret /
+      // twoFactorBackupCodes / tokenVersion into an export.
+      select: {
+        id: true, name: true, email: true, phone: true, avatar: true, coverPhoto: true,
+        bio: true, headline: true, description: true, jobTitle: true, address: true,
+        industry: true, language: true, profileSlug: true, privacySettings: true,
+        lastLoginAt: true, createdAt: true, updatedAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json(errorResponse('User not found', 'NOT_FOUND'));
+    }
+
+    // Memberships (business name + this user's role), and the profile-related rows.
+    // Kept lean via select. Connections resolve the "other party" name only.
+    const [
+      memberships,
+      sentConnections,
+      receivedConnections,
+      workExperience,
+      education,
+      certifications,
+      userSkills,
+      suggestions,
+    ] = await Promise.all([
+      prisma.businessMember.findMany({
+        where: { userId },
+        select: { role: true, status: true, createdAt: true, business: { select: { id: true, name: true } } },
+      }),
+      prisma.userConnection.findMany({
+        where: { senderId: userId, status: 'accepted' },
+        select: { createdAt: true, receiver: { select: { id: true, name: true } } },
+      }),
+      prisma.userConnection.findMany({
+        where: { receiverId: userId, status: 'accepted' },
+        select: { createdAt: true, sender: { select: { id: true, name: true } } },
+      }),
+      prisma.workExperience.findMany({ where: { userId } }),
+      prisma.education.findMany({ where: { userId } }),
+      prisma.certification.findMany({ where: { userId } }),
+      prisma.userSkill.findMany({
+        where: { userId },
+        select: { displayOrder: true, createdAt: true, skill: { select: { name: true, category: true } } },
+      }),
+      prisma.suggestion.findMany({
+        where: { userId },
+        select: { id: true, categoryId: true, text: true, createdAt: true },
+      }),
+    ]);
+
+    const connections = [
+      ...sentConnections.map(c => ({ userId: c.receiver?.id, name: c.receiver?.name, connectedAt: c.createdAt })),
+      ...receivedConnections.map(c => ({ userId: c.sender?.id, name: c.sender?.name, connectedAt: c.createdAt })),
+    ];
+
+    return res.json(successResponse({
+      exportedAt: new Date().toISOString(),
+      profile: user,
+      businesses: memberships.map(m => ({
+        id: m.business?.id,
+        name: m.business?.name,
+        role: m.role,
+        status: m.status,
+        joinedAt: m.createdAt,
+      })),
+      connections,
+      workExperience,
+      education,
+      certifications,
+      skills: userSkills.map(s => ({ name: s.skill?.name, category: s.skill?.category, displayOrder: s.displayOrder })),
+      suggestions,
+    }));
+  } catch (err) {
+    logger.error('[DataExport] Error:', err);
+    return res.status(500).json(errorResponse('Failed to export account data', 'INTERNAL_ERROR'));
+  }
+});
+
+/**
+ * DELETE /api/users/me
+ * GDPR erasure + Apple-required in-app account deletion.
+ * Body: { password: string, twoFactorCode?: string }
+ *
+ * Verifies password (and TOTP if 2FA is on), then anonymizes the User row and
+ * deletes purely-personal rows in a single transaction. Business records
+ * (orders/invoices/deliveries/messages) are RETAINED — they are other parties'
+ * legal records (GDPR Art. 17(3)(b)); the sender simply renders as "Deleted user".
+ */
+app.delete('/api/users/me', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { password, twoFactorCode } = req.body || {};
+
+    if (!password || typeof password !== 'string') {
+      return res.status(400).json(errorResponse('Password is required to delete your account', 'VALIDATION_ERROR'));
+    }
+
+    const dbUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!dbUser) {
+      return res.status(404).json(errorResponse('User not found', 'NOT_FOUND'));
+    }
+    if (dbUser.deletedAt) {
+      // Already erased — treat as gone.
+      return res.status(404).json(errorResponse('User not found', 'NOT_FOUND'));
+    }
+
+    // 1) Verify password.
+    if (!dbUser.passwordHash) {
+      return res.status(401).json(errorResponse('Invalid password', 'UNAUTHORIZED'));
+    }
+    const passwordValid = await bcrypt.compare(password, dbUser.passwordHash);
+    if (!passwordValid) {
+      return res.status(401).json(errorResponse('Invalid password', 'UNAUTHORIZED'));
+    }
+
+    // 2) If 2FA is enabled, require + verify a valid TOTP (or backup) code.
+    if (dbUser.twoFactorEnabled && dbUser.twoFactorSecret) {
+      if (!twoFactorCode || typeof twoFactorCode !== 'string') {
+        return res.status(401).json(errorResponse('Two-factor authentication code is required', 'UNAUTHORIZED'));
+      }
+      const { authenticator } = require('otplib');
+      authenticator.options = { window: 1 };
+      let codeValid = authenticator.verify({ token: twoFactorCode, secret: dbUser.twoFactorSecret });
+      // Fall back to one-time backup codes (same pattern as /2fa/verify).
+      if (!codeValid && dbUser.twoFactorBackupCodes) {
+        try {
+          const hashedCodes = JSON.parse(dbUser.twoFactorBackupCodes);
+          for (let i = 0; i < hashedCodes.length; i++) {
+            if (await bcrypt.compare(twoFactorCode, hashedCodes[i])) { codeValid = true; break; }
+          }
+        } catch { /* malformed backup codes -> treat as no match */ }
+      }
+      if (!codeValid) {
+        return res.status(401).json(errorResponse('Invalid two-factor authentication code', 'UNAUTHORIZED'));
+      }
+    }
+
+    // 3) Ownership guard: block if the user is the SOLE super_admin (OWNER) of any
+    //    business that has OTHER members — the app must ask them to transfer ownership first.
+    const ownerMemberships = await prisma.businessMember.findMany({
+      where: { userId, role: 'super_admin' },
+      select: { businessId: true, business: { select: { name: true } } },
+    });
+
+    const blockingBusinesses = [];
+    for (const m of ownerMemberships) {
+      const otherOwners = await prisma.businessMember.count({
+        where: { businessId: m.businessId, role: 'super_admin', userId: { not: userId } },
+      });
+      if (otherOwners > 0) continue; // another owner exists -> fine
+      const otherMembers = await prisma.businessMember.count({
+        where: { businessId: m.businessId, userId: { not: userId } },
+      });
+      if (otherMembers > 0) {
+        blockingBusinesses.push({ id: m.businessId, name: m.business?.name || 'Unnamed business' });
+      }
+    }
+
+    if (blockingBusinesses.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'OWNERSHIP_TRANSFER_REQUIRED',
+        errorCode: 'OWNERSHIP_TRANSFER_REQUIRED',
+        error: { code: 'OWNERSHIP_TRANSFER_REQUIRED', message: 'OWNERSHIP_TRANSFER_REQUIRED' },
+        data: { businesses: blockingBusinesses },
+      });
+    }
+
+    // Businesses this user belongs to (to potentially unpublish if left memberless).
+    const myMemberships = await prisma.businessMember.findMany({
+      where: { userId },
+      select: { businessId: true },
+    });
+    const myBusinessIds = [...new Set(myMemberships.map(m => m.businessId))];
+
+    // A fresh, un-loggable password hash so the anonymized row can never be signed into.
+    const scrambledHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
+
+    // 4) One atomic transaction: anonymize the User row + delete personal rows +
+    //    unpublish any now-memberless business. Business records are left intact.
+    await prisma.$transaction(async (tx) => {
+      // Delete purely-personal rows (both directions where applicable).
+      await tx.pushToken.deleteMany({ where: { userId } });
+      await tx.userConnection.deleteMany({ where: { OR: [{ senderId: userId }, { receiverId: userId }] } });
+      await tx.block.deleteMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
+      await tx.workExperience.deleteMany({ where: { userId } });
+      await tx.education.deleteMany({ where: { userId } });
+      await tx.certification.deleteMany({ where: { userId } });
+      await tx.userSkill.deleteMany({ where: { userId } });
+      await tx.businessFollow.deleteMany({ where: { userId } });
+      await tx.suggestionVote.deleteMany({ where: { userId } });
+      await tx.roleRequest.deleteMany({ where: { userId } });
+      // Also clear notification prefs/reads — purely personal, no third party.
+      await tx.notificationPreference.deleteMany({ where: { userId } });
+      await tx.notificationRead.deleteMany({ where: { userId } });
+
+      // Drop membership rows (business- and location-level).
+      await tx.locationMember.deleteMany({ where: { userId } });
+      await tx.businessMember.deleteMany({ where: { userId } });
+
+      // Any business now left with ZERO members -> unpublish it (keep the record).
+      for (const businessId of myBusinessIds) {
+        const remaining = await tx.businessMember.count({ where: { businessId } });
+        if (remaining === 0) {
+          await tx.business.update({ where: { id: businessId }, data: { isPublished: false } });
+        }
+      }
+
+      // Anonymize the User row (keep it so business records still resolve a sender).
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          name: 'Deleted user',
+          email: `deleted-${userId}@deleted.nou.pro`,
+          phone: null,
+          avatar: null,
+          coverPhoto: null,
+          bio: null,
+          headline: null,
+          description: null,
+          jobTitle: null,
+          address: null,
+          industry: null,
+          profileSlug: null,
+          privacySettings: null,
+          passwordHash: scrambledHash,
+          twoFactorSecret: null,
+          twoFactorBackupCodes: null,
+          twoFactorEnabled: false,
+          deletedAt: new Date(),
+          tokenVersion: { increment: 1 }, // kills all existing sessions/refresh tokens
+        },
+      });
+    });
+
+    logger.info('[AccountDeletion] Account erased/anonymized:', userId);
+    return res.json(successResponse(null, 'Your account has been deleted.'));
+  } catch (err) {
+    logger.error('[AccountDeletion] Error:', err);
+    return res.status(500).json(errorResponse('Failed to delete account. Please try again.', 'INTERNAL_ERROR'));
   }
 });
 
@@ -3340,7 +3639,9 @@ app.get('/api/businesses/:businessId/people', requireAuth, async (req, res) => {
     const { businessId } = req.params;
 
     const members = await prisma.businessMember.findMany({
-      where: { businessId, status: 'accepted' },
+      // Deleted users have their BusinessMember rows removed, but filter defensively on the
+      // relation too so an in-flight deletion can never surface an anonymized name here.
+      where: { businessId, status: 'accepted', user: { deletedAt: null } },
       include: {
         user: {
           select: { id: true, name: true, avatar: true, jobTitle: true, headline: true },

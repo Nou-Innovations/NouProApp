@@ -20,7 +20,7 @@ import { View, Text, TouchableOpacity, Image, StyleSheet, Linking, Platform } fr
 import { AppAlert } from '@/shared/services/appAlert';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import type { Message, OrderEventMessage, OrderEventStatus, VoiceMessage, ProfileMessage } from '@/shared/types/inbox';
+import type { Message, OrderEventMessage, OrderEventStatus, VoiceMessage, ProfileMessage, ContactMessage } from '@/shared/types/inbox';
 import { formatMessageTimestamp } from '../inbox.format';
 import {
   getOrderStatusColor,
@@ -33,6 +33,7 @@ import { OrderEventCard } from './OrderEventCard';
 import { InvoiceEventCard } from './InvoiceEventCard';
 import VoicePlayer from './VoicePlayer';
 import ProfileCard from './ProfileCard';
+import ContactCard from './ContactCard';
 import DoubleCheck, { SingleCheck } from './DoubleCheck';
 
 // ============================================================================
@@ -754,19 +755,19 @@ export function MessageBubble({
     });
   };
 
-  const renderUnsupportedMessage = () => {
-    // contact - Not yet implemented
+  const renderContactMessage = () => {
     if (message.type !== 'contact') return null;
+    const contactMsg = message as ContactMessage;
     return renderAttachmentBubble({
-      cardStyle: { opacity: 0.85 },
+      // Shared-contact inner card: 8px vertical + left padding (right keeps room for the icon).
+      cardStyle: { paddingTop: 8, paddingBottom: 8, paddingLeft: 8 },
       children: (
-        <>
-          <View style={styles.iconTextRow}>
-            <Icon name="user" size={18} color={isOutgoing ? appTheme.colors.textInverse : appTheme.colors.primary} style={styles.inlineIcon} />
-            <Text style={[textStyle, { fontStyle: 'italic', flexShrink: 1 }]} numberOfLines={1}>Contact</Text>
-          </View>
-          <Text style={[{ fontSize: 14 }, { color: mutedOnCard }]}>Not available in this version</Text>
-        </>
+        <ContactCard
+          contactName={contactMsg.contactName}
+          contactPhone={contactMsg.contactPhone}
+          contactAvatar={contactMsg.contactAvatar}
+          isOutgoing={isOutgoing}
+        />
       ),
     });
   };
@@ -871,7 +872,7 @@ export function MessageBubble({
     case 'profile':
       return renderProfileMessage();
     case 'contact':
-      return renderUnsupportedMessage();
+      return renderContactMessage();
     default:
       return null;
   }

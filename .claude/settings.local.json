@@ -76,7 +76,15 @@
       "Bash(sed 's/.prisma.js$//')",
       "Bash(cat > *)",
       "Bash(git rev-list *)",
-      "WebFetch(domain:kirillzyusko.github.io)"
+      "WebFetch(domain:kirillzyusko.github.io)",
+      "Bash(cat)",
+      "Bash(chmod +x /tmp/alert_analysis.sh)",
+      "Bash(/tmp/alert_analysis.sh)",
+      "Bash(chmod +x /tmp/detailed_alert_report.sh)",
+      "Bash(/tmp/detailed_alert_report.sh)",
+      "Bash(awk '/app\\\\.\\(get|post|put|patch|delete\\).*async \\\\\\(req, res\\\\\\)/ {start=NR; line=$0} start && NR==start+1 && !/try \\\\{/ {print NR-1 \": \" line; print NR \": \" $0; start=0}' /Users/arnaudlabonne/Nou/NouPro/NouProApp/backend/server.js)",
+      "Bash(chmod +x /private/tmp/claude-502/-Users-arnaudlabonne-Nou-NouPro-NouProApp/63b79778-f003-43db-b665-e4b624e37ba5/scratchpad/analyze_async.sh)",
+      "Bash(bash /private/tmp/claude-502/-Users-arnaudlabonne-Nou-NouPro-NouProApp/63b79778-f003-43db-b665-e4b624e37ba5/scratchpad/analyze_async.sh)"
     ]
   }
 }

@@ -32,12 +32,6 @@ const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const COVER_HEIGHT = SCREEN_WIDTH * (4 / 3); // 3:4 aspect ratio - matching BusinessProfileOwnScreen
 const TAB_BAR_HEIGHT = 50;
 
-// Mock map location
-const mockMapLocation = {
-  latitude: -20.232,
-  longitude: 57.498,
-};
-
 // Base tabs without Cart (Cart only shown in Business Mode)
 const BASE_TABS = [
   { key: 'products', label: 'Products', icon: 'cube-outline' },
@@ -118,9 +112,12 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       website: business?.website || '',
       phone: business?.phone || business?.locations?.[0]?.phone || '',
       businessHours: business?.businessHours ?? business?.settings?.businessHours ?? [],
-      mapLocation: business?.locations?.[0]
-        ? { latitude: business.locations[0].latitude || -20.232, longitude: business.locations[0].longitude || 57.498 }
-        : mockMapLocation,
+      // Real coordinates or nothing — never a fake pin (the old default pointed
+      // every business without coordinates at the same spot in Mauritius).
+      mapLocation:
+        business?.locations?.[0]?.latitude != null && business?.locations?.[0]?.longitude != null
+          ? { latitude: business.locations[0].latitude, longitude: business.locations[0].longitude }
+          : null,
     };
   }, [business]);
 
@@ -532,14 +529,14 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
 
   // Handle website press
   const handleWebsitePress = () => {
-    const website = aboutInfo.website || 'shop.com';
-    Linking.openURL(`https://${website}`);
+    if (!aboutInfo.website) return;
+    Linking.openURL(`https://${aboutInfo.website}`);
   };
 
   // Handle phone press
   const handlePhonePress = () => {
-    const phone = aboutInfo.phone || '412 3456';
-    Linking.openURL(`tel:${phone}`);
+    if (!aboutInfo.phone) return;
+    Linking.openURL(`tel:${aboutInfo.phone}`);
   };
 
   // People tab - shows accepted business members
@@ -630,34 +627,34 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
 
   const AboutUsTab = () => {
     const address = business?.address || business?.locations?.[0]?.address || 'No address available';
-    const website = aboutInfo.website || 'shop.com';
-    const phone = aboutInfo.phone || '412 3456';
 
     return (
       <View style={styles.aboutContainer}>
-        {/* Map Section */}
-        <View style={styles.mapContainer}>
-          <MapView
-            style={styles.map}
-            initialRegion={{
-              latitude: aboutInfo.mapLocation?.latitude || -20.232,
-              longitude: aboutInfo.mapLocation?.longitude || 57.498,
-              latitudeDelta: 0.02,
-              longitudeDelta: 0.02,
-            }}
-            scrollEnabled={false}
-            zoomEnabled={false}
-            pitchEnabled={false}
-            rotateEnabled={false}
-          >
-            <Marker
-              coordinate={{
-                latitude: aboutInfo.mapLocation?.latitude || -20.232,
-                longitude: aboutInfo.mapLocation?.longitude || 57.498,
+        {/* Map Section — only when the business has real coordinates */}
+        {aboutInfo.mapLocation && (
+          <View style={styles.mapContainer}>
+            <MapView
+              style={styles.map}
+              initialRegion={{
+                latitude: aboutInfo.mapLocation.latitude,
+                longitude: aboutInfo.mapLocation.longitude,
+                latitudeDelta: 0.02,
+                longitudeDelta: 0.02,
               }}
-            />
-          </MapView>
-        </View>
+              scrollEnabled={false}
+              zoomEnabled={false}
+              pitchEnabled={false}
+              rotateEnabled={false}
+            >
+              <Marker
+                coordinate={{
+                  latitude: aboutInfo.mapLocation.latitude,
+                  longitude: aboutInfo.mapLocation.longitude,
+                }}
+              />
+            </MapView>
+          </View>
+        )}
 
         {/* Info Section */}
         <View style={styles.infoSection}>
@@ -669,21 +666,25 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
             </Text>
           </View>
 
-          {/* Website */}
-          <View style={styles.infoItem}>
-            <Text style={[styles.infoLabel, { color: appTheme.colors.text }]}>Website</Text>
-            <TouchableOpacity onPress={handleWebsitePress}>
-              <Text style={styles.infoLink}>{website}</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Website — hidden when the business hasn't set one */}
+          {!!aboutInfo.website && (
+            <View style={styles.infoItem}>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.text }]}>Website</Text>
+              <TouchableOpacity onPress={handleWebsitePress}>
+                <Text style={styles.infoLink}>{aboutInfo.website}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-          {/* Phone number */}
-          <View style={styles.infoItem}>
-            <Text style={[styles.infoLabel, { color: appTheme.colors.text }]}>Phone number</Text>
-            <TouchableOpacity onPress={handlePhonePress}>
-              <Text style={styles.infoLink}>{phone}</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Phone number — hidden when the business hasn't set one */}
+          {!!aboutInfo.phone && (
+            <View style={styles.infoItem}>
+              <Text style={[styles.infoLabel, { color: appTheme.colors.text }]}>Phone number</Text>
+              <TouchableOpacity onPress={handlePhonePress}>
+                <Text style={styles.infoLink}>{aboutInfo.phone}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Business Hours */}
           <View style={styles.businessHoursSection}>

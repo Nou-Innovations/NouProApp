@@ -281,6 +281,7 @@ export type RootStackParamList = {
   BusinessSettings: undefined;
   ChangePassword: undefined;
   SecuritySettings: undefined;
+  DeleteAccount: undefined;
   ProfileSettings: undefined;
   PersonalProfileSettings: undefined;
   TwoFactorAuth: undefined;

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, Switch } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Switch, TouchableOpacity, Image } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -17,7 +17,8 @@ import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { checkPaywall, getLimitTriggerId, PaywallCheck } from '@/shared/utils/permissions';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { createProduct, updateProduct, getProducts } from '../products.service';
-import { uploadImage } from '@/shared/services/imageService';
+import { uploadImage, imageService } from '@/shared/services/imageService';
+import ImageViewerModal from '@/shared/components/ui/ImageViewerModal';
 import theme from '@/shared/theme';
 import { BUSINESS_CATEGORIES, getCategoryLabel } from '@/shared/constants/categories';
 
@@ -43,6 +44,8 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
   const [supplier, setSupplier] = useState('');
   const [isListed, setIsListed] = useState(true);
   const [productImages, setProductImages] = useState<string[]>([]);
+  const [imageActionIndex, setImageActionIndex] = useState<number | null>(null);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   // Carton pricing
@@ -221,6 +224,28 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
+  // Replace the image at `index` with a freshly picked + uploaded one.
+  const handleReplaceImage = (index: number) => {
+    const apply = async (picker: () => Promise<{ success: boolean; imageUri?: string }>) => {
+      const result = await picker();
+      if (!result.success || !result.imageUri) return;
+      try {
+        const serverUrl = await uploadImage(result.imageUri);
+        setProductImages(prev => prev.map((u, i) => (i === index ? serverUrl : u)));
+      } catch (err: any) {
+        AppAlert.alert('Upload Error', err?.message || 'Failed to upload image');
+      }
+    };
+    imageService.showImagePickerOptions(
+      () => apply(() => imageService.openCamera()),
+      () => apply(() => imageService.openGallery()),
+    );
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setProductImages(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSelectStatus = (newStatus: ProductStatus) => {
     setStatus(newStatus);
     setShowStatusModal(false);
@@ -241,14 +266,15 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
             contentContainerStyle={styles.imagesScrollContainer}
           >
             {productImages.map((uri, index) => (
-              <ImagePlaceholder 
+              <TouchableOpacity
                 key={`image-${index}`}
-                text=""
-                onPress={() => {}} 
-                imageUri={uri}
-                style={styles.productImageItem}
-                iconName="camera-outline"
-              />
+                style={[styles.productImageItem, styles.thumbWrap, { borderColor: appTheme.colors.borderColor }]}
+                onPress={() => setImageActionIndex(index)}
+                activeOpacity={0.8}
+                accessibilityLabel={`Product image ${index + 1}. Tap for options`}
+              >
+                <Image source={{ uri }} style={styles.thumbImage} />
+              </TouchableOpacity>
             ))}
             <ImagePlaceholder 
               text="Add picture"
@@ -553,6 +579,56 @@ const CreateProductScreen: React.FC<Props> = ({ navigation, route }) => {
         description={paywallCheckResult?.description}
         currentLimit={paywallCheckResult?.currentLimit}
       />
+
+      {/* Product image options (View / Replace / Remove) */}
+      <AppBottomSheet
+        visible={imageActionIndex !== null}
+        onClose={() => setImageActionIndex(null)}
+        title="Image options"
+      >
+        <ListItemCard
+          avatar={{ type: 'icon', icon: 'eye-outline' }}
+          title="View"
+          onPress={() => {
+            if (imageActionIndex !== null) setViewerUrl(productImages[imageActionIndex]);
+            setImageActionIndex(null);
+          }}
+        />
+        <ListItemCard
+          avatar={{ type: 'icon', icon: 'camera-outline' }}
+          title="Replace"
+          onPress={() => {
+            const idx = imageActionIndex;
+            setImageActionIndex(null);
+            if (idx !== null) handleReplaceImage(idx);
+          }}
+        />
+        <ListItemCard
+          avatar={{
+            type: 'icon',
+            icon: 'trash-outline',
+            iconColor: appTheme.colors.error,
+            backgroundColor: `${appTheme.colors.error}15`,
+          }}
+          title="Remove"
+          onPress={() => {
+            const idx = imageActionIndex;
+            setImageActionIndex(null);
+            if (idx !== null) handleRemoveImage(idx);
+          }}
+          showDivider={false}
+        />
+      </AppBottomSheet>
+
+      {/* Full-screen image viewer */}
+      <ImageViewerModal
+        isVisible={!!viewerUrl}
+        imageUrl={viewerUrl}
+        senderName={null}
+        timestamp={null}
+        messageId={null}
+        onClose={() => setViewerUrl(null)}
+      />
     </SafeAreaView>
   );
 };
@@ -617,6 +693,16 @@ const styles = StyleSheet.create({
   productImageItem: {
     width: 100,
     height: 100,
+  },
+  thumbWrap: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  thumbImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   saveButton: {
     marginTop: 16,

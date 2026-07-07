@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,19 @@ import {
   TouchableOpacity,
   ScrollView,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useProfileStore } from '@/shared/store/profileStore';
+import { authAPI } from '@/shared/services/api';
+import { AppAlert } from '@/shared/services/appAlert';
+import { SectionTitle } from '@/shared/components/ui';
 
 interface SecuritySettingsScreenProps {
   navigation: any;
@@ -44,6 +50,37 @@ export default function SecuritySettingsScreen({ navigation }: SecuritySettingsS
 
   const handleStaySignedInToggle = (value: boolean) => {
     setStaySignedIn(value);
+  };
+
+  // GDPR data export — fetches the user's data bundle and opens the share sheet.
+  const [isExporting, setIsExporting] = useState(false);
+  const handleExportData = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const data = await authAPI.exportMyData();
+      const fileUri = `${FileSystem.cacheDirectory}noupro-data-export.json`;
+      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(data, null, 2));
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Your NouPro data',
+        });
+      } else {
+        AppAlert.alert('Export Ready', 'Your data file was saved to the app cache.');
+      }
+    } catch (error: any) {
+      AppAlert.alert(
+        'Export Failed',
+        error?.response?.data?.message || 'Could not export your data. Please try again.',
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    navigation.navigate('DeleteAccount');
   };
 
 
@@ -134,6 +171,52 @@ export default function SecuritySettingsScreen({ navigation }: SecuritySettingsS
             Manage your account security settings and authentication methods.
           </Text>
           {renderSecurityOptions()}
+
+          <SectionTitle style={styles.dataSectionTitle}>Your Data</SectionTitle>
+          <View style={styles.settingsSection}>
+            <TouchableOpacity
+              style={[styles.settingItem, { borderBottomColor: appTheme.colors.borderColor }]}
+              onPress={handleExportData}
+              disabled={isExporting}
+              accessibilityLabel="Export a copy of my personal data"
+            >
+              <View style={styles.settingLeft}>
+                <Icon name="download-outline" size={24} color={appTheme.colors.iconColor} />
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: appTheme.colors.text }]}>
+                    Export My Data
+                  </Text>
+                  <Text style={[styles.settingDescription, { color: appTheme.colors.textLight }]}>
+                    Download a copy of your personal data
+                  </Text>
+                </View>
+              </View>
+              {isExporting ? (
+                <ActivityIndicator size="small" color={appTheme.colors.iconMuted} />
+              ) : (
+                <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.settingItem, { borderBottomColor: appTheme.colors.borderColor }]}
+              onPress={handleDeleteAccount}
+              accessibilityLabel="Delete my account permanently"
+            >
+              <View style={styles.settingLeft}>
+                <Icon name="trash-outline" size={24} color={appTheme.colors.error} />
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: appTheme.colors.error }]}>
+                    Delete Account
+                  </Text>
+                  <Text style={[styles.settingDescription, { color: appTheme.colors.textLight }]}>
+                    Permanently erase your account and personal data
+                  </Text>
+                </View>
+              </View>
+              <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -160,6 +243,10 @@ const styles = StyleSheet.create({
   },
   settingsSection: {
     marginTop: theme.spacing.sm,
+  },
+  dataSectionTitle: {
+    marginTop: 32,
+    marginHorizontal: 20,
   },
   settingItem: {
     flexDirection: 'row',

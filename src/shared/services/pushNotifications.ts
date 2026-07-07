@@ -82,7 +82,7 @@ export async function unregisterTokenFromBackend(): Promise<void> {
   try {
     const token = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
     if (token) {
-      await del('/push-tokens/unregister');
+      await del('/push-tokens/unregister', { token });
       await AsyncStorage.removeItem(PUSH_TOKEN_KEY);
     }
   } catch (err) {

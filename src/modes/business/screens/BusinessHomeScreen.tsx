@@ -45,8 +45,8 @@ import {
   ProQuickActions,
   ProRecentActivity,
   BusinessOverviewSection,
-  LocationSelectorPill,
 } from '../components';
+import LocationDropdown from '@/shared/components/ui/LocationDropdown';
 import { useBusinessDashboard } from '../hooks/useBusinessDashboard';
 import { useBusinessOverview } from '../hooks/useBusinessOverview';
 
@@ -127,7 +127,7 @@ export default function BusinessHomeScreen() {
         leftAction={{ icon: 'menu', onPress: openDrawer, accessibilityLabel: 'Open menu' }}
       />
       <View style={styles.locationRow}>
-        <LocationSelectorPill />
+        <LocationDropdown />
       </View>
 
       <ScrollView
@@ -233,7 +233,6 @@ const styles = StyleSheet.create({
   locationRow: {
     paddingHorizontal: theme.spacing.sm,
     paddingBottom: theme.spacing.sm,
-    alignItems: 'flex-start',
   },
   iconButton: {
     width: 40,

@@ -4,6 +4,15 @@ module.exports = {
   // a dependency). It bundles core + TypeScript + React + Prettier rules and the
   // React Native globals (__DEV__, fetch, etc.).
   extends: ['universe/native'],
+  globals: {
+    // Provided by Hermes/React Native at runtime but missing from the
+    // universe/native env sets — without these, `no-undef` false-positives.
+    URLSearchParams: 'readonly',
+    atob: 'readonly',
+    btoa: 'readonly',
+    // TS ambient namespace (NodeJS.Timeout in timer refs) — type-only, from @types/node.
+    NodeJS: 'readonly',
+  },
   ignorePatterns: [
     'node_modules/',
     '.expo/',
@@ -16,6 +25,11 @@ module.exports = {
     'backend/',
   ],
   rules: {
+    // Catches bare/undefined identifiers (e.g. `alignItems: center`, using an
+    // un-imported symbol). Hermes only throws these at RUNTIME, and tsc isn't
+    // gating CI yet (156-error backlog) — this rule is the safety net that would
+    // have caught all 3 crashes shipped to production in June 2026.
+    'no-undef': 'error',
     // React 17+/RN automatic JSX runtime — importing React into scope isn't required.
     'react/react-in-jsx-scope': 'off',
     // Don't lint formatting through ESLint (matches the original intent of extending
@@ -36,6 +50,10 @@ module.exports = {
         '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
         '@typescript-eslint/no-explicit-any': 'warn',
         '@typescript-eslint/no-require-imports': 'off',
+        // typescript-eslint's base config turns no-undef OFF for TS files (it
+        // assumes tsc gates instead — which it doesn't here yet). Re-enable; see
+        // the top-level rules comment.
+        'no-undef': 'error',
       },
     },
   ],

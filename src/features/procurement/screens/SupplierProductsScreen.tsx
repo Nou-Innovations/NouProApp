@@ -3,11 +3,12 @@
  *
  * Shows the list of products linked to a specific supplier.
  * Displays product name, supplier price, min order qty, and bulk pricing.
- * "+" action in the header opens a placeholder alert for adding products.
+ * "+" action in the header opens a bottom sheet to link a catalog product
+ * to this supplier with supplier-specific pricing.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -15,8 +16,18 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { EmptyState } from '@/shared/components/ui';
+import {
+  EmptyState,
+  AppBottomSheet,
+  AppBottomSheetScrollView,
+  AppSearchBar,
+  AppTextField,
+  AppButton,
+} from '@/shared/components/ui';
+import { Icon } from '@/shared/utils/icons';
 import type { SupplierProduct } from '@/shared/types/procurement';
+import type { UIProduct } from '@/shared/types/product';
+import { getProducts } from '@/features/products/products.service';
 import * as procurementService from '../services/procurement.service';
 
 export default function SupplierProductsScreen() {
@@ -33,6 +44,20 @@ export default function SupplierProductsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Add-product sheet state ──
+  const [showAddSheet, setShowAddSheet] = useState(false);
+  const [catalog, setCatalog] = useState<UIProduct[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<UIProduct | null>(null);
+  const [supplierPrice, setSupplierPrice] = useState('');
+  const [minOrderQty, setMinOrderQty] = useState('');
+  const [bulkPrice, setBulkPrice] = useState('');
+  const [bulkMinQty, setBulkMinQty] = useState('');
+  const [supplierSKU, setSupplierSKU] = useState('');
+  const [leadTimeDays, setLeadTimeDays] = useState('');
+  const [saving, setSaving] = useState(false);
 
   // ── Fetch ──
   const fetchProducts = useCallback(async () => {
@@ -66,10 +91,94 @@ export default function SupplierProductsScreen() {
     }
   }, [businessId, supplierId]);
 
-  // ── Add product placeholder ──
-  const handleAddProduct = useCallback(() => {
-    AppAlert.alert('Add Product', 'Add supplier product functionality coming soon.');
+  // ── Add product ──
+  const resetAddForm = useCallback(() => {
+    setSelectedProduct(null);
+    setSearch('');
+    setSupplierPrice('');
+    setMinOrderQty('');
+    setBulkPrice('');
+    setBulkMinQty('');
+    setSupplierSKU('');
+    setLeadTimeDays('');
   }, []);
+
+  const handleAddProduct = useCallback(async () => {
+    if (!businessId) return;
+    resetAddForm();
+    setShowAddSheet(true);
+    setCatalogLoading(true);
+    try {
+      const data = await getProducts({ companyId: businessId });
+      setCatalog(data);
+    } catch (e: any) {
+      AppAlert.alert('Error', e?.message || 'Failed to load products.');
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, [businessId, resetAddForm]);
+
+  const handleCloseAddSheet = useCallback(() => {
+    setShowAddSheet(false);
+    resetAddForm();
+  }, [resetAddForm]);
+
+  // Products not already linked to this supplier, filtered by the search box.
+  const availableProducts = useMemo(() => {
+    const linkedIds = new Set(products.map((p) => p.productId));
+    const q = search.trim().toLowerCase();
+    return catalog.filter(
+      (p) => !linkedIds.has(p.id) && (!q || p.name.toLowerCase().includes(q))
+    );
+  }, [catalog, products, search]);
+
+  const handleSaveSupplierProduct = useCallback(async () => {
+    if (!businessId || !supplierId) return;
+    if (!selectedProduct) {
+      AppAlert.alert('Select a product', 'Please choose a product to add.');
+      return;
+    }
+    const price = parseFloat(supplierPrice);
+    if (!supplierPrice.trim() || isNaN(price) || price < 0) {
+      AppAlert.alert('Invalid price', 'Please enter a valid supplier price.');
+      return;
+    }
+    const toNum = (s: string) => {
+      const n = parseFloat(s);
+      return s.trim() && !isNaN(n) ? n : undefined;
+    };
+    setSaving(true);
+    try {
+      await procurementService.addSupplierProduct(businessId, supplierId, {
+        productId: selectedProduct.id,
+        supplierPrice: price,
+        minOrderQty: toNum(minOrderQty),
+        bulkPrice: toNum(bulkPrice),
+        bulkMinQty: toNum(bulkMinQty),
+        supplierSKU: supplierSKU.trim() || undefined,
+        leadTimeDays: toNum(leadTimeDays),
+      });
+      handleCloseAddSheet();
+      await fetchProducts();
+      AppAlert.alert('Added', 'Product linked to this supplier.');
+    } catch (e: any) {
+      AppAlert.alert('Error', e?.message || 'Failed to add supplier product.');
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    businessId,
+    supplierId,
+    selectedProduct,
+    supplierPrice,
+    minOrderQty,
+    bulkPrice,
+    bulkMinQty,
+    supplierSKU,
+    leadTimeDays,
+    handleCloseAddSheet,
+    fetchProducts,
+  ]);
 
   // ── Render product card ──
   const renderItem = useCallback(
@@ -176,6 +285,127 @@ export default function SupplierProductsScreen() {
           }
         />
       )}
+
+      {/* Add supplier product */}
+      <AppBottomSheet
+        visible={showAddSheet}
+        onClose={handleCloseAddSheet}
+        title="Add Supplier Product"
+        fullHeight
+      >
+        <AppBottomSheetScrollView
+          contentContainerStyle={styles.sheetContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {!selectedProduct ? (
+            <>
+              <AppSearchBar
+                placeholder="Search products"
+                value={search}
+                onChangeText={setSearch}
+                containerStyle={styles.searchBar}
+              />
+              {catalogLoading ? (
+                <View style={styles.sheetCenter}>
+                  <ActivityIndicator color={appTheme.colors.primary} />
+                </View>
+              ) : availableProducts.length === 0 ? (
+                <Text style={[styles.sheetEmpty, { color: appTheme.colors.textSecondary }]}>
+                  {catalog.length === 0
+                    ? 'No products in your catalog yet.'
+                    : 'All catalog products are already linked to this supplier.'}
+                </Text>
+              ) : (
+                availableProducts.map((p) => (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[styles.pickRow, { borderColor: appTheme.colors.borderColor }]}
+                    onPress={() => setSelectedProduct(p)}
+                  >
+                    <Text style={[styles.pickName, { color: appTheme.colors.text }]} numberOfLines={1}>
+                      {p.name}
+                    </Text>
+                    <Icon name="chevron-forward" size={18} color={appTheme.colors.textSecondary} />
+                  </TouchableOpacity>
+                ))
+              )}
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={[styles.selectedRow, { borderColor: appTheme.colors.borderColor }]}
+                onPress={() => setSelectedProduct(null)}
+              >
+                <View style={styles.selectedInfo}>
+                  <Text style={[styles.selectedLabel, { color: appTheme.colors.textSecondary }]}>Product</Text>
+                  <Text style={[styles.pickName, { color: appTheme.colors.text }]} numberOfLines={1}>
+                    {selectedProduct.name}
+                  </Text>
+                </View>
+                <Text style={[styles.changeLink, { color: appTheme.colors.primary }]}>Change</Text>
+              </TouchableOpacity>
+
+              <AppTextField
+                label="Supplier Price"
+                value={supplierPrice}
+                onChangeText={setSupplierPrice}
+                placeholder="0.00"
+                keyboardType="numeric"
+                required
+                containerStyle={styles.field}
+              />
+              <AppTextField
+                label="Min Order Qty (optional)"
+                value={minOrderQty}
+                onChangeText={setMinOrderQty}
+                placeholder="e.g. 10"
+                keyboardType="numeric"
+                containerStyle={styles.field}
+              />
+              <AppTextField
+                label="Bulk Price (optional)"
+                value={bulkPrice}
+                onChangeText={setBulkPrice}
+                placeholder="0.00"
+                keyboardType="numeric"
+                containerStyle={styles.field}
+              />
+              <AppTextField
+                label="Bulk Min Qty (optional)"
+                value={bulkMinQty}
+                onChangeText={setBulkMinQty}
+                placeholder="e.g. 100"
+                keyboardType="numeric"
+                containerStyle={styles.field}
+              />
+              <AppTextField
+                label="Supplier SKU (optional)"
+                value={supplierSKU}
+                onChangeText={setSupplierSKU}
+                placeholder="Supplier's product code"
+                containerStyle={styles.field}
+              />
+              <AppTextField
+                label="Lead Time in Days (optional)"
+                value={leadTimeDays}
+                onChangeText={setLeadTimeDays}
+                placeholder="e.g. 7"
+                keyboardType="numeric"
+                containerStyle={styles.field}
+              />
+
+              <AppButton
+                title="Add Product"
+                onPress={handleSaveSupplierProduct}
+                loading={saving}
+                disabled={saving}
+                style={styles.saveBtn}
+              />
+            </>
+          )}
+        </AppBottomSheetScrollView>
+      </AppBottomSheet>
     </SafeAreaView>
   );
 }
@@ -207,4 +437,32 @@ const styles = StyleSheet.create({
   },
   detailLabel: { fontSize: 12, fontWeight: '500', textTransform: 'uppercase', marginBottom: 2 },
   detailValue: { fontSize: 15, fontWeight: '600' },
+
+  // Add-product sheet
+  sheetContent: { paddingHorizontal: 16, paddingBottom: 32 },
+  sheetCenter: { paddingVertical: 32, alignItems: 'center' },
+  sheetEmpty: { fontSize: 14, textAlign: 'center', paddingVertical: 24 },
+  searchBar: { marginBottom: 12 },
+  pickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  pickName: { fontSize: 15, fontWeight: '600', flex: 1, marginRight: 8 },
+  selectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+  },
+  selectedInfo: { flex: 1, marginRight: 8 },
+  selectedLabel: { fontSize: 12, fontWeight: '500', textTransform: 'uppercase', marginBottom: 2 },
+  changeLink: { fontSize: 14, fontWeight: '600' },
+  field: { marginBottom: 14 },
+  saveBtn: { marginTop: 8 },
 });

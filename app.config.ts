@@ -31,10 +31,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     assetBundlePatterns: ['**/*'],
     ios: {
-      supportsTablet: true,
+      supportsTablet: false,
       bundleIdentifier: 'com.noupro.app',
-      buildNumber: '1',
+      buildNumber: '2',
       infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: false,
           NSExceptionDomains: {
@@ -52,7 +53,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         backgroundColor: '#000000',
       },
       package: 'com.noupro.app',
-      versionCode: 1,
+      versionCode: 2,
       permissions: [
         'android.permission.ACCESS_COARSE_LOCATION',
         'android.permission.ACCESS_FINE_LOCATION',
@@ -69,19 +70,44 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         'expo-location',
         {
-          locationAlwaysAndWhenInUsePermission: 'Allow NouPro to use your location.',
+          locationWhenInUsePermission:
+            'NouPro uses your location to show nearby businesses, set your business address, and track deliveries you manage.',
+          locationAlwaysAndWhenInUsePermission:
+            'NouPro uses your location to show nearby businesses, set your business address, and track deliveries you manage.',
         },
       ],
       [
         'expo-image-picker',
         {
-          photosPermission: 'Allow NouPro to access your photos.',
+          photosPermission:
+            'NouPro accesses your photo library so you can add product images, business logos, and share photos in chat.',
+          cameraPermission:
+            'NouPro uses the camera to photograph products for your catalog and to share photos in chat.',
         },
       ],
       [
         'expo-camera',
         {
-          cameraPermission: 'Allow NouPro to access your camera.',
+          cameraPermission:
+            'NouPro uses the camera to photograph products for your catalog and to share photos in chat.',
+          microphonePermission:
+            'NouPro uses the microphone when you record videos to share with your business contacts.',
+        },
+      ],
+      [
+        'expo-media-library',
+        {
+          photosPermission:
+            'NouPro accesses your photo library so you can add product images, business logos, and share photos in chat.',
+          savePhotosPermission:
+            'NouPro saves images you choose to download, such as shared photos and invoices, to your photo library.',
+        },
+      ],
+      [
+        'expo-contacts',
+        {
+          contactsPermission:
+            'NouPro accesses your contacts only when you choose to share a contact card in a chat.',
         },
       ],
       [

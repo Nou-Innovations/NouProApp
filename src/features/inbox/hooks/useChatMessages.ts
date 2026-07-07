@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { useInboxStore } from '../inbox.store';
 import { chatService } from '@/shared/services/chat';
@@ -37,7 +38,7 @@ export interface UseChatMessagesResult {
   removeMessage: (messageId: string) => void;
   updateMessage: (messageId: string, updates: Partial<Message>) => void;
   /** Direct setter for complex message state transitions (optimistic updates, etc.) */
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  setMessages: Dispatch<SetStateAction<Message[]>>;
 }
 
 export function useChatMessages(chatId: string): UseChatMessagesResult {

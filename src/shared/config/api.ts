@@ -22,7 +22,11 @@ import { API_BASE_URL } from '@/config/env';
 
 export const API_CONFIG = {
   baseUrl: API_BASE_URL,
-  timeout: 30000, // 30 seconds
+  // 60s: the backend runs on Render's free tier, which sleeps after ~15min idle.
+  // The first request after sleep triggers a cold start that can take 30-60s to
+  // wake the server; a 30s timeout fired before it answered (looked like a
+  // "network error" on the first login, then worked on retry).
+  timeout: 60000,
   retryAttempts: 3,
 };
 

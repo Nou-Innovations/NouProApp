@@ -15,5 +15,4 @@ export { BusinessHealthCard } from './BusinessHealthCard';
 export { KpiGrid, type KpiCardData, type KpiDeltaTone } from './KpiCard';
 export { BusinessOverviewSection } from './BusinessOverviewSection';
 export { RevenueBars } from './RevenueBars';
-export { LocationSelectorPill } from './LocationSelectorPill';
 
