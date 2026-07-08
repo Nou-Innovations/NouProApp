@@ -353,7 +353,7 @@ export function MessageBubble({
   };
   
   const renderReplyContext = () => {
-    if (message.type !== 'text' || !message.replyingTo) return null;
+    if (!message.replyingTo) return null;
     
     const senderColor = isOutgoing ? appTheme.colors.textInverse : appTheme.colors.text;
     const snippetColor = isOutgoing ? appTheme.colors.textInverse : appTheme.colors.textSecondary;
@@ -474,6 +474,7 @@ export function MessageBubble({
               </Text>
             )}
             {renderForwardedLabel()}
+            {renderReplyContext()}
             <View style={[innerCardStyle, cardStyle]}>
               {children}
             </View>
@@ -649,6 +650,7 @@ export function MessageBubble({
               </Text>
             )}
             {renderForwardedLabel()}
+            {renderReplyContext()}
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={() => onImagePress?.(imageUrl, sender.name, message.timestamp, message.id)}
@@ -722,6 +724,7 @@ export function MessageBubble({
                   </Text>
                 )}
                 {renderForwardedLabel()}
+                {renderReplyContext()}
                 <VoicePlayer
                   audioUrl={voiceMsg.audioUrl}
                   durationSeconds={voiceMsg.durationSeconds}

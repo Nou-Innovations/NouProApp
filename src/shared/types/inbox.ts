@@ -86,6 +86,8 @@ interface BaseMessage {
   timestamp: string;
   status?: MessageStatus;
   forwardedFrom?: { chatId: string; senderName: string };
+  // Any message type can be a reply — the quote header renders for all of them.
+  replyingTo?: ReplyContext;
 }
 
 export interface TextMessage extends BaseMessage {

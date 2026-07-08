@@ -204,9 +204,10 @@ the caller, so they need no guard.
 > with `lastMessage` (inbox preview updates); ✅ **C6** typing requires room membership
 > (`socket.rooms.has`); ✅ **D5b** "Copy link" writes the clipboard (`expo-clipboard`); ✅ **D5c** the
 > leaked debug/stub alerts are gone (invoice action → OrderDetails, unknown action → dev-log); ✅ **D5d**
-> `chat_read` updates only changed rows via `store.updateMessage`. **Deferred: D5a** (reply-quote header
-> for media messages — needs wiring into every media renderer). Only the **data-model migration
-> (E1/E2, Phase 5)** remains.
+> `chat_read` updates only changed rows via `store.updateMessage`; ✅ **D5a** the reply/quote header now
+> renders on media messages too (`renderReplyContext` un-gated + wired into image/voice + the shared
+> attachment-bubble helper; `replyingTo` hoisted onto `BaseMessage`). **All Theme C/D P2 items done.**
+> The only remaining audit item is the **data-model migration (E1/E2, Phase 5)**.
 
 ### C1 · [P1] The 24-hour edit window is never enforced (verified)
 Edit route `server.js:10095`: `messageAge = Date.now() - new Date(message.createdAt).getTime()`. The
