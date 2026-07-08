@@ -10975,7 +10975,7 @@ app.post('/api/companies/:companyId/chats/:chatId/leave', requireAuth, requireCo
       type: 'event',
       content: `${userName} left the group`,
       event: `${userName} left the group`,
-      sender: { id: 'system', name: 'System', avatar: '', role: 'system' },
+      sender: { id: null, name: 'System', avatar: '', role: 'system' },
       status: 'sent',
       isOutgoing: false,
     };
@@ -11035,7 +11035,7 @@ app.post('/api/companies/:companyId/chats/:chatId/remove-participant', requireAu
       type: 'event',
       content: `${requesterName} removed ${targetName} from the group`,
       event: `${requesterName} removed ${targetName} from the group`,
-      sender: { id: 'system', name: 'System', avatar: '', role: 'system' },
+      sender: { id: null, name: 'System', avatar: '', role: 'system' },
       status: 'sent',
       isOutgoing: false,
     };
@@ -11673,7 +11673,7 @@ app.post('/api/users/:userId/chats/:chatId/leave', requireAuth, async (req, res)
       type: 'event',
       content: `${userName} left the group`,
       event: `${userName} left the group`,
-      sender: { id: 'system', name: 'System', avatar: '', role: 'system' },
+      sender: { id: null, name: 'System', avatar: '', role: 'system' },
       status: 'sent',
       isOutgoing: false,
     };
@@ -11729,7 +11729,7 @@ app.post('/api/users/:userId/chats/:chatId/remove-participant', requireAuth, asy
       type: 'event',
       content: `${requester?.name || 'Someone'} removed ${target?.name || 'a member'} from the group`,
       event: `${requester?.name || 'Someone'} removed ${target?.name || 'a member'} from the group`,
-      sender: { id: 'system', name: 'System', avatar: '', role: 'system' },
+      sender: { id: null, name: 'System', avatar: '', role: 'system' },
       status: 'sent',
       isOutgoing: false,
     };

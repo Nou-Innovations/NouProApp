@@ -285,7 +285,7 @@ async function emitLowStockAlerts(repos, order) {
           businessId: order.businessId,
           type: 'stock_alert',
           entityId: productId,
-          actorId: 'system',
+          actorId: null,
           actorName: 'System',
           metadata: { productName: product?.name, currentStock: available, locationId },
         });

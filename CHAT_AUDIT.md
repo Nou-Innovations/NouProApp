@@ -296,6 +296,14 @@ on the backend.
 
 ## Theme E — Data model / integrity
 
+> **STATUS — Phase 5 DONE (2026-07-08): E1 + E2 shipped.** ✅ **E1** `Message.senderId` → `User` (SET
+> NULL, keeps history), `ChatParticipant.userId` / `ReadReceipt.userId` → `User` (Cascade), plus User
+> back-relations — via migration `20260708190000_chat_user_integrity`, which nulls `'system'`/orphan
+> senders + deletes orphaned participant/receipt rows *before* each FK, so it can't fail on data. System
+> messages now write `senderId: null` (the "System" name is kept). ✅ **E2** the dead
+> `ReadReceipt @@index([messageId])` is dropped. **This was the last open audit item — the entire
+> CHAT_AUDIT.md is now addressed (every P0/P1/P2); voice recording left as-is per owner.**
+
 ### E1 · [P1] No referential integrity from chat rows to `User`
 `Message.senderId`, `ChatParticipant.userId`, `ReadReceipt.userId` are bare `String` with **no FK**
 to `User` (`schema.prisma:503-548`); `User` has zero chat back-relations. Deleting a user **orphans**

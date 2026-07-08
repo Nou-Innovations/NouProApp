@@ -48,6 +48,9 @@ model User {
   businessFollows      BusinessFollow[]
   suggestions          Suggestion[]     @relation("SuggestionAuthor")
   suggestionVotes      SuggestionVote[] @relation("SuggestionVoter")
+  chatMessages         Message[]
+  chatParticipants     ChatParticipant[]
+  readReceipts         ReadReceipt[]
 }
 
 model Business {
@@ -563,6 +566,7 @@ model Message {
   isRead       Boolean       @default(false)
   isOutgoing   Boolean       @default(false)
   chat         Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender       User?         @relation(fields: [senderId], references: [id], onDelete: SetNull)
   readReceipts ReadReceipt[]
 
   @@index([chatId])
@@ -577,6 +581,7 @@ model ChatParticipant {
   joinedAt    DateTime @default(now())
   unreadCount Int      @default(0)
   chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([chatId, userId])
   @@index([userId])
@@ -591,11 +596,11 @@ model ReadReceipt {
   readAt    DateTime @default(now())
   chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
   message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([chatId, userId])
   @@index([chatId])
   @@index([userId])
-  @@index([messageId])
 }
 
 model BusinessMember {
