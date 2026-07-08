@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { View, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -20,6 +20,7 @@ import { AppButton } from '@/shared/components/ui';
 import { formatCurrency } from '@/shared/utils/format';
 import { useCart, useOrderStore } from '@/shared/store/orderStore';
 import { useProfileStore } from '@/shared/store/profileStore';
+import { validateDiscountCode, Discount } from '@/features/discounts';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PlaceOrder'>;
 
@@ -38,8 +39,26 @@ export default function PlaceOrderScreen({ route }: Props) {
 
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState<Discount | null>(null);
+  const [applyingCode, setApplyingCode] = useState(false);
 
   const total = cart?.total ?? 0;
+
+  // Validate a coupon against the seller (businessId = the supplier). The final
+  // discounted total is computed server-side when the order is placed.
+  const handleApplyCode = async () => {
+    const code = promoCode.trim();
+    if (!code) return;
+    setApplyingCode(true);
+    try {
+      setAppliedDiscount(await validateDiscountCode(businessId, code));
+    } catch (e: any) {
+      AppAlert.alert('Invalid code', e?.message || 'That code isn’t valid right now.');
+    } finally {
+      setApplyingCode(false);
+    }
+  };
 
   const handleConfirm = async () => {
     if (activeMode !== 'business' || !activeBusiness?.id) {
@@ -62,7 +81,8 @@ export default function PlaceOrderScreen({ route }: Props) {
         businessId,
         businessName,
         notes.trim() || undefined,
-        currentUser?.id
+        currentUser?.id,
+        appliedDiscount?.code || undefined
       );
 
       if (order) {
@@ -131,6 +151,36 @@ export default function PlaceOrderScreen({ route }: Props) {
           </View>
         </View>
 
+        {/* Promo code */}
+        <Text style={[styles.sectionLabel, { color: appTheme.colors.textLight, marginTop: 20 }]}>
+          Promo code (optional)
+        </Text>
+        {appliedDiscount ? (
+          <View style={[styles.promoApplied, { borderColor: appTheme.colors.primary, backgroundColor: appTheme.colors.cardBackground }]}>
+            <Text style={{ color: appTheme.colors.text, flex: 1 }}>
+              {appliedDiscount.code} applied — {appliedDiscount.type === 'PERCENTAGE' ? `${appliedDiscount.value}% off` : `${formatCurrency(appliedDiscount.value)} off`}
+            </Text>
+            <TouchableOpacity onPress={() => { setAppliedDiscount(null); setPromoCode(''); }}>
+              <Text style={{ color: appTheme.colors.error, fontWeight: '600' }}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.promoRow}>
+            <TextInput
+              style={[styles.promoInput, { color: appTheme.colors.text, borderColor: appTheme.colors.borderColor, backgroundColor: appTheme.colors.inputBackground }]}
+              value={promoCode}
+              onChangeText={setPromoCode}
+              placeholder="Enter a code"
+              placeholderTextColor={appTheme.colors.textLight}
+              autoCapitalize="characters"
+            />
+            <AppButton title="Apply" variant="secondary" onPress={handleApplyCode} loading={applyingCode} disabled={!promoCode.trim() || applyingCode} />
+          </View>
+        )}
+        <Text style={[styles.promoHint, { color: appTheme.colors.textLight }]}>
+          Any discounts are applied to your total when the order is placed.
+        </Text>
+
         {/* Notes */}
         <Text style={[styles.sectionLabel, { color: appTheme.colors.textLight, marginTop: 20 }]}>
           Notes (optional)
@@ -181,6 +231,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 6,
   },
+  promoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  promoInput: { flex: 1, height: 44, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, fontSize: 15 },
+  promoApplied: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, gap: 12 },
+  promoHint: { fontSize: 12, marginTop: 8 },
   supplierName: { fontSize: 18, fontFamily: theme.fonts.primary.bold },
   card: { borderRadius: 12, padding: theme.spacing.md },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },

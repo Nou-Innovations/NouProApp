@@ -98,6 +98,8 @@ import AssignCustomersScreen from '@/features/pricing/screens/AssignCustomersScr
 import { CreateCollectionScreen } from '@/features/collections';
 // Screens - Customers
 import { CustomerDetailScreen, AddCustomerScreen } from '@/features/customers';
+// Screens - Discounts
+import { CreateDiscountScreen } from '@/features/discounts';
 // Screens - Brands
 import CreateBrandScreen from '@/features/brands/screens/CreateBrandScreen';
 import BrandSelectionScreen from '@/features/brands/screens/BrandSelectionScreen';
@@ -489,6 +491,7 @@ function AppNavigator() {
         <RootStack.Screen name="CreateCollection" component={CreateCollectionScreen} />
         <RootStack.Screen name="CustomerDetail" component={CustomerDetailScreen} />
         <RootStack.Screen name="AddCustomer" component={AddCustomerScreen} />
+        <RootStack.Screen name="CreateDiscount" component={CreateDiscountScreen} />
         <RootStack.Screen name="CreateProduct" component={CreateProductScreen} />
         <RootStack.Screen name="ProductDetail" component={ProductDetailScreen} />
         <RootStack.Screen name="ProductDetailShowcase" component={ProductDetailShowcaseScreen} />

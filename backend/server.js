@@ -4963,10 +4963,11 @@ app.get('/api/companies/:companyId/discounts', requireAuth, async (req, res) => 
 });
 
 // Validate a coupon code (checkout preview). Body: { code }. Declared before /:id.
+// Any authenticated business can validate a seller's code (the code is the secret) —
+// this is buyer-facing, so it does NOT require membership of the seller company.
 app.post('/api/companies/:companyId/discounts/validate', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
-    if (!(await requireBusinessMembership(req, res, companyId))) return;
     const code = (req.body.code || '').trim().toUpperCase();
     if (!code) return res.status(400).json(errorResponse('A code is required'));
     const discount = await repos.discountRepo.findByCode(companyId, code);

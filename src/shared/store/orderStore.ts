@@ -69,7 +69,8 @@ interface OrderActions {
     toBusinessId: string,
     toBusinessName: string,
     notes?: string,
-    createdBy?: string
+    createdBy?: string,
+    discountCode?: string
   ) => Promise<Order | null>;
   
   // Order fetching from API
@@ -316,7 +317,8 @@ export const useOrderStore = create<OrderStore>()(
         toBusinessId,
         toBusinessName,
         notes,
-        createdBy = 'current-user'
+        createdBy = 'current-user',
+        discountCode
       ) => {
         const cart = get().carts[toBusinessId];
         if (!cart || cart.items.length === 0) return null;
@@ -358,6 +360,7 @@ export const useOrderStore = create<OrderStore>()(
             items: orderItems,
             totalAmount: calculatedTotal,
             notes,
+            discountCode: discountCode || undefined,
           };
 
           // Call the backend API - toBusinessId is the seller

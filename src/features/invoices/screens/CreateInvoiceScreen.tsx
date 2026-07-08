@@ -18,6 +18,7 @@ import invoicesService from '../invoices.service';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { searchContacts, ContactSearchResult } from '@/features/inbox/inbox.service';
 import { getCustomers } from '@/features/customers';
+import { getDiscounts, Discount as SellerDiscount } from '@/features/discounts';
 import { getProducts } from '@/features/products/products.service';
 import type { UIProduct } from '@/shared/types/product';
 
@@ -100,6 +101,31 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
   const [subtotal, setSubtotal] = useState(0);
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [globalDiscountType, setGlobalDiscountType] = useState<'percentage' | 'fixed'>('percentage');
+  const [sellerDiscounts, setSellerDiscounts] = useState<SellerDiscount[]>([]);
+
+  // Load the seller's active promotions so they can be applied to this invoice.
+  useEffect(() => {
+    const cid = activeBusiness?.id;
+    if (!cid) return;
+    getDiscounts(cid).then((ds) => setSellerDiscounts(ds.filter((d) => d.isActive))).catch(() => { /* optional */ });
+  }, [activeBusiness?.id]);
+
+  const openPromotionPicker = () => {
+    AppAlert.actionSheet({
+      title: 'Apply a promotion',
+      message: 'Fills the discount below from one of your active promotions.',
+      options: [
+        ...sellerDiscounts.map((d) => ({
+          label: `${d.name} — ${d.type === 'PERCENTAGE' ? `${d.value}%` : formatInvoiceCurrency(d.value)}`,
+          onPress: () => {
+            setGlobalDiscountType(d.type === 'PERCENTAGE' ? 'percentage' : 'fixed');
+            setGlobalDiscount(d.value);
+          },
+        })),
+        { label: 'Cancel', cancel: true },
+      ],
+    });
+  };
   const [totalTax, setTotalTax] = useState(0);
   const [shipping, setShipping] = useState(0);
   const [total, setTotal] = useState(0);
@@ -729,14 +755,20 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
                 placeholder="0"
                 containerStyle={{ flex: 1, marginBottom: 16 }}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.discountTypeButton, { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.borderColor }]}
                 onPress={() => setGlobalDiscountType(globalDiscountType === 'percentage' ? 'fixed' : 'percentage')}
               >
                 <Text style={{ color: appTheme.colors.text }}>{globalDiscountType === 'percentage' ? '%' : getCurrencySymbol()}</Text>
               </TouchableOpacity>
             </View>
-            
+
+            {sellerDiscounts.length > 0 && (
+              <TouchableOpacity onPress={openPromotionPicker} style={{ marginBottom: 12 }}>
+                <Text style={{ color: appTheme.colors.primary, fontWeight: '600' }}>Apply a promotion…</Text>
+              </TouchableOpacity>
+            )}
+
             <AppTextField
               label="Tax"
               value={totalTax.toString()}

@@ -230,7 +230,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
   const TAB_ROUTES = new Set([
     'LogisticsOverview', 'Deliveries', 'Transfers', 'Orders', 'MyDeliveries', 'Routes',
     'Issues', 'Returns', 'DeliveriesAnalytics', 'Products', 'Categories', 'Brands', 'Collections', 'Stock',
-    'ProductVisibility', 'PriceLists', 'Invoices', 'TeamManagement', 'Locations', 'Customers', 'CompanySettings', 'SubscriptionHub',
+    'ProductVisibility', 'PriceLists', 'Discounts', 'Invoices', 'TeamManagement', 'Locations', 'Customers', 'CompanySettings', 'SubscriptionHub',
     'BottomSheetGallery', 'MessageGallery', 'ButtonGallery', 'ProductGallery',
   ]);
 
@@ -428,9 +428,9 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
             { label: 'Stock', icon: 'archive-outline', route: 'Stock', onPress: () => go('Stock') },
             { label: 'Price lists', icon: 'cash-outline', route: 'PriceLists', onPress: () => go('PriceLists') },
             { label: 'Visibility', icon: 'eye-outline', route: 'ProductVisibility', onPress: () => go('ProductVisibility') },
+            { label: 'Discounts', icon: 'pricetag-outline', route: 'Discounts', onPress: () => go('Discounts') },
             // COMING-SOON (hidden for v1 store submission — restore when built):
             // { label: 'Recipes', icon: 'restaurant-outline', onPress: () => comingSoon('Recipes') },
-            // { label: 'Discounts', icon: 'pricetag-outline', onPress: () => comingSoon('Discounts') },
           ],
         },
         {

@@ -238,6 +238,8 @@ export interface CreateOrderPayload {
   }[];
   totalAmount?: number;
   notes?: string;
+  /** Coupon code entered at checkout; the backend validates + applies it authoritatively. */
+  discountCode?: string;
 }
 
 /**
