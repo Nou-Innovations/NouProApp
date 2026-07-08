@@ -1051,7 +1051,7 @@ export default function ChatScreen() {
         // Update local message state to reflect the delivery confirmation
         setMessages(prev => prev.map(msg => {
           if (msg.type === 'order_event' && msg.payload?.orderId === orderId) {
-            return { ...msg, payload: { ...msg.payload, status: 'Delivered' } } as OrderEventMessage;
+            return { ...msg, payload: { ...msg.payload, status: 'DONE' } } as OrderEventMessage;
           }
           if (msg.type === 'order' && (msg as OrderMessage).orderId === orderId) {
             return { ...msg, orderStatus: 'DONE' } as OrderMessage;
