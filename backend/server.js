@@ -4729,8 +4729,10 @@ async function linkInvoiceCustomer(invoice) {
 }
 
 // List customers for a company (optional ?search= & ?status=)
+// Customer records hold client PII, so require membership (not just auth).
 app.get('/api/companies/:companyId/customers', requireAuth, async (req, res) => {
   try {
+    if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
     const { search, status } = req.query;
     const customers = await repos.customerRepo.getByBusinessId(req.params.companyId, { search, status });
     res.json(successResponse(customers));
@@ -4744,6 +4746,7 @@ app.get('/api/companies/:companyId/customers', requireAuth, async (req, res) => 
 app.get('/api/companies/:companyId/customers/:customerId', requireAuth, async (req, res) => {
   try {
     const { companyId, customerId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
     const customer = await repos.customerRepo.getById(customerId);
     if (!customer || customer.businessId !== companyId) {
       return res.status(404).json(errorResponse('Customer not found'));
