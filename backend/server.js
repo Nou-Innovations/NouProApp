@@ -13872,6 +13872,277 @@ app.get('/api/companies/:companyId/dashboard/overview', requireAuth, async (req,
   }
 });
 
+// ============================================================================
+// ANALYTICS + VARIANCE (Business+ only) — dedicated deep-dive screens.
+// Reuse the /dashboard/overview aggregation pattern; read-only, no money paths.
+// ============================================================================
+
+// Shared gate: Business+ only. Returns { tier } or sends 403 and returns null.
+async function analyticsGate(companyId, userId, res) {
+  if (!userId || !(await isBusinessMember(companyId, userId))) {
+    res.status(403).json(errorResponse('ACCESS_DENIED', 'You do not have access to this business'));
+    return null;
+  }
+  const business = await prisma.business.findUnique({ where: { id: companyId }, select: { subscriptionTier: true } });
+  const tier = business?.subscriptionTier || 'FREE';
+  if (tier !== 'BUSINESS' && tier !== 'ENTERPRISE') {
+    res.status(403).json(errorResponse('UPGRADE_REQUIRED', 'Analytics is available on the Business plan and above'));
+    return null;
+  }
+  return { tier };
+}
+
+const ANALYTICS_EXCLUDED_STATUSES = ['CANCELED', 'REJECTED'];
+const analyticsDayKey = (d) => {
+  const x = new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+};
+
+// Normalize an order's items JSON into { productId, qty, revenue, name } lines.
+function normalizeOrderItems(items) {
+  let arr = items;
+  if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch { arr = []; } }
+  if (!Array.isArray(arr)) return [];
+  return arr.map((it) => {
+    const qty = Number(it.quantity) || 0;
+    const revenue = it.subtotal != null ? Number(it.subtotal)
+      : (Number(it.unitPrice ?? it.unit_price ?? it.price) || 0) * qty;
+    return {
+      productId: it.productId || it.product_id || null,
+      qty,
+      revenue: Number.isFinite(revenue) ? revenue : 0,
+      name: it.productName || it.product_name || it.description || 'Item',
+    };
+  });
+}
+
+const monthKeyNow = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+};
+const resolvePeriod = (v) => (typeof v === 'string' && /^\d{4}-\d{2}$/.test(v) ? v : monthKeyNow());
+
+// GET /api/companies/:companyId/analytics?range=7d|30d&locationId=
+app.get('/api/companies/:companyId/analytics', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const gate = await analyticsGate(companyId, req.user?.id, res);
+    if (!gate) return;
+    const range = (req.query.range === '30d' && gate.tier === 'ENTERPRISE') ? '30d' : '7d';
+    const days = range === '30d' ? 30 : 7;
+    const { locationId } = req.query;
+
+    const now = new Date();
+    const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart); tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    const rangeStart = new Date(todayStart); rangeStart.setDate(rangeStart.getDate() - (days - 1));
+    const orderLoc = locationId ? { soldByLocationId: locationId } : {};
+    const invoiceLoc = locationId ? { issuedByLocationId: locationId } : {};
+
+    const [orders, ordersGrouped, invoiceRows] = await Promise.all([
+      prisma.order.findMany({
+        where: { businessId: companyId, createdAt: { gte: rangeStart, lt: tomorrowStart }, status: { notIn: ANALYTICS_EXCLUDED_STATUSES }, ...orderLoc },
+        select: { createdAt: true, totalAmount: true, items: true, customerId: true, customerName: true, buyerBusinessId: true, buyerBusinessName: true },
+      }),
+      prisma.order.groupBy({
+        by: ['status'], _count: { _all: true },
+        where: { businessId: companyId, createdAt: { gte: rangeStart, lt: tomorrowStart }, ...orderLoc },
+      }),
+      prisma.invoice.findMany({
+        where: { businessId: companyId, createdAt: { gte: rangeStart, lt: tomorrowStart }, ...invoiceLoc },
+        select: { totalAmount: true, paidAmount: true, status: true, dueDate: true },
+      }),
+    ]);
+
+    const buckets = {};
+    let revenueTotal = 0;
+    const prodMap = {}; const custMap = {};
+    for (const o of orders) {
+      const amt = o.totalAmount || 0;
+      const k = analyticsDayKey(o.createdAt);
+      buckets[k] = (buckets[k] || 0) + amt;
+      revenueTotal += amt;
+      for (const line of normalizeOrderItems(o.items)) {
+        const pkey = line.productId || line.name;
+        if (!prodMap[pkey]) prodMap[pkey] = { label: line.name, value: 0 };
+        prodMap[pkey].value += line.revenue;
+      }
+      const cKey = o.buyerBusinessId || o.customerId || o.buyerBusinessName || o.customerName || 'walk-in';
+      const cLabel = o.buyerBusinessName || o.customerName || 'Walk-in customer';
+      if (!custMap[cKey]) custMap[cKey] = { label: cLabel, value: 0 };
+      custMap[cKey].value += amt;
+    }
+    const revenueTrend = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date(rangeStart); d.setDate(d.getDate() + i);
+      const k = analyticsDayKey(d);
+      revenueTrend.push({ date: k, amount: Math.round((buckets[k] || 0) * 100) / 100 });
+    }
+    const orderCount = orders.length;
+    const avgOrderValue = orderCount ? Math.round((revenueTotal / orderCount) * 100) / 100 : 0;
+
+    const ordersByStatus = { New: 0, Active: 0, Pending: 0, Completed: 0, Canceled: 0 };
+    for (const g of ordersGrouped) {
+      const c = g._count?._all || 0;
+      switch (g.status) {
+        case 'NEW': ordersByStatus.New += c; break;
+        case 'ACCEPTED': case 'ONGOING': ordersByStatus.Active += c; break;
+        case 'PENDING': case 'IN_REVIEW': ordersByStatus.Pending += c; break;
+        case 'DONE': ordersByStatus.Completed += c; break;
+        case 'CANCELED': case 'REJECTED': ordersByStatus.Canceled += c; break;
+      }
+    }
+
+    let paid = 0, unpaid = 0, overdue = 0;
+    for (const inv of invoiceRows) {
+      const paidAmt = inv.paidAmount || 0;
+      paid += paidAmt;
+      const outstanding = Math.max(0, (inv.totalAmount || 0) - paidAmt);
+      if (['SENT', 'PARTIALLY_PAID', 'OVERDUE'].includes(inv.status)) unpaid += outstanding;
+      if (inv.status === 'OVERDUE' || (['SENT', 'PARTIALLY_PAID'].includes(inv.status) && inv.dueDate && new Date(inv.dueDate) < now)) overdue += outstanding;
+    }
+    const collectionRate = (paid + unpaid) > 0 ? Math.round((paid / (paid + unpaid)) * 100) : 0;
+
+    const r2 = (n) => Math.round(n * 100) / 100;
+    const topProducts = Object.values(prodMap).sort((a, b) => b.value - a.value).slice(0, 5).map((p) => ({ label: p.label, value: r2(p.value) }));
+    const topCustomers = Object.values(custMap).sort((a, b) => b.value - a.value).slice(0, 5).map((c) => ({ label: c.label, value: r2(c.value) }));
+
+    return res.json(successResponse({
+      range, revenueTrend, revenueTotal: r2(revenueTotal), orderCount, avgOrderValue, ordersByStatus,
+      invoiceCollection: { paid: r2(paid), unpaid: r2(unpaid), overdue: r2(overdue) },
+      collectionRate, topProducts, topCustomers,
+    }));
+  } catch (err) {
+    logger.error('Error fetching analytics:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch analytics'));
+  }
+});
+
+// GET /api/companies/:companyId/variance?period=YYYY-MM&locationId=
+app.get('/api/companies/:companyId/variance', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const gate = await analyticsGate(companyId, req.user?.id, res);
+    if (!gate) return;
+    const { locationId } = req.query;
+    const orderLoc = locationId ? { soldByLocationId: locationId } : {};
+
+    const period = resolvePeriod(req.query.period);
+    const [py, pm] = period.split('-').map(Number);
+    const monthStart = new Date(py, pm - 1, 1);
+    const nextMonthStart = new Date(py, pm, 1);
+    const prevMonthStart = new Date(py, pm - 2, 1);
+    const r2 = (n) => Math.round(n * 100) / 100;
+    const pctChange = (cur, prev) => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : (cur > 0 ? 100 : 0));
+
+    const sumOrders = async (gte, lt) => {
+      const agg = await prisma.order.aggregate({
+        _sum: { totalAmount: true }, _count: { _all: true },
+        where: { businessId: companyId, createdAt: { gte, lt }, status: { notIn: ANALYTICS_EXCLUDED_STATUSES }, ...orderLoc },
+      });
+      return { revenue: agg._sum.totalAmount || 0, orders: agg._count._all || 0 };
+    };
+    const sumCollected = async (gte, lt) => {
+      const agg = await prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { businessId: companyId, status: 'SUCCEEDED', createdAt: { gte, lt } },
+      });
+      return agg._sum.amount || 0;
+    };
+
+    const [current, previous, curCollected, prevCollected, target, monthOrders, products] = await Promise.all([
+      sumOrders(monthStart, nextMonthStart),
+      sumOrders(prevMonthStart, monthStart),
+      sumCollected(monthStart, nextMonthStart),
+      sumCollected(prevMonthStart, monthStart),
+      repos.targetRepo.getByPeriod(companyId, period),
+      prisma.order.findMany({
+        where: { businessId: companyId, createdAt: { gte: monthStart, lt: nextMonthStart }, status: { notIn: ANALYTICS_EXCLUDED_STATUSES }, ...orderLoc },
+        select: { items: true },
+      }),
+      prisma.product.findMany({ where: { businessId: companyId }, select: { id: true, price: true, costPrice: true } }),
+    ]);
+
+    const budget = {
+      period,
+      revenueTarget: target?.revenueTarget ?? null,
+      ordersTarget: target?.ordersTarget ?? null,
+      actualRevenue: r2(current.revenue),
+      actualOrders: current.orders,
+      revenuePct: target?.revenueTarget ? Math.round((current.revenue / target.revenueTarget) * 100) : null,
+      ordersPct: target?.ordersTarget ? Math.round((current.orders / target.ordersTarget) * 100) : null,
+    };
+
+    const periodOverPeriod = {
+      revenue: { current: r2(current.revenue), previous: r2(previous.revenue), changePct: pctChange(current.revenue, previous.revenue) },
+      orders: { current: current.orders, previous: previous.orders, changePct: pctChange(current.orders, previous.orders) },
+      collected: { current: r2(curCollected), previous: r2(prevCollected), changePct: pctChange(curCollected, prevCollected) },
+    };
+
+    const costMap = {};
+    for (const p of products) costMap[p.id] = { cost: p.costPrice, price: p.price };
+    let revenue = 0, cogs = 0, listMargin = 0, costedRevenue = 0;
+    for (const o of monthOrders) {
+      for (const line of normalizeOrderItems(o.items)) {
+        revenue += line.revenue;
+        const pc = line.productId ? costMap[line.productId] : null;
+        if (pc && pc.cost != null) {
+          cogs += pc.cost * line.qty;
+          costedRevenue += line.revenue;
+          if (pc.price != null) listMargin += (pc.price - pc.cost) * line.qty;
+        }
+      }
+    }
+    const grossMargin = costedRevenue - cogs;
+    const margin = {
+      revenue: r2(revenue),
+      costedRevenue: r2(costedRevenue),
+      cogs: r2(cogs),
+      grossMargin: r2(grossMargin),
+      marginPct: costedRevenue > 0 ? Math.round((grossMargin / costedRevenue) * 100) : null,
+      listMargin: r2(listMargin),
+      leakage: r2(listMargin - grossMargin),
+    };
+
+    return res.json(successResponse({ period, budget, periodOverPeriod, margin }));
+  } catch (err) {
+    logger.error('Error fetching variance:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch variance'));
+  }
+});
+
+// GET /api/companies/:companyId/targets?period=YYYY-MM
+app.get('/api/companies/:companyId/targets', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const gate = await analyticsGate(companyId, req.user?.id, res);
+    if (!gate) return;
+    const period = resolvePeriod(req.query.period);
+    const target = await repos.targetRepo.getByPeriod(companyId, period);
+    return res.json(successResponse(target || { period, revenueTarget: null, ordersTarget: null }));
+  } catch (err) {
+    logger.error('Error fetching targets:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to fetch targets'));
+  }
+});
+
+// PUT /api/companies/:companyId/targets  body: { period, revenueTarget, ordersTarget }
+app.put('/api/companies/:companyId/targets', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const gate = await analyticsGate(companyId, req.user?.id, res);
+    if (!gate) return;
+    const period = resolvePeriod(req.body.period);
+    const revenueTarget = req.body.revenueTarget != null && req.body.revenueTarget !== '' ? Number(req.body.revenueTarget) : null;
+    const ordersTarget = req.body.ordersTarget != null && req.body.ordersTarget !== '' ? Number(req.body.ordersTarget) : null;
+    const saved = await repos.targetRepo.upsert(companyId, period, { id: 'tgt-' + uuidv4().slice(0, 8), revenueTarget, ordersTarget });
+    return res.json(successResponse(saved));
+  } catch (err) {
+    logger.error('Error saving targets:', err);
+    return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to save targets'));
+  }
+});
+
 // Notifications API - Aggregates notifications from multiple sources
 // GET /api/users/:userId/notifications?filter=all|unread|requests&mode=business|personal
 app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {

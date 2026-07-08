@@ -59,6 +59,7 @@ function getRepos() {
     suggestionRepo: require('./prisma/suggestionRepo.prisma'),
     customerRepo: require('./prisma/customerRepo.prisma'),
     discountRepo: require('./prisma/discountRepo.prisma'),
+    targetRepo: require('./prisma/targetRepo.prisma'),
   };
 
   return cachedRepos;

@@ -54,6 +54,7 @@ import BrandsScreen from '@/features/brands/screens/BrandsScreen';
 import { CollectionsScreen } from '@/features/collections';
 import { CustomersScreen } from '@/features/customers';
 import { DiscountsScreen } from '@/features/discounts';
+import { BusinessAnalyticsScreen, VarianceScreen } from '@/features/analytics';
 import StockScreen from '@/features/products/screens/StockScreen';
 import ProductVisibilityScreen from '@/features/products/screens/ProductVisibilityScreen';
 import PriceListsScreen from '@/features/pricing/screens/PriceListsScreen';
@@ -241,6 +242,8 @@ export function BusinessTabNavigator() {
       <Tab.Screen name="Collections" component={CollectionsScreen} options={hiddenTabOptions} />
       <Tab.Screen name="Customers" component={CustomersScreen} options={hiddenTabOptions} />
       <Tab.Screen name="Discounts" component={DiscountsScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="BusinessAnalytics" component={BusinessAnalyticsScreen} options={hiddenTabOptions} />
+      <Tab.Screen name="Variance" component={VarianceScreen} options={hiddenTabOptions} />
       <Tab.Screen name="Stock" component={StockScreen} options={hiddenTabOptions} />
       <Tab.Screen name="ProductVisibility" component={ProductVisibilityScreen} options={hiddenTabOptions} />
       <Tab.Screen name="PriceLists" component={PriceListsScreen} options={hiddenTabOptions} />

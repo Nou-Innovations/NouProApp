@@ -132,6 +132,8 @@ export type BusinessTabParamList = {
   Collections: undefined;
   Customers: undefined;
   Discounts: undefined;
+  BusinessAnalytics: undefined;
+  Variance: undefined;
   Stock: undefined;
   ProductVisibility: undefined;
   PriceLists: undefined;
@@ -238,6 +240,11 @@ export type RootStackParamList = {
   // Discount screens (promotions + coupon codes)
   Discounts: undefined;
   CreateDiscount: { discountId?: string } | undefined;
+
+  // Analytics + Variance screens (Business+)
+  BusinessAnalytics: undefined;
+  Variance: undefined;
+  SetTargets: { period?: string } | undefined;
 
   // Brand screens
   Brands: undefined;

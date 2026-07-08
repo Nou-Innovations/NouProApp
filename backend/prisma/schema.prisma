@@ -112,6 +112,7 @@ model Business {
   customers               Customer[]            @relation("BusinessCustomers")
   customerLinks           Customer[]            @relation("CustomerLinkedBusiness")
   discounts               Discount[]            @relation("BusinessDiscounts")
+  targets                 BusinessTarget[]      @relation("BusinessTargets")
 }
 
 model Location {
@@ -1259,6 +1260,24 @@ model Discount {
 
   @@index([businessId])
   @@index([businessId, isActive])
+}
+
+// ── Business Target (monthly budget goals for the Variance report) ──
+// One row per business per month ('YYYY-MM'). Powers the Budget-vs-Actual section.
+
+model BusinessTarget {
+  id            String   @id            // 'tgt-' + uuidv4().slice(0,8)
+  businessId    String
+  period        String                   // month key 'YYYY-MM'
+  revenueTarget Float?
+  ordersTarget  Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  business      Business @relation("BusinessTargets", fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, period])
+  @@index([businessId])
 }
 
 // ── Procurement Models ──

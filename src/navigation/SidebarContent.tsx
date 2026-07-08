@@ -230,7 +230,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
   const TAB_ROUTES = new Set([
     'LogisticsOverview', 'Deliveries', 'Transfers', 'Orders', 'MyDeliveries', 'Routes',
     'Issues', 'Returns', 'DeliveriesAnalytics', 'Products', 'Categories', 'Brands', 'Collections', 'Stock',
-    'ProductVisibility', 'PriceLists', 'Discounts', 'Invoices', 'TeamManagement', 'Locations', 'Customers', 'CompanySettings', 'SubscriptionHub',
+    'ProductVisibility', 'PriceLists', 'Discounts', 'Invoices', 'TeamManagement', 'Locations', 'Customers', 'BusinessAnalytics', 'Variance', 'CompanySettings', 'SubscriptionHub',
     'BottomSheetGallery', 'MessageGallery', 'ButtonGallery', 'ProductGallery',
   ]);
 
@@ -449,9 +449,8 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
             { label: 'Customers', icon: 'people-outline', route: 'Customers', onPress: () => go('Customers') },
             { label: 'Team', icon: 'person-add-outline', route: 'TeamManagement', onPress: () => go('TeamManagement', { businessId: activeBusiness!.id }) },
             { label: 'Locations', icon: 'location-outline', route: 'Locations', onPress: () => go('Locations') },
-            // COMING-SOON (hidden for v1 store submission — restore when built):
-            // { label: 'Analytics', icon: 'bar-chart-outline', onPress: () => comingSoon('Analytics') },
-            // { label: 'Variance', icon: 'pie-chart-outline', onPress: () => comingSoon('Variance') },
+            { label: 'Analytics', icon: 'bar-chart-outline', route: 'BusinessAnalytics', onPress: () => go('BusinessAnalytics') },
+            { label: 'Variance', icon: 'pie-chart-outline', route: 'Variance', onPress: () => go('Variance') },
             { label: 'Subscription', icon: 'card-outline', route: 'SubscriptionHub', onPress: () => go('SubscriptionHub') },
             { label: 'Settings', icon: 'settings-outline', route: 'CompanySettings', onPress: () => go('CompanySettings') },
           ],
