@@ -270,7 +270,7 @@ async function getMessages(chatId, { limit = 50, cursor = null, requestingUserId
   const query = {
     where: { chatId },
     orderBy: { timestamp: 'desc' },
-    take: limit,
+    take: limit + 1, // fetch one extra to know if there's a next page (avoids a phantom empty fetch)
   };
 
   if (cursor) {
@@ -279,7 +279,10 @@ async function getMessages(chatId, { limit = 50, cursor = null, requestingUserId
   }
 
   const msgs = await prisma.message.findMany(query);
-  return msgs.map(msg => mapMessageToApi(msg, requestingUserId));
+  const hasMore = msgs.length > limit;
+  const page = hasMore ? msgs.slice(0, limit) : msgs;
+  const nextCursor = hasMore ? page[page.length - 1].id : null;
+  return { messages: page.map(msg => mapMessageToApi(msg, requestingUserId)), nextCursor };
 }
 
 async function addMessage(chatId, message, options = {}) {

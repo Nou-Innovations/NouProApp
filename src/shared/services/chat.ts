@@ -357,17 +357,13 @@ class ChatService {
       }
 
       // Update outgoing message statuses to 'seen' (another participant read our messages)
+      // Mark our outgoing messages 'seen' — update only the rows that changed
+      // (avoids replacing the whole array + re-diffing the thread on every read receipt).
       const chatMessages = store.messages[payload.chatId] ?? [];
-      let hasChanges = false;
-      const updated = chatMessages.map(msg => {
+      for (const msg of chatMessages) {
         if (msg.isOutgoing && msg.status !== 'seen') {
-          hasChanges = true;
-          return { ...msg, status: 'seen' as const };
+          store.updateMessage(payload.chatId, msg.id, { status: 'seen' });
         }
-        return msg;
-      });
-      if (hasChanges) {
-        store.setMessages(payload.chatId, updated);
       }
       if (__DEV__) {
         console.log('[ChatService] Chat read by:', payload.userId, 'in chat:', payload.chatId);

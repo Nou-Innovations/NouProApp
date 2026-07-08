@@ -197,8 +197,16 @@ the caller, so they need no guard.
 > "Sent a message" body bug is gone). ✅ **D2** `offlineQueue.init()` + `flush()` now wired at app boot
 > (`App.tsx`) so the offline outbox sends on reconnect. ✅ **D3/D4** `useChatMessages` always marks a
 > chat read on open (idempotent) and optimistically zeroes the store count, so notification/deep-link
-> opens mark read and badges stay accurate across restart. Remaining: P2 polish (C3–C6, D5) and the
-> data-model migration (E1/E2, Phase 5).
+> opens mark read and badges stay accurate across restart.
+>
+> **STATUS — P2 polish shipped (2026-07-08).** ✅ **C3** pagination fetches `limit+1` (no phantom empty
+> page); ✅ **C4** leave/remove now emit the mapped message shape; ✅ **C5** forward emits `chat_update`
+> with `lastMessage` (inbox preview updates); ✅ **C6** typing requires room membership
+> (`socket.rooms.has`); ✅ **D5b** "Copy link" writes the clipboard (`expo-clipboard`); ✅ **D5c** the
+> leaked debug/stub alerts are gone (invoice action → OrderDetails, unknown action → dev-log); ✅ **D5d**
+> `chat_read` updates only changed rows via `store.updateMessage`. **Deferred: D5a** (reply-quote header
+> for media messages — needs wiring into every media renderer). Only the **data-model migration
+> (E1/E2, Phase 5)** remains.
 
 ### C1 · [P1] The 24-hour edit window is never enforced (verified)
 Edit route `server.js:10095`: `messageAge = Date.now() - new Date(message.createdAt).getTime()`. The

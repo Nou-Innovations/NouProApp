@@ -18,6 +18,7 @@
 import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Linking, Platform } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
+import * as Clipboard from 'expo-clipboard';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import type { Message, OrderEventMessage, OrderEventStatus, VoiceMessage, ProfileMessage, ContactMessage } from '@/shared/types/inbox';
@@ -207,7 +208,7 @@ export function MessageBubble({
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open', onPress: () => Linking.openURL(url) },
-            { text: 'Copy', onPress: () => AppAlert.alert('Copied', 'Link copied to clipboard') },
+            { text: 'Copy', onPress: async () => { await Clipboard.setStringAsync(url); AppAlert.alert('Copied', 'Link copied to clipboard'); } },
           ]
         );
       } else {

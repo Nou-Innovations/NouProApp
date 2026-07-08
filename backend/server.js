@@ -1013,6 +1013,8 @@ io.on('connection', (socket) => {
   // Typing indicators
   socket.on('typing_start', ({ chatId }) => {
     if (!chatId) return;
+    // Only members who have joined the room may broadcast typing (join_chat verifies membership).
+    if (!socket.rooms.has(`chat:${chatId}`)) return;
     socket.to(`chat:${chatId}`).emit('typing', {
       chatId,
       userId: socket.userId,
@@ -1022,6 +1024,7 @@ io.on('connection', (socket) => {
 
   socket.on('typing_stop', ({ chatId }) => {
     if (!chatId) return;
+    if (!socket.rooms.has(`chat:${chatId}`)) return;
     socket.to(`chat:${chatId}`).emit('typing_stop', {
       chatId,
       userId: socket.userId,
@@ -10309,8 +10312,7 @@ app.get('/api/companies/:companyId/chats/:chatId/messages', requireAuth, require
     }
 
     // DB-level cursor pagination (messages returned newest-first)
-    const chatMessages = await repos.chatRepo.getMessages(chatId, { limit, cursor, requestingUserId });
-    const nextCursor = chatMessages.length === limit ? chatMessages[chatMessages.length - 1].id : null;
+    const { messages: chatMessages, nextCursor } = await repos.chatRepo.getMessages(chatId, { limit, cursor, requestingUserId });
 
     res.json({
       success: true,
@@ -10697,7 +10699,18 @@ app.post('/api/companies/:companyId/chats/:chatId/messages/:messageId/forward', 
     if (participantCounts) {
       for (const pc of participantCounts) {
         if (pc.userId !== userId) {
-          io.to(`user:${pc.userId}`).emit('unread_update', { chatId: targetChatId, unreadCount: pc.unreadCount });
+          io.to(`user:${pc.userId}`).emit('chat_update', {
+            id: targetChatId,
+            unreadCount: pc.unreadCount,
+            lastMessage: {
+              id: savedMessage.id,
+              content: savedMessage.text || savedMessage.content || '',
+              type: savedMessage.type || 'text',
+              senderId: savedMessage.sender?.id,
+              senderName: savedMessage.sender?.name || '',
+              timestamp: savedMessage.timestamp,
+            },
+          });
         }
       }
     }
@@ -10742,8 +10755,8 @@ app.post('/api/companies/:companyId/chats/:chatId/leave', requireAuth, requireCo
       status: 'sent',
       isOutgoing: false,
     };
-    await repos.chatRepo.addMessage(chatId, eventMessage, { incrementUnread: true });
-    io.to(`chat:${chatId}`).emit('message', eventMessage);
+    const { message: createdEvent } = await repos.chatRepo.addMessage(chatId, eventMessage, { incrementUnread: true });
+    io.to(`chat:${chatId}`).emit('message', createdEvent);
 
     // Notify remaining participants
     const remainingParticipants = updatedChat.participants || [];
@@ -10802,8 +10815,8 @@ app.post('/api/companies/:companyId/chats/:chatId/remove-participant', requireAu
       status: 'sent',
       isOutgoing: false,
     };
-    await repos.chatRepo.addMessage(chatId, eventMessage, { incrementUnread: true });
-    io.to(`chat:${chatId}`).emit('message', eventMessage);
+    const { message: createdEvent } = await repos.chatRepo.addMessage(chatId, eventMessage, { incrementUnread: true });
+    io.to(`chat:${chatId}`).emit('message', createdEvent);
 
     // Notify the removed user
     io.to(`user:${targetUserId}`).emit('chat_update', { id: chatId, removed: true });
@@ -10976,8 +10989,7 @@ app.get('/api/users/:userId/chats/:chatId/messages', requireAuth, async (req, re
 
     // DB-level cursor pagination (messages returned newest-first)
     const requestingUserId = req.user?.id;
-    const chatMessages = await repos.chatRepo.getMessages(chatId, { limit, cursor, requestingUserId });
-    const nextCursor = chatMessages.length === limit ? chatMessages[chatMessages.length - 1].id : null;
+    const { messages: chatMessages, nextCursor } = await repos.chatRepo.getMessages(chatId, { limit, cursor, requestingUserId });
 
     res.json({
       success: true,
@@ -11389,7 +11401,18 @@ app.post('/api/users/:userId/chats/:chatId/messages/:messageId/forward', require
     if (participantCounts) {
       for (const pc of participantCounts) {
         if (pc.userId !== userId) {
-          io.to(`user:${pc.userId}`).emit('unread_update', { chatId: targetChatId, unreadCount: pc.unreadCount });
+          io.to(`user:${pc.userId}`).emit('chat_update', {
+            id: targetChatId,
+            unreadCount: pc.unreadCount,
+            lastMessage: {
+              id: savedMessage.id,
+              content: savedMessage.text || savedMessage.content || '',
+              type: savedMessage.type || 'text',
+              senderId: savedMessage.sender?.id,
+              senderName: savedMessage.sender?.name || '',
+              timestamp: savedMessage.timestamp,
+            },
+          });
         }
       }
     }
@@ -11430,8 +11453,8 @@ app.post('/api/users/:userId/chats/:chatId/leave', requireAuth, async (req, res)
       status: 'sent',
       isOutgoing: false,
     };
-    await repos.chatRepo.addMessage(chatId, eventMessage, { incrementUnread: true });
-    io.to(`chat:${chatId}`).emit('message', eventMessage);
+    const { message: createdEvent } = await repos.chatRepo.addMessage(chatId, eventMessage, { incrementUnread: true });
+    io.to(`chat:${chatId}`).emit('message', createdEvent);
 
     const remainingParticipants = updatedChat.participants || [];
     for (const pid of remainingParticipants) {
@@ -11486,8 +11509,8 @@ app.post('/api/users/:userId/chats/:chatId/remove-participant', requireAuth, asy
       status: 'sent',
       isOutgoing: false,
     };
-    await repos.chatRepo.addMessage(chatId, eventMessage, { incrementUnread: true });
-    io.to(`chat:${chatId}`).emit('message', eventMessage);
+    const { message: createdEvent } = await repos.chatRepo.addMessage(chatId, eventMessage, { incrementUnread: true });
+    io.to(`chat:${chatId}`).emit('message', createdEvent);
 
     io.to(`user:${targetUserId}`).emit('chat_update', { id: chatId, removed: true });
 

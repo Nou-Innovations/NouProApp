@@ -767,7 +767,7 @@ export default function ChatScreen() {
           updateOrderMessage(msg.id, { paymentStatus: 'PAID' });
         }
       } else if (type === 'invoice') {
-        AppAlert.alert('Invoice', 'Show invoice/receipt for order ' + msg.orderId);
+        (navigation as any).navigate('OrderDetails', { orderId: msg.orderId });
       }
     } catch (err: any) {
       console.error('Order action failed:', err);
@@ -1075,7 +1075,7 @@ export default function ChatScreen() {
         }));
         AppAlert.alert('Payment Confirmed', 'Payment has been marked as received.');
       } else {
-        AppAlert.alert('Action', `Action "${actionId}" for order ${orderId}`);
+        if (__DEV__) console.warn('[Chat] Unhandled order action:', actionId, orderId);
       }
     } catch (err) {
       AppAlert.alert('Error', 'Failed to perform action. Please try again.');
