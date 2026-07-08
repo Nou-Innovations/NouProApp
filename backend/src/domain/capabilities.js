@@ -47,6 +47,9 @@ function deriveCapabilities(business) {
     canPublishOnFeed: isBusiness || isEnterprise,
     canPublishProductsOnFeed: isBusiness || isEnterprise,
 
+    // Discounts / promotions (Pro+ can run automatic promotions + coupon codes)
+    canManageDiscounts: isPaidTier,
+
     // Marketplace growth (paid tiers can post Opportunities / host Events on Explore)
     canPostOpportunities: isPaidTier,
     canHostEvents: isPaidTier,

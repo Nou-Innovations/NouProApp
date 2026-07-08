@@ -48,6 +48,7 @@ import SidebarContent from '@/navigation/SidebarContent';
 
 // Services
 import { userAvatarService } from '@/shared/services/userAvatarService';
+import { offlineQueue } from '@/features/inbox/services/offlineQueue';
 import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
 import { authAPI } from '@/shared/services/api';
@@ -802,6 +803,20 @@ const AppWithTheme = () => {
 
     prepare();
   }, []);
+
+  // Offline outbox (D2): register the NetInfo reconnect→flush listener once at boot, so
+  // messages composed while offline actually send when connectivity returns. Previously
+  // offlineQueue.init() was never called, so the outbox never flushed.
+  useEffect(() => {
+    offlineQueue.init();
+    return () => offlineQueue.destroy();
+  }, []);
+
+  // Drain any queued offline messages once the user is authenticated (flush needs a valid
+  // token). The reconnect listener above also flushes when connectivity is restored.
+  useEffect(() => {
+    if (isSignedIn) offlineQueue.flush().catch(() => {});
+  }, [isSignedIn]);
 
   // Hide native splash once resources AND auth tokens are ready
   const appReady = resourcesReady && isRehydrated;

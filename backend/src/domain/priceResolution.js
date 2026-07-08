@@ -25,6 +25,53 @@ const { deriveCapabilities } = require('./capabilities');
 module.exports = (repos /*, prisma */) => {
   const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
+  // ── Discounts (seller promotions + coupon codes) ──
+  // Applied AFTER price-list resolution. Automatic discounts (code == null) always
+  // apply to matching products; coupon discounts apply only when the matching code
+  // is supplied. minOrderAmount is stored/displayed but not enforced per-line in v1.
+
+  async function getActiveDiscounts(sellerBusinessId) {
+    if (!sellerBusinessId || !repos.discountRepo) return [];
+    try { return await repos.discountRepo.getActiveForBusiness(sellerBusinessId); }
+    catch { return []; }
+  }
+
+  function discountMatchesProduct(d, product) {
+    if (!product) return false;
+    if (d.scope === 'ALL') return true;
+    if (d.scope === 'PRODUCTS') return Array.isArray(d.productIds) && d.productIds.includes(product.id);
+    if (d.scope === 'CATEGORY') return product.category != null && Array.isArray(d.categories) && d.categories.includes(product.category);
+    return false;
+  }
+
+  function discountedUnit(d, unitPrice) {
+    if (d.type === 'FIXED') return Math.max(0, round2(unitPrice - Number(d.value)));
+    const pct = Math.min(Math.max(Number(d.value), 0), 100);
+    return round2(unitPrice * (1 - pct / 100));
+  }
+
+  /**
+   * Pick the single best (lowest-price) eligible discount for a product at a given
+   * unit price. Coupon discounts require opts.code to match; automatic ones don't.
+   * @returns {{ discount, unitPrice }|null}
+   */
+  function bestDiscount(product, unitPrice, discounts, opts = {}) {
+    const code = opts.code ? String(opts.code).trim().toUpperCase() : null;
+    let best = null;
+    for (const d of discounts || []) {
+      if (d.code) {
+        if (!code || String(d.code).toUpperCase() !== code) continue;
+        if (d.maxUses != null && d.usedCount >= d.maxUses) continue;
+      }
+      if (!discountMatchesProduct(d, product)) continue;
+      const priced = discountedUnit(d, unitPrice);
+      if (priced < unitPrice && (best === null || priced < best.unitPrice)) {
+        best = { discount: d, unitPrice: priced };
+      }
+    }
+    return best;
+  }
+
   /**
    * Resolve the PriceList (with items) that applies to a buyer for a seller, or null.
    * Precedence: valid manual selection > buyer auto-assignment > seller default list > null.
@@ -126,6 +173,9 @@ module.exports = (repos /*, prisma */) => {
    */
   async function repriceLineItems(priceList, items, sellerBusinessId, opts = {}) {
     const forceBase = !!opts.forceBase;
+    const applyDisc = !!opts.applyDiscounts;
+    const discounts = applyDisc ? await getActiveDiscounts(sellerBusinessId) : [];
+    const appliedDiscountIds = new Set();
     const out = [];
     let total = 0;
     let changed = false;
@@ -140,9 +190,9 @@ module.exports = (repos /*, prisma */) => {
       let unitPrice = typeof clientUnitRaw === 'number' ? clientUnitRaw : 0;
       let priceSource = 'client';
       let priceListId = null;
+      let product = null;
 
       if (productId) {
-        let product = null;
         try { product = await repos.productRepo.getById(productId); } catch { /* ignore */ }
         if (product && product.businessId === sellerBusinessId) {
           const base = unit === 'carton' ? product.pricePerCarton : product.price;
@@ -157,12 +207,29 @@ module.exports = (repos /*, prisma */) => {
         }
       }
 
+      // Promotions/coupons: best eligible discount on top of the resolved unit price.
+      const line = { ...raw, productId: productId || undefined, quantity, unit, unitPrice, subtotal: 0, priceSource, priceListId };
+      if (applyDisc && discounts.length && product && product.businessId === sellerBusinessId) {
+        const picked = bestDiscount(product, unitPrice, discounts, { code: opts.discountCode });
+        if (picked) {
+          line.originalUnitPrice = unitPrice;
+          unitPrice = picked.unitPrice;
+          line.unitPrice = unitPrice;
+          line.priceSource = 'discount';
+          line.discountId = picked.discount.id;
+          line.discountName = picked.discount.name;
+          changed = true;
+          appliedDiscountIds.add(picked.discount.id);
+        }
+      }
+
       const subtotal = Math.round(unitPrice * quantity * 100) / 100;
+      line.subtotal = subtotal;
       total += subtotal;
-      out.push({ ...raw, productId: productId || undefined, quantity, unit, unitPrice, subtotal, priceSource, priceListId });
+      out.push(line);
     }
 
-    return { items: out, totalAmount: Math.round(total * 100) / 100, changed };
+    return { items: out, totalAmount: Math.round(total * 100) / 100, changed, appliedDiscountIds: [...appliedDiscountIds] };
   }
 
   /**
@@ -173,20 +240,44 @@ module.exports = (repos /*, prisma */) => {
   async function attachYourPrice(products, sellerBusinessId, buyerBusinessId, opts = {}) {
     if (!Array.isArray(products) || products.length === 0) return products;
     const list = await resolvePriceListForBuyer(sellerBusinessId, buyerBusinessId, opts);
-    if (!list) return products;
+    // Automatic promotions surface in the catalog; coupon codes only apply at checkout.
+    const autoDiscounts = (await getActiveDiscounts(sellerBusinessId)).filter((d) => !d.code);
+    if (!list && autoDiscounts.length === 0) return products;
     return products.map((p) => {
       if (!p || p.priceHidden) return p;
-      const { unitPrice, source } = applyPriceList(list, p, 1);
-      if (source === 'base') return p; // no discount for this product → leave untouched
-      return {
-        ...p,
-        basePrice: p.price ?? null,
-        yourPrice: unitPrice,
-        priceListId: list.id,
-        priceSource: source,
-      };
+
+      // 1. Price-list effective unit price (unchanged behaviour).
+      let listPrice = p.price;
+      let listSource = 'base';
+      if (list) {
+        const r = applyPriceList(list, p, 1);
+        if (r.source !== 'base') { listPrice = r.unitPrice; listSource = r.source; }
+      }
+
+      // 2. Best automatic promotion on top of the list price.
+      const picked = autoDiscounts.length && listPrice != null
+        ? bestDiscount(p, listPrice, autoDiscounts, {}) : null;
+
+      if (listSource === 'base' && !picked) return p; // nothing applies → untouched
+
+      const out = { ...p };
+      if (listSource !== 'base') {
+        out.basePrice = p.price ?? null;
+        out.yourPrice = listPrice;
+        out.priceListId = list.id;
+        out.priceSource = listSource;
+      }
+      if (picked) {
+        // Markdown the existing PriceBlock understands: price = discounted (bold),
+        // originalPrice = pre-promo price (list price if any, else base) = struck-through.
+        out.originalPrice = listPrice;
+        out.price = picked.unitPrice;
+        out.discountId = picked.discount.id;
+        out.priceSource = 'discount';
+      }
+      return out;
     });
   }
 
-  return { resolvePriceListForBuyer, applyPriceList, resolveUnitPrice, repriceLineItems, attachYourPrice };
+  return { resolvePriceListForBuyer, applyPriceList, resolveUnitPrice, repriceLineItems, attachYourPrice, getActiveDiscounts, bestDiscount };
 };

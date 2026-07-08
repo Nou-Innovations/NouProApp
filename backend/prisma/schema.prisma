@@ -111,6 +111,7 @@ model Business {
   priceLists              PriceList[]
   customers               Customer[]            @relation("BusinessCustomers")
   customerLinks           Customer[]            @relation("CustomerLinkedBusiness")
+  discounts               Discount[]            @relation("BusinessDiscounts")
 }
 
 model Location {
@@ -1215,6 +1216,49 @@ model Customer {
   @@index([businessId])
   @@index([businessId, status])
   @@index([customerBusinessId])
+}
+
+// ── Discount (seller promotions + coupon codes) ──
+// Applied server-side in priceResolution AFTER the price-list step. `code` null =
+// automatic promotion (auto-applies to matching products in its window); `code` set =
+// coupon entered at checkout. Scope targets (productIds/categories) are JSON string
+// arrays (matching the Product.variants Json convention; the schema has no scalar lists).
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum DiscountScope {
+  ALL
+  PRODUCTS
+  CATEGORY
+}
+
+model Discount {
+  id             String        @id
+  businessId     String
+  name           String
+  description    String?
+  type           DiscountType  @default(PERCENTAGE)
+  value          Float
+  scope          DiscountScope @default(ALL)
+  productIds     Json?
+  categories     Json?
+  code           String?
+  minOrderAmount Float?
+  startDate      DateTime?
+  endDate        DateTime?
+  maxUses        Int?
+  usedCount      Int           @default(0)
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  business       Business      @relation("BusinessDiscounts", fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([businessId, isActive])
 }
 
 // ── Procurement Models ──

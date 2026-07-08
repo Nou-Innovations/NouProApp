@@ -104,11 +104,13 @@ export function useChatMessages(chatId: string): UseChatMessagesResult {
             setMessages(normalized);
             setNextCursor(result.nextCursor);
             storeSetMessages(chatId, normalized);
-            // Only mark as read if there are unread messages (avoid unnecessary API calls)
-            const chatUnread = useInboxStore.getState().chats.find(c => c.id === chatId)?.unreadCount ?? 0;
-            if (chatUnread > 0) {
-              await markUserChatAsRead(currentUser.id, chatId);
-            }
+            // Always mark read on open (idempotent). A chat opened via notification/deep-link
+            // before the inbox list has loaded has no cached count, so the old `unreadCount > 0`
+            // guard skipped it entirely (D4). Also optimistically zero the store count so the
+            // badge clears immediately and stays correct across restart via the authoritative
+            // backend count (D3).
+            useInboxStore.getState().markChatAsRead(chatId);
+            await markUserChatAsRead(currentUser.id, chatId);
           } else {
             if (!cancelled) setMessages([]);
           }
@@ -123,11 +125,9 @@ export function useChatMessages(chatId: string): UseChatMessagesResult {
           setMessages(normalized);
           setNextCursor(result.nextCursor);
           storeSetMessages(chatId, normalized);
-          // Only mark as read if there are unread messages (avoid unnecessary API calls)
-          const chatUnread = useInboxStore.getState().chats.find(c => c.id === chatId)?.unreadCount ?? 0;
-          if (chatUnread > 0) {
-            await markChatAsRead(activeBusiness.id, chatId);
-          }
+          // Always mark read on open (idempotent) — see the D3/D4 note in the personal branch above.
+          useInboxStore.getState().markChatAsRead(chatId);
+          await markChatAsRead(activeBusiness.id, chatId);
         } else {
           if (!cancelled) setMessages([]);
         }

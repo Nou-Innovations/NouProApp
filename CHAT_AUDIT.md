@@ -191,6 +191,15 @@ the caller, so they need no guard.
 
 ## Theme C — Message-operation bugs
 
+> **STATUS — Phase 3 shipped (2026-07-08): the Theme C/D P1 bugs are fixed.** ✅ **C1** edit routes now
+> use `message.timestamp` (was the non-existent `createdAt`) so the 24h window enforces. ✅ **C2** the
+> duplicate `pushService.sendToUsers` on the company send route was removed (one correct push; the
+> "Sent a message" body bug is gone). ✅ **D2** `offlineQueue.init()` + `flush()` now wired at app boot
+> (`App.tsx`) so the offline outbox sends on reconnect. ✅ **D3/D4** `useChatMessages` always marks a
+> chat read on open (idempotent) and optimistically zeroes the store count, so notification/deep-link
+> opens mark read and badges stay accurate across restart. Remaining: P2 polish (C3–C6, D5) and the
+> data-model migration (E1/E2, Phase 5).
+
 ### C1 · [P1] The 24-hour edit window is never enforced (verified)
 Edit route `server.js:10095`: `messageAge = Date.now() - new Date(message.createdAt).getTime()`. The
 `Message` model has **no `createdAt`** — only `timestamp` (`schema.prisma:510`). So `message.createdAt`

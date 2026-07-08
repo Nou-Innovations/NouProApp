@@ -4925,6 +4925,157 @@ app.post('/api/companies/:companyId/customers/seed', requireAuth, async (req, re
 });
 
 // ============================================================================
+// DISCOUNT ROUTES (seller promotions + coupon codes — creating is Pro+ gated)
+// Applied to prices server-side by priceResolution. `code` null = automatic.
+// ============================================================================
+
+// Normalize a discount request body into safe stored fields.
+function buildDiscountFields(body) {
+  const type = body.type === 'FIXED' ? 'FIXED' : 'PERCENTAGE';
+  const scope = ['ALL', 'PRODUCTS', 'CATEGORY'].includes(body.scope) ? body.scope : 'ALL';
+  return {
+    name: (body.name || '').trim(),
+    description: body.description || null,
+    type,
+    value: Number(body.value) || 0,
+    scope,
+    productIds: scope === 'PRODUCTS' && Array.isArray(body.productIds) ? body.productIds : null,
+    categories: scope === 'CATEGORY' && Array.isArray(body.categories) ? body.categories : null,
+    code: body.code ? String(body.code).trim().toUpperCase() : null,
+    minOrderAmount: body.minOrderAmount != null && body.minOrderAmount !== '' ? Number(body.minOrderAmount) : null,
+    startDate: body.startDate ? new Date(body.startDate) : null,
+    endDate: body.endDate ? new Date(body.endDate) : null,
+    maxUses: body.maxUses != null && body.maxUses !== '' ? Number(body.maxUses) : null,
+    isActive: body.isActive !== undefined ? !!body.isActive : true,
+  };
+}
+
+// List discounts for a company
+app.get('/api/companies/:companyId/discounts', requireAuth, async (req, res) => {
+  try {
+    if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+    const discounts = await repos.discountRepo.getByBusinessId(req.params.companyId);
+    res.json(successResponse(discounts));
+  } catch (e) {
+    logger.error('Error fetching discounts:', e);
+    res.status(500).json(errorResponse('Failed to fetch discounts'));
+  }
+});
+
+// Validate a coupon code (checkout preview). Body: { code }. Declared before /:id.
+app.post('/api/companies/:companyId/discounts/validate', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+    const code = (req.body.code || '').trim().toUpperCase();
+    if (!code) return res.status(400).json(errorResponse('A code is required'));
+    const discount = await repos.discountRepo.findByCode(companyId, code);
+    const now = Date.now();
+    const usable = discount && discount.isActive
+      && (!discount.startDate || new Date(discount.startDate).getTime() <= now)
+      && (!discount.endDate || new Date(discount.endDate).getTime() >= now)
+      && (discount.maxUses == null || discount.usedCount < discount.maxUses);
+    if (!usable) return res.status(404).json(errorResponse('That code isn’t valid right now.'));
+    res.json(successResponse(discount));
+  } catch (e) {
+    logger.error('Error validating discount code:', e);
+    res.status(500).json(errorResponse('Failed to validate code'));
+  }
+});
+
+// Single discount
+app.get('/api/companies/:companyId/discounts/:discountId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, discountId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+    const discount = await repos.discountRepo.getById(discountId);
+    if (!discount || discount.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Discount not found'));
+    }
+    res.json(successResponse(discount));
+  } catch (e) {
+    logger.error('Error fetching discount:', e);
+    res.status(500).json(errorResponse('Failed to fetch discount'));
+  }
+});
+
+// Create a discount (Pro+ gated)
+app.post('/api/companies/:companyId/discounts', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+    const business = await repos.businessRepo.getById(companyId);
+    if (!hasCapability(business, 'canManageDiscounts')) {
+      return res.status(403).json(paywallResponse('Upgrade to Pro to create discounts and promotions.', 'manage_discounts', 'pro'));
+    }
+
+    const fields = buildDiscountFields(req.body);
+    if (!fields.name) return res.status(400).json(errorResponse('Discount name is required'));
+    if (!(fields.value > 0)) return res.status(400).json(errorResponse('Discount value must be greater than 0'));
+    if (fields.type === 'PERCENTAGE' && fields.value > 100) {
+      return res.status(400).json(errorResponse('Percentage discount cannot exceed 100'));
+    }
+    if (fields.code) {
+      const existing = await repos.discountRepo.findByCode(companyId, fields.code);
+      if (existing) return res.status(409).json(errorResponse('A discount with this code already exists'));
+    }
+
+    const created = await repos.discountRepo.create({ id: 'disc-' + uuidv4().slice(0, 8), businessId: companyId, ...fields });
+    res.status(201).json(successResponse(created));
+  } catch (e) {
+    logger.error('Error creating discount:', e);
+    res.status(500).json(errorResponse('Failed to create discount'));
+  }
+});
+
+// Update a discount (Pro+ gated)
+app.patch('/api/companies/:companyId/discounts/:discountId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, discountId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+    const discount = await repos.discountRepo.getById(discountId);
+    if (!discount || discount.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Discount not found'));
+    }
+    const business = await repos.businessRepo.getById(companyId);
+    if (!hasCapability(business, 'canManageDiscounts')) {
+      return res.status(403).json(paywallResponse('Upgrade to Pro to manage discounts.', 'manage_discounts', 'pro'));
+    }
+
+    const fields = buildDiscountFields({ ...discount, ...req.body });
+    if (!fields.name) return res.status(400).json(errorResponse('Discount name is required'));
+    if (fields.code && fields.code !== discount.code) {
+      const existing = await repos.discountRepo.findByCode(companyId, fields.code);
+      if (existing) return res.status(409).json(errorResponse('A discount with this code already exists'));
+    }
+    const updated = await repos.discountRepo.update(discountId, { ...fields, updatedAt: new Date() });
+    res.json(successResponse(updated));
+  } catch (e) {
+    logger.error('Error updating discount:', e);
+    res.status(500).json(errorResponse('Failed to update discount'));
+  }
+});
+
+// Delete a discount (admin only)
+app.delete('/api/companies/:companyId/discounts/:discountId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, discountId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
+    const discount = await repos.discountRepo.getById(discountId);
+    if (!discount || discount.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Discount not found'));
+    }
+    await repos.discountRepo.delete(discountId);
+    res.json(successResponse(null, 'Discount deleted successfully'));
+  } catch (e) {
+    logger.error('Error deleting discount:', e);
+    res.status(500).json(errorResponse('Failed to delete discount'));
+  }
+});
+
+// ============================================================================
 // PRICE LIST ROUTES (customer-specific pricing)
 // Gated by canUseBusinessSpecificPricing (Business+). The seller owns the lists;
 // they are applied to customer businesses via assignment or manual selection.
@@ -6246,7 +6397,7 @@ app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
     const {
       customerName, customerAddress, customerPhone,
       items, totalAmount, notes, fulfillmentLocationId,
-      buyerBusinessId, buyerBusinessName, createdBy, manualPriceListId
+      buyerBusinessId, buyerBusinessName, createdBy, manualPriceListId, discountCode
     } = orderData;
 
     const isB2B = !!buyerBusinessId;
@@ -6289,7 +6440,7 @@ app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
       isB2B ? buyerBusinessId : null,
       { manualPriceListId: isB2B ? null : (manualPriceListId || null) }
     );
-    const priced = await repriceLineItems(resolvedList, items, req.params.companyId, { forceBase: isB2B });
+    const priced = await repriceLineItems(resolvedList, items, req.params.companyId, { forceBase: isB2B, applyDiscounts: true, discountCode });
     if (priced.changed) {
       logger.info(`[priceList] order repriced for seller ${req.params.companyId}` +
         `${resolvedList ? ` via list ${resolvedList.id}` : ''} (client total ${totalAmount} → ${priced.totalAmount})`);
@@ -6317,6 +6468,14 @@ app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
     };
 
     const created = await repos.orderRepo.create(newOrder);
+
+    // Count coupon usage (automatic promotions don't consume uses).
+    if (discountCode && priced.appliedDiscountIds && priced.appliedDiscountIds.length) {
+      try {
+        const coupon = await repos.discountRepo.findByCode(req.params.companyId, String(discountCode).trim().toUpperCase());
+        if (coupon && priced.appliedDiscountIds.includes(coupon.id)) await repos.discountRepo.incrementUsage(coupon.id);
+      } catch { /* usage counting is best-effort */ }
+    }
 
     // Create event message for the order (non-blocking)
     try {
@@ -10341,19 +10500,10 @@ app.post('/api/companies/:companyId/chats/:chatId/messages', requireAuth, requir
       logger.warn(`[Chat] No participants found for chat ${chatId}, skipping chat_update emit`);
     }
 
-    // Send push notifications to other participants
-    const otherParticipantIds = participantCounts
-      .map((p) => p.userId)
-      .filter((id) => id !== senderId);
-    if (otherParticipantIds.length > 0) {
-      pushService.sendToUsers({
-        userIds: otherParticipantIds,
-        title: senderName || 'New Message',
-        body: created.content || 'Sent a message',
-        category: 'messages',
-        data: { type: 'chat_message', chatId },
-      }, repos).catch((err) => logger.error('[Push] Chat message push error:', err));
-    }
+    // (C2) Offline participants were already pushed above via sendPushToOfflineParticipants.
+    // A second unconditional pushService.sendToUsers here caused a DUPLICATE push and a
+    // wrong "Sent a message" body for text messages (body used created.content, which is
+    // undefined for type:'text') — removed to match the user-mode send route.
 
     res.json(successResponse(created));
   } catch (e) {
@@ -10444,7 +10594,7 @@ app.patch('/api/companies/:companyId/chats/:chatId/messages/:messageId', require
     }
 
     // Must be within 24 hours
-    const messageAge = Date.now() - new Date(message.createdAt).getTime();
+    const messageAge = Date.now() - new Date(message.timestamp).getTime();
     if (messageAge > 24 * 60 * 60 * 1000) {
       return res.status(400).json(errorResponse('Messages can only be edited within 24 hours'));
     }
@@ -11136,7 +11286,7 @@ app.patch('/api/users/:userId/chats/:chatId/messages/:messageId', requireAuth, a
       return res.status(400).json(errorResponse('Only text messages can be edited'));
     }
 
-    const messageAge = Date.now() - new Date(message.createdAt).getTime();
+    const messageAge = Date.now() - new Date(message.timestamp).getTime();
     if (messageAge > 24 * 60 * 60 * 1000) {
       return res.status(400).json(errorResponse('Messages can only be edited within 24 hours'));
     }
