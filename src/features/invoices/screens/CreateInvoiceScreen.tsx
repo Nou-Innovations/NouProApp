@@ -17,6 +17,7 @@ import { formatInvoiceCurrency, getCurrencySymbol } from '@/shared/types/invoice
 import invoicesService from '../invoices.service';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { searchContacts, ContactSearchResult } from '@/features/inbox/inbox.service';
+import { getCustomers } from '@/features/customers';
 import { getProducts } from '@/features/products/products.service';
 import type { UIProduct } from '@/shared/types/product';
 
@@ -42,6 +43,10 @@ interface ClientOption {
   email: string | null;
   avatar: string | null;
   type: 'user' | 'business';
+  phone?: string | null;
+  address?: string | null;
+  customerId?: string;              // set when picked from the Customers directory
+  customerBusinessId?: string | null; // linked NouPro business, if any
 }
 
 export default function CreateInvoiceScreen({ navigation, route }: Props) {
@@ -118,25 +123,45 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Fetch clients (connected businesses) on mount
+  // Fetch clients: the Customers directory first, then any connected businesses not
+  // already in it. Any brand-new client typed on an invoice is auto-added to Customers
+  // server-side, so the directory stays the source of truth over time.
   useEffect(() => {
     const fetchClients = async () => {
       setClientsLoading(true);
       try {
+        const options: ClientOption[] = [];
+        const companyId = activeBusiness?.id;
+        if (companyId) {
+          try {
+            const custs = await getCustomers(companyId);
+            custs.forEach((c) => options.push({
+              id: c.customerBusinessId || c.id,
+              name: c.name,
+              email: c.email || null,
+              avatar: c.customerBusiness?.logoUrl || null,
+              type: c.customerBusinessId ? 'business' : 'user',
+              phone: c.phone,
+              address: c.address,
+              customerId: c.id,
+              customerBusinessId: c.customerBusinessId,
+            }));
+          } catch { /* fall through to connections */ }
+        }
+        // Append connected businesses that aren't already represented as a customer.
+        const knownBiz = new Set(options.map((o) => o.customerBusinessId).filter(Boolean));
+        const knownName = new Set(options.map((o) => o.name.trim().toLowerCase()));
         const userId = currentUser?.id;
         if (userId) {
           const contacts = await searchContacts(userId);
-          const businessContacts: ClientOption[] = contacts
+          contacts
             .filter((c: ContactSearchResult) => c.type === 'business')
-            .map((c: ContactSearchResult) => ({
-              id: c.id,
-              name: c.name,
-              email: c.email,
-              avatar: c.avatar,
-              type: c.type,
+            .filter((c: ContactSearchResult) => !knownBiz.has(c.id) && !knownName.has((c.name || '').trim().toLowerCase()))
+            .forEach((c: ContactSearchResult) => options.push({
+              id: c.id, name: c.name, email: c.email, avatar: c.avatar, type: c.type,
             }));
-          setClients(businessContacts);
         }
+        setClients(options);
       } catch (err) {
         if (__DEV__) console.warn('[CreateInvoice] Failed to fetch clients:', err);
       } finally {
@@ -144,7 +169,25 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
       }
     };
     fetchClients();
-  }, [currentUser?.id]);
+  }, [currentUser?.id, activeBusiness?.id]);
+
+  // Prefill the client when opened from a customer's "Create invoice" action.
+  useEffect(() => {
+    const pc = route.params?.presetCustomer;
+    if (!pc) return;
+    setSelectedClient({
+      id: pc.customerBusinessId || pc.id,
+      name: pc.name,
+      email: pc.email || null,
+      avatar: null,
+      type: pc.customerBusinessId ? 'business' : 'user',
+      phone: pc.phone,
+      address: pc.address,
+      customerId: pc.id,
+      customerBusinessId: pc.customerBusinessId,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params?.presetCustomer]);
 
   // Fetch products on mount
   useEffect(() => {
@@ -457,9 +500,12 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
   const buildInvoicePayload = (status: 'DRAFT' | 'SENT') => ({
     clientName: selectedClient?.name || '',
     clientEmail: selectedClient?.email || '',
+    clientPhone: selectedClient?.phone || undefined,
+    clientAddress: selectedClient?.address || undefined,
     // Persist which platform business the client is, so invoices/estimates can be
-    // delivered live into that business's chat (the picker only lists businesses).
-    clientBusinessId: selectedClient?.type === 'business' ? selectedClient.id : undefined,
+    // delivered live into that business's chat. Also link the CRM Customer record.
+    clientBusinessId: selectedClient?.customerBusinessId || (selectedClient?.type === 'business' ? selectedClient.id : undefined),
+    customerId: selectedClient?.customerId,
     amount: subtotal,
     taxAmount: totalTax,
     totalAmount: total,

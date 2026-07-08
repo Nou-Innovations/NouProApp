@@ -14,172 +14,10 @@ function init(d) {
   deps = { ...deps, ...(d || {}) };
 }
 
-/**
- * Creates a message in the appropriate chat when a business event occurs.
- * Finds or creates a conversation between the two parties.
- * 
- * @param {Object} params
- * @param {string} params.type - Message type: 'order_event' | 'invoice' | 'estimate' | 'status_update'
- * @param {string} params.fromBusinessId - Sender business ID
- * @param {string} params.toBusinessId - Recipient business ID (optional for single-party events)
- * @param {string} params.entityId - The entity ID (orderId, invoiceId, etc.)
- * @param {string} params.actorId - User who triggered the event
- * @param {string} params.actorName - Name of the user who triggered the event
- * @param {Object} params.metadata - Additional data (status, amount, etc.)
- * @returns {Promise<Object>} The created message
- */
-async function createEventMessage({
-  type,
-  fromBusinessId,
-  toBusinessId,
-  entityId,
-  actorId,
-  actorName,
-  metadata = {}
-}) {
-  const repos = getRepos();
-  
-  // 1. Find existing chat between businesses (or create one)
-  let chat = await findOrCreateChat(fromBusinessId, toBusinessId);
-  
-  // 2. Generate message content based on type
-  const content = generateMessageContent(type, metadata);
-  
-  // 3. Create the message
-  // Note: isOutgoing is NOT set here - it should be computed on the frontend
-  // by comparing message.sender.id with the current user's ID
-  const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const { message } = await repos.chatRepo.addMessage(chat.id, {
-    id: messageId,
-    type,
-    content,
-    sender: { id: actorId, name: actorName },
-    status: 'sent',
-    meta: { 
-      entityId, 
-      entityType: getEntityType(type),
-      ...metadata 
-    }
-  });
-  
-  return message;
-}
-
-/**
- * Find or create a chat between two businesses
- */
-async function findOrCreateChat(businessA, businessB) {
-  const repos = getRepos();
-  
-  // Find existing chat between these businesses
-  const { chats } = await repos.chatRepo.getByBusinessId(businessA);
-  
-  // Look for a chat that includes businessB as a participant
-  // Participants can be plain string IDs or legacy objects with businessId/companyId
-  let chat = chats.find(c => {
-    if (!c.participants || !Array.isArray(c.participants)) return false;
-    return c.participants.some(p =>
-      p === businessB || p.businessId === businessB || p.companyId === businessB
-    );
-  });
-  
-  // Also search chats owned by businessB that include businessA (bidirectional)
-  if (!chat && businessB) {
-    const { chats: chatsB } = await repos.chatRepo.getByBusinessId(businessB);
-    chat = chatsB.find(c => {
-      if (!c.participants || !Array.isArray(c.participants)) return false;
-      return c.participants.some(p =>
-        p === businessA || p.businessId === businessA || p.companyId === businessA
-      );
-    });
-  }
-  
-  // If no existing chat found in either direction, create one
-  if (!chat && businessB) {
-    chat = await repos.chatRepo.create({
-      id: `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      companyId: businessA,
-      type: 'supplier',
-      name: 'Business Chat',
-      participants: [businessA, businessB],
-      unreadCount: 0
-    });
-  }
-  
-  // If still no chat (single-party event), create a dedicated activity feed chat
-  if (!chat) {
-    chat = await repos.chatRepo.create({
-      id: `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      companyId: businessA,
-      type: 'internal',
-      name: 'Activity Feed',
-      participants: [businessA],
-      unreadCount: 0,
-    });
-  }
-  
-  return chat;
-}
-
-/**
- * Generate human-readable content based on message type
- */
-function generateMessageContent(type, metadata) {
-  switch (type) {
-    case 'order_event':
-      return `New order #${metadata.orderNumber || metadata.entityId} created`;
-    case 'status_update':
-      return `Order status changed from ${metadata.previousStatus} to ${metadata.status}`;
-    case 'invoice':
-      return `Invoice for ${formatCurrency(metadata.amount, metadata.currency)} sent`;
-    case 'estimate':
-      return `Estimate for ${formatCurrency(metadata.amount, metadata.currency)} sent`;
-    case 'estimate_confirmed':
-      return `Estimate confirmed and converted to invoice`;
-    case 'stock_alert':
-      return `Low stock alert: ${metadata.productName || 'Unknown product'} has only ${metadata.currentStock ?? 0} units remaining`;
-    default:
-      return `Business event: ${type}`;
-  }
-}
-
-/**
- * Get entity type from message type
- */
-function getEntityType(type) {
-  switch (type) {
-    case 'order_event':
-    case 'status_update':
-      return 'order';
-    case 'invoice':
-      return 'invoice';
-    case 'estimate':
-    case 'estimate_confirmed':
-      return 'estimate';
-    case 'stock_alert':
-      return 'stock';
-    default:
-      return 'unknown';
-  }
-}
-
-/**
- * Format currency for display
- */
-function formatCurrency(amount, currency = 'EUR') {
-  if (!amount) return '€0.00';
-  return new Intl.NumberFormat('en-EU', {
-    style: 'currency',
-    currency: currency
-  }).format(amount);
-}
-
 // ============================================================================
-// Order events (dedicated path — see CHAT_AUDIT.md Theme A / Phase 2)
-// Orders resolve to a canonical buyer<->seller chat with real USER participants,
-// carry a full OrderEventPayload the card can render, and broadcast + push live.
-// This is intentionally separate from createEventMessage so invoices/procurement
-// keep their current behaviour untouched.
+// Business event → chat bridge. Each domain (orders / invoices / procurement)
+// has a dedicated post*Event() that resolves a canonical chat with real USER
+// participants and broadcasts + pushes live. See CHAT_AUDIT.md Theme A.
 // ============================================================================
 
 /** Accepted member USER ids of a business (empty array on any failure). */
@@ -465,11 +303,68 @@ async function postInvoiceEvent({ invoice, actorId, actorName, kind, details = n
   return created;
 }
 
+/** Human-readable line for a procurement / stock event. */
+function procurementText(type, metadata = {}) {
+  const m = metadata || {};
+  switch (type) {
+    case 'purchase_request_created':   return 'Purchase request created';
+    case 'purchase_request_submitted': return 'Purchase request submitted for approval';
+    case 'purchase_request_approved':  return 'Purchase request approved';
+    case 'purchase_request_rejected':  return `Purchase request rejected${m.reason ? `: ${m.reason}` : ''}`;
+    case 'purchase_order_sent':        return 'Purchase order sent to supplier';
+    case 'purchase_order_confirmed':   return 'Purchase order confirmed';
+    case 'purchase_order_received':    return 'Purchase order fully received';
+    case 'purchase_order_status_changed':
+      return `Purchase order: ${m.fromStatus || '—'} → ${m.toStatus || '—'}`;
+    case 'goods_received': {
+      const n = Number(m.itemCount) || 0;
+      return `Goods received (${n} item${n === 1 ? '' : 's'})`;
+    }
+    case 'stock_alert':
+      return `Low stock: ${m.productName || 'a product'} — ${m.currentStock ?? 0} left`;
+    default:
+      return 'Business update';
+  }
+}
+
+/**
+ * Post an internal procurement / stock event (purchase requests, purchase orders,
+ * goods receipts, low-stock alerts) as a live system line into the business's own
+ * activity feed (all accepted members). Internal-only — no external counterparty.
+ * @returns {Promise<object|null>} the created (mapped) message, or null
+ */
+async function postProcurementEvent({ businessId, type, entityId, actorId, actorName, metadata = {} }) {
+  const repos = getRepos();
+  if (!businessId) return null;
+
+  let businessName = null;
+  try { businessName = (await repos.businessRepo.getById(businessId))?.name || null; } catch (e) { /* ignore */ }
+
+  const { chatId } = await resolveBusinessPairChat({
+    sellerBiz: businessId,
+    otherBiz: null,
+    chatName: `${businessName || 'Business'} · Activity`,
+  });
+
+  const humanText = procurementText(type, metadata);
+
+  const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const { message: created, participantCounts } = await repos.chatRepo.addMessage(chatId, {
+    id: messageId,
+    type: 'event',
+    content: humanText,
+    sender: { id: actorId, name: actorName },
+    status: 'sent',
+    meta: { isSystem: true, event: humanText, entityId, entityType: 'procurement', procurementType: type },
+  }, { incrementUnread: true });
+
+  broadcastEventMessage({ chatId, created, participantCounts, humanText, actorId, actorName });
+  return created;
+}
+
 module.exports = {
   init,
-  createEventMessage,
   postOrderEvent,
   postInvoiceEvent,
-  findOrCreateChat,
-  generateMessageContent
+  postProcurementEvent,
 };

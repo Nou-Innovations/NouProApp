@@ -64,8 +64,15 @@ appears in real time. Verified by reading the service directly.
 > (migration `20260708130000_add_invoice_client_business`) populated from the client the invoice form
 > already picks (`CreateInvoiceScreen`); recipient resolves via `clientBusinessId` → else linked
 > `order.buyerBusinessId` → else the seller's activity feed. Invoice/estimate create + send post a live
-> `InvoiceEventCard`; estimate acceptance/conversion posts a system line. **Procurement/stock events remain
-> unchanged** (still persist-only via `createEventMessage`) — the only Theme A items still open.
+> `InvoiceEventCard`; estimate acceptance/conversion posts a system line.
+>
+> **STATUS — Theme A COMPLETE (2026-07-08, procurement/stock):** `eventMessages.postProcurementEvent()`
+> posts purchase-request / purchase-order / goods-received / low-stock events as live `event` system
+> lines into the business's own `chat-actfeed-<businessId>` team feed (all members, socket + push), with
+> proper text. 7 sites rewired (server.js + orderStatus.js). The legacy `createEventMessage` /
+> `findOrCreateChat` / `generateMessageContent` are now **deleted** (all domains use `post*Event`). **All
+> of Theme A is now live in chat** (orders + invoices/estimates + procurement). Deferred enhancement:
+> route `purchase_order_sent` to a platform supplier's chat when `Supplier.supplierBusinessId` is set.
 
 ### A0 · [P0] Event messages never appear live — no socket emit, no push
 `createEventMessage` calls `chatRepo.addMessage` (`eventMessages.js:45`) but **never** calls

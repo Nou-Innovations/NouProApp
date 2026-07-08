@@ -130,6 +130,7 @@ export type BusinessTabParamList = {
   Categories: undefined;
   Brands: undefined;
   Collections: undefined;
+  Customers: undefined;
   Stock: undefined;
   ProductVisibility: undefined;
   PriceLists: undefined;
@@ -228,6 +229,11 @@ export type RootStackParamList = {
   Collections: undefined;
   CreateCollection: { manage?: boolean; collectionId?: string } | undefined;
 
+  // Customer screens (sell-side CRM directory)
+  Customers: undefined;
+  CustomerDetail: { customerId: string };
+  AddCustomer: { customerId?: string } | undefined;
+
   // Brand screens
   Brands: undefined;
   CreateBrand: {
@@ -248,7 +254,7 @@ export type RootStackParamList = {
   PlaceOrder: { businessId: string; businessName: string };
 
   // Invoice screens
-  CreateInvoice: { type?: 'invoice' | 'estimate'; invoiceId?: string };
+  CreateInvoice: { type?: 'invoice' | 'estimate'; invoiceId?: string; presetCustomer?: { id: string; name: string; email?: string | null; phone?: string | null; address?: string | null; customerBusinessId?: string | null } };
   InvoiceDetails: { invoiceId: string };
   ReceivedPayments: { 
     invoiceId: string; 

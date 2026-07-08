@@ -106,7 +106,10 @@ export interface InvoiceFilters {
 export interface CreateInvoiceData {
   clientName: string;
   clientEmail: string;
+  clientPhone?: string;
+  clientAddress?: string;
   clientBusinessId?: string;
+  customerId?: string;
   items: Omit<InvoiceItem, 'totalPrice'>[] | InvoiceItem[];
   type: InvoiceType;
   issueDate?: string;

@@ -109,6 +109,8 @@ model Business {
   stockMovements          StockMovement[]
   transfers               Transfer[]
   priceLists              PriceList[]
+  customers               Customer[]            @relation("BusinessCustomers")
+  customerLinks           Customer[]            @relation("CustomerLinkedBusiness")
 }
 
 model Location {
@@ -488,6 +490,7 @@ model Invoice {
   clientEmail        String?
   clientPhone        String?
   clientAddress      String?
+  customerId         String?
   amount             Float?
   taxAmount          Float?
   totalAmount        Float?
@@ -517,6 +520,7 @@ model Invoice {
   @@index([createdAt])
   @@index([orderId])
   @@index([clientBusinessId])
+  @@index([customerId])
 }
 
 model Chat {
@@ -1179,6 +1183,38 @@ model Task {
   @@index([linkedOrderId])
   @@index([linkedDeliveryId])
   @@index([linkedInvoiceId])
+}
+
+// ── Customer (sell-side CRM directory) ──
+// Mirrors Supplier (buy-side): a record a business keeps about who it sells to.
+// Supports both a linked NouPro business (customerBusinessId) AND a standalone
+// external contact (name/email/phone only, no link).
+
+enum CustomerStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model Customer {
+  id                 String         @id
+  businessId         String
+  customerBusinessId String?
+  name               String
+  contactName        String?
+  email              String?
+  phone              String?
+  address            String?
+  notes              String?
+  status             CustomerStatus @default(ACTIVE)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  business         Business  @relation("BusinessCustomers", fields: [businessId], references: [id], onDelete: Cascade)
+  customerBusiness Business? @relation("CustomerLinkedBusiness", fields: [customerBusinessId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([customerBusinessId])
 }
 
 // ── Procurement Models ──

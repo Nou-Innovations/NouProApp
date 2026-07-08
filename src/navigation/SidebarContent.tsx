@@ -230,7 +230,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
   const TAB_ROUTES = new Set([
     'LogisticsOverview', 'Deliveries', 'Transfers', 'Orders', 'MyDeliveries', 'Routes',
     'Issues', 'Returns', 'DeliveriesAnalytics', 'Products', 'Categories', 'Brands', 'Collections', 'Stock',
-    'ProductVisibility', 'PriceLists', 'Invoices', 'TeamManagement', 'Locations', 'CompanySettings', 'SubscriptionHub',
+    'ProductVisibility', 'PriceLists', 'Invoices', 'TeamManagement', 'Locations', 'Customers', 'CompanySettings', 'SubscriptionHub',
     'BottomSheetGallery', 'MessageGallery', 'ButtonGallery', 'ProductGallery',
   ]);
 
@@ -446,8 +446,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
           title: 'Business',
           items: [
             { label: 'Public profile', icon: 'business-outline', onPress: () => go('ViewBusinessProfile', { businessId: activeBusiness!.id }) },
-            // COMING-SOON (hidden for v1 store submission — restore when built):
-            // { label: 'Customers', icon: 'people-outline', onPress: () => comingSoon('Customers') },
+            { label: 'Customers', icon: 'people-outline', route: 'Customers', onPress: () => go('Customers') },
             { label: 'Team', icon: 'person-add-outline', route: 'TeamManagement', onPress: () => go('TeamManagement', { businessId: activeBusiness!.id }) },
             { label: 'Locations', icon: 'location-outline', route: 'Locations', onPress: () => go('Locations') },
             // COMING-SOON (hidden for v1 store submission — restore when built):

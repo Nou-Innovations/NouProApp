@@ -281,10 +281,9 @@ async function emitLowStockAlerts(repos, order) {
       if (available <= LOW_STOCK_THRESHOLD) {
         const eventMessages = require('./eventMessages');
         const product = await repos.productRepo.getById(productId);
-        await eventMessages.createEventMessage({
+        await eventMessages.postProcurementEvent({
+          businessId: order.businessId,
           type: 'stock_alert',
-          fromBusinessId: order.businessId,
-          toBusinessId: null,
           entityId: productId,
           actorId: 'system',
           actorName: 'System',

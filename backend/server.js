@@ -4687,6 +4687,241 @@ app.delete('/api/companies/:companyId/collections/:collectionId/products/:produc
 });
 
 // ============================================================================
+// CUSTOMER ROUTES (sell-side CRM directory — free for all tiers)
+// Mirrors the Supplier (buy-side) pattern. A customer may link to a NouPro
+// business or be a standalone external contact. Auto-seeded from past invoices.
+// ============================================================================
+
+// Stable de-dupe key for a client identity (prefers the business link).
+function customerIdentityKey({ customerBusinessId, name, email } = {}) {
+  if (customerBusinessId) return `biz:${customerBusinessId}`;
+  const n = (name || '').trim().toLowerCase();
+  const e = (email || '').trim().toLowerCase();
+  return n ? `name:${n}|${e}` : null;
+}
+
+// Auto-add or link a Customer from an invoice's client fields, and back-link the
+// invoice via customerId. Idempotent (findByIdentity dedupes). Returns the invoice.
+async function linkInvoiceCustomer(invoice) {
+  try {
+    if (!invoice || invoice.customerId) return invoice;
+    if (!invoice.clientName && !invoice.clientBusinessId) return invoice;
+    const existing = await repos.customerRepo.findByIdentity(invoice.businessId, {
+      customerBusinessId: invoice.clientBusinessId,
+      name: invoice.clientName,
+      email: invoice.clientEmail,
+    });
+    const customer = existing || (await repos.customerRepo.create({
+      id: 'cus-' + uuidv4().slice(0, 8),
+      businessId: invoice.businessId,
+      customerBusinessId: invoice.clientBusinessId || null,
+      name: (invoice.clientName || '').trim() || 'Unnamed customer',
+      email: invoice.clientEmail || null,
+      phone: invoice.clientPhone || null,
+      address: invoice.clientAddress || null,
+      status: 'ACTIVE',
+    }));
+    return await repos.invoiceRepo.update(invoice.id, { customerId: customer.id });
+  } catch (e) {
+    logger.warn('[Invoice] customer auto-link failed:', e.message);
+    return invoice;
+  }
+}
+
+// List customers for a company (optional ?search= & ?status=)
+app.get('/api/companies/:companyId/customers', requireAuth, async (req, res) => {
+  try {
+    const { search, status } = req.query;
+    const customers = await repos.customerRepo.getByBusinessId(req.params.companyId, { search, status });
+    res.json(successResponse(customers));
+  } catch (e) {
+    logger.error('Error fetching customers:', e);
+    res.status(500).json(errorResponse('Failed to fetch customers'));
+  }
+});
+
+// Single customer with invoice/order history + totals
+app.get('/api/companies/:companyId/customers/:customerId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, customerId } = req.params;
+    const customer = await repos.customerRepo.getById(customerId);
+    if (!customer || customer.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Customer not found'));
+    }
+    const { invoices, orders } = await repos.customerRepo.getHistory(companyId, customer);
+    const totalInvoiced = invoices.reduce((s, i) => s + (i.totalAmount || 0), 0);
+    const totalPaid = invoices.reduce((s, i) => s + (i.paidAmount || 0), 0);
+    const dates = [...invoices, ...orders].map((r) => r.createdAt).filter(Boolean);
+    const lastActivityAt = dates.length
+      ? new Date(Math.max(...dates.map((d) => new Date(d).getTime())))
+      : null;
+    res.json(successResponse({
+      ...customer,
+      invoices,
+      orders,
+      stats: { invoiceCount: invoices.length, orderCount: orders.length, totalInvoiced, totalPaid, lastActivityAt },
+    }));
+  } catch (e) {
+    logger.error('Error fetching customer:', e);
+    res.status(500).json(errorResponse('Failed to fetch customer'));
+  }
+});
+
+// Create a customer
+app.post('/api/companies/:companyId/customers', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+    const { name, contactName, email, phone, address, notes, customerBusinessId, status } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json(errorResponse('Customer name is required'));
+    }
+
+    const newCustomer = await repos.customerRepo.create({
+      id: 'cus-' + uuidv4().slice(0, 8),
+      businessId: companyId,
+      customerBusinessId: customerBusinessId || null,
+      name: name.trim(),
+      contactName: contactName || null,
+      email: email || null,
+      phone: phone || null,
+      address: address || null,
+      notes: notes || null,
+      status: status === 'ARCHIVED' ? 'ARCHIVED' : 'ACTIVE',
+    });
+
+    res.status(201).json(successResponse(newCustomer));
+  } catch (e) {
+    logger.error('Error creating customer:', e);
+    res.status(500).json(errorResponse('Failed to create customer'));
+  }
+});
+
+// Update a customer
+app.patch('/api/companies/:companyId/customers/:customerId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, customerId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+    const customer = await repos.customerRepo.getById(customerId);
+    if (!customer || customer.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Customer not found'));
+    }
+
+    const { name, contactName, email, phone, address, notes, customerBusinessId, status } = req.body;
+    const updated = await repos.customerRepo.update(customerId, {
+      ...(name !== undefined && { name }),
+      ...(contactName !== undefined && { contactName }),
+      ...(email !== undefined && { email }),
+      ...(phone !== undefined && { phone }),
+      ...(address !== undefined && { address }),
+      ...(notes !== undefined && { notes }),
+      ...(customerBusinessId !== undefined && { customerBusinessId: customerBusinessId || null }),
+      ...(status !== undefined && { status: status === 'ARCHIVED' ? 'ARCHIVED' : 'ACTIVE' }),
+      updatedAt: new Date(),
+    });
+
+    res.json(successResponse(updated));
+  } catch (e) {
+    logger.error('Error updating customer:', e);
+    res.status(500).json(errorResponse('Failed to update customer'));
+  }
+});
+
+// Delete a customer (admin only)
+app.delete('/api/companies/:companyId/customers/:customerId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, customerId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
+
+    const customer = await repos.customerRepo.getById(customerId);
+    if (!customer || customer.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Customer not found'));
+    }
+
+    await repos.customerRepo.delete(customerId);
+    res.json(successResponse(null, 'Customer deleted successfully'));
+  } catch (e) {
+    logger.error('Error deleting customer:', e);
+    res.status(500).json(errorResponse('Failed to delete customer'));
+  }
+});
+
+// Seed customers from existing invoices + orders (idempotent). Also back-links the
+// source invoices/orders via customerId so history is precise immediately.
+app.post('/api/companies/:companyId/customers/seed', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+    const [existing, invoices, orders] = await Promise.all([
+      repos.customerRepo.getByBusinessId(companyId),
+      repos.invoiceRepo.getByBusinessId(companyId),
+      repos.orderRepo.getByBusinessId(companyId),
+    ]);
+
+    // identityKey -> customerId for everything we already have.
+    const keyToId = new Map();
+    for (const c of existing) {
+      const k = customerIdentityKey({ customerBusinessId: c.customerBusinessId, name: c.name, email: c.email });
+      if (k) keyToId.set(k, c.id);
+    }
+
+    // Collect distinct new identities from invoices + orders.
+    const identities = [];
+    const seen = new Set(keyToId.keys());
+    const addIdentity = (idn) => {
+      const k = customerIdentityKey(idn);
+      if (!k || seen.has(k)) return;
+      seen.add(k);
+      identities.push({ key: k, idn });
+    };
+    for (const inv of invoices) {
+      addIdentity({ customerBusinessId: inv.clientBusinessId, name: inv.clientName, email: inv.clientEmail, phone: inv.clientPhone, address: inv.clientAddress });
+    }
+    for (const ord of orders) {
+      addIdentity({ customerBusinessId: ord.buyerBusinessId, name: ord.buyerBusinessName || ord.customerName, phone: ord.customerPhone, address: ord.customerAddress });
+    }
+
+    // Create the new customers.
+    let created = 0;
+    for (const { key, idn } of identities) {
+      const c = await repos.customerRepo.create({
+        id: 'cus-' + uuidv4().slice(0, 8),
+        businessId: companyId,
+        customerBusinessId: idn.customerBusinessId || null,
+        name: (idn.name || '').trim() || 'Unnamed customer',
+        email: idn.email || null,
+        phone: idn.phone || null,
+        address: idn.address || null,
+        status: 'ACTIVE',
+      });
+      keyToId.set(key, c.id);
+      created += 1;
+    }
+
+    // Best-effort: back-link invoices/orders that have no customerId yet.
+    await Promise.all(invoices.filter((inv) => !inv.customerId).map((inv) => {
+      const k = customerIdentityKey({ customerBusinessId: inv.clientBusinessId, name: inv.clientName, email: inv.clientEmail });
+      const cid = k && keyToId.get(k);
+      return cid ? repos.invoiceRepo.update(inv.id, { customerId: cid }).catch(() => {}) : null;
+    }).filter(Boolean));
+    await Promise.all(orders.filter((ord) => !ord.customerId).map((ord) => {
+      const k = customerIdentityKey({ customerBusinessId: ord.buyerBusinessId, name: ord.buyerBusinessName || ord.customerName });
+      const cid = k && keyToId.get(k);
+      return cid ? repos.orderRepo.update(ord.id, { customerId: cid }).catch(() => {}) : null;
+    }).filter(Boolean));
+
+    const total = await repos.customerRepo.countByBusinessId(companyId);
+    res.json(successResponse({ created, total }));
+  } catch (e) {
+    logger.error('Error seeding customers:', e);
+    res.status(500).json(errorResponse('Failed to seed customers'));
+  }
+});
+
+// ============================================================================
 // PRICE LIST ROUTES (customer-specific pricing)
 // Gated by canUseBusinessSpecificPricing (Business+). The seller owns the lists;
 // they are applied to customer businesses via assignment or manual selection.
@@ -7141,10 +7376,9 @@ app.post('/api/companies/:companyId/purchase-requests', requireAuth, procurement
     // Activity event (non-blocking)
     try {
       const eventMessages = require('./src/services/eventMessages');
-      await eventMessages.createEventMessage({
+      await eventMessages.postProcurementEvent({
+        businessId: req.params.companyId,
         type: 'purchase_request_created',
-        fromBusinessId: req.params.companyId,
-        toBusinessId: null,
         entityId: pr.id,
         actorId: req.user?.id,
         actorName: req.user?.name || 'Staff',
@@ -7222,10 +7456,9 @@ app.post('/api/companies/:companyId/purchase-requests/:prId/submit', requireAuth
     // Activity event (non-blocking)
     try {
       const eventMessages = require('./src/services/eventMessages');
-      await eventMessages.createEventMessage({
+      await eventMessages.postProcurementEvent({
+        businessId: req.params.companyId,
         type: 'purchase_request_submitted',
-        fromBusinessId: req.params.companyId,
-        toBusinessId: null,
         entityId: pr.id,
         actorId: req.user?.id,
         actorName: req.user?.name || 'Staff',
@@ -7269,10 +7502,9 @@ app.post('/api/companies/:companyId/purchase-requests/:prId/approve', requireAut
     // Activity event (non-blocking)
     try {
       const eventMessages = require('./src/services/eventMessages');
-      await eventMessages.createEventMessage({
+      await eventMessages.postProcurementEvent({
+        businessId: req.params.companyId,
         type: 'purchase_request_approved',
-        fromBusinessId: req.params.companyId,
-        toBusinessId: null,
         entityId: pr.id,
         actorId: req.user?.id,
         actorName: req.user?.name || 'Admin',
@@ -7320,10 +7552,9 @@ app.post('/api/companies/:companyId/purchase-requests/:prId/reject', requireAuth
     // Activity event (non-blocking)
     try {
       const eventMessages = require('./src/services/eventMessages');
-      await eventMessages.createEventMessage({
+      await eventMessages.postProcurementEvent({
+        businessId: req.params.companyId,
         type: 'purchase_request_rejected',
-        fromBusinessId: req.params.companyId,
-        toBusinessId: null,
         entityId: pr.id,
         actorId: req.user?.id,
         actorName: req.user?.name || 'Admin',
@@ -7528,10 +7759,9 @@ app.patch('/api/companies/:companyId/purchase-orders/:poId/status', requireAuth,
         : nextStatus === 'RECEIVED' ? 'purchase_order_received'
         : 'purchase_order_status_changed';
 
-      await eventMessages.createEventMessage({
+      await eventMessages.postProcurementEvent({
+        businessId: req.params.companyId,
         type: eventType,
-        fromBusinessId: req.params.companyId,
-        toBusinessId: null,
         entityId: po.id,
         actorId: req.user?.id,
         actorName: req.user?.name || 'Admin',
@@ -7697,10 +7927,9 @@ app.post('/api/companies/:companyId/purchase-orders/:poId/receive', requireAuth,
     // Activity event (non-blocking)
     try {
       const eventMessages = require('./src/services/eventMessages');
-      await eventMessages.createEventMessage({
+      await eventMessages.postProcurementEvent({
+        businessId: req.params.companyId,
         type: 'goods_received',
-        fromBusinessId: req.params.companyId,
-        toBusinessId: null,
         entityId: grn.id,
         actorId: req.user?.id,
         actorName: req.user?.name || 'Staff',
@@ -9280,10 +9509,10 @@ app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => 
       const invoiceNumber = `${prefix}-${new Date().getFullYear()}-${String(maxNum + 1).padStart(3, '0')}`;
 
       // SECURITY: Extract only allowed fields from req.body to prevent mass assignment
-      const { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId,
+      const { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId, customerId,
               items, notes, currency, taxRate, discountAmount, dueDate, type: invoiceType,
               totalAmount, subtotal, taxAmount } = req.body;
-      const safeBody = { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId,
+      const safeBody = { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId, customerId,
                          items, notes, currency, taxRate, discountAmount, dueDate,
                          totalAmount, subtotal, taxAmount };
       // Remove undefined keys
@@ -9317,6 +9546,9 @@ app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => 
     if (!created) {
       return res.status(500).json(errorResponse('Failed to generate unique invoice number after retries', 'CREATE_ERROR'));
     }
+
+    // CRM: auto-add/link a Customer from the invoice's client fields (idempotent).
+    created = await linkInvoiceCustomer(created);
 
     // Create event message if invoice is being sent (not draft)
     if (created.status && created.status !== 'DRAFT') {
@@ -9493,10 +9725,10 @@ app.post('/api/locations/:locationId/invoices', requireAuth, async (req, res) =>
       const invoiceNumber = `${prefix}-${new Date().getFullYear()}-${String(maxLocNum + 1).padStart(3, '0')}`;
 
       // SECURITY: Extract only allowed fields from req.body to prevent mass assignment
-      const { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId,
+      const { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId, customerId,
               items, notes, currency, taxRate, discountAmount, dueDate, type: invoiceType,
               totalAmount, subtotal, taxAmount, issueDate } = req.body;
-      const safeBody = { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId,
+      const safeBody = { clientName, clientEmail, clientPhone, clientAddress, clientBusinessId, customerId,
                          items, notes, currency, taxRate, discountAmount, dueDate,
                          totalAmount, subtotal, taxAmount };
       if (issueDate) safeBody.issueDate = new Date(issueDate);
@@ -9530,6 +9762,9 @@ app.post('/api/locations/:locationId/invoices', requireAuth, async (req, res) =>
     if (!created) {
       return res.status(500).json(errorResponse('Failed to generate unique invoice number after retries', 'CREATE_ERROR'));
     }
+
+    // CRM: auto-add/link a Customer from the invoice's client fields (idempotent).
+    created = await linkInvoiceCustomer(created);
 
     // Create event message if invoice is being sent (not draft)
     if (created.status && created.status !== 'DRAFT') {
