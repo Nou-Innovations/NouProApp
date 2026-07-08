@@ -457,12 +457,15 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
   const buildInvoicePayload = (status: 'DRAFT' | 'SENT') => ({
     clientName: selectedClient?.name || '',
     clientEmail: selectedClient?.email || '',
+    // Persist which platform business the client is, so invoices/estimates can be
+    // delivered live into that business's chat (the picker only lists businesses).
+    clientBusinessId: selectedClient?.type === 'business' ? selectedClient.id : undefined,
     amount: subtotal,
     taxAmount: totalTax,
     totalAmount: total,
     discount: globalDiscount || 0,
     shipping: shipping || 0,
-    type: documentType.toLowerCase(), // 'invoice' or 'estimate'
+    type: documentType.toLowerCase() as 'invoice' | 'estimate', // 'invoice' or 'estimate'
     issueDate: issueDate.toISOString().split('T')[0],
     dueDate: dueDate.toISOString().split('T')[0],
     items: selectedItems.map((item) => ({

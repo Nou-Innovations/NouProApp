@@ -482,6 +482,7 @@ model Invoice {
   issuedByScope      InvoiceScope   @default(PARENT)
   issuedByLocationId String?
   orderId            String?
+  clientBusinessId   String?
   invoiceNumber      String?
   clientName         String?
   clientEmail        String?
@@ -515,6 +516,7 @@ model Invoice {
   @@index([status])
   @@index([createdAt])
   @@index([orderId])
+  @@index([clientBusinessId])
 }
 
 model Chat {

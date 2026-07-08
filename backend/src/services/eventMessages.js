@@ -197,6 +197,88 @@ async function resolveMemberUserIds(businessId) {
 }
 
 /**
+ * Find (or create) the canonical chat for a seller and an optional counterpart business,
+ * with real USER participants. Deterministic id → one shared chat per business pair (so a
+ * business's orders + invoices land together), no duplicates. Reconciles participants
+ * non-destructively when the chat already exists.
+ * @returns {Promise<{ chatId: string, participantIds: string[] }>}
+ */
+async function resolveBusinessPairChat({ sellerBiz, otherBiz = null, extraUserIds = [], chatName }) {
+  const repos = getRepos();
+  const isPair = !!otherBiz && otherBiz !== sellerBiz;
+
+  const [sellerUserIds, otherUserIds] = await Promise.all([
+    resolveMemberUserIds(sellerBiz),
+    isPair ? resolveMemberUserIds(otherBiz) : Promise.resolve([]),
+  ]);
+  const participantIds = Array.from(new Set([
+    ...sellerUserIds, ...otherUserIds, ...extraUserIds,
+  ].filter(Boolean)));
+
+  const chatId = isPair
+    ? `chat-ord-${[otherBiz, sellerBiz].sort().join('__')}`
+    : `chat-actfeed-${sellerBiz}`;
+
+  let chat = await repos.chatRepo.getById(chatId);
+  if (!chat) {
+    try {
+      chat = await repos.chatRepo.create({
+        id: chatId,
+        companyId: sellerBiz,
+        type: isPair ? 'supplier' : 'internal',
+        name: chatName || (isPair ? 'Business chat' : 'Activity Feed'),
+        participants: participantIds,
+        unreadCount: 0,
+      });
+    } catch (createErr) {
+      // Lost a create race with a concurrent event — reuse the now-existing chat.
+      chat = await repos.chatRepo.getById(chatId);
+      if (!chat) throw createErr;
+    }
+  }
+  if (chat) {
+    const existing = Array.isArray(chat.participants) ? chat.participants : [];
+    const missing = participantIds.filter((id) => !existing.includes(id));
+    if (missing.length) {
+      try { await repos.chatRepo.addParticipants(chatId, missing); } catch (e) { /* ignore */ }
+    }
+  }
+  return { chatId, participantIds };
+}
+
+/**
+ * Broadcast a just-persisted event message live + push offline participants.
+ * Mirrors the normal send route; never throws (realtime failure must not break the op).
+ */
+function broadcastEventMessage({ chatId, created, participantCounts, humanText, actorId, actorName }) {
+  try {
+    if (deps.io) {
+      deps.io.to(`chat:${chatId}`).emit('message', created);
+      const lastMessagePayload = {
+        id: created.id,
+        content: humanText,
+        type: created.type || 'event',
+        senderId: actorId,
+        senderName: actorName || '',
+        timestamp: created.timestamp,
+      };
+      for (const p of participantCounts) {
+        deps.io.to(`user:${p.userId}`).emit('chat_update', {
+          id: chatId,
+          unreadCount: p.unreadCount,
+          lastMessage: lastMessagePayload,
+        });
+      }
+    }
+    if (deps.sendPushToOfflineParticipants) {
+      deps.sendPushToOfflineParticipants(chatId, actorName || 'NouPro', humanText, actorId);
+    }
+  } catch (emitErr) {
+    // realtime/push failure must not fail the underlying operation
+  }
+}
+
+/**
  * Post an order lifecycle event (created / status change) into the canonical
  * buyer<->seller chat, live.
  * @param {object} params
@@ -214,24 +296,7 @@ async function postOrderEvent({ order, actorId, actorName, previousStatus = null
   const buyerBiz = order.buyerBusinessId || null;
   const isB2B = !!buyerBiz;
 
-  // 1. Resolve real USER participants (business ids are NEVER stored as participants).
-  const [sellerUserIds, buyerUserIds] = await Promise.all([
-    resolveMemberUserIds(sellerBiz),
-    isB2B ? resolveMemberUserIds(buyerBiz) : Promise.resolve([]),
-  ]);
-  const participantIds = Array.from(new Set([
-    ...sellerUserIds,
-    ...buyerUserIds,
-    ...(order.createdBy ? [order.createdBy] : []),
-  ].filter(Boolean)));
-
-  // 2. Canonical, deterministic chat id → same chat regardless of event direction,
-  //    and no duplicates (fixes A3/A7). B2B = supplier chat; B2C = seller activity feed.
-  const chatId = isB2B
-    ? `chat-ord-${[buyerBiz, sellerBiz].sort().join('__')}`
-    : `chat-actfeed-${sellerBiz}`;
-
-  // Business records for buyer/seller display on the card (best-effort).
+  // Business records for buyer/seller display on the card + the chat name (best-effort).
   let sellerBusiness = null;
   let buyerBusiness = null;
   try { sellerBusiness = await repos.businessRepo.getById(sellerBiz); } catch (e) { /* ignore */ }
@@ -242,33 +307,15 @@ async function postOrderEvent({ order, actorId, actorName, previousStatus = null
     ? `${sellerBusiness?.name || 'Seller'} ↔ ${buyerBusiness?.name || order.buyerBusinessName || 'Buyer'}`
     : `${sellerBusiness?.name || 'Business'} · Orders`;
 
-  // 3. Find-or-create the chat; reconcile participants if it already exists.
-  let chat = await repos.chatRepo.getById(chatId);
-  if (!chat) {
-    try {
-      chat = await repos.chatRepo.create({
-        id: chatId,
-        companyId: sellerBiz,
-        type: isB2B ? 'supplier' : 'internal',
-        name: chatName,
-        participants: participantIds,
-        unreadCount: 0,
-      });
-    } catch (createErr) {
-      // Lost a create race with a concurrent event — reuse the now-existing chat.
-      chat = await repos.chatRepo.getById(chatId);
-      if (!chat) throw createErr;
-    }
-  }
-  if (chat) {
-    const existing = Array.isArray(chat.participants) ? chat.participants : [];
-    const missing = participantIds.filter((id) => !existing.includes(id));
-    if (missing.length) {
-      try { await repos.chatRepo.addParticipants(chatId, missing); } catch (e) { /* ignore */ }
-    }
-  }
+  // Canonical buyer<->seller chat with real user participants (incl. the order creator).
+  const { chatId } = await resolveBusinessPairChat({
+    sellerBiz,
+    otherBiz: buyerBiz,
+    extraUserIds: order.createdBy ? [order.createdBy] : [],
+    chatName,
+  });
 
-  // 4. Build the OrderEventPayload the card renders (order.status already matches
+  // Build the OrderEventPayload the card renders (order.status already matches
   //    OrderEventStatus, so it is passed through directly).
   let delivery = { type: 'delivery' };
   try {
@@ -335,33 +382,86 @@ async function postOrderEvent({ order, actorId, actorName, previousStatus = null
     meta: { isSystem: true, payload, entityId: order.id, entityType: 'order' },
   }, { incrementUnread: true });
 
-  // 6. Broadcast live + push (mirrors the normal send route). Never break the order flow.
-  try {
-    if (deps.io) {
-      deps.io.to(`chat:${chatId}`).emit('message', created);
-      const lastMessagePayload = {
-        id: created.id,
-        content: humanText,
-        type: 'order_event',
-        senderId: actorId,
-        senderName: actorName || '',
-        timestamp: created.timestamp,
-      };
-      for (const p of participantCounts) {
-        deps.io.to(`user:${p.userId}`).emit('chat_update', {
-          id: chatId,
-          unreadCount: p.unreadCount,
-          lastMessage: lastMessagePayload,
-        });
-      }
-    }
-    if (deps.sendPushToOfflineParticipants) {
-      deps.sendPushToOfflineParticipants(chatId, actorName || 'NouPro', humanText, actorId);
-    }
-  } catch (emitErr) {
-    // realtime/push failure must not fail the order operation
+  broadcastEventMessage({ chatId, created, participantCounts, humanText, actorId, actorName });
+  return created;
+}
+
+/**
+ * Post an invoice / estimate lifecycle event into the client's chat, live.
+ * Recipient business = the invoice's clientBusinessId, else the linked order's buyer.
+ * If neither is known, it lands in the seller's activity feed.
+ * @param {object} params
+ * @param {object} params.invoice   - the full invoice row
+ * @param {string} params.actorId   - user who triggered the event
+ * @param {string} params.actorName - display name of the actor
+ * @param {'invoice'|'estimate'|'estimate_confirmed'} params.kind
+ * @param {object|null} [params.details] - card details (from buildInvoiceCardDetails); omit for estimate_confirmed
+ * @returns {Promise<object|null>} the created (mapped) message, or null
+ */
+async function postInvoiceEvent({ invoice, actorId, actorName, kind, details = null }) {
+  const repos = getRepos();
+  if (!invoice || !invoice.id) return null;
+
+  const sellerBiz = invoice.businessId;
+
+  // Resolve the recipient business: explicit clientBusinessId, else via a linked order's buyer.
+  let recipientBiz = invoice.clientBusinessId || null;
+  if (!recipientBiz && invoice.orderId) {
+    try {
+      const order = await repos.orderRepo.getById(invoice.orderId);
+      recipientBiz = order?.buyerBusinessId || null;
+    } catch (e) { /* ignore */ }
+  }
+  const isPair = !!recipientBiz && recipientBiz !== sellerBiz;
+
+  // Business records for the chat name (best-effort).
+  let sellerBusiness = null;
+  let recipientBusiness = null;
+  try { sellerBusiness = await repos.businessRepo.getById(sellerBiz); } catch (e) { /* ignore */ }
+  if (isPair) {
+    try { recipientBusiness = await repos.businessRepo.getById(recipientBiz); } catch (e) { /* ignore */ }
+  }
+  const chatName = isPair
+    ? `${sellerBusiness?.name || 'Seller'} ↔ ${recipientBusiness?.name || invoice.clientName || 'Client'}`
+    : `${sellerBusiness?.name || 'Business'} · Orders`;
+
+  const { chatId } = await resolveBusinessPairChat({
+    sellerBiz,
+    otherBiz: recipientBiz,
+    chatName,
+  });
+
+  const num = invoice.invoiceNumber || invoice.id;
+
+  // estimate_confirmed → a lightweight system line (no card; avoids duplicating the invoice card).
+  // invoice / estimate → a card carrying meta.details (built by the caller) + the entity id.
+  let messageType;
+  let humanText;
+  let meta;
+  if (kind === 'estimate_confirmed') {
+    messageType = 'event';
+    humanText = `Estimate #${num} accepted`;
+    meta = { isSystem: true, event: humanText, entityId: invoice.id, entityType: 'invoice' };
+  } else {
+    messageType = kind === 'estimate' ? 'estimate' : 'invoice';
+    humanText = messageType === 'estimate' ? `Estimate #${num} sent` : `Invoice #${num} sent`;
+    meta = { isSystem: true, entityId: invoice.id, entityType: messageType };
+    if (details) meta.details = details;
+    if (messageType === 'invoice') meta.invoiceId = invoice.id;
+    else meta.estimateId = invoice.id;
   }
 
+  const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const { message: created, participantCounts } = await repos.chatRepo.addMessage(chatId, {
+    id: messageId,
+    type: messageType,
+    content: humanText,
+    sender: { id: actorId, name: actorName },
+    status: 'sent',
+    meta,
+  }, { incrementUnread: true });
+
+  broadcastEventMessage({ chatId, created, participantCounts, humanText, actorId, actorName });
   return created;
 }
 
@@ -369,6 +469,7 @@ module.exports = {
   init,
   createEventMessage,
   postOrderEvent,
+  postInvoiceEvent,
   findOrCreateChat,
   generateMessageContent
 };

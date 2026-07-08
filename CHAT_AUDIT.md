@@ -56,10 +56,16 @@ appears in real time. Verified by reading the service directly.
 > `OrderEventPayload` and post a rich, **live** (socket + push), tappable order card into a canonical
 > deterministic buyer↔seller chat with real **user** participants (dedup + direction fixed); the card
 > is crash-proofed and its fabricated timelines removed; `handleOrderPress` deep-links to
-> `OrderDetails`; `MessageBubble` no longer renders blank bubbles for any type. **Invoices, estimates,
-> and procurement are intentionally unchanged** (still persist-only via `createEventMessage`) — the
-> Invoice model has no client-business link, deferred by owner decision. So A1/A2/A5/A7 remain **open
-> for invoices/procurement only**.
+> `OrderDetails`; `MessageBubble` no longer renders blank bubbles for any type.
+>
+> **STATUS — Phase 2b shipped (2026-07-08, INVOICES + ESTIMATES):** A0–A5 now also fixed for invoices via
+> `eventMessages.postInvoiceEvent()` (shares `resolveBusinessPairChat` + `broadcastEventMessage` with
+> orders, so a business's orders + invoices land in **one** chat). Added a nullable `Invoice.clientBusinessId`
+> (migration `20260708130000_add_invoice_client_business`) populated from the client the invoice form
+> already picks (`CreateInvoiceScreen`); recipient resolves via `clientBusinessId` → else linked
+> `order.buyerBusinessId` → else the seller's activity feed. Invoice/estimate create + send post a live
+> `InvoiceEventCard`; estimate acceptance/conversion posts a system line. **Procurement/stock events remain
+> unchanged** (still persist-only via `createEventMessage`) — the only Theme A items still open.
 
 ### A0 · [P0] Event messages never appear live — no socket emit, no push
 `createEventMessage` calls `chatRepo.addMessage` (`eventMessages.js:45`) but **never** calls

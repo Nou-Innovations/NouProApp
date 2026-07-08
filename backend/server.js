@@ -9322,22 +9322,12 @@ app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => 
     if (created.status && created.status !== 'DRAFT') {
       try {
         const messageType = created.type === 'estimate' ? 'estimate' : 'invoice';
-        await eventMessages.createEventMessage({
-          type: messageType,
-          fromBusinessId: created.businessId,
-          toBusinessId: null, // B2B invoice messaging requires clientBusinessId field on Invoice model (future enhancement)
-          entityId: created.id,
+        await eventMessages.postInvoiceEvent({
+          invoice: created,
           actorId: req.user?.id,
           actorName: req.user?.name || 'Staff',
-          metadata: { 
-            amount: created.totalAmount || created.total,
-            currency: business.settings?.currency || 'EUR',
-            invoiceNumber: created.invoiceNumber,
-            clientName: created.clientName,
-            invoiceId: created.type === 'invoice' ? created.id : undefined,
-            estimateId: created.type === 'estimate' ? created.id : undefined,
-            details: buildInvoiceCardDetails(created, business.settings?.currency || 'EUR'),
-          }
+          kind: messageType,
+          details: buildInvoiceCardDetails(created, business.settings?.currency || 'EUR'),
         });
       } catch (msgErr) {
         logger.error('Failed to create invoice event message:', msgErr);
@@ -9545,23 +9535,12 @@ app.post('/api/locations/:locationId/invoices', requireAuth, async (req, res) =>
     if (created.status && created.status !== 'DRAFT') {
       try {
         const messageType = created.type === 'estimate' ? 'estimate' : 'invoice';
-        await eventMessages.createEventMessage({
-          type: messageType,
-          fromBusinessId: created.businessId,
-          toBusinessId: null, // B2C invoice
-          entityId: created.id,
+        await eventMessages.postInvoiceEvent({
+          invoice: created,
           actorId: req.user?.id,
           actorName: req.user?.name || 'Staff',
-          metadata: { 
-            amount: created.totalAmount || created.total,
-            currency: business.settings?.currency || 'EUR',
-            invoiceNumber: created.invoiceNumber,
-            clientName: created.clientName,
-            locationId: location.id,
-            invoiceId: created.type === 'invoice' ? created.id : undefined,
-            estimateId: created.type === 'estimate' ? created.id : undefined,
-            details: buildInvoiceCardDetails(created, business.settings?.currency || 'EUR'),
-          }
+          kind: messageType,
+          details: buildInvoiceCardDetails(created, business.settings?.currency || 'EUR'),
         });
       } catch (msgErr) {
         logger.error('Failed to create invoice event message:', msgErr);
@@ -9684,20 +9663,11 @@ app.patch('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
     const isNowInvoice = (updated.type || '').toLowerCase() === 'invoice';
     if (wasEstimate && isNowInvoice) {
       try {
-        await eventMessages.createEventMessage({
-          type: 'estimate_confirmed',
-          fromBusinessId: updated.businessId,
-          toBusinessId: null, // B2B invoice messaging requires clientBusinessId field on Invoice model (future enhancement)
-          entityId: updated.id,
+        await eventMessages.postInvoiceEvent({
+          invoice: updated,
           actorId: req.user?.id,
           actorName: req.user?.name || 'Staff',
-          metadata: {
-            invoiceId: updated.id,
-            invoiceNumber: updated.invoiceNumber,
-            amount: updated.totalAmount || updated.total,
-            currency: updated.currency || 'EUR',
-            clientName: updated.clientName,
-          }
+          kind: 'estimate_confirmed',
         });
       } catch (msgErr) {
         logger.error('Failed to create estimate_confirmed event:', msgErr);
@@ -9708,22 +9678,12 @@ app.patch('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
     if (wasNotSent && isBeingSent) {
       try {
         const messageType = updated.type === 'estimate' ? 'estimate' : 'invoice';
-        await eventMessages.createEventMessage({
-          type: messageType,
-          fromBusinessId: updated.businessId,
-          toBusinessId: null, // B2B invoice messaging requires clientBusinessId field on Invoice model (future enhancement)
-          entityId: updated.id,
+        await eventMessages.postInvoiceEvent({
+          invoice: updated,
           actorId: req.user?.id,
           actorName: req.user?.name || 'Staff',
-          metadata: { 
-            amount: updated.totalAmount || updated.total,
-            currency: updated.currency || 'EUR',
-            invoiceNumber: updated.invoiceNumber,
-            clientName: updated.clientName,
-            invoiceId: updated.type === 'invoice' ? updated.id : undefined,
-            estimateId: updated.type === 'estimate' ? updated.id : undefined,
-            details: buildInvoiceCardDetails(updated, updated.currency || 'EUR'),
-          }
+          kind: messageType,
+          details: buildInvoiceCardDetails(updated, updated.currency || 'EUR'),
         });
       } catch (msgErr) {
         logger.error('Failed to create invoice sent event message:', msgErr);
@@ -9794,20 +9754,11 @@ app.post('/api/invoices/:invoiceId/accept', requireAuth, async (req, res) => {
     const updated = await repos.invoiceRepo.update(req.params.invoiceId, { type: 'invoice' });
     // Emit estimate_confirmed event
     try {
-      await eventMessages.createEventMessage({
-        type: 'estimate_confirmed',
-        fromBusinessId: invoice.businessId,
-        toBusinessId: null, // B2B invoice messaging requires clientBusinessId field on Invoice model (future enhancement)
-        entityId: invoice.id,
+      await eventMessages.postInvoiceEvent({
+        invoice: updated,
         actorId: userId,
         actorName: req.user?.name || 'Client',
-        metadata: {
-          invoiceId: invoice.id,
-          invoiceNumber: invoice.invoiceNumber,
-          amount: invoice.totalAmount,
-          currency: invoice.currency || 'EUR',
-          clientName: invoice.clientName,
-        }
+        kind: 'estimate_confirmed',
       });
     } catch (msgErr) {
       logger.error('Failed to create estimate_confirmed event:', msgErr);
