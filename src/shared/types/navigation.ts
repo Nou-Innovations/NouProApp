@@ -132,6 +132,7 @@ export type BusinessTabParamList = {
   Collections: undefined;
   Customers: undefined;
   Discounts: undefined;
+  Recipes: undefined;
   BusinessAnalytics: undefined;
   Variance: undefined;
   Stock: undefined;
@@ -231,6 +232,10 @@ export type RootStackParamList = {
   // Collection screens (internal product groupings)
   Collections: undefined;
   CreateCollection: { manage?: boolean; collectionId?: string } | undefined;
+
+  // Recipe screens (bill-of-materials)
+  Recipes: undefined;
+  CreateRecipe: { recipeId?: string } | undefined;
 
   // Customer screens (sell-side CRM directory)
   Customers: undefined;

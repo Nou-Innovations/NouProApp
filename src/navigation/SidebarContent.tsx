@@ -229,7 +229,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
   // keeps the bottom nav bar and shows the hamburger (not a back button) at its root.
   const TAB_ROUTES = new Set([
     'LogisticsOverview', 'Deliveries', 'Transfers', 'Orders', 'MyDeliveries', 'Routes',
-    'Issues', 'Returns', 'DeliveriesAnalytics', 'Products', 'Categories', 'Brands', 'Collections', 'Stock',
+    'Issues', 'Returns', 'DeliveriesAnalytics', 'Products', 'Categories', 'Brands', 'Collections', 'Recipes', 'Stock',
     'ProductVisibility', 'PriceLists', 'Discounts', 'Invoices', 'TeamManagement', 'Locations', 'Customers', 'BusinessAnalytics', 'Variance', 'CompanySettings', 'SubscriptionHub',
     'BottomSheetGallery', 'MessageGallery', 'ButtonGallery', 'ProductGallery',
   ]);
@@ -429,8 +429,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
             { label: 'Price lists', icon: 'cash-outline', route: 'PriceLists', onPress: () => go('PriceLists') },
             { label: 'Visibility', icon: 'eye-outline', route: 'ProductVisibility', onPress: () => go('ProductVisibility') },
             { label: 'Discounts', icon: 'pricetag-outline', route: 'Discounts', onPress: () => go('Discounts') },
-            // COMING-SOON (hidden for v1 store submission — restore when built):
-            // { label: 'Recipes', icon: 'restaurant-outline', onPress: () => comingSoon('Recipes') },
+            { label: 'Recipes', icon: 'restaurant-outline', route: 'Recipes', onPress: () => go('Recipes') },
           ],
         },
         {

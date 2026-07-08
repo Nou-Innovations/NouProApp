@@ -113,6 +113,7 @@ model Business {
   customerLinks           Customer[]            @relation("CustomerLinkedBusiness")
   discounts               Discount[]            @relation("BusinessDiscounts")
   targets                 BusinessTarget[]      @relation("BusinessTargets")
+  recipes                 Recipe[]
 }
 
 model Location {
@@ -383,6 +384,8 @@ model Product {
   supplierProducts    SupplierProduct[]
   priceListItems      PriceListItem[]
   collectionProducts  CollectionProduct[]
+  finishedRecipes     Recipe[]             @relation("ProductFinishedRecipe")
+  ingredientIn        RecipeIngredient[]   @relation("ProductAsIngredient")
 
   @@index([businessId])
   @@index([businessId, category])
@@ -1278,6 +1281,45 @@ model BusinessTarget {
 
   @@unique([businessId, period])
   @@index([businessId])
+}
+
+// ── Recipe (bill-of-materials attached to a finished product) ──
+// A Recipe belongs to one finished Product and lists ingredient products with
+// quantities. Powers ingredient-cost → margin. Producing stock is a future add-on.
+
+model Recipe {
+  id          String             @id
+  businessId  String
+  productId   String
+  name        String
+  batchSize   Int                @default(1)
+  yieldUnit   String?
+  notes       String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  business    Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  product     Product            @relation("ProductFinishedRecipe", fields: [productId], references: [id], onDelete: Cascade)
+  ingredients RecipeIngredient[]
+
+  @@unique([businessId, productId])
+  @@index([businessId])
+}
+
+model RecipeIngredient {
+  id        String   @id
+  recipeId  String
+  productId String
+  quantity  Float
+  unit      String?
+  createdAt DateTime @default(now())
+
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  product   Product  @relation("ProductAsIngredient", fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, productId])
+  @@index([recipeId])
+  @@index([productId])
 }
 
 // ── Procurement Models ──

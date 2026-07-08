@@ -4690,6 +4690,230 @@ app.delete('/api/companies/:companyId/collections/:collectionId/products/:produc
 });
 
 // ============================================================================
+// RECIPE ROUTES (bill-of-materials attached to a finished product — quota-gated)
+// A recipe lists ingredient products with quantities → ingredient cost & margin.
+// ============================================================================
+
+// Compute ingredient cost + margin for a recipe (ingredients + product must be loaded).
+function computeRecipeCost(recipe) {
+  const ingredients = (recipe.ingredients || []).map((ing) => {
+    const cost = ing.product?.costPrice ?? null;
+    const lineCost = (cost ?? 0) * (ing.quantity || 0);
+    return {
+      id: ing.id,
+      productId: ing.productId,
+      name: ing.product?.name || 'Ingredient',
+      unit: ing.unit || ing.product?.unit || null,
+      quantity: ing.quantity,
+      costPrice: cost,
+      lineCost: Math.round(lineCost * 100) / 100,
+      hasCost: cost != null,
+    };
+  });
+  const batchCost = Math.round(ingredients.reduce((s, i) => s + i.lineCost, 0) * 100) / 100;
+  const batchSize = recipe.batchSize && recipe.batchSize > 0 ? recipe.batchSize : 1;
+  const costPerUnit = Math.round((batchCost / batchSize) * 100) / 100;
+  const sellPrice = recipe.product?.price ?? 0;
+  const marginPerUnit = Math.round((sellPrice - costPerUnit) * 100) / 100;
+  const marginPct = sellPrice > 0 ? Math.round((marginPerUnit / sellPrice) * 100) : null;
+  return {
+    ...recipe,
+    ingredients,
+    cost: { batchCost, batchSize, costPerUnit, sellPrice, marginPerUnit, marginPct, missingCost: ingredients.some((i) => !i.hasCost) },
+  };
+}
+
+// List recipes (each with a cost summary)
+app.get('/api/companies/:companyId/recipes', requireAuth, async (req, res) => {
+  try {
+    if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+    const recipes = await repos.recipeRepo.getByBusinessId(req.params.companyId);
+    res.json(successResponse(recipes.map(computeRecipeCost)));
+  } catch (e) {
+    logger.error('Error fetching recipes:', e);
+    res.status(500).json(errorResponse('Failed to fetch recipes'));
+  }
+});
+
+// Single recipe (ingredients + computed cost/margin)
+app.get('/api/companies/:companyId/recipes/:recipeId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, recipeId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+    const recipe = await repos.recipeRepo.getById(recipeId);
+    if (!recipe || recipe.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Recipe not found'));
+    }
+    res.json(successResponse(computeRecipeCost(recipe)));
+  } catch (e) {
+    logger.error('Error fetching recipe:', e);
+    res.status(500).json(errorResponse('Failed to fetch recipe'));
+  }
+});
+
+// Create a recipe on a finished product (quota-enforced)
+app.post('/api/companies/:companyId/recipes', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
+    const { productId, name, batchSize, yieldUnit, notes } = req.body;
+    if (!productId) return res.status(400).json(errorResponse('A finished product is required'));
+
+    const product = await repos.productRepo.getById(productId);
+    if (!product || product.businessId !== companyId) {
+      return res.status(400).json(errorResponse('Choose one of your own products as the finished item'));
+    }
+
+    // Enforce per-plan recipe quota (Free = 3, paid tiers scale up).
+    const business = await repos.businessRepo.getById(companyId);
+    const capabilities = deriveCapabilities(business);
+    const currentCount = await repos.recipeRepo.countByBusinessId(companyId);
+    if (currentCount >= capabilities.maxRecipes) {
+      const requiredPlan = capabilities.maxRecipes >= 100 ? 'enterprise'
+        : (capabilities.maxRecipes >= 25 ? 'business' : 'pro');
+      return res.status(403).json(paywallResponse(
+        `Recipe limit reached (${capabilities.maxRecipes}). Upgrade your plan to create more recipes.`,
+        'recipe_limit_reached',
+        requiredPlan
+      ));
+    }
+
+    const newRecipe = await repos.recipeRepo.create({
+      id: 'rec-' + uuidv4().slice(0, 8),
+      businessId: companyId,
+      productId,
+      name: (name && name.trim()) || product.name,
+      batchSize: batchSize != null && Number(batchSize) > 0 ? Math.floor(Number(batchSize)) : 1,
+      yieldUnit: yieldUnit || null,
+      notes: notes || null,
+    });
+    res.status(201).json(successResponse(computeRecipeCost(newRecipe)));
+  } catch (e) {
+    if (e.code === 'P2002') {
+      return res.status(409).json(errorResponse('This product already has a recipe'));
+    }
+    logger.error('Error creating recipe:', e);
+    res.status(500).json(errorResponse('Failed to create recipe'));
+  }
+});
+
+// Update a recipe
+app.patch('/api/companies/:companyId/recipes/:recipeId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, recipeId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+    const recipe = await repos.recipeRepo.getById(recipeId);
+    if (!recipe || recipe.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Recipe not found'));
+    }
+    const { name, batchSize, yieldUnit, notes } = req.body;
+    const updated = await repos.recipeRepo.update(recipeId, {
+      ...(name !== undefined && { name }),
+      ...(batchSize !== undefined && { batchSize: Number(batchSize) > 0 ? Math.floor(Number(batchSize)) : 1 }),
+      ...(yieldUnit !== undefined && { yieldUnit: yieldUnit || null }),
+      ...(notes !== undefined && { notes: notes || null }),
+      updatedAt: new Date(),
+    });
+    res.json(successResponse(computeRecipeCost(updated)));
+  } catch (e) {
+    logger.error('Error updating recipe:', e);
+    res.status(500).json(errorResponse('Failed to update recipe'));
+  }
+});
+
+// Delete a recipe (admin only)
+app.delete('/api/companies/:companyId/recipes/:recipeId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, recipeId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
+    const recipe = await repos.recipeRepo.getById(recipeId);
+    if (!recipe || recipe.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Recipe not found'));
+    }
+    await repos.recipeRepo.delete(recipeId);
+    res.json(successResponse(null, 'Recipe deleted successfully'));
+  } catch (e) {
+    logger.error('Error deleting recipe:', e);
+    res.status(500).json(errorResponse('Failed to delete recipe'));
+  }
+});
+
+// Add ingredients (batch). Body: { ingredients: [{ productId, quantity, unit }] }
+app.post('/api/companies/:companyId/recipes/:recipeId/ingredients', requireAuth, async (req, res) => {
+  try {
+    const { companyId, recipeId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+    const recipe = await repos.recipeRepo.getById(recipeId);
+    if (!recipe || recipe.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Recipe not found'));
+    }
+    const list = Array.isArray(req.body.ingredients) ? req.body.ingredients : [];
+    if (list.length === 0) return res.status(400).json(errorResponse('ingredients must be a non-empty array'));
+
+    // Only the business's own products can be ingredients (no cross-tenant inserts).
+    const businessProducts = await repos.productRepo.getByBusinessId(companyId);
+    const ownedIds = new Set(businessProducts.map((p) => p.id));
+    const rows = list
+      .filter((it) => it && it.productId && ownedIds.has(it.productId) && Number(it.quantity) > 0)
+      .map((it) => ({
+        id: 'ri-' + uuidv4().slice(0, 8),
+        recipeId,
+        productId: it.productId,
+        quantity: Number(it.quantity),
+        unit: it.unit || null,
+      }));
+    if (rows.length > 0) await repos.recipeRepo.addIngredients(rows);
+
+    const updated = await repos.recipeRepo.getById(recipeId);
+    res.status(201).json(successResponse(computeRecipeCost(updated)));
+  } catch (e) {
+    logger.error('Error adding recipe ingredients:', e);
+    res.status(500).json(errorResponse('Failed to add ingredients'));
+  }
+});
+
+// Update one ingredient's quantity/unit
+app.patch('/api/companies/:companyId/recipes/:recipeId/ingredients/:ingredientId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, recipeId, ingredientId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+    const recipe = await repos.recipeRepo.getById(recipeId);
+    if (!recipe || recipe.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Recipe not found'));
+    }
+    const { quantity, unit } = req.body;
+    await repos.recipeRepo.updateIngredient(ingredientId, {
+      ...(quantity !== undefined && { quantity: Number(quantity) }),
+      ...(unit !== undefined && { unit: unit || null }),
+    });
+    const updated = await repos.recipeRepo.getById(recipeId);
+    res.json(successResponse(computeRecipeCost(updated)));
+  } catch (e) {
+    logger.error('Error updating recipe ingredient:', e);
+    res.status(500).json(errorResponse('Failed to update ingredient'));
+  }
+});
+
+// Remove an ingredient (by product id)
+app.delete('/api/companies/:companyId/recipes/:recipeId/ingredients/:productId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, recipeId, productId } = req.params;
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+    const recipe = await repos.recipeRepo.getById(recipeId);
+    if (!recipe || recipe.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Recipe not found'));
+    }
+    await repos.recipeRepo.removeIngredient(recipeId, productId);
+    const updated = await repos.recipeRepo.getById(recipeId);
+    res.json(successResponse(computeRecipeCost(updated)));
+  } catch (e) {
+    logger.error('Error removing recipe ingredient:', e);
+    res.status(500).json(errorResponse('Failed to remove ingredient'));
+  }
+});
+
+// ============================================================================
 // CUSTOMER ROUTES (sell-side CRM directory — free for all tiers)
 // Mirrors the Supplier (buy-side) pattern. A customer may link to a NouPro
 // business or be a standalone external contact. Auto-seeded from past invoices.
@@ -15186,6 +15410,24 @@ app.get('/api/automation/orders/preview', async (req, res) => {
   }
 });
 
+// Run subscription renewals (REV-1): charge stored cards for businesses past currentPeriodEnd,
+// with a 7-day grace-then-downgrade dunning cycle. Point a daily external cron at this
+// (a fallback in-process timer also runs it). Add ?dryRun=true to preview without charging.
+// Idempotent, so overlapping runs (cron + timer) cannot double-charge.
+app.post('/api/automation/subscriptions/renew', async (req, res) => {
+  if (!requireAutomationAuth(req, res)) return;
+
+  try {
+    const dryRun = req.query.dryRun === 'true' || req.body.dryRun === true;
+    const { subscriptionRenewal } = require('./src/services');
+    const results = await subscriptionRenewal.processRenewals({ dryRun, notify: true, repos });
+    res.json(successResponse(results, 'Subscription renewals completed'));
+  } catch (err) {
+    logger.error('Error running subscription renewals:', err);
+    res.status(500).json(errorResponse('Subscription renewals failed', 'AUTOMATION_ERROR'));
+  }
+});
+
 // Health Check
 app.get('/api/health', (req, res) => {
   res.json(successResponse({ status: 'OK', timestamp: new Date().toISOString() }));
@@ -15258,12 +15500,11 @@ eventMessages.init({ io, sendPushToOfflineParticipants });
 // ============================================================================
 
 const peachPayments = require('./src/services/peachPayments');
+const paymentService = require('./src/services/paymentService');
 
-// Subscription plan pricing (MUR) - must match frontend subscription.ts
-const PLAN_PRICES = {
-  MONTHLY: { PRO: 899, BUSINESS: 2699, ENTERPRISE: 4399 },
-  YEARLY: { PRO: 9588, BUSINESS: 28788, ENTERPRISE: 46788 },
-};
+// Subscription plan pricing (MUR) — single source of truth in paymentService, shared
+// with the recurring-renewal job (subscriptionRenewal.js). Must match frontend subscription.ts.
+const { PLAN_PRICES } = paymentService;
 
 // Create checkout session for subscription payment
 app.post('/api/payments/create-checkout', requireAuth, async (req, res) => {
@@ -15436,22 +15677,14 @@ async function processSuccessfulPayment(payment, peachResult) {
     return;
   }
 
-  // If this is a subscription payment, update the business
+  // If this is a subscription payment, update the business. Period/pricing math lives in
+  // paymentService so the recurring-renewal job (subscriptionRenewal.js) shares it exactly.
   if (payment.type === 'SUBSCRIPTION' && metadata.plan) {
-    const periodDays = metadata.billingPeriod === 'YEARLY' ? 365 : 30;
-    const currentPeriodEnd = new Date();
-    currentPeriodEnd.setDate(currentPeriodEnd.getDate() + periodDays);
-
-    const updateData = {
-      subscriptionTier: metadata.plan,
-      billingPeriod: metadata.billingPeriod || 'MONTHLY',
-      currentPeriodEnd,
-    };
-
-    // Store card token for recurring billing if available
-    if (registrationId) {
-      updateData.peachCardRegistrationId = registrationId;
-    }
+    const updateData = paymentService.buildSubscriptionUpdate({
+      plan: metadata.plan,
+      billingPeriod: metadata.billingPeriod,
+      registrationId,
+    });
 
     await prisma.business.update({
       where: { id: payment.businessId },
@@ -15610,6 +15843,17 @@ if (process.env.NODE_ENV !== 'test') {
       .runAutomation({ autoCancel: false, notify: true, repos })
       .catch((err) => logger.error('[orderAutomation] scheduled run failed:', err.message));
   }, ORDER_AUTOMATION_INTERVAL_MS);
+
+  // Subscription renewals (REV-1): once a day, charge stored cards for businesses past their
+  // period end (7-day grace-then-downgrade). Idempotent, so this in-process fallback is safe to
+  // run alongside an external cron hitting POST /api/automation/subscriptions/renew.
+  const SUBSCRIPTION_RENEWAL_INTERVAL_MS = 24 * 60 * 60 * 1000; // daily
+  setInterval(() => {
+    const { subscriptionRenewal } = require('./src/services');
+    subscriptionRenewal
+      .processRenewals({ notify: true, repos })
+      .catch((err) => logger.error('[subscriptionRenewal] scheduled run failed:', err.message));
+  }, SUBSCRIPTION_RENEWAL_INTERVAL_MS);
 }
 
 server.listen(PORT, HOST, () => {

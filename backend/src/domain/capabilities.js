@@ -101,6 +101,11 @@ function deriveCapabilities(business) {
                     tier === SUBSCRIPTION_TIERS.PRO ? 25 :
                     tier === SUBSCRIPTION_TIERS.BUSINESS ? 100 : 999999,
 
+    // Product recipes (bill-of-materials). Free is capped at 3; paid tiers scale up.
+    maxRecipes: tier === SUBSCRIPTION_TIERS.FREE ? 3 :
+                tier === SUBSCRIPTION_TIERS.PRO ? 25 :
+                tier === SUBSCRIPTION_TIERS.BUSINESS ? 100 : 999999,
+
     // Price privacy (Business+ only)
     canEnablePricePrivacy: isBusiness || isEnterprise,
 

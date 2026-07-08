@@ -95,6 +95,16 @@ export function maxCollectionsForPlan(plan: SubscriptionPlan | null | undefined)
   return limit === 'unlimited' ? Infinity : limit;
 }
 
+// Recipe quota per plan (mirrors backend capabilities.maxRecipes: 3 / 25 / 100 / ∞).
+export function maxRecipesForPlan(plan: SubscriptionPlan | null | undefined): number {
+  switch (plan) {
+    case 'pro': return 25;
+    case 'business': return 100;
+    case 'enterprise': return Infinity;
+    default: return 3;
+  }
+}
+
 /**
  * Analytics types
  */
