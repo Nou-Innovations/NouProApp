@@ -19,7 +19,7 @@ import {
   ProductViewType,
   UpdateUIProductData,
 } from '@/shared/types/product';
-import { getProducts, updateProduct, updateProductStatus, updateProductStock, toggleProductDisplayable, toggleProductListed } from '../products.service';
+import { getProducts, updateProduct, updateProductStatus, toggleProductDisplayable, toggleProductListed } from '../products.service';
 import { getProductsWithSupplierPricing } from '@/features/procurement/services/procurement.service';
 import { ApiError } from '@/shared/services/api';
 import { useProfileStore } from '@/shared/store/profileStore';

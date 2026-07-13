@@ -203,6 +203,7 @@ const _orderDeliverySyncInProgress = new Set();
 // ---------------------------------------------------------------------------
 const deliveryStatusService = require('./src/services/deliveryStatus');
 const transferStatusService = require('./src/services/transferStatus');
+const { validateTransferShape } = require('./src/services/transferValidation');
 const returnService = require('./src/services/returnService');
 const recurringService = require('./src/services/recurringService');
 const { DELIVERY_STATUS_TRANSITIONS, isValidDeliveryTransition } = deliveryStatusService;
@@ -4219,21 +4220,19 @@ app.patch('/api/companies/:companyId/products/:productId', requireAuth, async (r
   if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
   try {
     const { companyId, productId } = req.params;
-    const { name, description, unit, price, taxRate, minOrderQty, stock, sku, barcode, isAvailable, images, categoryId, subcategoryId } = req.body;
+    // Whitelist of real Product columns only. Unknown body fields (e.g. the
+    // legacy stockQuantity — stock lives per-location on the Stock model, via
+    // PATCH /locations/:locationId/stock/:productId) are ignored rather than
+    // forwarded, because prisma.product.update throws on unknown columns.
+    const { name, description, unit, price, taxRate, sku, barcode } = req.body;
     const patch = {
       ...(name !== undefined && { name }),
       ...(description !== undefined && { description }),
       ...(unit !== undefined && { unit }),
       ...(price !== undefined && { price }),
       ...(taxRate !== undefined && { taxRate }),
-      ...(minOrderQty !== undefined && { minOrderQty }),
-      ...(stock !== undefined && { stock }),
       ...(sku !== undefined && { sku }),
       ...(barcode !== undefined && { barcode }),
-      ...(isAvailable !== undefined && { isAvailable }),
-      ...(images !== undefined && { images }),
-      ...(categoryId !== undefined && { categoryId }),
-      ...(subcategoryId !== undefined && { subcategoryId }),
     };
 
     const product = await repos.productRepo.getById(productId);
@@ -8460,10 +8459,11 @@ app.post('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =
     // Cutover (P9): transfers now use the dedicated Transfer entity. Reroute any
     // legacy type=transfer create so no new transfer-Delivery rows are produced.
     if (body.type === 'transfer') {
-      if (!body.fromLocationId || !body.toLocationId) {
-        return res.status(400).json(errorResponse('fromLocationId and toLocationId are required for transfers'));
+      const v = await validateTransferCreate(companyId, body);
+      if (v.error) {
+        return res.status(400).json(errorResponse(v.error.message, v.error.code));
       }
-      const tItems = Array.isArray(body.items) ? body.items : [];
+      const tItems = v.items;
       const created = await repos.transferRepo.create({
         id: uuidv4(),
         businessId: companyId,
@@ -8939,6 +8939,37 @@ app.delete('/api/companies/:companyId/deliveries/:deliveryId', requireAuth, asyn
 // approval lifecycle. Additive: the frontend switches to these in P9.
 // ===========================================================================
 
+/**
+ * Full validation for creating a Transfer: payload shape (pure, see
+ * transferValidation.js), then ownership — both locations and every item's
+ * product must belong to the business, otherwise the stock engine would write
+ * Stock/StockMovement rows keyed by foreign locations or phantom product ids.
+ * Returns { error: { code, message } } or { from, to, items } with items
+ * normalized to numeric quantities.
+ */
+async function validateTransferCreate(companyId, body) {
+  const shape = validateTransferShape(body);
+  if (!shape.ok) return { error: { code: shape.code, message: shape.message } };
+
+  const [fromLoc, toLoc] = await Promise.all([
+    repos.locationRepo.getById(shape.from),
+    repos.locationRepo.getById(shape.to),
+  ]);
+  const owns = (loc) => !!loc && (loc.businessId || loc.companyId) === companyId;
+  if (!owns(fromLoc) || !owns(toLoc)) {
+    return { error: { code: 'TRANSFER_LOCATION_INVALID', message: 'Both locations must belong to your business' } };
+  }
+
+  const products = await repos.productRepo.getByBusinessId(companyId);
+  const productIds = new Set(products.map((p) => p.id));
+  const unknown = shape.items.find((it) => !productIds.has(it.productId));
+  if (unknown) {
+    return { error: { code: 'TRANSFER_PRODUCT_INVALID', message: `Unknown product on transfer: ${unknown.productId}` } };
+  }
+
+  return { from: shape.from, to: shape.to, items: shape.items };
+}
+
 // List transfers
 app.get('/api/companies/:companyId/transfers', requireAuth, async (req, res) => {
   if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
@@ -8988,10 +9019,11 @@ app.post('/api/companies/:companyId/transfers', requireAuth, async (req, res) =>
   if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
   try {
     const b = req.body || {};
-    if (!b.fromLocationId || !b.toLocationId) {
-      return res.status(400).json(errorResponse('fromLocationId and toLocationId are required'));
+    const v = await validateTransferCreate(req.params.companyId, b);
+    if (v.error) {
+      return res.status(400).json(errorResponse(v.error.message, v.error.code));
     }
-    const items = Array.isArray(b.items) ? b.items : [];
+    const items = v.items;
     const itemCount = b.itemCount != null ? b.itemCount : items.length;
     const totalAmount = b.totalAmount != null
       ? b.totalAmount

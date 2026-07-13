@@ -119,17 +119,6 @@ export async function updateProductStatus(
 }
 
 /**
- * Update product stock
- */
-export async function updateProductStock(
-  companyId: string,
-  productId: string,
-  stockQuantity: number
-): Promise<UIProduct> {
-  return patch<UIProduct>(`/companies/${companyId}/products/${productId}`, { stockQuantity });
-}
-
-/**
  * Toggle product display visibility
  */
 export async function toggleProductDisplayable(
@@ -186,7 +175,6 @@ const productsService = {
   updateProduct,
   deleteProduct,
   updateProductStatus,
-  updateProductStock,
   toggleProductDisplayable,
   toggleProductListed,
   carryProduct,

@@ -27,6 +27,7 @@ import {
   PaywallCheck,
 } from '@/shared/utils/permissions';
 import { useProducts, DisplayBrand } from '../hooks/useProducts';
+import { setStock } from '../stock.service';
 import { BUSINESS_CATEGORIES, getCategoryLabel } from '@/shared/constants/categories';
 import { 
   UIProduct, 
@@ -47,6 +48,8 @@ const ProductsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
   const currentCompany = useBusinessStore((state) => state.currentCompany);
+  const currentLocation = useBusinessStore((state) => state.currentLocation);
+  const businessLocations = useBusinessStore((state) => state.locations);
   
   // Profile store for RBAC
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
@@ -140,40 +143,98 @@ const ProductsScreen: React.FC = () => {
   }, []);
   
   const handleConfirmSave = async () => {
-    setIsSaving(true);
     setShowSaveConfirmation(false);
 
-    // Apply edits locally first (optimistic update)
-    Object.entries(editedProducts).forEach(([productId, updates]) => {
-      updateProductLocal(productId, updates);
-    });
-
-    // Persist to server
-    const entries = Object.entries(editedProducts);
-    const errors: string[] = [];
-    for (const [productId, updates] of entries) {
-      try {
-        await updateProductServer(productId, updates);
-      } catch (err: any) {
-        errors.push(err?.message || `Failed to update product ${productId}`);
+    // Stock lives per-location (Stock model): it must go through the
+    // location-stock endpoint — the product PATCH ignores stockQuantity.
+    // Split stock edits out from regular product-field edits.
+    const stockEdits: Array<{ productId: string; qty: number }> = [];
+    const fieldEdits: Array<[string, Partial<UIProduct>]> = [];
+    for (const [productId, updates] of Object.entries(editedProducts)) {
+      const { stockQuantity, ...rest } = updates;
+      if (stockQuantity != null && Number.isFinite(Number(stockQuantity)) && Number(stockQuantity) >= 0) {
+        stockEdits.push({ productId, qty: Number(stockQuantity) });
       }
+      if (Object.keys(rest).length > 0) fieldEdits.push([productId, rest]);
     }
 
-    setIsEditing(false);
-    setEditedProducts({});
-    setIsSaving(false);
+    const performSave = async (stockLocationId: string | null) => {
+      setIsSaving(true);
 
-    if (errors.length > 0) {
-      // Re-fetch from server to correct the optimistic state
-      refresh();
-      AppAlert.alert(
-        'Save Partially Failed',
-        `${errors.length} of ${entries.length} product update(s) failed. The list has been refreshed from the server.`,
-        [{ text: 'OK' }]
-      );
-    } else {
-      setShowSuccessDialog(true);
+      // Optimistic: non-stock fields always; stock only when the list is
+      // showing that same location's quantities (in "All Locations" the shown
+      // value is a sum across locations and can't be patched client-side).
+      fieldEdits.forEach(([productId, rest]) => updateProductLocal(productId, rest));
+      if (stockLocationId && currentLocation?.id === stockLocationId) {
+        stockEdits.forEach(({ productId, qty }) => updateProductLocal(productId, { stockQuantity: qty }));
+      }
+
+      const errors: string[] = [];
+      for (const [productId, rest] of fieldEdits) {
+        try {
+          await updateProductServer(productId, rest);
+        } catch (err: any) {
+          errors.push(err?.message || `Failed to update product ${productId}`);
+        }
+      }
+      let stockSaved = 0;
+      if (stockLocationId) {
+        for (const { productId, qty } of stockEdits) {
+          try {
+            await setStock(stockLocationId, productId, qty);
+            stockSaved++;
+          } catch (err: any) {
+            errors.push(err?.message || `Failed to update stock for ${productId}`);
+          }
+        }
+      } else if (stockEdits.length > 0) {
+        errors.push(`${stockEdits.length} stock edit(s) were skipped — no location to save them to.`);
+      }
+
+      setIsEditing(false);
+      setEditedProducts({});
+      setIsSaving(false);
+
+      if (errors.length > 0) {
+        // Re-fetch from server to correct the optimistic state
+        refresh();
+        AppAlert.alert(
+          'Save Partially Failed',
+          `${errors.length} of ${fieldEdits.length + stockEdits.length} update(s) failed or were skipped. The list has been refreshed from the server.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        // In "All Locations" the displayed stock is a sum across locations —
+        // refetch so the new per-location value is reflected in the total.
+        if (stockSaved > 0 && !currentLocation?.id) refresh();
+        setShowSuccessDialog(true);
+      }
+    };
+
+    if (stockEdits.length === 0) {
+      await performSave(null);
+      return;
     }
+    if (currentLocation?.id) {
+      await performSave(currentLocation.id);
+      return;
+    }
+    if (businessLocations.length === 1) {
+      await performSave(businessLocations[0].id);
+      return;
+    }
+    if (businessLocations.length === 0) {
+      await performSave(null); // saves other fields; surfaces the skipped stock edits
+      return;
+    }
+    AppAlert.actionSheet({
+      title: 'Save stock to which location?',
+      message: 'Stock is tracked per location. Your stock edits will be saved to the location you pick.',
+      options: [
+        ...businessLocations.map((l) => ({ label: l.name, onPress: () => { void performSave(l.id); } })),
+        { label: 'Cancel', cancel: true },
+      ],
+    });
   };
 
   const handleDiscardChanges = () => {

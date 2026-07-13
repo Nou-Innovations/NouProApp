@@ -20,7 +20,6 @@ export {
   updateProduct,
   deleteProduct,
   updateProductStatus,
-  updateProductStock,
   toggleProductDisplayable,
   toggleProductListed,
 } from './products.service';// Types are exported from @/shared/types/product
