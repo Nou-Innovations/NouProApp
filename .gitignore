@@ -160,3 +160,6 @@ logs/
 !.cursor/rules
 !.cursor/rules/*
 __MACOSX/
+
+# Claude Code worktrees (local session copies — never commit)
+.claude/worktrees/
