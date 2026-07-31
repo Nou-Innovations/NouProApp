@@ -1,0 +1,5 @@
+/Users/arnaudlabonne/Nou/NouPro/NouProApp/src/shared/utils/format.ts
+/Users/arnaudlabonne/Nou/NouPro/NouProApp/src/shared/utils/icons.tsx
+/Users/arnaudlabonne/Nou/NouPro/NouProApp/src/shared/utils/permissions.ts
+/Users/arnaudlabonne/Nou/NouPro/NouProApp/src/shared/utils/statusColors.ts
+/Users/arnaudlabonne/Nou/NouPro/NouProApp/src/shared/utils/timeAgo.ts
