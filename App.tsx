@@ -49,6 +49,7 @@ import SidebarContent from '@/navigation/SidebarContent';
 // Services
 import { userAvatarService } from '@/shared/services/userAvatarService';
 import { offlineQueue } from '@/features/inbox/services/offlineQueue';
+import { syncOrderStatusMeta } from '@/shared/services/orderStatusSync';
 import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
 import { authAPI } from '@/shared/services/api';
@@ -811,6 +812,13 @@ const AppWithTheme = () => {
     }
 
     prepare();
+  }, []);
+
+  // Sync order-status config from the backend SSOT (GET /api/order-status-meta) once at
+  // boot. Folds the server's meta + transitions into the frontend defaults so the two never
+  // drift silently. Fire-and-forget: never blocks startup, falls back to bundled defaults.
+  useEffect(() => {
+    syncOrderStatusMeta();
   }, []);
 
   // Offline outbox (D2): register the NetInfo reconnect→flush listener once at boot, so

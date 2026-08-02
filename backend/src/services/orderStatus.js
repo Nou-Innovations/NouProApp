@@ -21,18 +21,16 @@ const { getRepos } = require('../repositories');
 // ============================================================================
 
 /**
- * All valid order statuses
+ * All valid order statuses.
+ *
+ * The bare enum lives in ../constants (backend/src/constants.js) — a
+ * dependency-free leaf that enumConstants.test.js guards against the Prisma
+ * `OrderStatus` enum. We import it here rather than redefining it, so the
+ * backend has exactly ONE order-status enum. This service layers the behavior
+ * (metadata, transitions, enforcement) on top and remains the source of truth
+ * for that behavior.
  */
-const ORDER_STATUS = {
-  NEW: 'NEW',
-  ACCEPTED: 'ACCEPTED',
-  ONGOING: 'ONGOING',
-  PENDING: 'PENDING',
-  IN_REVIEW: 'IN_REVIEW',
-  DONE: 'DONE',
-  CANCELED: 'CANCELED',
-  REJECTED: 'REJECTED',
-};
+const { ORDER_STATUS } = require('../constants');
 
 /**
  * ORDER_STATUS_META - Complete metadata for each status

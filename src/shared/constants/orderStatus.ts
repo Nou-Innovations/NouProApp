@@ -1,21 +1,24 @@
 /**
- * Order Status Configuration (Frontend Mirror)
- * 
- * IMPORTANT: The backend `backend/src/services/orderStatus.js` is the
- * SINGLE SOURCE OF TRUTH for order status logic. This file mirrors that
- * configuration for offline/client-side use.
- * 
- * The backend exposes this via: GET /api/order-status-meta
- * 
- * This file controls:
+ * Order Status Configuration (Frontend)
+ *
+ * The backend `backend/src/services/orderStatus.js` is the SINGLE SOURCE OF
+ * TRUTH for order-status behavior. At runtime the app fetches it via
+ * `GET /api/order-status-meta` and calls `hydrateOrderStatusConfig()` (see
+ * `src/shared/services/orderStatusSync.ts`, invoked once at app start) to fold
+ * the server's `meta` + `transitions` into the objects below.
+ *
+ * So the values in THIS file are the typed **offline fallback / first-paint
+ * defaults**, not a hand-maintained mirror. They should stay reasonable, but if
+ * they ever drift from the backend the runtime sync corrects them and logs a
+ * loud warning (drift is no longer silent). Frontend-only concerns that the
+ * backend does not own — `shortLabel` and `ORDER_STATUS_TONE` (badge colors) —
+ * are preserved across hydration.
+ *
+ * This file controls (as defaults, until hydrated):
  * - Status labels and short labels for UI
  * - Sort order for list displays
  * - Behavioral flags (isFinal, requiresReason, blocksEdits)
- * - Color mappings for badges
- * 
- * When updating status rules, update BOTH:
- * 1. backend/src/services/orderStatus.js (authoritative)
- * 2. This file (client mirror)
+ * - Color mappings for badges (frontend-only)
  */
 
 /**
@@ -280,4 +283,107 @@ export function getTransitionsWithMeta(currentStatus: OrderStatus): {
     status,
     meta: ORDER_STATUS_META[status],
   }));
+}
+
+// ============================================================================
+// RUNTIME SYNC — fold the backend SSOT into the defaults above
+// ============================================================================
+
+/** Shape of GET /api/order-status-meta. All fields optional / untrusted. */
+export interface ServerOrderStatusConfig {
+  statuses?: Record<string, string> | string[];
+  meta?: Record<string, Partial<OrderStatusMeta>>;
+  transitions?: Record<string, string[]>;
+}
+
+/** Fields the backend owns. Everything else here (shortLabel, tone) is frontend-only. */
+const SERVER_OWNED_META_FIELDS: (keyof OrderStatusMeta)[] = [
+  'label',
+  'isFinal',
+  'requiresReason',
+  'blocksEdits',
+  'sortRank',
+];
+
+function isKnownStatus(s: string): s is OrderStatus {
+  return (ORDER_STATUSES as string[]).includes(s);
+}
+
+function replaceArrayContents<T>(target: T[], next: T[]): void {
+  target.length = 0;
+  target.push(...next);
+}
+
+/**
+ * Fold a server order-status config (from GET /api/order-status-meta) into this
+ * module's defaults, IN PLACE — so every consumer that already imported
+ * ORDER_STATUS_META / ALLOWED_TRANSITIONS / the derived arrays sees the update
+ * without re-importing.
+ *
+ * Defensive by contract: never throws, ignores malformed input, only touches
+ * statuses this build already knows, validates transition targets, and
+ * preserves frontend-only fields (shortLabel, tone). Returns true if anything
+ * actually changed. Logs a warning for each drift it corrects and for any
+ * server status the build doesn't recognize.
+ */
+export function hydrateOrderStatusConfig(
+  server: ServerOrderStatusConfig | null | undefined
+): boolean {
+  if (!server || typeof server !== 'object') return false;
+  let changed = false;
+  const drifts: string[] = [];
+
+  // 1. Metadata — server-owned scalar fields only.
+  if (server.meta && typeof server.meta === 'object') {
+    for (const [status, serverMeta] of Object.entries(server.meta)) {
+      if (!isKnownStatus(status)) {
+        drifts.push(`server has status "${status}" this build does not know (update the app to render it)`);
+        continue;
+      }
+      if (!serverMeta || typeof serverMeta !== 'object') continue;
+      const local = ORDER_STATUS_META[status] as unknown as Record<string, unknown>;
+      for (const field of SERVER_OWNED_META_FIELDS) {
+        const next = (serverMeta as Record<string, unknown>)[field];
+        if (next === undefined) continue;
+        if (local[field] !== next) {
+          drifts.push(`${status}.${field}: ${JSON.stringify(local[field])} → ${JSON.stringify(next)}`);
+          local[field] = next;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  // 2. Transitions — validate every target is a known status before applying.
+  if (server.transitions && typeof server.transitions === 'object') {
+    for (const [status, targets] of Object.entries(server.transitions)) {
+      if (!isKnownStatus(status) || !Array.isArray(targets)) continue;
+      const validTargets = targets.filter(isKnownStatus);
+      const current = ALLOWED_TRANSITIONS[status];
+      if (validTargets.join(',') !== current.join(',')) {
+        drifts.push(`${status} transitions: [${current.join(',')}] → [${validTargets.join(',')}]`);
+        replaceArrayContents(current, validTargets);
+        changed = true;
+      }
+    }
+  }
+
+  // 3. Rebuild derived arrays in place so their contents reflect any meta change.
+  if (changed) {
+    replaceArrayContents(STATUSES_REQUIRING_REASON, ORDER_STATUSES.filter(s => ORDER_STATUS_META[s].requiresReason));
+    replaceArrayContents(FINAL_STATUSES, ORDER_STATUSES.filter(s => ORDER_STATUS_META[s].isFinal));
+    replaceArrayContents(ACTIVE_STATUSES, ORDER_STATUSES.filter(s => !ORDER_STATUS_META[s].isFinal));
+  }
+
+  if (drifts.length) {
+    console.warn(
+      '[orderStatus] Frontend order-status config differed from the backend' +
+        (changed ? ' and was auto-corrected at runtime' : '') +
+        '. Update the defaults in src/shared/constants/orderStatus.ts to match ' +
+        'backend/src/services/orderStatus.js:\n  - ' +
+        drifts.join('\n  - ')
+    );
+  }
+
+  return changed;
 }
