@@ -15538,6 +15538,19 @@ const paymentService = require('./src/services/paymentService');
 // with the recurring-renewal job (subscriptionRenewal.js). Must match frontend subscription.ts.
 const { PLAN_PRICES } = paymentService;
 
+// Subscription plan pricing — SINGLE SOURCE OF TRUTH for the charge amount (paymentService).
+// Public, like /api/order-status-meta. The frontend syncs its DISPLAY prices from this at boot
+// so the shown price can't silently drift from what the card is charged; see
+// src/shared/services/subscriptionPricingSync.ts. Thin projection of the SSOT (uppercase keys,
+// no FREE, no derived rates) — the frontend maps/derives.
+app.get('/api/subscription-pricing', publicReadLimiter, (req, res) => {
+  res.json(successResponse({
+    currency: 'MUR',
+    monthly: PLAN_PRICES.MONTHLY,
+    yearly: PLAN_PRICES.YEARLY,
+  }, 'Subscription pricing retrieved successfully'));
+});
+
 // Create checkout session for subscription payment
 app.post('/api/payments/create-checkout', requireAuth, async (req, res) => {
   try {

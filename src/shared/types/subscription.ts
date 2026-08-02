@@ -1,6 +1,16 @@
 /**
  * Subscription Types
  * Based on app-logic.json subscriptionPlans
+ *
+ * PRICING: the backend `backend/src/services/paymentService.js` PLAN_PRICES is the SINGLE
+ * SOURCE OF TRUTH for the amount a card is charged. At boot the app fetches
+ * `GET /api/subscription-pricing` and calls `hydrateSubscriptionPricing()` (see
+ * `src/shared/services/subscriptionPricingSync.ts`) to fold the server's prices into the
+ * constants below. So the price maps here are the typed **offline fallback / first-paint
+ * defaults**, not a hand-maintained mirror — only PLAN_PRICES_MONTHLY and PLAN_PRICES_YEARLY
+ * are authored by hand; everything else (effective-monthly, PLAN_PRICES alias, PLAN_INFO.price)
+ * derives from them. If they ever drift from the backend, the runtime sync corrects them and
+ * logs a loud warning.
  */
 
 import { theme } from '@/shared/theme';
@@ -52,14 +62,15 @@ export const PLAN_PRICES_YEARLY: Record<SubscriptionPlan, number> = {
 };
 
 /**
- * Plan pricing - Yearly effective monthly rate
- * For display purposes (billed yearly)
+ * Plan pricing - Yearly effective monthly rate (DERIVED from PLAN_PRICES_YEARLY / 12).
+ * For display purposes (billed yearly). Not hand-authored — kept in sync by derivation here
+ * and re-derived in place by hydrateSubscriptionPricing() when the yearly price updates.
  */
 export const PLAN_PRICES_YEARLY_MONTHLY: Record<SubscriptionPlan, number> = {
   free: 0,
-  pro: 799,
-  business: 2399,
-  enterprise: 3899,
+  pro: Math.round(PLAN_PRICES_YEARLY.pro / 12),
+  business: Math.round(PLAN_PRICES_YEARLY.business / 12),
+  enterprise: Math.round(PLAN_PRICES_YEARLY.enterprise / 12),
 };
 
 /**
@@ -287,7 +298,7 @@ export interface PlanInfo {
 export const PLAN_INFO: Record<SubscriptionPlan, PlanInfo> = {
   free: {
     name: 'Free Plan',
-    price: 0,
+    price: PLAN_PRICES_MONTHLY.free,
     period: '',
     description: 'Get started with basic features',
     targetUser: 'Get started',
@@ -303,7 +314,7 @@ export const PLAN_INFO: Record<SubscriptionPlan, PlanInfo> = {
   },
   pro: {
     name: 'Pro Plan',
-    price: 899,
+    price: PLAN_PRICES_MONTHLY.pro,
     period: '/month',
     description: 'For small teams getting serious',
     targetUser: 'For small teams',
@@ -320,7 +331,7 @@ export const PLAN_INFO: Record<SubscriptionPlan, PlanInfo> = {
   },
   business: {
     name: 'Business Plan',
-    price: 2699,
+    price: PLAN_PRICES_MONTHLY.business,
     period: '/month',
     description: 'Scale + visibility',
     targetUser: 'Most popular',
@@ -337,7 +348,7 @@ export const PLAN_INFO: Record<SubscriptionPlan, PlanInfo> = {
   },
   enterprise: {
     name: 'Enterprise Plan',
-    price: 4399,
+    price: PLAN_PRICES_MONTHLY.enterprise,
     period: '/month',
     description: 'Autonomy, control, and power',
     targetUser: 'Full control',
@@ -402,6 +413,83 @@ export function getPlanPricePerMonth(plan: SubscriptionPlan, billingPeriod: Bill
  */
 export function getYearlySavings(plan: SubscriptionPlan): number {
   return PLAN_PRICES_MONTHLY[plan] * 12 - PLAN_PRICES_YEARLY[plan];
+}
+
+// ============================================================================
+// RUNTIME SYNC — fold the backend pricing SSOT into the defaults above
+// ============================================================================
+
+/** Shape of GET /api/subscription-pricing. All fields optional / untrusted. */
+export interface ServerSubscriptionPricing {
+  currency?: string;
+  monthly?: Record<string, number>;
+  yearly?: Record<string, number>;
+}
+
+/** Paid tiers the backend prices. FREE is always 0 and is not served by the endpoint. */
+const PAID_PLANS: Exclude<SubscriptionPlan, 'free'>[] = ['pro', 'business', 'enterprise'];
+
+function isValidPrice(n: unknown): n is number {
+  return typeof n === 'number' && Number.isFinite(n) && n >= 0;
+}
+
+/**
+ * Fold a server pricing config (from GET /api/subscription-pricing) into this module's price
+ * defaults, IN PLACE — so every consumer that already imported PLAN_PRICES_MONTHLY /
+ * PLAN_PRICES_YEARLY / PLAN_PRICES_YEARLY_MONTHLY / PLAN_INFO sees the update on its next render
+ * without re-importing.
+ *
+ * Defensive by contract: never throws, ignores malformed/negative values, only touches the paid
+ * tiers (FREE stays 0). Re-derives the effective-monthly rate and the (display-unused)
+ * PLAN_INFO.price from the new monthly figures. Returns true if anything changed and logs each
+ * drift it corrects. The backend serves UPPERCASE keys (PRO/BUSINESS/ENTERPRISE).
+ */
+export function hydrateSubscriptionPricing(
+  server: ServerSubscriptionPricing | null | undefined
+): boolean {
+  if (!server || typeof server !== 'object') return false;
+  const monthly = server.monthly && typeof server.monthly === 'object' ? server.monthly : null;
+  const yearly = server.yearly && typeof server.yearly === 'object' ? server.yearly : null;
+  if (!monthly && !yearly) return false;
+
+  let changed = false;
+  const drifts: string[] = [];
+
+  for (const plan of PAID_PLANS) {
+    const key = plan.toUpperCase();
+
+    if (monthly) {
+      const next = monthly[key];
+      if (isValidPrice(next) && next !== PLAN_PRICES_MONTHLY[plan]) {
+        drifts.push(`monthly.${plan}: ${PLAN_PRICES_MONTHLY[plan]} → ${next}`);
+        PLAN_PRICES_MONTHLY[plan] = next; // PLAN_PRICES shares this object reference
+        PLAN_INFO[plan].price = next; // display-unused, kept consistent
+        changed = true;
+      }
+    }
+
+    if (yearly) {
+      const next = yearly[key];
+      if (isValidPrice(next) && next !== PLAN_PRICES_YEARLY[plan]) {
+        drifts.push(`yearly.${plan}: ${PLAN_PRICES_YEARLY[plan]} → ${next}`);
+        PLAN_PRICES_YEARLY[plan] = next;
+        PLAN_PRICES_YEARLY_MONTHLY[plan] = Math.round(next / 12); // re-derive in place
+        changed = true;
+      }
+    }
+  }
+
+  if (drifts.length) {
+    console.warn(
+      '[subscriptionPricing] Frontend plan prices differed from the backend' +
+        (changed ? ' and were auto-corrected at runtime' : '') +
+        '. Update the defaults in src/shared/types/subscription.ts to match ' +
+        'backend/src/services/paymentService.js PLAN_PRICES:\n  - ' +
+        drifts.join('\n  - ')
+    );
+  }
+
+  return changed;
 }
 
 
