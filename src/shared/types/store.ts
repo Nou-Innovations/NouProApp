@@ -2,7 +2,7 @@ export type User = {
   id: string;
   name: string;
   email: string;
-  role: 'superAdmin' | 'admin' | 'staff';
+  role: 'super_admin' | 'admin' | 'staff';
   avatar?: string;
   assignedLocationIds?: string[]; // For staff - which locations they can fulfill orders at
   companyId: string; // User belongs to a company

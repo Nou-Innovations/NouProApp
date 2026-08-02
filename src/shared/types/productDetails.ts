@@ -37,7 +37,7 @@ export interface BuyerCapabilities {
 /**
  * User role in relation to the product's business
  */
-export type ViewerRole = 'owner' | 'superAdmin' | 'admin' | 'staff' | 'buyer';
+export type ViewerRole = 'owner' | 'super_admin' | 'admin' | 'staff' | 'buyer';
 
 /**
  * Viewer context - who is viewing and what they can do
@@ -255,13 +255,13 @@ export function computeViewerContext(
   // Compute owner capabilities
   let ownerCapabilities: OwnerCapabilities | null = null;
   if (isOwner) {
-    const hasFullAccess = role === 'owner' || role === 'superAdmin' || role === 'admin';
+    const hasFullAccess = role === 'owner' || role === 'super_admin' || role === 'admin';
     ownerCapabilities = {
       canEdit: hasFullAccess,
       canManageStock: hasFullAccess || role === 'staff',
       canChangePrice: hasFullAccess,
       canArchive: hasFullAccess,
-      canDelete: role === 'owner' || role === 'superAdmin',
+      canDelete: role === 'owner' || role === 'super_admin',
       canDuplicate: hasFullAccess,
       canToggleListing: hasFullAccess,
     };

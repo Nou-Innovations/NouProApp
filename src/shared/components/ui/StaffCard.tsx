@@ -6,10 +6,12 @@ import theme from '@/shared/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppBottomSheet, { AppBottomSheetItem } from './AppBottomSheet';
 import ListItemCard from './ListItemCard';
+import type { StaffRole } from '@/shared/types/business';
 
-// Renamed from StaffRole to avoid colliding with the domain StaffRole in
-// @/shared/types/business (different values). This is the StaffCard UI-local role.
-export type StaffCardRole = 'superAdmin' | 'admin' | 'staff';
+// Alias of the domain StaffRole ('super_admin' | 'admin' | 'staff') so the card's role
+// value always matches the backend/DB — no parallel spelling to convert. Kept under the
+// StaffCardRole name for existing callers.
+export type StaffCardRole = StaffRole;
 
 export interface StaffMember {
   id: string;
@@ -33,7 +35,7 @@ interface StaffCardProps {
 
 const getRoleLabel = (role: StaffCardRole): string => {
   switch (role) {
-    case 'superAdmin':
+    case 'super_admin':
       return 'Super Admin';
     case 'admin':
       return 'Admin';
@@ -48,7 +50,7 @@ const getRoleLabel = (role: StaffCardRole): string => {
 const ALL_ROLES: { id: StaffCardRole; title: string }[] = [
   { id: 'staff', title: 'Staff' },
   { id: 'admin', title: 'Admin' },
-  { id: 'superAdmin', title: 'Super Admin' },
+  { id: 'super_admin', title: 'Super Admin' },
 ];
 
 /** Role Badge/Button component */

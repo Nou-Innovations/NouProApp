@@ -199,11 +199,10 @@ export default function TeamManagementScreen() {
   // Handle role change from StaffCard
   const handleRoleChange = (staff: StaffMember, newRole: StaffCardRole) => {
     const user = users.find(u => u.id === staff.id);
-    // Convert StaffCard camelCase roles back to API snake_case
-    const apiRole = newRole === 'superAdmin' ? 'super_admin' : newRole;
+    // newRole already uses the domain values (super_admin/admin/staff) — no conversion needed.
     AppAlert.alert(
       'Change Role',
-      `Change ${staff.name}'s role to ${newRole === 'superAdmin' ? 'Super Admin' : newRole === 'admin' ? 'Admin' : 'Staff'}?`,
+      `Change ${staff.name}'s role to ${newRole === 'super_admin' ? 'Super Admin' : newRole === 'admin' ? 'Admin' : 'Staff'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -211,7 +210,7 @@ export default function TeamManagementScreen() {
           onPress: async () => {
             if (!activeBusiness?.id) return;
             try {
-              await updateTeamMemberRole(activeBusiness.id, staff.id, apiRole, user?.locationId || user?.locationIds?.[0]);
+              await updateTeamMemberRole(activeBusiness.id, staff.id, newRole, user?.locationId || user?.locationIds?.[0]);
               setSuccessMessage(`${staff.name}'s role has been updated`);
               setShowSuccessDialog(true);
               fetchUsers();
@@ -621,7 +620,7 @@ export default function TeamManagementScreen() {
                           name: user.name,
                           email: user.email,
                           username: user.email.split('@')[0],
-                          role: user.role === 'super_admin' ? 'superAdmin' : user.role,
+                          role: user.role,
                           avatar: user.avatar || undefined,
                         }}
                         isCurrentUser={user.id === currentUser?.id}
