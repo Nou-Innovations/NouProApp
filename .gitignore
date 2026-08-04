@@ -163,3 +163,10 @@ __MACOSX/
 
 # Claude Code worktrees (local session copies — never commit)
 .claude/worktrees/
+
+############################################
+# Graphify knowledge-graph output (generated)
+############################################
+# Rebuilt on demand by /graphify (~15 MB, incl. a 6 MB graph.json that is rewritten in full
+# on every run). Nothing in the app reads it — it is a local analysis artifact only.
+graphify-out/
