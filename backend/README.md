@@ -77,9 +77,19 @@ The server includes pre-loaded mock data:
 
 ## Authentication
 
-For testing, use:
-- **Email:** admin@noupro.com
-- **Password:** password
+After running `npm run prisma:seed` against a local/throwaway database:
+- **Email:** admin@nou.pro
+- **Password:** the dev-only default set in `prisma/seed.js`
+
+> ⚠️ The seed hashes one dev password and reuses it for **every** user it creates. Any
+> database that was seeded — including a deployed one — has that password on all seeded
+> accounts until it is rotated. Check and fix with:
+>
+> ```bash
+> node scripts/rotate-password.js --audit          # read-only: who is still on the default
+> node scripts/rotate-password.js                  # rotate admin@nou.pro
+> node scripts/rotate-password.js --scramble-others # lock the remaining demo accounts
+> ```
 
 ## Development Notes
 

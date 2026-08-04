@@ -166,7 +166,7 @@ const businesses = [
 ];
 
 const users = [
-  { id: 'user-1', name: 'Arnaud Labonne', email: 'admin@noupro.com', phone: '+230 5700 0001', avatar: 'https://i.pravatar.cc/200?u=admin@noupro.com', jobTitle: 'CEO & Founder', description: 'Building the future of B2B commerce in Mauritius.' },
+  { id: 'user-1', name: 'Arnaud Labonne', email: 'admin@nou.pro', phone: '+230 5700 0001', avatar: 'https://i.pravatar.cc/200?u=admin@nou.pro', jobTitle: 'CEO & Founder', description: 'Building the future of B2B commerce in Mauritius.' },
   { id: 'user-2', name: 'Priya Devi', email: 'priya.devi@example.com', phone: '+230 5700 0002', avatar: 'https://i.pravatar.cc/200?u=priya.devi@example.com', jobTitle: 'Operations Manager', description: null },
   { id: 'user-3', name: 'Jean-Marc Perrier', email: 'jm.perrier@example.com', phone: '+230 5700 0003', avatar: 'https://i.pravatar.cc/200?u=jm.perrier@example.com', jobTitle: 'Sales Director', description: null },
   { id: 'user-4', name: 'Anisha Doorgakant', email: 'anisha.d@example.com', phone: '+230 5700 0004', avatar: 'https://i.pravatar.cc/200?u=anisha.d@example.com', jobTitle: 'Warehouse Supervisor', description: null },

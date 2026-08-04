@@ -38,3 +38,6 @@ if (require.main === module) {
 }
 
 module.exports = assertNotProd;
+// Exposed so non-destructive scripts (e.g. rotate-password.js) can *warn* that the
+// target is production without refusing to run. Keep PROD_REFS the single source.
+module.exports.PROD_REFS = PROD_REFS;

@@ -420,7 +420,9 @@ async function main() {
   console.log(`   ${brands.length} brands, ${products.length} products`);
   console.log(`   ${orders.length} orders, ${deliveries.length} deliveries, ${invoices.length} invoices`);
   console.log(`   ${chats.length} chats, ${msgCount} messages, ${feedPosts.length} feed posts`);
-  console.log(`   Login: admin@noupro.com / password`);
+  console.log(`   Login: admin@nou.pro / password`);
+  console.log(`   ⚠️  Every seeded user shares that dev-only password — rotate before any real use:`);
+  console.log(`       node scripts/rotate-password.js --audit`);
 }
 
 main()
