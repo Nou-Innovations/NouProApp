@@ -39,7 +39,21 @@ const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 const { PROD_REFS } = require('./guard-not-prod');
 
-const prisma = new PrismaClient();
+// Prefer DIRECT_URL (session pooler, :5432) over DATABASE_URL (transaction pooler, :6543).
+// 6543 is a non-standard port that some ISPs block outbound, and a direct session connection
+// is the better fit for a one-off script anyway (no pgBouncer prepared-statement limits).
+// Falls back to DATABASE_URL when DIRECT_URL isn't set.
+function resolveConnection() {
+  const direct = (process.env.DIRECT_URL || '').trim();
+  if (direct) return { url: direct, source: 'DIRECT_URL' };
+  const pooled = (process.env.DATABASE_URL || '').trim();
+  return { url: pooled || null, source: pooled ? 'DATABASE_URL' : null };
+}
+
+const CONNECTION = resolveConnection();
+const prisma = new PrismaClient(
+  CONNECTION.url ? { datasources: { db: { url: CONNECTION.url } } } : undefined
+);
 
 const SEED_DEFAULT_PASSWORD = 'password'; // prisma/seed.js:80
 const BCRYPT_ROUNDS = 12; // matches server.js (1296, 1405, 1505)
@@ -76,15 +90,18 @@ function parseArgs(argv) {
 }
 
 function describeTarget() {
-  const url = process.env.DATABASE_URL;
-  if (!url) return { label: '(DATABASE_URL is not set)', isProd: false };
-  const isProd = PROD_REFS.some((ref) => url.includes(ref));
+  const { url, source } = CONNECTION;
+  if (!url) return { label: '(neither DIRECT_URL nor DATABASE_URL is set)', isProd: false };
+  // Warn if EITHER configured URL points at production — both normally target the same project.
+  const configured = [process.env.DATABASE_URL, process.env.DIRECT_URL].filter(Boolean);
+  const isProd = PROD_REFS.some((ref) => configured.some((u) => u.includes(ref)));
   let label;
   try {
     const u = new URL(url);
-    label = `${u.hostname}${u.pathname}`; // host + db name only — never the credentials
+    // host + port + db name only — never the credentials
+    label = `${u.hostname}:${u.port || '5432'}${u.pathname}  (via ${source})`;
   } catch {
-    label = '(unparseable DATABASE_URL)';
+    label = `(unparseable ${source})`;
   }
   return { label, isProd };
 }
