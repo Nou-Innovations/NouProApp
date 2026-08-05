@@ -19,8 +19,10 @@ import { ApiError } from '@/shared/services/api';
 import { useProfileStore } from '@/shared/store/profileStore';
 
 
-// Welcome feed for new users - diverse content to discover
-const newUserFeedPosts: FeedPost[] = [
+// Welcome feed for new users - diverse content to discover.
+// These are FABRICATED examples (the ids don't exist in the database); the
+// isExample flag added below makes HomeScreen label them and disable taps.
+const newUserFeedPostsRaw: FeedPost[] = [
   // Company presentation - local distributor
   {
     id: 'welcome-1',
@@ -203,6 +205,13 @@ const newUserFeedPosts: FeedPost[] = [
     },
   },
 ];
+
+// Tag every welcome post as example content so the UI can label it and
+// disable navigation (tapping used to dead-end on "Business not found").
+const newUserFeedPosts: FeedPost[] = newUserFeedPostsRaw.map((post) => ({
+  ...post,
+  isExample: true,
+}));
 
 interface UseFeedResult {
   /** List of feed posts */

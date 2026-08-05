@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { post, del } from '@/shared/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_CONFIG } from '@/shared/config/api';
 import { theme } from '@/shared/theme';
 
 const PUSH_TOKEN_KEY = 'noupro_push_token';
@@ -87,6 +88,37 @@ export async function unregisterTokenFromBackend(): Promise<void> {
     }
   } catch (err) {
     console.error('[Push] Failed to unregister token:', err);
+  }
+}
+
+/**
+ * Best-effort push-token unregister used during logout, so a logged-out
+ * device stops receiving the old account's notifications.
+ *
+ * Takes the access token explicitly: logout() clears the store synchronously,
+ * so by the time this request fires the normal `del` helper would send an
+ * unauthenticated request (and trigger the 401/refresh interceptor).
+ * Fire-and-forget — must never block or delay logout.
+ */
+export async function unregisterPushTokenOnLogout(accessToken: string | null): Promise<void> {
+  try {
+    const pushToken = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
+    if (pushToken && accessToken) {
+      await fetch(`${API_CONFIG.baseUrl}/push-tokens/unregister`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ token: pushToken }),
+      });
+    }
+  } catch (err) {
+    console.warn('[Push] Failed to unregister token on logout:', err);
+  } finally {
+    // Always clear the cached token so the next account on this device
+    // doesn't inherit it.
+    AsyncStorage.removeItem(PUSH_TOKEN_KEY).catch(() => {});
   }
 }
 

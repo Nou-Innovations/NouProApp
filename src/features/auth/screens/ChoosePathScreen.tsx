@@ -48,6 +48,9 @@ export default function ChoosePathScreen({ navigation, route }: Props) {
   };
 
   const handleSkip = () => {
+    // Clear any selected option so the modal's Continue goes to personal home
+    // (previously a selected "join" would still route to SelectCompany on Skip)
+    setSelectedOption(null);
     // Show success modal and go to personal home
     setShowSuccessModal(true);
   };
@@ -213,7 +216,10 @@ export default function ChoosePathScreen({ navigation, route }: Props) {
         message="Your profile has been successfully created! You can now connect with other professionals."
         primaryButtonText="Continue"
         onPrimaryAction={handleSuccessModalContinue}
-        onClose={() => setShowSuccessModal(false)}
+        // Dismissing the modal must behave like "Continue" — the account already
+        // exists server-side at this point; closing without completing would
+        // strand the user un-logged-in on this screen.
+        onClose={handleSuccessModalContinue}
       />
     </View>
   );

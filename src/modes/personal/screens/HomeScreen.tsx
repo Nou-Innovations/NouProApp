@@ -25,6 +25,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AppAlert } from '@/shared/services/appAlert';
 import { PrimaryHeader } from '@/shared/components/layout/headers';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
@@ -92,6 +93,15 @@ export default function HomeScreen() {
     navigation.navigate('ViewBusinessProfile', { businessId, expandBrandId: brandId });
   };
 
+  // Example (welcome-feed) cards reference fabricated ids that don't exist in
+  // the database — navigating or following would dead-end. Explain instead.
+  const showExampleInfo = useCallback(() => {
+    AppAlert.alert(
+      'Example content',
+      'This is a preview of what your feed will look like. Follow real businesses and connect with companies to build your own feed.',
+    );
+  }, []);
+
   // In personal mode a person follows a business (see docs/PROFILES.md).
   const handleFollowPress = async (companyId: string, currentlyFollowing: boolean) => {
     // Optimistic toggle — immediately update UI
@@ -155,9 +165,34 @@ export default function HomeScreen() {
   );
 
   const renderFeedPost = ({ item }: { item: FeedPost }) => {
+    const isExample = !!item.isExample;
+
+    // Example cards get an "Example" strip and their taps explain instead of
+    // navigating (the referenced ids don't exist in the database).
+    const wrapCard = (card: React.ReactElement) => {
+      if (!isExample) return card;
+      return (
+        <View style={{ backgroundColor: appTheme.colors.cardBackground }}>
+          <View style={styles.exampleBadgeRow}>
+            <View
+              style={[
+                styles.exampleBadge,
+                { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.borderColor },
+              ]}
+            >
+              <Text style={[styles.exampleBadgeText, { color: appTheme.colors.textSecondary }]}>
+                EXAMPLE
+              </Text>
+            </View>
+          </View>
+          {card}
+        </View>
+      );
+    };
+
     switch (item.type) {
       case 'brand_presentation':
-        return (
+        return wrapCard(
           <BrandPresentationPost
             id={item.id}
             brandId={item.data.brandId}
@@ -169,16 +204,16 @@ export default function HomeScreen() {
             timestamp={item.timestamp}
             createdAt={item.createdAt}
             // Clicking the brand header goes to the distributor's business profile with that brand expanded
-            onBrandPress={(brandId, distributorId) => handleBrandPress(brandId, distributorId)}
-            onDistributorPress={() => handleBusinessPress(item.data.distributorId)}
+            onBrandPress={isExample ? showExampleInfo : (brandId, distributorId) => handleBrandPress(brandId, distributorId)}
+            onDistributorPress={isExample ? showExampleInfo : () => handleBusinessPress(item.data.distributorId)}
             // Product cards navigate to product detail (browse only, no ordering in Personal mode)
-            onProductPress={(productId) => handleProductPress(productId, item.data.distributorId)}
-          />
+            onProductPress={isExample ? showExampleInfo : (productId) => handleProductPress(productId, item.data.distributorId)}
+          />,
         );
 
       case 'company_presentation': {
         const following = followOverrides[item.data.companyId] ?? item.data.isFollowing ?? item.data.isConnected ?? false;
-        return (
+        return wrapCard(
           <CompanyPresentationPost
             id={item.data.companyId}
             companyName={item.data.companyName}
@@ -189,16 +224,16 @@ export default function HomeScreen() {
             brands={item.data.brands}
             timestamp={item.timestamp}
             createdAt={item.createdAt}
-            onCompanyPress={() => handleBusinessPress(item.data.companyId)}
-            onActionPress={() => handleFollowPress(item.data.companyId, following)}
+            onCompanyPress={isExample ? showExampleInfo : () => handleBusinessPress(item.data.companyId)}
+            onActionPress={isExample ? showExampleInfo : () => handleFollowPress(item.data.companyId, following)}
             // Clicking a brand card navigates to the company's business profile with that brand expanded
-            onBrandPress={(brandId: string) => handleBrandPress(brandId, item.data.companyId)}
-          />
+            onBrandPress={isExample ? showExampleInfo : (brandId: string) => handleBrandPress(brandId, item.data.companyId)}
+          />,
         );
       }
 
       case 'new_products':
-        return (
+        return wrapCard(
           <NewProductPost
             id={item.id}
             postType={item.data.postType}
@@ -208,11 +243,11 @@ export default function HomeScreen() {
             products={item.data.products}
             timestamp={item.timestamp}
             createdAt={item.createdAt}
-            onBusinessPress={() => handleBusinessPress(item.data.businessId)}
+            onBusinessPress={isExample ? showExampleInfo : () => handleBusinessPress(item.data.businessId)}
             // Product cards navigate to product detail
-            onProductPress={(productId) => handleProductPress(productId, item.data.businessId)}
-            onViewAllPress={() => handleBusinessPress(item.data.businessId)}
-          />
+            onProductPress={isExample ? showExampleInfo : (productId) => handleProductPress(productId, item.data.businessId)}
+            onViewAllPress={isExample ? showExampleInfo : () => handleBusinessPress(item.data.businessId)}
+          />,
         );
 
       default:
@@ -396,6 +431,22 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: theme.spacing.xl,
+  },
+  exampleBadgeRow: {
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.sm,
+    alignItems: 'flex-start',
+  },
+  exampleBadge: {
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  exampleBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.fonts.primary.semiBold,
+    letterSpacing: 0.5,
   },
   emptyState: {
     alignItems: 'center',

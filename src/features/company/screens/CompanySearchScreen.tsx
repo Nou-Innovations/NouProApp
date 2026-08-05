@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import theme from '@/shared/theme';
+import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { searchCompanies, CompanySearchResult } from '@/features/search/search.service';
 
@@ -47,22 +47,31 @@ type CompanySearchScreenRouteParams = {
 const CompanySearchScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<CompanySearchScreenRouteParams, 'CompanySearch'>>();
-  const searchQuery = route.params?.query || '';
+  const initialQuery = route.params?.query || '';
   const { theme: appTheme } = useTheme();
 
+  // The screen is typeable: several entry points ("Join a business",
+  // search "See more") navigate here with an empty or pre-filled query.
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
   const [companies, setCompanies] = useState<CompanySearchResult[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      if (!searchQuery.trim()) {
+      if (!debouncedQuery.trim()) {
         setCompanies([]);
         return;
       }
       setLoading(true);
       try {
-        const results = await searchCompanies(searchQuery);
+        const results = await searchCompanies(debouncedQuery);
         if (!cancelled) setCompanies(results);
       } catch {
         if (!cancelled) setCompanies([]);
@@ -74,7 +83,7 @@ const CompanySearchScreen = () => {
     return () => {
       cancelled = true;
     };
-  }, [searchQuery]);
+  }, [debouncedQuery]);
 
   const renderCompanyItem = ({ item }: { item: CompanySearchResult }) => (
     <TouchableOpacity
@@ -95,7 +104,7 @@ const CompanySearchScreen = () => {
         </View>
       )}
       <View style={styles.textContainer}>
-        <HighlightText text={item.name} highlight={searchQuery} />
+        <HighlightText text={item.name} highlight={debouncedQuery} />
       </View>
     </TouchableOpacity>
   );
@@ -103,9 +112,18 @@ const CompanySearchScreen = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
       <SecondaryHeader
-        title={`Companies: ${searchQuery}`}
+        title="Search Companies"
         leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
       />
+      <View style={styles.searchContainer}>
+        <AppSearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search for companies"
+          onClear={() => setSearchQuery('')}
+          autoFocus={!initialQuery}
+        />
+      </View>
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={appTheme.colors.primary} />
@@ -116,10 +134,13 @@ const CompanySearchScreen = () => {
           keyExtractor={(item) => item.id}
           renderItem={renderCompanyItem}
           contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={[styles.emptyText, { color: appTheme.colors.textLight }]}>
-                No companies found matching "{searchQuery}"
+                {debouncedQuery.trim()
+                  ? `No companies found matching "${debouncedQuery}"`
+                  : 'Search for companies by name'}
               </Text>
             </View>
           }
@@ -132,6 +153,10 @@ const CompanySearchScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   listContent: {
     paddingBottom: 20,

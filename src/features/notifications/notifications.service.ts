@@ -25,6 +25,7 @@ export interface Notification {
     // Personal mode
     | 'invite_received'
     | 'join_request_accepted'
+    | 'join_request_rejected'
     | 'status_change'
     | 'delivery_assigned'
     // Shared

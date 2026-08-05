@@ -83,6 +83,12 @@ export interface FeedPostBase {
   type: FeedPostType;
   timestamp: string;
   createdAt: string;
+  /**
+   * Fabricated example content (new-user welcome feed). The referenced
+   * business/brand/product ids don't exist in the database, so cards with
+   * this flag must not navigate or trigger follow actions.
+   */
+  isExample?: boolean;
 }
 
 export interface BrandPresentationPost extends FeedPostBase {

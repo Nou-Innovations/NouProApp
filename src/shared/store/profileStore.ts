@@ -326,6 +326,16 @@ export const useProfileStore = create<ProfileStore>()(
        * Full logout - clears all auth state and resets all feature stores
        */
       logout: () => {
+        // Best-effort: unregister this device's push token so it stops
+        // receiving this account's notifications. Fire-and-forget with the
+        // token captured now — the store is cleared synchronously below.
+        // (lazy require to avoid a circular dependency at module load time)
+        try {
+          const tokenForUnregister = get().accessToken;
+          require('@/shared/services/pushNotifications')
+            .unregisterPushTokenOnLogout(tokenForUnregister);
+        } catch {}
+
         // Disconnect Socket.IO
         chatService.disconnect();
 

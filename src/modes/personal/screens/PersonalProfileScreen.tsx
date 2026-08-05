@@ -29,6 +29,7 @@ import Avatar from '@/shared/components/ui/Avatar';
 import { AppModal, SectionTitle } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { imageService } from '@/shared/services/imageService';
+import { patch as apiPatch } from '@/shared/services/api';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -82,21 +83,29 @@ export default function PersonalProfileScreen() {
   };
 
   const handleChangeAvatar = async () => {
+    // Upload the image, save it server-side, then update the local store.
+    // The PATCH is essential: without it the avatar only lived in the local
+    // store and reverted on the next login/refresh (and other users never saw it).
+    const uploadAndPersistAvatar = async (localUri: string) => {
+      const uploadResult = await imageService.uploadProfilePicture({
+        userId: currentUser?.id || '1',
+        imageUri: localUri,
+        imageType: 'profile',
+      });
+      if (uploadResult.success && uploadResult.imageUri) {
+        await apiPatch('/auth/me', { avatar: uploadResult.imageUri });
+        updateCurrentUser({ avatar_url: uploadResult.imageUri });
+        setSuccessMessage('Profile picture updated!');
+        setShowSuccessDialog(true);
+      }
+    };
+
     const handleCamera = async () => {
       setIsUploadingAvatar(true);
       try {
         const result = await imageService.openCamera();
         if (result.success && result.imageUri) {
-          const uploadResult = await imageService.uploadProfilePicture({
-            userId: currentUser?.id || '1',
-            imageUri: result.imageUri,
-            imageType: 'profile',
-          });
-          if (uploadResult.success && uploadResult.imageUri) {
-            updateCurrentUser({ avatar_url: uploadResult.imageUri });
-            setSuccessMessage('Profile picture updated!');
-            setShowSuccessDialog(true);
-          }
+          await uploadAndPersistAvatar(result.imageUri);
         }
       } catch (error) {
         console.error('Camera error:', error);
@@ -110,16 +119,7 @@ export default function PersonalProfileScreen() {
       try {
         const result = await imageService.openGallery();
         if (result.success && result.imageUri) {
-          const uploadResult = await imageService.uploadProfilePicture({
-            userId: currentUser?.id || '1',
-            imageUri: result.imageUri,
-            imageType: 'profile',
-          });
-          if (uploadResult.success && uploadResult.imageUri) {
-            updateCurrentUser({ avatar_url: uploadResult.imageUri });
-            setSuccessMessage('Profile picture updated!');
-            setShowSuccessDialog(true);
-          }
+          await uploadAndPersistAvatar(result.imageUri);
         }
       } catch (error) {
         console.error('Gallery error:', error);
@@ -303,15 +303,37 @@ export default function PersonalProfileScreen() {
 
   const renderProfileSection = () => (
     <View style={styles.profileSection}>
-      {/* Avatar on the left - 80x80 */}
+      {/* Avatar on the left - 80x80, tappable to change the picture */}
       <View style={styles.profileTopRow}>
         <View style={styles.avatarContainer}>
-          <Avatar
-            userId={currentUser?.id || '1'}
-            userName={currentUser?.name || 'User'}
-            imageUri={currentUser?.avatar_url}
-            size={80}
-          />
+          <TouchableOpacity
+            onPress={handleChangeAvatar}
+            disabled={isUploadingAvatar}
+            activeOpacity={0.8}
+            accessibilityLabel="Change profile picture"
+            accessibilityRole="button"
+          >
+            <Avatar
+              userId={currentUser?.id || '1'}
+              userName={currentUser?.name || 'User'}
+              imageUri={currentUser?.avatar_url}
+              size={80}
+            />
+            {isUploadingAvatar ? (
+              <View style={styles.avatarUploadOverlay}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.avatarEditBadge,
+                  { backgroundColor: appTheme.colors.primary, borderColor: appTheme.colors.background },
+                ]}
+              >
+                <Icon name="camera" size={12} color="#FFFFFF" />
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -833,6 +855,28 @@ const styles = StyleSheet.create({
   avatarContainer: {
     position: 'relative',
     marginBottom: theme.spacing.md,
+  },
+  avatarUploadOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
   },
   avatarEditIcon: {
     position: 'absolute',

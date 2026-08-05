@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import theme from '@/shared/theme';
 import { searchUsers, UserSearchResult } from '../search.service';
 
@@ -44,21 +45,30 @@ type UserSearchScreenRouteParams = {
 const UserSearchScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<UserSearchScreenRouteParams, 'UserSearch'>>();
-  const searchQuery = route.params?.query || '';
+  const initialQuery = route.params?.query || '';
 
+  // The screen is typeable: several entry points ("Start a new chat", inbox
+  // search "See more") navigate here with an empty or pre-filled query.
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
   const [users, setUsers] = useState<UserSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      if (!searchQuery.trim()) {
+      if (!debouncedQuery.trim()) {
         setUsers([]);
         return;
       }
       setLoading(true);
       try {
-        const results = await searchUsers(searchQuery);
+        const results = await searchUsers(debouncedQuery);
         if (!cancelled) setUsers(results);
       } catch {
         if (!cancelled) setUsers([]);
@@ -70,7 +80,7 @@ const UserSearchScreen = () => {
     return () => {
       cancelled = true;
     };
-  }, [searchQuery]);
+  }, [debouncedQuery]);
 
   const renderUserItem = ({ item }: { item: UserSearchResult }) => (
     <TouchableOpacity
@@ -85,7 +95,7 @@ const UserSearchScreen = () => {
         </View>
       )}
       <View style={styles.textContainer}>
-        <HighlightText text={item.name} highlight={searchQuery} />
+        <HighlightText text={item.name} highlight={debouncedQuery} />
       </View>
     </TouchableOpacity>
   );
@@ -93,9 +103,18 @@ const UserSearchScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <SecondaryHeader
-        title={`Users: ${searchQuery}`}
+        title="Search Users"
         leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack() }}
       />
+      <View style={styles.searchContainer}>
+        <AppSearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search for people"
+          onClear={() => setSearchQuery('')}
+          autoFocus={!initialQuery}
+        />
+      </View>
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -110,9 +129,14 @@ const UserSearchScreen = () => {
           windowSize={5}
           initialNumToRender={10}
           contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No users found matching "{searchQuery}"</Text>
+              <Text style={styles.emptyText}>
+                {debouncedQuery.trim()
+                  ? `No users found matching "${debouncedQuery}"`
+                  : 'Search for people by name'}
+              </Text>
             </View>
           }
         />
@@ -125,6 +149,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   listContent: {
     paddingBottom: 20,

@@ -49,8 +49,17 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
     } catch (err: any) {
       if (err.status === 0 || err.code === 'ERR_NETWORK') {
         setError('No internet connection. Please check your network and try again.');
+      } else if (err.status === 503) {
+        // Backend deliberately fails loud when the email service is down —
+        // showing "check your email" here would be a lie (no email was sent).
+        setError('Password reset is temporarily unavailable. Please try again later.');
+      } else if (err.status === 429) {
+        setError('Too many attempts. Please wait a few minutes and try again.');
+      } else if (err.status >= 500) {
+        setError('Something went wrong on our side. Please try again later.');
       } else {
-        // Always show success to prevent email enumeration
+        // 4xx validation responses still show the uniform success state to
+        // prevent email enumeration.
         setSent(true);
       }
     } finally {

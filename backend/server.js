@@ -296,6 +296,19 @@ app.get('/legal/terms', sendLegalPage('terms.html'));
 // deletion; Apple reviewers also check it. Steps live in the HTML, not here.
 app.get('/legal/delete-account', sendLegalPage('delete-account.html'));
 
+// Password-reset landing page. Reset emails link to
+// `${APP_BASE_URL}/reset-password?token=...` — this used to 404 (no page
+// existed), which made the emailed link a dead end and left
+// POST /api/auth/reset-password unreachable. The page posts to that endpoint.
+app.get('/reset-password', (req, res) => {
+  const filePath = path.join(__dirname, 'public', 'reset-password.html');
+  res.sendFile(filePath, (err) => {
+    if (err && !res.headersSent) {
+      res.status(404).type('text/plain').send('Not found');
+    }
+  });
+});
+
 // Shared client-IP key for all rate limiters. Behind Cloudflare (Render fronts every
 // *.onrender.com with CF), `CF-Connecting-IP` is the true client IP and cannot be spoofed —
 // CF overwrites any client-supplied value. Fall back to req.ip (real via `trust proxy`)
@@ -12978,6 +12991,30 @@ app.patch('/api/companies/:companyId/role-requests/:requestId', requireAuth, asy
       updatePatch.rejectionReason = rejectionReason;
     }
 
+    // Check staff limits BEFORE marking the request resolved (paywall).
+    // Previously this check ran after the APPROVED write: a 403 here left the
+    // request permanently APPROVED with no BusinessMember created, the user got
+    // an "accepted" notification for a company they never joined, and
+    // re-approval was blocked by the PENDING guard above.
+    if (status === 'APPROVED' && request.currentRole === 'none') {
+      const business = await repos.businessRepo.getById(businessId);
+      if (business) {
+        const capabilities = deriveCapabilities(business);
+        if (!capabilities.canHaveStaff) {
+          return res.status(403).json(paywallResponse('Upgrade to Pro to accept join requests', 'accept_staff', 'pro'));
+        }
+        const currentCount = await getStaffCount(businessId);
+        if (currentCount >= capabilities.maxStaff) {
+          const requiredPlan = capabilities.maxStaff >= 9 ? 'enterprise' : (capabilities.maxStaff >= 3 ? 'business' : 'pro');
+          return res.status(403).json(paywallResponse(
+            `Staff limit reached (${capabilities.maxStaff}). Upgrade your plan to accept more members.`,
+            `staff_limit_reached_${requiredPlan === 'enterprise' ? 'business' : (requiredPlan === 'business' ? 'pro' : 'free')}`,
+            requiredPlan
+          ));
+        }
+      }
+    }
+
     const updated = await repos.roleRequestRepo.update(requestId, updatePatch);
 
     // If approved, create or upgrade membership
@@ -12985,24 +13022,6 @@ app.patch('/api/companies/:companyId/role-requests/:requestId', requireAuth, asy
       const bm = await findBusinessMember(businessId, request.userId);
 
       if (request.currentRole === 'none') {
-        // Check staff limits before adding new member (paywall)
-        const business = await repos.businessRepo.getById(businessId);
-        if (business) {
-          const capabilities = deriveCapabilities(business);
-          if (!capabilities.canHaveStaff) {
-            return res.status(403).json(paywallResponse('Upgrade to Pro to accept join requests', 'accept_staff', 'pro'));
-          }
-          const currentCount = await getStaffCount(businessId);
-          if (currentCount >= capabilities.maxStaff) {
-            const requiredPlan = capabilities.maxStaff >= 9 ? 'enterprise' : (capabilities.maxStaff >= 3 ? 'business' : 'pro');
-            return res.status(403).json(paywallResponse(
-              `Staff limit reached (${capabilities.maxStaff}). Upgrade your plan to accept more members.`,
-              `staff_limit_reached_${requiredPlan === 'enterprise' ? 'business' : (requiredPlan === 'business' ? 'pro' : 'free')}`,
-              requiredPlan
-            ));
-          }
-        }
-
         // Join request: user is not yet a member — create BusinessMember
         // Only admin or staff may be assigned via join request (never super_admin)
         const assignedRole = ['admin', 'staff'].includes(req.body.role) ? req.body.role : 'staff';

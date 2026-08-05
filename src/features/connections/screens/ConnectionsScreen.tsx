@@ -80,16 +80,19 @@ export default function ConnectionsScreen() {
       const [userList, bizList] = await Promise.all([
         get<{ connectionId: string; user: any; connectedAt: string }[]>('/connections'),
         activeBusiness?.id
-          ? get<any[]>(`/companies/${activeBusiness.id}/connections`)
+          ? // Without the status filter the endpoint returns pending/rejected
+            // rows too, which would render as if already connected.
+            get<any[]>(`/companies/${activeBusiness.id}/connections`, { status: 'accepted' })
           : Promise.resolve([] as any[]),
       ]);
 
+      // Backend returns Prisma User fields: { id, name, avatar, jobTitle }
       const userConns: UserConnection[] = (userList || []).map((c: any) => ({
         id: c.user?.id || c.connectionId,
-        name: `${c.user?.firstName || ''} ${c.user?.lastName || ''}`.trim(),
+        name: c.user?.name || '',
         job_title: c.user?.jobTitle || undefined,
         company: c.user?.company || undefined,
-        avatar_url: c.user?.profilePicture || '',
+        avatar_url: c.user?.avatar || '',
         type: 'user' as const,
       }));
 

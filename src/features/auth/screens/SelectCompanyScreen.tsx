@@ -52,6 +52,16 @@ export default function SelectCompanyScreen({ navigation, route }: Props) {
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // During registration flow the user isn't in the store yet, so authenticated
+  // calls (/companies/search, /request-membership) would 401 and force a logout.
+  // Temporarily seed the pending token so the Axios interceptor can pick it up
+  // (same pattern as UploadBusinessLogoScreen). login() overwrites it later.
+  useEffect(() => {
+    if (pendingAuth?.token && !useProfileStore.getState().accessToken) {
+      useProfileStore.setState({ accessToken: pendingAuth.token });
+    }
+  }, [pendingAuth?.token]);
+
   const fetchCompanies = useCallback(async (q: string) => {
     setIsLoadingCompanies(true);
     setErrorMessage(null);
@@ -99,7 +109,7 @@ export default function SelectCompanyScreen({ navigation, route }: Props) {
         await post(`/companies/${companyId}/request-membership`, {});
         successCount++;
       } catch (err: any) {
-        const msg = err?.response?.data?.error?.message || err?.message || 'Failed to send request';
+        const msg = err?.response?.error?.message || err?.response?.message || err?.message || 'Failed to send request';
         errors.push(msg);
       }
     }
@@ -265,7 +275,10 @@ export default function SelectCompanyScreen({ navigation, route }: Props) {
         message="Your request has been sent and is waiting to be accepted by the company."
         primaryButtonText="Continue"
         onPrimaryAction={handleSuccessModalContinue}
-        onClose={() => setShowSuccessModal(false)}
+        // Dismissing the modal must behave like "Continue" — otherwise the user
+        // is stranded on this screen with an account that exists server-side
+        // but was never logged in (tokens only live in nav params).
+        onClose={handleSuccessModalContinue}
       />
     </View>
   );

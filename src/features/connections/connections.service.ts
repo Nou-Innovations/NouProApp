@@ -18,3 +18,9 @@ export async function acceptBusinessConnectionRequest(
 ): Promise<{ id: string; status: string }> {
   return patch(`/business-connections/${connectionId}/accept`, {});
 }
+
+export async function declineBusinessConnectionRequest(
+  connectionId: string,
+): Promise<{ id: string; status: string }> {
+  return patch(`/business-connections/${connectionId}/reject`, {});
+}

@@ -35,6 +35,10 @@ import {
   acceptJoinRequest,
   rejectJoinRequest,
 } from '@/features/team/team.service';
+import {
+  acceptBusinessConnectionRequest,
+  declineBusinessConnectionRequest,
+} from '@/features/connections/connections.service';
 
 type Notification = APINotification;
 
@@ -367,6 +371,9 @@ export default function NotificationsScreen() {
             notification.requestData.businessId!,
             currentUser.id,
           );
+          // Sync the profile switcher so the newly joined company appears
+          // immediately (previously it only showed up after a relogin).
+          await refreshBusinesses();
           setSuccessMessage(
             `You joined ${notification.requestData.companyName || 'the company'}`,
           );
@@ -379,11 +386,24 @@ export default function NotificationsScreen() {
         }
       } else if (notification.type === 'company_request') {
         const connectionId = notification.requestData?.connectionId!;
+        // Two payload shapes share this type: business mode carries companyId
+        // (a BusinessConnection id), personal mode carries userId (a
+        // UserConnection id). They use different endpoints — calling the user
+        // endpoints with a business connection id 404s.
+        const isBusinessConnection = !!notification.requestData?.companyId;
         if (status === 'accepted') {
-          await acceptConnectionRequest(connectionId);
+          if (isBusinessConnection) {
+            await acceptBusinessConnectionRequest(connectionId);
+          } else {
+            await acceptConnectionRequest(connectionId);
+          }
           setSuccessMessage('Connection request accepted');
         } else {
-          await declineConnectionRequest(connectionId);
+          if (isBusinessConnection) {
+            await declineBusinessConnectionRequest(connectionId);
+          } else {
+            await declineConnectionRequest(connectionId);
+          }
           setSuccessMessage('Connection request declined');
         }
       }
@@ -462,8 +482,11 @@ export default function NotificationsScreen() {
         }
         break;
       case 'company_request':
+        // Business mode carries companyId; personal mode carries the requester's userId
         if (notification.requestData?.companyId) {
           navigation.navigate('ViewBusinessProfile', { businessId: notification.requestData.companyId });
+        } else if (notification.requestData?.userId) {
+          navigation.navigate('ViewUserProfile', { userId: notification.requestData.userId });
         }
         break;
       case 'connection_accepted':
@@ -514,7 +537,9 @@ export default function NotificationsScreen() {
         navigation.navigate('MainTabs', { screen: 'Tabs', params: { screen: 'Invoices' } });
         break;
       case 'order_update':
-        // No OrderDetail screen yet — stay on notifications
+        if (notification.requestData?.orderId) {
+          navigation.navigate('OrderDetails', { orderId: notification.requestData.orderId });
+        }
         break;
       case 'stock_alert':
         if (notification.productData?.productId) {

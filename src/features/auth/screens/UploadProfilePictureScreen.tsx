@@ -18,7 +18,9 @@ import { Text } from '@/shared/components/ui/Typography';
 import { AppButton, TextButton } from '@/shared/components/ui';
 import ImageUploadField from '@/shared/components/ui/ImageUploadField';
 import { Icon } from '@/shared/utils/icons';
-import { authAPI, unwrapAuthResponse } from '@/shared/services/api';
+import { authAPI, patch, unwrapAuthResponse } from '@/shared/services/api';
+import { uploadImage } from '@/shared/services/imageService';
+import { useProfileStore } from '@/shared/store/profileStore';
 import { useRegistrationStore } from '@/shared/store/registrationStore';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'UploadProfilePicture'>;
@@ -48,8 +50,8 @@ export default function UploadProfilePictureScreen({ navigation, route }: Props)
     setError('');
 
     try {
-      // Note: Profile picture upload happens via profile edit after registration
-      // Sending a local file URI as JSON doesn't work - the image needs to be uploaded separately
+      // A local file URI can't be sent as JSON — register first, then upload
+      // the image with the fresh token and save it via PATCH /auth/me.
       const response = await authAPI.register({
         firstName: userData.firstName,
         lastName: userData.lastName,
@@ -60,6 +62,24 @@ export default function UploadProfilePictureScreen({ navigation, route }: Props)
       });
 
       const pendingAuth = unwrapAuthResponse(response);
+
+      // Best-effort avatar upload — must never block a successful registration.
+      if (withProfilePicture && profileImage && pendingAuth.token) {
+        try {
+          // Seed the token so uploadImage() and the PATCH are authenticated
+          // (same pattern as UploadBusinessLogoScreen). login() overwrites it later.
+          useProfileStore.setState({ accessToken: pendingAuth.token });
+          const avatarUrl = await uploadImage(profileImage);
+          await patch('/auth/me', { avatar: avatarUrl });
+          // Reflect it on the pending user so login() shows it immediately.
+          pendingAuth.user = { ...pendingAuth.user, avatar: avatarUrl };
+        } catch (uploadErr) {
+          if (__DEV__) {
+            console.log('[Register] Avatar upload failed (non-fatal):', uploadErr);
+          }
+        }
+      }
+
       navigation.navigate('ChoosePath', { pendingAuth });
       clearPassword();
     } catch (err: any) {
