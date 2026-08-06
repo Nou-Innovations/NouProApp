@@ -9,6 +9,8 @@ import { AppModal } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
+import { deleteCompany } from '@/features/team/team.service';
+import AppTextField from '@/shared/components/ui/AppTextField';
 import theme from '@/shared/theme';
 
 interface ProfileSettingsScreenProps {
@@ -76,11 +78,15 @@ export default function ProfileSettingsScreen({ navigation }: ProfileSettingsScr
   const isSuperAdmin = isSuperAdminRole();
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const removeUserBusiness = useProfileStore((state) => state.removeUserBusiness);
+  const switchToPersonal = useProfileStore((state) => state.switchToPersonal);
+  const refreshBusinesses = useProfileStore((state) => state.refreshBusinesses);
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
   const [showAreYouSureDialog, setShowAreYouSureDialog] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleLeaveWorkplace = () => {
     setShowLeaveDialog(true);
@@ -98,9 +104,25 @@ export default function ProfileSettingsScreen({ navigation }: ProfileSettingsScr
     setShowDeleteDialog(true);
   };
 
-  const confirmDeleteCompany = () => {
-    setShowDeleteDialog(false);
-    AppAlert.alert('Delete Company', 'Company deletion process started...');
+  const confirmDeleteCompany = async () => {
+    if (!activeBusiness?.id || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deleteCompany(activeBusiness.id, deleteConfirmName);
+      setShowDeleteDialog(false);
+      setDeleteConfirmName('');
+      // Deliberately NOT removeUserBusiness(): that calls DELETE members/me and would
+      // erase the owner's membership — the row that proves ownership on a later restore.
+      switchToPersonal();
+      await refreshBusinesses().catch(() => {});
+    } catch (error) {
+      AppAlert.alert(
+        'Could not delete company',
+        getApiErrorMessage(error, 'Failed to delete company. Please try again.'),
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const confirmLeaveWorkplace = async () => {
@@ -165,7 +187,7 @@ export default function ProfileSettingsScreen({ navigation }: ProfileSettingsScr
         onClose={() => setShowAreYouSureDialog(false)}
         variant="confirm"
         title="Are you sure?"
-        message="You are about to delete this company. This action is irreversible."
+        message="You are about to delete this company. Your team will lose access immediately."
         primaryButtonText="Yes, I'm sure"
         onPrimaryAction={handleConfirmAreYouSure}
         secondaryButtonText="No"
@@ -175,15 +197,35 @@ export default function ProfileSettingsScreen({ navigation }: ProfileSettingsScr
       {/* Delete Confirmation Dialog */}
       <AppModal
         visible={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
+        onClose={() => {
+          if (isDeleting) return;
+          setShowDeleteDialog(false);
+          setDeleteConfirmName('');
+        }}
         variant="delete"
         title="Delete Company?"
-        message="This action cannot be undone. All company data will be permanently deleted."
+        message={`This removes ${activeBusiness?.name || 'this company'} from NouPro: it disappears from search, its storefront goes offline, and your team loses access. Orders and invoices already exchanged with other businesses stay in their records.\n\nType the company name to confirm.`}
         primaryButtonText="Delete"
         onPrimaryAction={confirmDeleteCompany}
+        primaryButtonLoading={isDeleting}
+        primaryButtonDisabled={
+          deleteConfirmName.trim().toLowerCase() !== (activeBusiness?.name || '').trim().toLowerCase()
+        }
         secondaryButtonText="Cancel"
-        onSecondaryAction={() => setShowDeleteDialog(false)}
-      />
+        onSecondaryAction={() => {
+          setShowDeleteDialog(false);
+          setDeleteConfirmName('');
+        }}
+        secondaryButtonDisabled={isDeleting}
+      >
+        <AppTextField
+          label="Company name"
+          value={deleteConfirmName}
+          onChangeText={setDeleteConfirmName}
+          placeholder={activeBusiness?.name || 'Company name'}
+          autoCapitalize="none"
+        />
+      </AppModal>
 
       {/* Leave Workplace Confirmation Dialog */}
       <AppModal
