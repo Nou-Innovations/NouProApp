@@ -16,6 +16,7 @@ import {
   Eye,
   LogOut,
   CreditCard,
+  Trash2,
   LucideIcon,
 } from 'lucide-react-native';
 import { AppModal } from '@/shared/components/ui';
@@ -26,9 +27,11 @@ import { getCapabilities } from '@/shared/auth/capabilities';
 import { hasPricePrivacy, checkPaywall, PaywallCheck } from '@/shared/utils/permissions';
 import BusinessAdminGuard from '@/shared/guards/BusinessAdminGuard';
 import AppButton from '@/shared/components/ui/AppButton';
+import AppTextField from '@/shared/components/ui/AppTextField';
 import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { patch } from '@/shared/services/api';
+import { deleteCompany } from '@/features/team/team.service';
 import theme from '@/shared/theme';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
 
@@ -86,6 +89,8 @@ export default function CompanySettingsScreen() {
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
   const removeUserBusiness = useProfileStore((state) => state.removeUserBusiness);
+  const switchToPersonal = useProfileStore((state) => state.switchToPersonal);
+  const refreshBusinesses = useProfileStore((state) => state.refreshBusinesses);
   
   // Use capabilities for access control (single source of truth)
   const capabilities = currentUserRole ? getCapabilities(currentUserRole) : null;
@@ -99,6 +104,31 @@ export default function CompanySettingsScreen() {
   const [paywallCheckResult, setPaywallCheckResult] = useState<PaywallCheck | null>(null);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!activeBusiness?.id || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deleteCompany(activeBusiness.id, deleteConfirmName);
+      setShowDeleteDialog(false);
+      setDeleteConfirmName('');
+      // Leave business mode locally, then resync. Deliberately NOT removeUserBusiness():
+      // that calls DELETE members/me and would erase the owner's accepted membership —
+      // the very row that proves ownership if they later restore the company.
+      switchToPersonal();
+      await refreshBusinesses().catch(() => {});
+    } catch (error) {
+      AppAlert.alert(
+        'Could not delete company',
+        getApiErrorMessage(error, 'Failed to delete company. Please try again.'),
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handlePricePrivacyToggle = async (newValue: boolean) => {
     const plan = activeBusiness?.plan || null;
@@ -275,6 +305,14 @@ export default function CompanySettingsScreen() {
               isDestructive
             />
           )}
+          {currentUserRole === 'super_admin' && (
+            <SettingsOption
+              icon={Trash2}
+              title="Delete Company"
+              onPress={() => setShowDeleteDialog(true)}
+              isDestructive
+            />
+          )}
         </View>
       </ScrollView>
 
@@ -292,6 +330,39 @@ export default function CompanySettingsScreen() {
         onSecondaryAction={() => setShowLeaveDialog(false)}
         secondaryButtonDisabled={isLeaving}
       />
+
+      {/* Delete (archive) Company — typed-name confirmation */}
+      <AppModal
+        visible={showDeleteDialog}
+        onClose={() => {
+          if (isDeleting) return;
+          setShowDeleteDialog(false);
+          setDeleteConfirmName('');
+        }}
+        variant="delete"
+        title="Delete Company"
+        message={`This removes ${activeBusiness?.name || 'this company'} from NouPro: it disappears from search, its storefront goes offline, and your team loses access. Orders and invoices already exchanged with other businesses stay in their records, where your name shows as no longer active.\n\nType the company name to confirm.`}
+        primaryButtonText="Delete"
+        onPrimaryAction={handleConfirmDelete}
+        primaryButtonLoading={isDeleting}
+        primaryButtonDisabled={
+          deleteConfirmName.trim().toLowerCase() !== (activeBusiness?.name || '').trim().toLowerCase()
+        }
+        secondaryButtonText="Cancel"
+        onSecondaryAction={() => {
+          setShowDeleteDialog(false);
+          setDeleteConfirmName('');
+        }}
+        secondaryButtonDisabled={isDeleting}
+      >
+        <AppTextField
+          label="Company name"
+          value={deleteConfirmName}
+          onChangeText={setDeleteConfirmName}
+          placeholder={activeBusiness?.name || 'Company name'}
+          autoCapitalize="none"
+        />
+      </AppModal>
 
       {/* Paywall Modal for Price Privacy */}
       <PaywallModal

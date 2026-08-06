@@ -3,16 +3,37 @@
  */
 const { prisma } = require('../../db/prisma');
 
-async function list(limit = 500) {
+/**
+ * Where-fragment matching only live (non-archived) companies. Spread into any `where`.
+ * Archived companies must disappear from search, discovery and anything actionable —
+ * but must still RESOLVE by id so counterparties can render their name on past orders.
+ */
+const NOT_DELETED = { deletedAt: null };
+
+async function list(limit = 500, { includeDeleted = false } = {}) {
   return prisma.business.findMany({
+    where: includeDeleted ? undefined : { ...NOT_DELETED },
     orderBy: { createdAt: 'desc' },
     take: limit,
   });
 }
 
+/**
+ * Resolve a company by id REGARDLESS of archive state.
+ * This is the tombstone resolver — use it when you need the name of a company that may
+ * have been archived (order history, chats, invoices). For anything a viewer can act on
+ * (connect, order, join, follow, publish), use getActiveById instead.
+ */
 async function getById(id) {
   return prisma.business.findUnique({
     where: { id }
+  });
+}
+
+/** Resolve a company only if it is still active. Returns null for an archived company. */
+async function getActiveById(id) {
+  return prisma.business.findFirst({
+    where: { id, ...NOT_DELETED },
   });
 }
 
@@ -60,11 +81,13 @@ async function updateSubscription(id, data) {
   });
 }
 
-module.exports = { 
-  list, 
-  getById, 
-  create, 
-  update, 
+module.exports = {
+  list,
+  getById,
+  getActiveById,
+  NOT_DELETED,
+  create,
+  update,
   delete: remove,
   updateSubscription,
 };

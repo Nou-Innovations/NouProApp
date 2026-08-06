@@ -724,6 +724,10 @@ function stripSensitiveBusinessFields(business) {
   // Business hours are public-facing profile data (customers want to see when you're open),
   // but they live inside the otherwise-private `settings` blob. Surface just that part.
   if (settings && settings.businessHours) safe.businessHours = settings.businessHours;
+  // Expose archive state as a plain boolean so clients can render a greyed-out,
+  // non-tappable tombstone. The exact archive time is nobody else's business.
+  safe.isDeleted = !!safe.deletedAt;
+  delete safe.deletedAt;
   return safe;
 }
 
@@ -1140,7 +1144,8 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     // Get user's businesses from database (parallel fetch to avoid N+1)
     const memberships = await repos.memberRepo.getByUserId(dbUser.id);
     const acceptedMemberships = memberships.filter(m => m.status === 'accepted');
-    const businesses = await Promise.all(acceptedMemberships.map(m => repos.businessRepo.getById(m.businessId)));
+    // getActiveById: archived companies drop out of the switcher (.filter(Boolean) below).
+    const businesses = await Promise.all(acceptedMemberships.map(m => repos.businessRepo.getActiveById(m.businessId)));
     const userBusinesses = acceptedMemberships
       .map((m, i) => {
         const business = businesses[i];
@@ -1851,7 +1856,7 @@ app.post('/api/auth/2fa/verify', authLimiter, async (req, res) => {
     // Issue real tokens (same as login success)
     const memberships = await repos.memberRepo.getByUserId(dbUser.id);
     const acceptedMs = memberships.filter(m => m.status === 'accepted');
-    const bizResults = await Promise.all(acceptedMs.map(m => repos.businessRepo.getById(m.businessId)));
+    const bizResults = await Promise.all(acceptedMs.map(m => repos.businessRepo.getActiveById(m.businessId)));
     const userBusinesses = acceptedMs
       .map((m, i) => {
         const business = bizResults[i];
@@ -1974,7 +1979,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
     // Get businesses from Prisma (parallel fetch)
     const memberships = await repos.memberRepo.getByUserId(user.id);
     const acceptedMs = memberships.filter(m => m.status === 'accepted');
-    const bizResults = await Promise.all(acceptedMs.map(m => repos.businessRepo.getById(m.businessId)));
+    const bizResults = await Promise.all(acceptedMs.map(m => repos.businessRepo.getActiveById(m.businessId)));
     const userBusinesses = acceptedMs
       .map((m, i) => {
         const business = bizResults[i];
@@ -2411,6 +2416,83 @@ app.post('/api/companies', requireAuth, async (req, res) => {
       return res.status(400).json(errorResponse('Longitude must be between -180 and 180'));
     }
 
+    // ── Reactivation: offer to restore a company this user previously archived ──
+    //
+    // SECURITY: the email/phone match is only a HINT for finding candidates. Business
+    // email/phone are neither unique nor verified, so matching one must never grant
+    // access — otherwise anyone who knows a competitor's public contact address could
+    // inherit their whole commercial history. The AUTHORIZATION is the membership
+    // clause below: you must still hold an accepted super_admin row on that company,
+    // which only the person who archived it does.
+    const emailNorm = email ? String(email).trim() : null;
+    const phoneNorm = phone ? String(phone).trim() : null;
+    const { restoreBusinessId, forceCreateNew } = req.body;
+
+    if (!forceCreateNew && (emailNorm || phoneNorm)) {
+      const contactMatch = [
+        emailNorm ? { email: { equals: emailNorm, mode: 'insensitive' } } : null,
+        phoneNorm ? { phone: phoneNorm } : null,
+      ].filter(Boolean);
+
+      const candidates = await prisma.business.findMany({
+        where: {
+          deletedAt: { not: null },
+          OR: contactMatch,
+          businessMembers: {
+            some: { userId: req.user.id, role: 'super_admin', status: 'accepted' },
+          },
+        },
+        select: { id: true, name: true, logoUrl: true, deletedAt: true },
+        orderBy: { deletedAt: 'desc' },
+        take: 5,
+      });
+
+      if (candidates.length > 0) {
+        if (restoreBusinessId) {
+          const chosen = candidates.find(c => c.id === restoreBusinessId);
+          if (!chosen) {
+            return res.status(403).json(errorResponse(
+              'You cannot restore that company', 'RESTORE_NOT_PERMITTED'));
+          }
+          // Restore, but never silently re-publish a public page or resurrect a paid
+          // tier/card token. Freshly typed profile details win.
+          const restored = await prisma.business.update({
+            where: { id: chosen.id },
+            data: {
+              deletedAt: null,
+              isPublished: false,
+              name: name.trim(),
+              ...(emailNorm ? { email: emailNorm } : {}),
+              ...(phoneNorm ? { phone: phoneNorm } : {}),
+              ...(address ? { address } : {}),
+              ...(logoUrl ? { logoUrl } : {}),
+            },
+          });
+          const membership = await findBusinessMember(restored.id, req.user.id);
+          logger.info('[CompanyRestore] Restored company:', restored.id, 'by', req.user.id);
+          return res.status(200).json(successResponse({
+            business: { ...restored, capabilities: deriveCapabilities(restored) },
+            role: membership?.role || 'super_admin',
+            staff_entry: membership ? {
+              id: membership.id,
+              status: membership.status,
+              role_type: membership.roleType || null,
+              joinedAt: membership.createdAt,
+            } : null,
+            restored: true,
+          }, 'Company restored.'));
+        }
+
+        // Ask before discarding what they just typed OR resurrecting a whole catalogue.
+        return res.status(409).json({
+          success: false,
+          message: 'You previously deleted a company with these contact details.',
+          error: { code: 'RESTORABLE_COMPANY_FOUND', message: 'You previously deleted a company with these contact details.' },
+          data: { candidates },
+        });
+      }
+    }
+
     // Resolve industry from frontend type or direct industry value
     const VALID_INDUSTRIES = ['food_beverage', 'general_retail', 'production', 'services', 'cosmetics', 'electronics', 'other'];
     const resolvedIndustry = (industry && VALID_INDUSTRIES.includes(industry))
@@ -2505,6 +2587,7 @@ app.get('/api/companies/search', requireAuth, async (req, res) => {
     const businesses = await prisma.business.findMany({
       where: {
         isPublished: true,
+        deletedAt: null, // archived companies leave discovery
         ...(q.trim() ? {
           OR: [
             { name: { contains: q, mode: 'insensitive' } },
@@ -2882,6 +2965,18 @@ app.get('/api/companies/:companyId', optionalAuth, async (req, res) => {
     return res.status(404).json(errorResponse('Business not found'));
   }
 
+  // Archived company: resolve just enough for a tombstone (a stale link or an old order
+  // row must still render a name), but nothing actionable — no followers, no people,
+  // no locations, no connection status.
+  if (business.deletedAt) {
+    return res.json(successResponse({
+      id: business.id,
+      name: business.name,
+      logoUrl: business.logoUrl || null,
+      isDeleted: true,
+    }));
+  }
+
   const businessLocations = await repos.locationRepo.getByBusinessId(business.id);
   const capabilities = deriveCapabilities(business);
 
@@ -3068,6 +3163,91 @@ app.patch('/api/companies/:companyId/subscription', requireAuth, async (req, res
     ...updated,
     capabilities: deriveCapabilities(updated),
   }));
+});
+
+// Archive (soft-delete) a company.
+// DELETE /api/companies/:companyId  Body: { confirmName }
+//
+// Deliberately a SOFT delete. Order.buyerBusinessId / Invoice.clientBusinessId are plain
+// columns with no FK while Order.businessId / Invoice.businessId cascade, so the buyer's
+// record of a transaction physically lives on the SELLER's row — a hard delete would wipe
+// a trading partner's own history. We keep the row (name resolves as a greyed-out
+// tombstone) and drop the company out of search, discovery and anything actionable.
+app.delete('/api/companies/:companyId', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+
+    // SECURITY: business admin, then narrowed to super_admin — archiving the whole
+    // workspace is a bigger blast radius than any admin-level action.
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
+    const membership = await findBusinessMember(companyId, req.user?.id);
+    if (!membership || membership.role !== 'super_admin') {
+      return res.status(403).json(errorResponse(
+        'Only the business owner (super admin) can delete this company', 'PERMISSION_DENIED'));
+    }
+
+    const business = await repos.businessRepo.getById(companyId);
+    if (!business) {
+      return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
+    }
+
+    // Idempotent: a retry over a flaky connection should not surface an error.
+    if (business.deletedAt) {
+      return res.json(successResponse(
+        { id: business.id, name: business.name, deletedAt: business.deletedAt },
+        'This company is already archived.',
+      ));
+    }
+
+    // Typed company name rather than a password: this is reversible by design, and the
+    // real risk is a mis-tap, not a stolen session.
+    const { confirmName } = req.body || {};
+    if (!confirmName || String(confirmName).trim().toLowerCase() !== business.name.trim().toLowerCase()) {
+      return res.status(400).json(errorResponse(
+        'Type the company name exactly to confirm', 'CONFIRMATION_MISMATCH'));
+    }
+
+    const archivedAt = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.business.update({
+        where: { id: companyId },
+        data: {
+          deletedAt: archivedAt,
+          isPublished: false,
+          // Reset billing or the renewal job keeps charging the stored card.
+          subscriptionTier: 'FREE',
+          currentPeriodEnd: null,
+          peachCardRegistrationId: null,
+        },
+      });
+
+      // Take every public surface down.
+      await tx.location.updateMany({ where: { businessId: companyId }, data: { isPublic: false } });
+      await tx.product.updateMany({ where: { businessId: companyId }, data: { isListed: false } });
+      await tx.feedPost.deleteMany({ where: { businessId: companyId } });
+
+      // Drop actionable cards sitting in OTHER people's notification lists, which would
+      // otherwise 404 on tap. Accepted memberships are deliberately KEPT: they authorize
+      // ex-members to open their own history, and they are how restore proves ownership.
+      await tx.businessMember.deleteMany({ where: { businessId: companyId, status: { not: 'accepted' } } });
+      await tx.roleRequest.deleteMany({ where: { businessId: companyId, status: 'PENDING' } });
+      await tx.businessConnection.deleteMany({
+        where: {
+          status: 'pending',
+          OR: [{ requesterBusinessId: companyId }, { targetBusinessId: companyId }],
+        },
+      });
+    });
+
+    logger.info('[CompanyArchive] Archived company:', companyId, 'by', req.user?.id);
+    return res.json(successResponse(
+      { id: business.id, name: business.name, deletedAt: archivedAt.toISOString() },
+      'Company archived. Its name stays visible on past orders and messages.',
+    ));
+  } catch (err) {
+    logger.error('[CompanyArchive] Error:', err);
+    return res.status(500).json(errorResponse('Failed to delete company. Please try again.', 'INTERNAL_ERROR'));
+  }
 });
 
 // Legacy company routes (for backwards compatibility)
@@ -3409,7 +3589,7 @@ app.post('/api/business-connections/request', requireAuth, async (req, res) => {
     if (!(await requireBusinessMembership(req, res, requesterBusinessId))) return;
 
     // Check target exists
-    const target = await repos.businessRepo.getById(targetBusinessId);
+    const target = await repos.businessRepo.getActiveById(targetBusinessId);
     if (!target) {
       return res.status(404).json(errorResponse('Target business not found'));
     }
@@ -3550,7 +3730,7 @@ app.post('/api/businesses/:businessId/follow', requireAuth, async (req, res) => 
     const userId = req.user.id;
     const { businessId } = req.params;
 
-    const business = await repos.businessRepo.getById(businessId);
+    const business = await repos.businessRepo.getActiveById(businessId);
     if (!business) {
       return res.status(404).json(errorResponse('Business not found'));
     }
@@ -6483,7 +6663,7 @@ app.post('/api/companies/:companyId/connections', requireAuth, async (req, res) 
     if (targetBusinessId === req.params.companyId) {
       return res.status(400).json(errorResponse('Cannot connect to your own business'));
     }
-    const targetBusiness = await repos.businessRepo.getById(targetBusinessId);
+    const targetBusiness = await repos.businessRepo.getActiveById(targetBusinessId);
     if (!targetBusiness) {
       return res.status(404).json(errorResponse('Target business not found'));
     }
@@ -11905,8 +12085,8 @@ app.get('/api/users/:userId/contacts', requireAuth, async (req, res) => {
     const userBusinessIds = acceptedMemberships.map(m => m.businessId);
 
     // Build search filter for Prisma (push filtering to DB instead of loading all records)
-    const userWhere = { id: { not: userId } };
-    const businessWhere = {};
+    const userWhere = { id: { not: userId }, deletedAt: null };
+    const businessWhere = { deletedAt: null };
     if (searchTerm) {
       userWhere.OR = [
         { name: { contains: searchTerm, mode: 'insensitive' } },
@@ -13104,8 +13284,8 @@ app.post('/api/companies/:companyId/request-membership', requireAuth, joinReques
       return res.status(401).json(errorResponse('Authentication required'));
     }
 
-    // Check business exists
-    const business = await repos.businessRepo.getById(businessId);
+    // Check business exists (and is not archived)
+    const business = await repos.businessRepo.getActiveById(businessId);
     if (!business) {
       return res.status(404).json(errorResponse('Company not found'));
     }
@@ -14558,7 +14738,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
       // 10. Subscription status — batch-fetch admin businesses
       adminBusinessIds.length > 0
         ? prisma.business.findMany({
-            where: { id: { in: adminBusinessIds }, subscriptionTier: { not: 'FREE' }, currentPeriodEnd: { not: null } },
+            where: { id: { in: adminBusinessIds }, subscriptionTier: { not: 'FREE' }, currentPeriodEnd: { not: null }, deletedAt: null },
             select: { id: true, name: true, subscriptionTier: true, currentPeriodEnd: true },
           })
         : Promise.resolve([]),
@@ -15059,7 +15239,7 @@ app.get('/api/products', async (req, res) => {
       )];
       if (ownerIds.length > 0) {
         const owners = await prisma.business.findMany({
-          where: { id: { in: ownerIds } },
+          where: { id: { in: ownerIds }, deletedAt: null },
           select: { id: true, subscriptionTier: true, currentPeriodEnd: true },
         });
         const allowedOwnerIds = new Set(
@@ -15276,7 +15456,7 @@ app.get('/api/public/locations/:locationId', publicReadLimiter, async (req, res)
     }
 
     const business = await prisma.business.findUnique({ where: { id: location.businessId } });
-    if (!business) {
+    if (!business || business.deletedAt) {
       return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
     }
 
@@ -15311,7 +15491,7 @@ app.get('/api/public/locations/:locationId/products', publicReadLimiter, async (
     }
 
     const business = await prisma.business.findUnique({ where: { id: location.businessId } });
-    if (!business) {
+    if (!business || business.deletedAt) {
       return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
     }
 
@@ -15344,7 +15524,7 @@ app.post('/api/public/locations/:locationId/orders', publicOrderLimiter, async (
     }
 
     const business = await prisma.business.findUnique({ where: { id: location.businessId } });
-    if (!business) {
+    if (!business || business.deletedAt) {
       return res.status(404).json(errorResponse('Business not found', 'NOT_FOUND'));
     }
 

@@ -9,45 +9,45 @@ datasource db {
 }
 
 model User {
-  id                   String           @id
+  id                   String            @id
   name                 String?
-  email                String?          @unique
+  email                String?           @unique
   avatar               String?
-  phone                String?          @unique
+  phone                String?           @unique
   passwordHash         String?
   twoFactorSecret      String?
-  twoFactorEnabled     Boolean          @default(false)
+  twoFactorEnabled     Boolean           @default(false)
   twoFactorBackupCodes String?
-  tokenVersion         Int              @default(0)
+  tokenVersion         Int               @default(0)
   jobTitle             String?
   description          String?
   address              String?
-  language             String?          @default("EN")
+  language             String?           @default("EN")
   privacySettings      Json?
   lastLoginAt          DateTime?
   headline             String?
-  bio                  String?          @db.Text
+  bio                  String?           @db.Text
   industry             String?
   coverPhoto           String?
-  profileSlug          String?          @unique
+  profileSlug          String?           @unique
   deletedAt            DateTime? // set when the account is erased/anonymized (GDPR). NULL = active.
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
   businessMembers      BusinessMember[]
   locationMembers      LocationMember[]
-  deliveryAssignments  DeliveryStaff[]  @relation("DeliveryStaffUser")
-  roleRequests         RoleRequest[]    @relation("RoleRequestUser")
-  sentConnections      UserConnection[] @relation("ConnectionSender")
-  receivedConnections  UserConnection[] @relation("ConnectionReceiver")
-  blocksInitiated      Block[]          @relation("Blocker")
-  blocksReceived       Block[]          @relation("Blocked")
+  deliveryAssignments  DeliveryStaff[]   @relation("DeliveryStaffUser")
+  roleRequests         RoleRequest[]     @relation("RoleRequestUser")
+  sentConnections      UserConnection[]  @relation("ConnectionSender")
+  receivedConnections  UserConnection[]  @relation("ConnectionReceiver")
+  blocksInitiated      Block[]           @relation("Blocker")
+  blocksReceived       Block[]           @relation("Blocked")
   workExperiences      WorkExperience[]
   education            Education[]
   certifications       Certification[]
   userSkills           UserSkill[]
   businessFollows      BusinessFollow[]
-  suggestions          Suggestion[]     @relation("SuggestionAuthor")
-  suggestionVotes      SuggestionVote[] @relation("SuggestionVoter")
+  suggestions          Suggestion[]      @relation("SuggestionAuthor")
+  suggestionVotes      SuggestionVote[]  @relation("SuggestionVoter")
   chatMessages         Message[]
   chatParticipants     ChatParticipant[]
   readReceipts         ReadReceipt[]
@@ -75,6 +75,7 @@ model Business {
   peachCustomerId         String?               @unique
   peachCardRegistrationId String?
   settings                Json?
+  deletedAt               DateTime? // set when the owner archives the company. NULL = active.
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
   businessMembers         BusinessMember[]
@@ -117,6 +118,8 @@ model Business {
   discounts               Discount[]            @relation("BusinessDiscounts")
   targets                 BusinessTarget[]      @relation("BusinessTargets")
   recipes                 Recipe[]
+
+  @@index([deletedAt])
 }
 
 model Location {
@@ -349,7 +352,7 @@ model Transport {
 }
 
 model Product {
-  id                  String            @id
+  id                  String              @id
   businessId          String
   name                String
   brand               String?
@@ -362,7 +365,7 @@ model Product {
   status              String?
   variants            Json?
   unit                String?
-  isListed            Boolean?          @map("is_listed")
+  isListed            Boolean?            @map("is_listed")
   isCreatedByUser     Boolean?
   isDisplayable       Boolean?
   isImported          Boolean?
@@ -373,22 +376,22 @@ model Product {
   barcode             String?
   taxRate             Float?
   supplier            String?
-  hasCarton           Boolean?          @default(false)
+  hasCarton           Boolean?            @default(false)
   unitsPerCarton      Int?
   pricePerCarton      Float?
-  hasRetailPriceLimit Boolean?          @default(false)
+  hasRetailPriceLimit Boolean?            @default(false)
   retailPriceLimit    Float?
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
   locationProducts    LocationProduct[]
-  business            Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  brandRef            Brand?            @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  business            Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  brandRef            Brand?              @relation(fields: [brandId], references: [id], onDelete: SetNull)
   stocks              Stock[]
   supplierProducts    SupplierProduct[]
   priceListItems      PriceListItem[]
   collectionProducts  CollectionProduct[]
-  finishedRecipes     Recipe[]             @relation("ProductFinishedRecipe")
-  ingredientIn        RecipeIngredient[]   @relation("ProductAsIngredient")
+  finishedRecipes     Recipe[]            @relation("ProductFinishedRecipe")
+  ingredientIn        RecipeIngredient[]  @relation("ProductAsIngredient")
 
   @@index([businessId])
   @@index([businessId, category])
@@ -1264,7 +1267,7 @@ model Discount {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  business       Business      @relation("BusinessDiscounts", fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation("BusinessDiscounts", fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
   @@index([businessId, isActive])
@@ -1274,15 +1277,15 @@ model Discount {
 // One row per business per month ('YYYY-MM'). Powers the Budget-vs-Actual section.
 
 model BusinessTarget {
-  id            String   @id            // 'tgt-' + uuidv4().slice(0,8)
+  id            String   @id // 'tgt-' + uuidv4().slice(0,8)
   businessId    String
-  period        String                   // month key 'YYYY-MM'
+  period        String // month key 'YYYY-MM'
   revenueTarget Float?
   ordersTarget  Int?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  business      Business @relation("BusinessTargets", fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation("BusinessTargets", fields: [businessId], references: [id], onDelete: Cascade)
 
   @@unique([businessId, period])
   @@index([businessId])
@@ -1293,15 +1296,15 @@ model BusinessTarget {
 // quantities. Powers ingredient-cost → margin. Producing stock is a future add-on.
 
 model Recipe {
-  id          String             @id
-  businessId  String
-  productId   String
-  name        String
-  batchSize   Int                @default(1)
-  yieldUnit   String?
-  notes       String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id         String   @id
+  businessId String
+  productId  String
+  name       String
+  batchSize  Int      @default(1)
+  yieldUnit  String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   business    Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
   product     Product            @relation("ProductFinishedRecipe", fields: [productId], references: [id], onDelete: Cascade)
@@ -1319,8 +1322,8 @@ model RecipeIngredient {
   unit      String?
   createdAt DateTime @default(now())
 
-  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  product   Product  @relation("ProductAsIngredient", fields: [productId], references: [id], onDelete: Cascade)
+  recipe  Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  product Product @relation("ProductAsIngredient", fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([recipeId, productId])
   @@index([recipeId])

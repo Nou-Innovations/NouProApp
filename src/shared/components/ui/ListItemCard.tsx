@@ -132,6 +132,12 @@ export interface ListItemCardProps {
   onPress?: () => void;
   /** Disable interactions */
   disabled?: boolean;
+  /**
+   * Entity this row represents has been deleted/archived. Renders a muted, non-tappable
+   * tombstone: the name stays readable (so history still makes sense) but there is no
+   * profile to open. Opt-in — leaving it undefined renders exactly as before.
+   */
+  isDeleted?: boolean;
 
   // === SELECTION VARIANT ===
   /** Selection style: 'highlight' changes bg, 'border' adds border, 'optionList' for checkbox list */
@@ -262,6 +268,7 @@ export function ListItemCard({
   bottomElement,
   onPress,
   disabled = false,
+  isDeleted = false,
   selectionVariant,
   showDivider = true,
   style,
@@ -334,6 +341,7 @@ export function ListItemCard({
         imageUri={avatar.imageUri}
         size={avatar.size ?? LIST_ITEM_CARD.avatar.size}
         borderRadius={avatar.borderRadius ?? LIST_ITEM_CARD.avatar.borderRadius}
+        isDeleted={isDeleted}
       />
     );
   };
@@ -382,8 +390,11 @@ export function ListItemCard({
     return null;
   };
 
-  const CardWrapper = onPress ? TouchableOpacity : View;
-  const cardProps = onPress
+  // A deleted entity has no profile to open, so the row must not be tappable
+  // even when a caller still passes onPress.
+  const interactive = !!onPress && !isDeleted;
+  const CardWrapper = interactive ? TouchableOpacity : View;
+  const cardProps = interactive
     ? { onPress, disabled, activeOpacity: 0.7 }
     : {};
 
@@ -408,7 +419,7 @@ export function ListItemCard({
                   <Text
                     style={[
                       styles.title, 
-                      { color: isOptionList && selected ? '#FFFFFF' : appTheme.colors.text }
+                      { color: isDeleted ? appTheme.colors.textMuted : (isOptionList && selected ? '#FFFFFF' : appTheme.colors.text) }
                     ]}
                     numberOfLines={1}
                   >
@@ -452,7 +463,7 @@ export function ListItemCard({
                   <Text
                     style={[
                       styles.title, 
-                      { color: isOptionList && selected ? '#FFFFFF' : appTheme.colors.text }
+                      { color: isDeleted ? appTheme.colors.textMuted : (isOptionList && selected ? '#FFFFFF' : appTheme.colors.text) }
                     ]}
                     numberOfLines={1}
                   >

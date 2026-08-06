@@ -109,6 +109,7 @@ async function processRenewals({
     where: {
       subscriptionTier: { not: 'FREE' },
       currentPeriodEnd: { lte: now },
+      deletedAt: null, // never charge an archived company
     },
   });
   summary.due = businesses.length;

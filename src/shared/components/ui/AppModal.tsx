@@ -26,6 +26,8 @@ export interface AppModalProps {
   onSecondaryAction?: () => void;
   onClose: () => void;
   primaryButtonLoading?: boolean;
+  /** Block the primary action without hiding it (e.g. a confirmation field is incomplete). */
+  primaryButtonDisabled?: boolean;
   secondaryButtonDisabled?: boolean;
   /** Optional custom content rendered between the message and the action buttons (e.g. a prompt text field). */
   children?: React.ReactNode;
@@ -50,6 +52,7 @@ export default function AppModal({
   onSecondaryAction,
   onClose,
   primaryButtonLoading = false,
+  primaryButtonDisabled = false,
   secondaryButtonDisabled = false,
   children,
 }: AppModalProps) {
@@ -160,7 +163,7 @@ export default function AppModal({
               style={styles.primaryButton}
               textStyle={greenButtonTextColor ? { color: greenButtonTextColor } : undefined}
               loading={primaryButtonLoading}
-              disabled={primaryButtonLoading}
+              disabled={primaryButtonLoading || primaryButtonDisabled}
             />
           </View>
 

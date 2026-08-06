@@ -934,6 +934,33 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     );
   }
 
+  // Archived company: the backend returns only { id, name, logoUrl, isDeleted }, so render
+  // a tombstone rather than a profile with dead Connect/Message/Order actions. This is the
+  // safety net for stale deep links and any tap that slipped past the navigation guards.
+  if (business?.isDeleted) {
+    return (
+      <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: insets.top + 10, left: 12, width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="chevron-back" size={24} color={appTheme.colors.text} />
+          </TouchableOpacity>
+          <Icon name="business-outline" size={48} color={appTheme.colors.textMuted} />
+          <Text style={{ fontSize: 18, fontFamily: theme.fonts.primary.bold, color: appTheme.colors.textMuted, marginTop: 12, textAlign: 'center' }}>
+            {business.name}
+          </Text>
+          <Text style={{ fontSize: 14, fontFamily: theme.fonts.primary.regular, color: appTheme.colors.textMuted, marginTop: 8, textAlign: 'center' }}>
+            This company is no longer on NouPro. Your past orders, invoices and messages with
+            them are unchanged.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   // Error state
   if (error || !business) {
     return (

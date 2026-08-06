@@ -188,6 +188,19 @@ export async function leaveCompany(companyId: string): Promise<void> {
   await del(`/companies/${companyId}/members/me`);
 }
 
+/**
+ * Archive (soft-delete) a company. super_admin only.
+ *
+ * Soft, not hard: a buyer's record of an order/invoice lives on the SELLER's row, so
+ * really deleting the company would wipe trading partners' history. The company leaves
+ * search and discovery; its name stays visible (greyed out) on existing records.
+ *
+ * `confirmName` must match the company name exactly (case-insensitive) or the API 400s.
+ */
+export async function deleteCompany(companyId: string, confirmName: string): Promise<void> {
+  await del(`/companies/${companyId}`, { confirmName });
+}
+
 // NOTE (R4): resendInvite was removed — the invite-by-email flow never actually sent
 // email, so resending did nothing. Deferred until real staff-invite emails are built.
 

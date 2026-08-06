@@ -94,7 +94,9 @@ async function getByBuyerBusinessId(buyerBusinessId, options = {}) {
     orderBy: { createdAt: 'desc' },
     // Include the seller business so the buyer's "Outgoing" list can label
     // the order. The seller is order.business (via businessId).
-    include: { business: { select: { name: true } } },
+    // deletedAt comes along so an archived seller renders as a greyed-out,
+    // non-tappable tombstone instead of vanishing or linking to a dead profile.
+    include: { business: { select: { name: true, deletedAt: true } } },
   };
   if (limit) {
     query.take = Math.min(Number(limit) || 200, 200);
@@ -106,6 +108,7 @@ async function getByBuyerBusinessId(buyerBusinessId, options = {}) {
   return orders.map(({ business, ...order }) => ({
     ...order,
     sellerBusinessName: business?.name || null,
+    sellerBusinessDeleted: !!business?.deletedAt,
   }));
 }
 

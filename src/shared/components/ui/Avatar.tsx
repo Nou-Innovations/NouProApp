@@ -14,6 +14,11 @@ interface AvatarProps {
   style?: ViewStyle;
   textStyle?: TextStyle;
   showFallback?: boolean;
+  /**
+   * Entity has been deleted/archived — render muted and drop the photo/logo.
+   * Opt-in: undefined renders exactly as before.
+   */
+  isDeleted?: boolean;
 }
 
 export const Avatar: React.FC<AvatarProps> = ({
@@ -24,6 +29,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   style,
   textStyle,
   showFallback = true,
+  isDeleted = false,
 }) => {
   // Use theme colors as defaults
   const [backgroundColor, setBackgroundColor] = useState(theme.colors.surface);
@@ -51,7 +57,8 @@ export const Avatar: React.FC<AvatarProps> = ({
     loadAvatarData();
   }, [userId, userName]);
 
-  const hasValidImage = isValidImageUri(imageUri) && !imageLoadError;
+  // A deleted entity keeps its initials but loses its photo/logo and its brand colour.
+  const hasValidImage = isValidImageUri(imageUri) && !imageLoadError && !isDeleted;
   const shouldShowFallback = showFallback && (!hasValidImage || isLoading);
 
   // Every profile picture in the app is a rounded square ("squircle"), never a circle.
@@ -61,7 +68,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   const avatarStyle: ViewStyle = {
     width: size,
     height: size,
-    backgroundColor: shouldShowFallback ? backgroundColor : 'transparent',
+    backgroundColor: shouldShowFallback ? (isDeleted ? theme.colors.surface : backgroundColor) : 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     ...style,
@@ -72,7 +79,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   const finalTextStyle: TextStyle = {
     fontSize,
     fontFamily: theme.fonts.primary.bold,
-    color: textColor,
+    color: isDeleted ? theme.colors.textMuted : textColor,
     ...textStyle,
   };
 

@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
@@ -42,7 +43,10 @@ export default function UploadBusinessLogoScreen({ navigation, route }: Props) {
     setLogoImage(uri);
   };
 
-  const createBusiness = async (withLogoUri: string | null): Promise<UserBusiness> => {
+  const createBusiness = async (
+    withLogoUri: string | null,
+    extra: Record<string, unknown> = {},
+  ): Promise<UserBusiness> => {
     // During registration flow, the user isn't in the store yet.
     // Temporarily set the pending token so the Axios interceptor can pick it up.
     const isLoggedIn = !!useProfileStore.getState().accessToken;
@@ -71,26 +75,39 @@ export default function UploadBusinessLogoScreen({ navigation, route }: Props) {
       logoUrl,
     };
 
-    const result = await post<UserBusiness>('/companies', payload);
+    const result = await post<UserBusiness>('/companies', { ...payload, ...extra });
     return result;
   };
 
-  const handleCreate = async (withLogo: boolean) => {
+  // Set when the API reports an archived company this user still owns (409).
+  const [restoreCandidate, setRestoreCandidate] = useState<{ id: string; name: string } | null>(null);
+  const [pendingLogoChoice, setPendingLogoChoice] = useState(true);
+
+  const handleCreate = async (withLogo: boolean, extra?: Record<string, unknown>) => {
     setIsCreating(true);
     try {
-      const newBusiness = await createBusiness(withLogo ? logoImage : null);
+      const newBusiness = await createBusiness(withLogo ? logoImage : null, extra);
       setCreatedBusiness(newBusiness);
       setIsCreating(false);
       setShowSuccessModal(true);
-    } catch (err) {
+    } catch (err: any) {
       setIsCreating(false);
+      // The user previously archived a company with these contact details and still owns
+      // it. Ask before discarding what they just typed OR resurrecting a whole catalogue.
+      // NOTE: ApiError.response is the response BODY, so read err.status / err.response.data.
+      if (err?.status === 409 && err?.response?.data?.candidates?.length) {
+        const candidate = err.response.data.candidates[0];
+        setPendingLogoChoice(withLogo);
+        setRestoreCandidate(candidate);
+        return;
+      }
       // Clear the temporarily set token on failure so it doesn't pollute the store
       if (!fromProfileSwitcher) {
         useProfileStore.setState({ accessToken: null });
       }
       AppAlert.alert(
         'Failed to create business',
-        'Something went wrong. Please try again.',
+        getApiErrorMessage(err, 'Something went wrong. Please try again.'),
         [{ text: 'OK' }]
       );
     }
@@ -189,6 +206,26 @@ export default function UploadBusinessLogoScreen({ navigation, route }: Props) {
         primaryButtonText="Continue"
         onPrimaryAction={handleSuccessModalContinue}
         onClose={() => setShowSuccessModal(false)}
+      />
+
+      {/* Restore a company this user previously archived (409 from POST /companies) */}
+      <AppModal
+        visible={!!restoreCandidate}
+        variant="confirm"
+        title="Restore your previous company?"
+        message={`You deleted “${restoreCandidate?.name}” earlier. Restoring brings back its products, customers and history. It stays unpublished until you publish it again.`}
+        primaryButtonText="Restore it"
+        onPrimaryAction={() => {
+          const id = restoreCandidate?.id;
+          setRestoreCandidate(null);
+          if (id) void handleCreate(pendingLogoChoice, { restoreBusinessId: id });
+        }}
+        secondaryButtonText="Create a new one"
+        onSecondaryAction={() => {
+          setRestoreCandidate(null);
+          void handleCreate(pendingLogoChoice, { forceCreateNew: true });
+        }}
+        onClose={() => setRestoreCandidate(null)}
       />
     </View>
   );
