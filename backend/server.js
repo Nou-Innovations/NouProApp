@@ -765,6 +765,22 @@ function stripSensitiveBusinessFields(business) {
   return safe;
 }
 
+// SECURITY (CO-4/5/6): strip a product's internal/commercial fields before returning it to
+// a non-member of the owning company. Keeps public catalogue fields (name, description,
+// selling price, pricePerCarton, brand, category, unit, barcode, images, isListed); drops
+// cost/margin, supplier, sku, tax config, retail-price caps, and all inventory figures.
+// Selling prices are governed separately by applyPricePrivacy.
+function stripInternalProductFields(product) {
+  if (!product) return product;
+  const {
+    costPrice, salePrice, supplier, sku, taxRate,
+    hasRetailPriceLimit, retailPriceLimit,
+    stockQuantity, locationStocks, reorderLevel,
+    ...safe
+  } = product;
+  return safe;
+}
+
 /**
  * Archive (soft-delete) a company inside an existing transaction.
  *
@@ -873,6 +889,61 @@ async function getBusinessAdminUserIds(businessId) {
     logger.error('[Push] admin lookup failed:', err?.message || err);
     return [];
   }
+}
+
+// The businesses a chat belongs to. A company chat belongs to its companyId; a buyer<->seller
+// trade chat (`chat-ord-<A>__<B>`) belongs to both embedded businesses. Personal 1:1 chats
+// (no companyId, non-event id) belong to none.
+function businessesForChat(chat) {
+  const bizIds = new Set(chat?.companyId ? [chat.companyId] : []);
+  if (typeof chat?.id === 'string' && chat.id.startsWith('chat-ord-')) {
+    chat.id.slice('chat-ord-'.length).split('__').forEach(b => b && bizIds.add(b));
+  }
+  return bizIds;
+}
+
+// SECURITY (CO-9): revoke a user's access to a company's chats when they leave / are removed /
+// are suspended / the company is archived. Chat.participants is the authoritative ACL (mirrored
+// by ChatParticipant); removeParticipant updates both atomically. A user who still holds an
+// accepted membership in ANOTHER business the chat belongs to (dual-hat on a trade chat) is
+// kept. Best-effort: never throws into the caller — the recheck below is the backstop.
+async function removeUserFromBusinessChats(companyId, userId) {
+  try {
+    const candidates = await prisma.chat.findMany({
+      where: { OR: [{ companyId }, { id: { startsWith: 'chat-ord-', contains: companyId } }] },
+      select: { id: true, companyId: true, participants: true },
+    });
+    for (const chat of candidates) {
+      const parts = Array.isArray(chat.participants) ? chat.participants : [];
+      if (!parts.includes(userId)) continue;
+      const bizIds = businessesForChat(chat);
+      // `contains` is a substring match — make sure this pair chat really involves companyId.
+      if (!bizIds.has(companyId)) continue;
+      const still = await prisma.businessMember.findFirst({
+        where: { userId, businessId: { in: [...bizIds] }, status: 'accepted' },
+      });
+      if (still) continue;
+      await repos.chatRepo.removeParticipant(chat.id, userId);
+      try { io.to(`user:${userId}`).emit('chat_update', { id: chat.id, removed: true }); } catch (e) { /* best-effort */ }
+    }
+  } catch (err) {
+    logger.warn('[chat-cleanup] failed to revoke chat access:', err?.message || err);
+  }
+}
+
+// SECURITY (CO-9): defense-in-depth for the user-scoped chat routes, which authorize on the
+// participants blob alone. Bar a user from a company chat if they hold ONLY non-accepted
+// membership rows (suspended/pending/invited/rejected/locked) in the businesses the chat
+// belongs to. A user with NO membership row in any relevant business (a B2C customer on a
+// seller's activity feed, a buyer-side trade-chat participant) is NOT barred.
+async function isBarredFromCompanyChat(chat, userId) {
+  const bizIds = businessesForChat(chat);
+  if (bizIds.size === 0) return false; // personal chats untouched
+  const rows = await prisma.businessMember.findMany({
+    where: { userId, businessId: { in: [...bizIds] } },
+    select: { status: true },
+  });
+  return rows.length > 0 && !rows.some(r => r.status === 'accepted');
 }
 
 // Require user to be a member of the business
@@ -1133,7 +1204,10 @@ io.on('connection', (socket) => {
       let isCompanyMember = false;
       if (!isParticipant && chat.companyId) {
         const member = await findBusinessMember(chat.companyId, socket.userId);
-        if (member) {
+        // SECURITY (CO-11): only an ACCEPTED member may join a company chat over the socket.
+        // The HTTP routes use status-checked isBusinessMember; this path used the raw lookup,
+        // letting pending/invited/rejected/suspended members onto the live message stream.
+        if (member && member.status === 'accepted') {
           isCompanyMember = true;
           // If chat is scoped to a location, verify location access (unless super_admin)
           if (chat.locationId && member.role !== 'super_admin') {
@@ -3499,36 +3573,23 @@ app.patch('/api/companies/:companyId/subscription', requireAuth, async (req, res
     return res.status(404).json(errorResponse('Business not found'));
   }
 
-  const { subscriptionTier, billingPeriod } = req.body;
-  
-  // Validate inputs
-  const validTiers = ['FREE', 'PRO', 'BUSINESS', 'ENTERPRISE'];
-  const validPeriods = ['MONTHLY', 'YEARLY'];
-  
-  if (subscriptionTier && !validTiers.includes(subscriptionTier)) {
-    return res.status(400).json(errorResponse('Invalid subscription tier'));
+  const { subscriptionTier } = req.body;
+
+  // SECURITY (CO-7): this route is the self-service DOWNGRADE path only. Paid tiers are
+  // activated exclusively by a verified payment (POST /api/payments/create-checkout →
+  // Peach → processSuccessfulPayment), never from the request body — otherwise any owner
+  // could grant themselves ENTERPRISE for free. Only 'FREE' is accepted here.
+  if (subscriptionTier !== 'FREE') {
+    return res.status(403).json(errorResponse(
+      'Paid plans must be purchased through checkout.', 'PAYMENT_REQUIRED'));
   }
-  
-  if (billingPeriod && !validPeriods.includes(billingPeriod)) {
-    return res.status(400).json(errorResponse('Invalid billing period'));
-  }
-  
-  // Calculate period end (simple: +30 days for monthly, +365 for yearly)
-  let currentPeriodEnd = null;
-  if (billingPeriod) {
-    const days = billingPeriod === 'MONTHLY' ? 30 : 365;
-    currentPeriodEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-  }
-  
-  // Update business
-  const updateData = {};
-  if (subscriptionTier) updateData.subscriptionTier = subscriptionTier;
-  if (billingPeriod) updateData.billingPeriod = billingPeriod;
-  if (currentPeriodEnd) updateData.currentPeriodEnd = currentPeriodEnd;
-  
+
+  // Downgrade to FREE: clear the paid period. billingPeriod is meaningless on FREE and is
+  // ignored. The stored card token is intentionally kept (the renewal job never charges a
+  // FREE company); archiving is the flow that clears it.
   const updated = await repos.businessRepo.updateSubscription(
     req.params.companyId,
-    updateData
+    { subscriptionTier: 'FREE', currentPeriodEnd: null }
   );
   
   res.json(successResponse({
@@ -4355,16 +4416,23 @@ app.get('/api/locations/:locationId', requireAuth, async (req, res) => {
   const businessId = location.businessId || location.companyId;
 
   const business = await repos.businessRepo.getById(businessId);
-  const capabilities = business ? deriveCapabilities(business) : {};
-  
+
   const publicEffective = business ? isLocationPublicEffective(business, location) : false;
   const publicDisabledReason = business ? getPublicDisabledReason(business, location) : null;
-  
+
+  // SECURITY (CO-12): `capabilities` encodes the owner's subscription tier
+  // (canHaveIndependentLocations ⇒ ENTERPRISE, etc.). Only expose it to members — a
+  // non-member gets the location and the business name, but not the tier signal.
+  const isMemberViewer = business ? await isBusinessMember(businessId, req.user?.id) : false;
+  const businessOut = business
+    ? { id: business.id, name: business.name, ...(isMemberViewer && { capabilities: deriveCapabilities(business) }) }
+    : null;
+
   res.json(successResponse({
     ...location,
     publicEffective,
     publicDisabledReason,
-    business: business ? { id: business.id, name: business.name, capabilities } : null,
+    business: businessOut,
   }));
 });
 
@@ -4540,6 +4608,15 @@ app.get('/api/companies/:companyId/products', requireAuth, async (req, res) => {
     // Repo returns products for this businessId (companyId maps to businessId)
     let companyProducts = await repos.productRepo.getByBusinessId(companyId);
 
+    // SECURITY (CO-5): only an accepted member of this company sees the full catalogue
+    // (incl. unlisted products, costs and per-location stock). Any other authenticated
+    // caller is an outside viewer: listed products only, no stock, internal fields stripped.
+    const isMemberViewer = !!(req.user?.id
+      && (await findBusinessMember(companyId, req.user.id))?.status === 'accepted');
+    if (!isMemberViewer) {
+      companyProducts = companyProducts.filter(p => (p.isListed ?? p.is_listed ?? p.isDisplayable) === true);
+    }
+
     // Filter by location if specified (via LocationProduct or Stock tables)
     if (locationId) {
       try {
@@ -4596,35 +4673,37 @@ app.get('/api/companies/:companyId/products', requireAuth, async (req, res) => {
       return (a.name || '').localeCompare(b.name || '');
     });
 
-    // Enrich products with aggregated stock data (batch-fetch to avoid N+1)
-    const allStocks = await repos.stockRepo.getByBusinessId(companyId);
-    const stockByProduct = new Map();
-    for (const s of allStocks) {
-      if (!stockByProduct.has(s.productId)) stockByProduct.set(s.productId, []);
-      stockByProduct.get(s.productId).push(s);
+    // Enrich products with aggregated stock data (batch-fetch to avoid N+1). Members only —
+    // outside viewers (CO-5) must never receive per-location inventory figures.
+    let enrichedProducts = companyProducts;
+    if (isMemberViewer) {
+      const allStocks = await repos.stockRepo.getByBusinessId(companyId);
+      const stockByProduct = new Map();
+      for (const s of allStocks) {
+        if (!stockByProduct.has(s.productId)) stockByProduct.set(s.productId, []);
+        stockByProduct.get(s.productId).push(s);
+      }
+      enrichedProducts = companyProducts.map(product => {
+        const stocks = stockByProduct.get(product.id) || [];
+        const totalStock = stocks.reduce((sum, s) => sum + (s.qtyOnHand || 0), 0);
+        return { ...product, stockQuantity: totalStock, locationStocks: stocks };
+      });
     }
-    const enrichedProducts = companyProducts.map(product => {
-      const stocks = stockByProduct.get(product.id) || [];
-      const totalStock = stocks.reduce((sum, s) => sum + (s.qtyOnHand || 0), 0);
-      return { ...product, stockQuantity: totalStock, locationStocks: stocks };
-    });
 
-    // SECURITY (P0-4): enforce price privacy. A caller who belongs to companyId sees their own
-    // prices/costs; anyone else is an outside viewer (prices hidden unless connected).
-    // viewerBusinessId is derived from membership, never trusted from query params.
-    let viewerBusinessId = null;
-    if (req.user?.id) {
-      const ownerMember = await findBusinessMember(companyId, req.user.id);
-      if (ownerMember && ownerMember.status === 'accepted') {
-        viewerBusinessId = companyId;
-      } else if (req.query.viewerBusinessId) {
-        const viewerMember = await findBusinessMember(req.query.viewerBusinessId, req.user.id);
-        if (viewerMember && viewerMember.status === 'accepted') {
-          viewerBusinessId = req.query.viewerBusinessId;
-        }
+    // SECURITY (P0-4): enforce price privacy. A member of companyId sees their own
+    // prices/costs (viewerBusinessId = companyId); an outside viewer who is a member of the
+    // viewerBusinessId they passed sees connected-buyer pricing; everyone else, prices hidden.
+    let viewerBusinessId = isMemberViewer ? companyId : null;
+    if (!isMemberViewer && req.user?.id && req.query.viewerBusinessId) {
+      const viewerMember = await findBusinessMember(req.query.viewerBusinessId, req.user.id);
+      if (viewerMember && viewerMember.status === 'accepted') {
+        viewerBusinessId = req.query.viewerBusinessId;
       }
     }
-    const privacyProducts = await applyPricePrivacyBatch(enrichedProducts, viewerBusinessId);
+    let privacyProducts = await applyPricePrivacyBatch(enrichedProducts, viewerBusinessId);
+    if (!isMemberViewer) {
+      privacyProducts = privacyProducts.map(stripInternalProductFields);
+    }
 
     // Price lists: attach the viewing buyer's effective price (yourPrice/basePrice/
     // priceListId/priceSource) without overwriting `price`. No-op when the viewer is
@@ -4655,28 +4734,30 @@ app.get('/api/companies/:companyId/products/:productId', requireAuth, async (req
       return res.status(404).json(errorResponse('Product not found'));
     }
 
-    // SECURITY (P0-4): enforce price privacy. The URL companyId is the product's owner
-    // business; a caller who belongs to it sees their own prices, anyone else is treated
-    // as an outside viewer (prices hidden unless connected). viewerBusinessId is derived
-    // from membership, never trusted from query params.
-    let viewerBusinessId = null;
-    if (req.user?.id) {
-      const ownerMember = await findBusinessMember(companyId, req.user.id);
-      if (ownerMember && ownerMember.status === 'accepted') {
-        viewerBusinessId = companyId;
-      } else if (req.query.viewerBusinessId) {
-        const viewerMember = await findBusinessMember(req.query.viewerBusinessId, req.user.id);
-        if (viewerMember && viewerMember.status === 'accepted') {
-          viewerBusinessId = req.query.viewerBusinessId;
-        }
+    // SECURITY (P0-4/CO-5): enforce price privacy + visibility. A member of companyId sees
+    // their own prices/costs; anyone else is an outside viewer. An outside viewer may only
+    // see a LISTED product, with internal fields stripped. viewerBusinessId is derived from
+    // membership, never trusted from query params.
+    const isMemberViewer = !!(req.user?.id
+      && (await findBusinessMember(companyId, req.user.id))?.status === 'accepted');
+    if (!isMemberViewer && (product.isListed ?? product.is_listed ?? product.isDisplayable) !== true) {
+      return res.status(404).json(errorResponse('Product not found'));
+    }
+
+    let viewerBusinessId = isMemberViewer ? companyId : null;
+    if (!isMemberViewer && req.user?.id && req.query.viewerBusinessId) {
+      const viewerMember = await findBusinessMember(req.query.viewerBusinessId, req.user.id);
+      if (viewerMember && viewerMember.status === 'accepted') {
+        viewerBusinessId = req.query.viewerBusinessId;
       }
     }
     const result = await applyPricePrivacy(product, viewerBusinessId);
 
     // Price lists: attach the viewing buyer's effective price (no-op for owner / no list).
-    const withYourPrice = (viewerBusinessId && viewerBusinessId !== companyId)
+    let withYourPrice = (viewerBusinessId && viewerBusinessId !== companyId)
       ? (await attachYourPrice([result], companyId, viewerBusinessId))[0]
       : result;
+    if (!isMemberViewer) withYourPrice = stripInternalProductFields(withYourPrice);
 
     res.json(successResponse(withYourPrice));
   } catch (e) {
@@ -4972,20 +5053,37 @@ app.get('/api/companies/:companyId/products/:productId/suppliers', requireAuth, 
 // List brands for a company
 app.get('/api/companies/:companyId/brands', requireAuth, async (req, res) => {
   try {
+    const { companyId } = req.params;
+    // SECURITY (CO-6): this route embeds every brand's products, and it's what the app uses
+    // to render ANOTHER company's catalogue (BusinessProfileScreen). A non-member may only
+    // see LISTED products, with internal fields stripped and _count corrected to match.
+    const isMemberViewer = !!(req.user?.id
+      && (await findBusinessMember(companyId, req.user.id))?.status === 'accepted');
+
     // SECURITY: Derive viewerBusinessId from caller's membership, not query params
-    let viewerBusinessId = null;
-    if (req.query.viewerBusinessId && req.user?.id) {
+    let viewerBusinessId = isMemberViewer ? companyId : null;
+    if (!isMemberViewer && req.query.viewerBusinessId && req.user?.id) {
       const viewerMember = await findBusinessMember(req.query.viewerBusinessId, req.user.id);
       if (viewerMember && viewerMember.status === 'accepted') {
         viewerBusinessId = req.query.viewerBusinessId;
       }
     }
-    const brands = await repos.brandRepo.getByBusinessId(req.params.companyId);
+    const brands = await repos.brandRepo.getByBusinessId(companyId);
 
     // Apply price privacy to products within each brand
     const brandsWithPrivacy = await Promise.all(brands.map(async (brand) => {
-      if (!brand.products || brand.products.length === 0) return brand;
-      const privacyProducts = await applyPricePrivacyBatch(brand.products, viewerBusinessId);
+      let products = brand.products || [];
+      if (!isMemberViewer) {
+        products = products.filter(p => (p.isListed ?? p.is_listed ?? p.isDisplayable) === true);
+      }
+      if (products.length === 0) {
+        return isMemberViewer ? brand : { ...brand, products: [], _count: { ...brand._count, products: 0 } };
+      }
+      let privacyProducts = await applyPricePrivacyBatch(products, viewerBusinessId);
+      if (!isMemberViewer) {
+        privacyProducts = privacyProducts.map(stripInternalProductFields);
+        return { ...brand, products: privacyProducts, _count: { ...brand._count, products: privacyProducts.length } };
+      }
       return { ...brand, products: privacyProducts };
     }));
 
@@ -11021,10 +11119,11 @@ app.post('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, c
       allParticipants.push(creatorId);
     }
 
-    // Validate that all participants are members of this company
+    // Validate that all participants are ACCEPTED members of this company (CO-11: a mere
+    // truthy membership row let invited/pending/suspended users be added to a company chat).
     for (const pid of allParticipants) {
       const member = await findBusinessMember(companyId, pid);
-      if (!member) {
+      if (!member || member.status !== 'accepted') {
         return res.status(400).json(errorResponse(`Participant ${pid} is not a member of this company`));
       }
     }
@@ -11080,6 +11179,21 @@ app.get('/api/companies/:companyId/chats', requireAuth, requireCompanyMember, as
     );
 
     let companyChats = rawChats;
+
+    // SECURITY (CO-10): participant-only visibility. Previously this returned EVERY chat
+    // scoped to the company — so any staff member could read the lastMessage (and search
+    // the content) of every private 1:1 and group thread, incl. admin-to-admin. The only
+    // company-wide-by-design chats are the deterministic event chats created by
+    // eventMessages (`chat-ord-…` trade threads and `chat-actfeed-…` activity feeds), which
+    // include every accepted member; those stay visible, everything else needs the viewer
+    // in the authoritative participants blob. Runs before search so search can't reach hidden
+    // chats. Note: internal groups also use type 'internal', so a type-based carve-out would
+    // still leak — the id prefix is the reliable discriminator.
+    const viewerId = req.user?.id;
+    companyChats = companyChats.filter(c =>
+      (typeof c.id === 'string' && (c.id.startsWith('chat-ord-') || c.id.startsWith('chat-actfeed-'))) ||
+      (Array.isArray(c.participants) && c.participants.includes(viewerId))
+    );
 
     // Apply filters
     if (locationId) {
@@ -11715,6 +11829,25 @@ app.get('/api/users/:userId/chats', requireAuth, async (req, res) => {
       });
     }
 
+    // SECURITY (CO-9): hide company chats from a viewer who has lost their membership
+    // (suspended, or removed before cleanup ran) so a stale participants blob can't keep
+    // leaking lastMessage previews. Batched: one membership lookup for the whole page.
+    // A viewer with NO membership row in a chat's businesses (external participant) is kept.
+    const pageBizIds = new Set();
+    for (const c of userChats) for (const b of businessesForChat(c)) pageBizIds.add(b);
+    if (pageBizIds.size > 0) {
+      const memRows = await prisma.businessMember.findMany({
+        where: { userId, businessId: { in: [...pageBizIds] } },
+        select: { businessId: true, status: true },
+      });
+      const statusByBiz = new Map(memRows.map(r => [r.businessId, r.status]));
+      userChats = userChats.filter(c => {
+        const bizIds = [...businessesForChat(c)];
+        const known = bizIds.map(b => statusByBiz.get(b)).filter(s => s !== undefined);
+        return !(known.length > 0 && !known.includes('accepted'));
+      });
+    }
+
     // Sort by updatedAt (most recent first)
     userChats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
@@ -11817,6 +11950,12 @@ app.get('/api/users/:userId/chats/:chatId/messages', requireAuth, async (req, re
       return res.status(403).json(errorResponse('Access denied'));
     }
 
+    // SECURITY (CO-9): defense-in-depth — a still-listed participant who lost their company
+    // membership (suspended, or removed before cleanup ran) is barred from company chats.
+    if (await isBarredFromCompanyChat(chat, userId)) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
     // DB-level cursor pagination (messages returned newest-first)
     const requestingUserId = req.user?.id;
     const { messages: chatMessages, nextCursor } = await repos.chatRepo.getMessages(chatId, { limit, cursor, requestingUserId });
@@ -11851,6 +11990,11 @@ app.post('/api/users/:userId/chats/:chatId/read', requireAuth, async (req, res) 
     // Verify user is a participant
     const isParticipant = Array.isArray(chat.participants) && chat.participants.includes(userId);
     if (!isParticipant) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    // SECURITY (CO-9): bar a participant who has lost their company membership.
+    if (await isBarredFromCompanyChat(chat, userId)) {
       return res.status(403).json(errorResponse('Access denied'));
     }
 
@@ -11903,6 +12047,12 @@ app.post('/api/users/:userId/chats/:chatId/messages', requireAuth, messageLimite
     // Verify user is a participant
     const isParticipant = Array.isArray(chat.participants) && chat.participants.includes(userId);
     if (!isParticipant) {
+      return res.status(403).json(errorResponse('Access denied'));
+    }
+
+    // SECURITY (CO-9): an ex-member (suspended/removed) must not be able to POST into a
+    // company chat even if their id lingers in the participants blob.
+    if (await isBarredFromCompanyChat(chat, userId)) {
       return res.status(403).json(errorResponse('Access denied'));
     }
 
@@ -13137,9 +13287,16 @@ app.patch('/api/companies/:companyId/users/:userId', requireAuth, async (req, re
 app.get('/api/companies/:companyId/access/locations', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
-    const { userId } = req.query;
+    const userId = req.query.userId || req.user?.id;
 
     if (!userId) return res.status(400).json(errorResponse('userId is required'));
+
+    // SECURITY (CO-12): only allow querying your own access, or an admin querying a member.
+    // Without this, any authenticated user could enumerate which locations user X holds in
+    // company Y (plus X's role) — an org-chart probe. Mirrors /access/capabilities.
+    if (userId !== req.user?.id) {
+      if (!(await requireBusinessAdmin(req, res, companyId))) return;
+    }
 
     const bm = await findBusinessMember(companyId, userId);
     if (!bm) return res.status(404).json(errorResponse('User not member of this business'));
@@ -13467,13 +13624,14 @@ app.delete('/api/companies/:companyId/users/:userId/invite', requireAuth, async 
     const { companyId, userId } = req.params;
     if (!(await requireBusinessAdmin(req, res, companyId))) return;
 
-    // SECURITY (CO-3): an admin must not be able to remove the owner (or another admin's
-    // super_admin). Only a super_admin may remove a member who is admin/super_admin.
+    // SECURITY (CO-3): an admin must not be able to remove the owner. Only a super_admin
+    // may remove a member who is super_admin. (Admins remain free to manage each other and
+    // to revoke invites they created.)
     const targetBm = await findBusinessMember(companyId, userId);
-    if (targetBm && (targetBm.role === 'admin' || targetBm.role === 'super_admin')) {
+    if (targetBm && targetBm.role === 'super_admin') {
       const requester = await findBusinessMember(companyId, req.user?.id);
       if (!requester || requester.role !== 'super_admin') {
-        return res.status(403).json(errorResponse('Only a super_admin can remove an admin or owner.', 'FORBIDDEN'));
+        return res.status(403).json(errorResponse('Only a super_admin can remove an owner.', 'FORBIDDEN'));
       }
     }
 
@@ -13499,6 +13657,9 @@ app.delete('/api/companies/:companyId/users/:userId/invite', requireAuth, async 
     if (bm) {
       await repos.memberRepo.removeBusinessMember(bm.id);
     }
+
+    // SECURITY (CO-9): revoke the removed member's access to the company's chats.
+    await removeUserFromBusinessChats(companyId, userId);
 
     return res.json(successResponse({ ok: true }));
   } catch (err) {
@@ -13527,6 +13688,9 @@ app.post('/api/companies/:companyId/users/:userId/decline', requireAuth, async (
 
     // Remove business membership
     await repos.memberRepo.removeBusinessMember(bm.id);
+
+    // SECURITY (CO-9): a declined invitee shouldn't retain any company chat access.
+    await removeUserFromBusinessChats(companyId, userId);
 
     return res.json(successResponse({ removed: bm }));
   } catch (err) {
@@ -13590,6 +13754,8 @@ app.delete('/api/companies/:companyId/members/me', requireAuth, async (req, res)
           await tx.businessMember.delete({ where: { id: bm.id } });
         });
         logger.info('[LeaveCompany] Last owner left; company archived:', companyId);
+        // SECURITY (CO-9): revoke the departing owner's chat access too.
+        await removeUserFromBusinessChats(companyId, currentUser.id);
         return res.json(successResponse(
           { removed: bm, archived: true },
           'You left the company. With no owner remaining, it has been archived.',
@@ -13616,6 +13782,10 @@ app.delete('/api/companies/:companyId/members/me', requireAuth, async (req, res)
 
     // Remove business membership
     await repos.memberRepo.removeBusinessMember(bm.id);
+
+    // SECURITY (CO-9): revoke this ex-member's access to the company's chats (after the
+    // membership row is gone, so the dual-hat "still accepted elsewhere" check is accurate).
+    await removeUserFromBusinessChats(companyId, currentUser.id);
 
     return res.json(successResponse({ ok: true }));
   } catch (err) {
@@ -15243,7 +15413,12 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
     // BUSINESS MODE — parallelized with DB-level filtering
     // =========================================================================
     if (mode === 'business') {
-    const userBusinesses = await repos.memberRepo.getByUserId(userId);
+    // SECURITY (CO-8): getByUserId returns rows of every status. Only ACCEPTED members may
+    // receive a company's notifications — otherwise a rejected/suspended/invited member
+    // (esp. one carrying role 'admin') would keep receiving member names/emails, stock
+    // alerts, invoice amounts and subscription details for a company they don't belong to.
+    const userBusinesses = (await repos.memberRepo.getByUserId(userId))
+      .filter(ub => ub.status === 'accepted');
     const allBusinessIds = userBusinesses.map(ub => ub.businessId);
     const adminBusinesses = userBusinesses.filter(ub => ub.role === 'admin' || ub.role === 'super_admin');
     const adminBusinessIds = adminBusinesses.map(ub => ub.businessId);
@@ -15825,36 +16000,36 @@ app.patch('/api/notification-preferences', requireAuth, async (req, res) => {
 // GET /api/products?visibility=public (also supported for compatibility)
 app.get('/api/products', async (req, res) => {
   try {
-    const { scope, visibility, companyId, brand, category } = req.query;
+    const { companyId, brand, category } = req.query;
     // SECURITY: Public endpoint — do not trust viewerBusinessId from query params
     const viewerBusinessId = null;
     let catalog = await repos.productRepo.list();
 
-    // "public catalog" — only listed products visible to others
-    if (scope === 'public' || visibility === 'public') {
-      catalog = catalog.filter(p =>
-        p.isListed === true || p.is_listed === true || p.isDisplayable === true || p.isPublic === true
-      );
+    // SECURITY (CO-4): this is an unauthenticated, cross-tenant route. It ALWAYS returns
+    // only listed products (regardless of any ?scope param a caller does or doesn't pass) —
+    // previously the listed-only filter ran only when the caller volunteered scope=public,
+    // so a bare GET /api/products dumped every company's full catalogue incl. costs.
+    catalog = catalog.filter(p =>
+      p.isListed === true || p.is_listed === true || p.isDisplayable === true || p.isPublic === true
+    );
 
-      // ENTITLEMENT (P2 #10): publishing products on the public feed is a
-      // Business+ capability (canPublishProductsOnFeed). Hide products owned by
-      // businesses without it so FREE/PRO catalogs don't leak into the public
-      // Explore feed or the cross-business product search.
-      const ownerIds = [...new Set(
-        catalog.map(p => p.companyId || p.businessId || p.ownerBusinessId).filter(Boolean)
-      )];
-      if (ownerIds.length > 0) {
-        const owners = await prisma.business.findMany({
-          where: { id: { in: ownerIds }, deletedAt: null },
-          select: { id: true, subscriptionTier: true, currentPeriodEnd: true },
-        });
-        const allowedOwnerIds = new Set(
-          owners.filter(b => deriveCapabilities(b).canPublishProductsOnFeed).map(b => b.id)
-        );
-        catalog = catalog.filter(p =>
-          allowedOwnerIds.has(p.companyId || p.businessId || p.ownerBusinessId)
-        );
-      }
+    // ENTITLEMENT (P2 #10): publishing products on the public feed is a Business+ capability
+    // (canPublishProductsOnFeed). Hide products owned by businesses without it so FREE/PRO
+    // catalogs don't leak into the public Explore feed or the cross-business product search.
+    const ownerIds = [...new Set(
+      catalog.map(p => p.companyId || p.businessId || p.ownerBusinessId).filter(Boolean)
+    )];
+    if (ownerIds.length > 0) {
+      const owners = await prisma.business.findMany({
+        where: { id: { in: ownerIds }, deletedAt: null },
+        select: { id: true, subscriptionTier: true, currentPeriodEnd: true },
+      });
+      const allowedOwnerIds = new Set(
+        owners.filter(b => deriveCapabilities(b).canPublishProductsOnFeed).map(b => b.id)
+      );
+      catalog = catalog.filter(p =>
+        allowedOwnerIds.has(p.companyId || p.businessId || p.ownerBusinessId)
+      );
     }
 
     // Optional filters for product-details suggestions carousels
@@ -15877,7 +16052,9 @@ app.get('/api/products', async (req, res) => {
     // Apply price privacy: hide prices for businesses with pricePrivacyEnabled
     catalog = await applyPricePrivacyBatch(catalog, viewerBusinessId || null);
 
-    return res.json(successResponse(catalog.map(withProductVisibility)));
+    // SECURITY (CO-4): strip internal/commercial fields — this route has no authenticated
+    // viewer, so nobody here is a member of the owning company.
+    return res.json(successResponse(catalog.map(p => stripInternalProductFields(withProductVisibility(p)))));
   } catch (err) {
     return sendError(res, err);
   }
@@ -15978,8 +16155,17 @@ app.get('/api/products/:productId', optionalAuth, async (req, res) => {
       return res.status(404).json(errorResponse('Product not found'));
     }
 
+    // SECURITY (CO-5): this route is optionalAuth and addressable by id. A caller who is
+    // NOT an accepted member of the owning company may only see a LISTED product, with
+    // internal fields stripped. Members (owners) keep the full row.
+    const ownerBizId = foundProduct.businessId || foundProduct.companyId;
+    const isMemberViewer = !!(req.user?.id && await isBusinessMember(ownerBizId, req.user.id));
+    if (!isMemberViewer && foundProduct.isListed !== true) {
+      return res.status(404).json(errorResponse('Product not found'));
+    }
+
     // Apply price privacy
-    const result = await applyPricePrivacy(foundProduct, viewerBusinessId || null);
+    let result = await applyPricePrivacy(foundProduct, viewerBusinessId || null);
 
     // Viewer relationship: attach `viewerStock` only for an AUTHENTICATED member
     // of the claimed business who is NOT the product's owner. Membership is
@@ -15994,6 +16180,8 @@ app.get('/api/products/:productId', optionalAuth, async (req, res) => {
       const viewerStock = await computeViewerStock(productId, claimedBizId);
       if (viewerStock) result.viewerStock = viewerStock;
     }
+
+    if (!isMemberViewer) result = stripInternalProductFields(result);
 
     return res.json(successResponse(result));
   } catch (e) {

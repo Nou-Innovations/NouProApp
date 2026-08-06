@@ -178,6 +178,36 @@ Twilio-free signup (round-2 A-9); Peach webhook signature verification (has a do
 
 **Batch C — feature completion / UX:** CO-22 (staff-invite UI) · CO-23 (onboarding hours) · CO-24 (transports sidebar) · CO-25 (team dead controls) · CO-26 (role guards) · CO-27 (small stubs) · CO-28 (plan-limit UX) · CO-29 (dead-code sweep).
 
-Each batch: `node --check backend/server.js`, backend tests (58 baseline), eslint 0 errors on touched files, `tsc --noEmit` unchanged baseline (133). Fix log + smoke checklist appended per batch. No live smoke test from the sandbox (no network egress).
+Each batch: `node --check backend/server.js`, backend tests (70 baseline — up from 58 after the concurrent OTP workstream landed), `tsc --noEmit` unchanged baseline (133) for frontend batches. Fix log + smoke checklist appended per batch. No live smoke test from the sandbox (no network egress).
+
+---
+
+## Fix log — Batch A (P0 security / tenant isolation, 2026-08-07)
+
+All backend-only, in `backend/server.js` (+ one repo file). Verified: `node --check` OK · backend tests **70/70** · membership/product/chat routes anchored by path (line numbers drift under the concurrent OTP workstream).
+
+| ID | What changed |
+|---|---|
+| **CO-1** | `POST /companies/:id/users/invite` now (a) only creates an `invited` membership — an admin can no longer add someone as `accepted` (no consent) or `suspended` (also closes round-2 M-7); (b) refuses to grant `super_admin` unless the caller is `super_admin`; (c) on re-invite of an existing member, 409s if they're already `accepted` (use the role editor) and refuses to touch a `super_admin` unless the caller is one. Mirrors the guard already on `PATCH .../users/:userId`. |
+| **CO-2** | `POST /companies/:id/users/:userId/accept` now accepts only from `invited` (already-accepted → idempotent success; anything else, incl. `suspended`, → 403). A suspended member can no longer self-reinstate. |
+| **CO-3** | `DELETE /companies/:id/users/:userId/invite` now refuses to remove a `super_admin` unless the caller is a `super_admin` — an admin can't delete the owner. (Admins can still manage each other and revoke invites they created.) |
+| **CO-4** | `GET /api/products` (unauthenticated) now **always** returns listed-only + entitlement-filtered products and strips internal/commercial fields — a bare call no longer dumps every company's full catalogue with costs. |
+| **CO-5** | `GET /companies/:id/products`, `/products/:productId`, and the public `/api/products/:productId` now check accepted membership: non-members get listed products only, **no** stock enrichment, and internal fields (`costPrice`/`salePrice`/`supplier`/`sku`/`taxRate`/retail caps/stock) stripped. Members are byte-identical to before. |
+| **CO-6** | `GET /companies/:id/brands` (the route the app uses to render another company's catalogue) now filters each brand's embedded products to listed-only for non-members, corrects `_count`, and strips internal fields. |
+| **CO-7** | `PATCH /companies/:id/subscription` now accepts only `FREE` (self-service downgrade) → clears the paid period; any paid tier returns 403 `PAYMENT_REQUIRED`. Paid plans activate exclusively via the verified Peach checkout path. Also fixed `businessRepo.updateSubscription` so an explicit `currentPeriodEnd: null` actually clears (was a silent no-op). |
+| **CO-8** | The notification aggregator now filters memberships to `status === 'accepted'` before building its business/admin id lists — a rejected/suspended/invited member no longer receives a company's names/emails, stock alerts, invoice amounts or subscription details. |
+| **CO-9** | Leaving / being removed / declining / archive-on-leave now revoke the user's access to that company's chats (`removeUserFromBusinessChats` — company chats + `chat-ord-` trade chats, keeping dual-hat members of the counterparty). The user-scoped chat read/send/read-receipt/list routes gained an `isBarredFromCompanyChat` recheck, which also contains **suspended** members (kept as participants, denied at read time; access returns on un-suspend). Personal 1:1 chats and legitimate external participants (B2C customers) are untouched. |
+| **CO-10** | `GET /companies/:id/chats` now returns only chats where the caller is a participant, with a carve-out for the company-wide event chats (`chat-ord-`/`chat-actfeed-`). Staff can no longer read every private thread's last message or search their content. |
+| **CO-11** | Socket `join_chat` now requires an **accepted** company membership (was a status-blind lookup); company-chat creation now validates participants are accepted members. |
+| **CO-12** | `GET /companies/:id/access/locations` now requires self-or-admin (was open to any authenticated user — an org-chart/role probe); `GET /locations/:id` no longer attaches `business.capabilities` (a subscription-tier signal) for non-members. |
+
+### Smoke-test checklist for Batch A
+
+1. **Privilege guard** — as a company *admin* (not owner): invite yourself as `super_admin` → 403; re-invite the owner as `staff`/`suspended` → 403; delete the owner → 403. As the *owner*, granting `super_admin` still works.
+2. **Suspended member** — suspend a staff member, then (as them) call accept on the company → 403; they can't open company chats or post; un-suspend → access returns.
+3. **Product isolation** — from a second account that is **not** a member of company X: open X's profile → products tab shows only listed items, no stock numbers; hitting `/api/products` while logged out returns listed-only with no `costPrice`. As a member of X, your own catalogue (incl. unlisted + stock) is unchanged.
+4. **Subscription** — `PATCH /companies/:id/subscription {subscriptionTier:'ENTERPRISE'}` → 403; `{subscriptionTier:'FREE'}` → tier FREE, period cleared. A real paid upgrade via checkout still activates.
+5. **Chat retention** — a member of two companies that trade with each other leaves one → still sees the shared trade chat; a plain staff member leaves → the company's group + trade chats disappear from their inbox and message fetch 403s.
+6. **Chat list** — as staff not in an admin-only group, that group is absent from the company chat list and from search; the activity-feed and trade chats are still listed.
 
 ---

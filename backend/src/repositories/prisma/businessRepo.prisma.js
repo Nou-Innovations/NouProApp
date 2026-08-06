@@ -76,7 +76,9 @@ async function updateSubscription(id, data) {
     data: {
       ...(subscriptionTier && { subscriptionTier }),
       ...(billingPeriod && { billingPeriod }),
-      ...(currentPeriodEnd && { currentPeriodEnd }),
+      // Use !== undefined so an explicit null clears the paid period on a FREE downgrade
+      // (a plain truthy check would silently skip null and leave a stale period end).
+      ...(currentPeriodEnd !== undefined && { currentPeriodEnd }),
     },
   });
 }
