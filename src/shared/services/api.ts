@@ -357,6 +357,10 @@ export const authAPI = {
     email?: string;
     password: string;
     profilePicture?: string | null;
+    /** Proof from verify-phone / verify-email. Register records which contact details
+     *  were actually verified, and can be configured to require one. */
+    phoneVerificationToken?: string;
+    emailVerificationToken?: string;
   }): Promise<ApiResponse<AuthResponseData>> => {
     const response = await apiClient.post('/auth/register', userData);
     return response.data;
@@ -435,6 +439,15 @@ export const authAPI = {
    * login is email-only and an unverified change (or a cleared field) locks the account
    * out permanently. Request sends a code to the NEW address; confirm applies it.
    */
+  /**
+   * Which verification channels can actually reach a user right now.
+   * Called before collecting a code so the client can route to a channel that works,
+   * instead of dead-ending on a 503 when Twilio isn't configured.
+   */
+  getVerificationCapabilities: async (): Promise<{ sms: boolean; email: boolean }> => {
+    return get<{ sms: boolean; email: boolean }>('/auth/verification-capabilities');
+  },
+
   requestEmailChange: async (newEmail: string): Promise<void> => {
     await post<void>('/auth/change-email/request', { newEmail });
   },
@@ -543,9 +556,10 @@ export const authAPI = {
     return response.data;
   },
 
-  verifyPhoneOTP: async (phone: string, countryCode: string, code: string): Promise<ApiResponse<null>> => {
+  /** Returns a short-lived token proving the number was verified; register checks it. */
+  verifyPhoneOTP: async (phone: string, countryCode: string, code: string): Promise<{ verificationToken?: string }> => {
     const response = await apiClient.post('/auth/verify-phone', { phone, countryCode, code });
-    return response.data;
+    return response.data?.data || {};
   },
 
   sendEmailOTP: async (email: string): Promise<ApiResponse<{ message: string }>> => {
@@ -553,9 +567,10 @@ export const authAPI = {
     return response.data;
   },
 
-  verifyEmailOTP: async (email: string, code: string): Promise<ApiResponse<null>> => {
+  /** Returns a short-lived token proving the address was verified; register checks it. */
+  verifyEmailOTP: async (email: string, code: string): Promise<{ verificationToken?: string }> => {
     const response = await apiClient.post('/auth/verify-email', { email, code });
-    return response.data;
+    return response.data?.data || {};
   },
 };
 

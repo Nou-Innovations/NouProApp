@@ -91,6 +91,40 @@ function getEmailTransporter() {
   return emailTransporter;
 }
 
+/**
+ * Deliver a verification code by email.
+ *
+ * Used when Twilio is not configured — this SMTP transport is completely independent of
+ * Twilio, so it keeps signup working. Unlike sendPasswordResetEmail this includes a
+ * `text:` part: HTML-only mail is markedly more likely to be filtered as spam, which
+ * matters a lot more when email is the only way to complete signup.
+ */
+async function sendOtpEmail(toEmail, code) {
+  const transporter = getEmailTransporter();
+  if (!transporter) {
+    // The caller (otpService) only reaches here when a transporter exists; guard anyway.
+    throw new Error('Email transporter is not configured');
+  }
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || 'NouPro <noreply@noupro.app>',
+    to: toEmail,
+    subject: `${code} is your NouPro verification code`,
+    text: `Your NouPro verification code is ${code}. It expires in 10 minutes.\n\nIf you didn't request this, you can ignore this email.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #000;">Your verification code</h2>
+        <p>Enter this code to continue:</p>
+        <p style="font-size:32px;font-weight:bold;letter-spacing:6px;margin:24px 0;">${code}</p>
+        <p style="color:#666;font-size:14px;">This code expires in 10 minutes.</p>
+        <p style="margin-top:24px;color:#666;font-size:14px;">
+          If you didn't request this, you can safely ignore this email.
+        </p>
+      </div>
+    `,
+  });
+}
+
 async function sendPasswordResetEmail(toEmail, resetToken) {
   const transporter = getEmailTransporter();
   const appUrl = process.env.APP_BASE_URL || 'https://nouproapp.onrender.com';
@@ -149,7 +183,7 @@ const repos = getRepos();
 const { prisma } = require('./src/db/prisma');
 
 // Services
-const { orderStatus: orderStatusService, eventMessages, pushService, storageService, stockService } = require('./src/services');
+const { orderStatus: orderStatusService, eventMessages, pushService, storageService, stockService, otpService } = require('./src/services');
 
 // Authentication middleware
 const { requireAuth, optionalAuth, generateToken, verifyToken } = require('./src/middleware/auth');
@@ -1490,7 +1524,8 @@ app.post('/api/auth/refresh', authLimiter, async (req, res) => {
 // Register new user
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   try {
-    const { firstName, lastName, phone, countryCode, email, password, profilePicture } = req.body;
+    const { firstName, lastName, phone, countryCode, email, password, profilePicture,
+            phoneVerificationToken, emailVerificationToken } = req.body;
     
     // Validate required fields
     if (!firstName || !lastName || !phone || !password) {
@@ -1522,6 +1557,22 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       }
     }
 
+    // Verification. Until now the OTP step was a client-side navigation convention —
+    // this endpoint accepted anyone who called it directly, so the codes proved nothing.
+    // verify-phone / verify-email now return a short-lived signed token; we check it here.
+    const phoneVerified = isContactVerified(phoneVerificationToken, fullPhone);
+    const emailVerified = email ? isContactVerified(emailVerificationToken, email) : false;
+
+    // Gated rollout: the backend deploys on push while the app ships via EAS, so
+    // enforcing immediately would break signup for everyone still on the old build.
+    // The flags are recorded from day one either way — flip this on once the app is out.
+    if (process.env.REQUIRE_VERIFIED_SIGNUP === 'true' && !phoneVerified && !emailVerified) {
+      return res.status(403).json(errorResponse(
+        'Please verify your phone number or email address before creating your account.',
+        'VERIFICATION_REQUIRED',
+      ));
+    }
+
     // Hash the password
     const passwordHash = await bcrypt.hash(password, 12);
 
@@ -1536,6 +1587,8 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
         phone: fullPhone,
         avatar: profilePicture || null,
         passwordHash,
+        phoneVerified,
+        emailVerified,
       });
     } catch (createErr) {
       if (createErr.code === 'P2002') {
@@ -1702,6 +1755,48 @@ function getTwilioClient() {
   return twilioClient;
 }
 
+// Dependencies handed to otpService so it stays free of server.js globals.
+const otpDeps = {
+  getTwilioClient,
+  getEmailTransporter,
+  sendOtpEmail,
+};
+
+/** Turn otpService errors into the right HTTP response instead of a blanket 500. */
+function sendOtpError(res, err, fallbackMessage) {
+  if (err?.code === 'OTP_UNAVAILABLE') {
+    return res.status(503).json(errorResponse(err.message, 'OTP_UNAVAILABLE'));
+  }
+  if (err?.code === 'OTP_LOCKED') {
+    return res.status(429).json(errorResponse(err.message, 'OTP_LOCKED'));
+  }
+  return res.status(500).json(errorResponse(fallbackMessage));
+}
+
+/** Mint proof that a contact detail was verified, for register to check later.
+ *  Safe to hand to the client: it contains no secret, only the fact of a passed check.
+ *  Mirrors the existing 'password_reset' / '2fa_pending' token pattern. */
+function issueVerificationToken(to, channel) {
+  return generateToken({ sub: to, type: 'contact_verified', channel, to }, { expiresIn: '15m' });
+}
+
+/** Validate such a token against the value the client is registering with. */
+function isContactVerified(token, expectedTo) {
+  if (!token) return false;
+  const result = verifyToken(`Bearer ${token}`);
+  if (result.error) return false;
+  const claims = result.user?.claims || {};
+  if (claims.type !== 'contact_verified') return false;
+  return String(claims.to || '').toLowerCase() === String(expectedTo || '').toLowerCase();
+}
+
+// Which verification channels can actually reach a user right now.
+// The client calls this BEFORE collecting a code so it can route to a channel that
+// works, instead of dead-ending on a 503 (audit A-9).
+app.get('/api/auth/verification-capabilities', (req, res) => {
+  return res.json(successResponse(otpService.getVerificationCapabilities(otpDeps)));
+});
+
 // Send phone OTP via SMS
 app.post('/api/auth/send-phone-otp', authLimiter, async (req, res) => {
   try {
@@ -1711,26 +1806,18 @@ app.post('/api/auth/send-phone-otp', authLimiter, async (req, res) => {
       return res.status(400).json(errorResponse('Phone number and country code are required'));
     }
 
-    const client = getTwilioClient();
-    if (!client) {
-      return res.status(503).json(errorResponse('SMS service is not configured'));
-    }
-
     const fullNumber = countryCode + phone;
-    const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
-    await client.verify.v2.services(serviceSid)
-      .verifications
-      .create({ to: fullNumber, channel: 'sms' });
+    const { provider } = await otpService.sendOtp({ to: fullNumber, channel: 'sms' }, otpDeps);
 
-    logger.debug('[OTP] Phone verification sent to:', fullNumber);
+    logger.debug('[OTP] Phone verification sent to:', fullNumber, 'via', provider);
     res.json(successResponse({ message: 'Verification code sent' }));
   } catch (err) {
     logger.error('[OTP] Send phone OTP error:', err.message);
     if (err.code === 60200) {
       return res.status(400).json(errorResponse('Invalid phone number'));
     }
-    res.status(500).json(errorResponse('Failed to send verification code'));
+    return sendOtpError(res, err, 'Failed to send verification code');
   }
 });
 
@@ -1743,21 +1830,18 @@ app.post('/api/auth/verify-phone', authLimiter, async (req, res) => {
       return res.status(400).json(errorResponse('Phone, country code, and verification code are required'));
     }
 
-    const client = getTwilioClient();
-    if (!client) {
-      return res.status(503).json(errorResponse('SMS service is not configured'));
-    }
-
     const fullNumber = countryCode + phone;
-    const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
-    const check = await client.verify.v2.services(serviceSid)
-      .verificationChecks
-      .create({ to: fullNumber, code });
+    const approved = await otpService.verifyOtp({ to: fullNumber, code }, otpDeps);
 
-    if (check.status === 'approved') {
+    if (approved) {
       logger.debug('[OTP] Phone verified:', fullNumber);
-      res.json(successResponse(null, 'Phone number verified successfully'));
+      // Register checks this token, so verification finally means something
+      // server-side rather than being a client-side navigation convention.
+      res.json(successResponse(
+        { verificationToken: issueVerificationToken(fullNumber, 'sms') },
+        'Phone number verified successfully',
+      ));
     } else {
       res.status(400).json(errorResponse('Incorrect verification code'));
     }
@@ -1766,7 +1850,7 @@ app.post('/api/auth/verify-phone', authLimiter, async (req, res) => {
     if (err.code === 60200) {
       return res.status(400).json(errorResponse('Invalid verification code'));
     }
-    res.status(500).json(errorResponse('Verification failed'));
+    return sendOtpError(res, err, 'Verification failed');
   }
 });
 
@@ -1790,18 +1874,13 @@ app.post('/api/auth/change-email/request', requireAuth, authLimiter, async (req,
       return res.status(409).json(errorResponse('That email is already in use.', 'DUPLICATE'));
     }
 
-    const client = getTwilioClient();
-    if (!client) {
-      return res.status(503).json(errorResponse('Verification service is not configured'));
-    }
-    await client.verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID)
-      .verifications.create({ to: normalized, channel: 'email' });
+    await otpService.sendOtp({ to: normalized, channel: 'email' }, otpDeps);
 
     logger.debug('[ChangeEmail] Code sent to new address for user:', req.user.id);
     return res.json(successResponse({ sent: true }, 'We sent a code to that address.'));
   } catch (err) {
     logger.error('[ChangeEmail] request error:', err?.message || err);
-    return res.status(500).json(errorResponse('Could not send the verification code.'));
+    return sendOtpError(res, err, 'Could not send the verification code.');
   }
 });
 
@@ -1814,13 +1893,8 @@ app.post('/api/auth/change-email/confirm', requireAuth, authLimiter, async (req,
       return res.status(400).json(errorResponse('Email and code are required'));
     }
 
-    const client = getTwilioClient();
-    if (!client) {
-      return res.status(503).json(errorResponse('Verification service is not configured'));
-    }
-    const check = await client.verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID)
-      .verificationChecks.create({ to: normalized, code });
-    if (check.status !== 'approved') {
+    const approved = await otpService.verifyOtp({ to: normalized, code }, otpDeps);
+    if (!approved) {
       return res.status(400).json(errorResponse('That code is incorrect or has expired.'));
     }
 
@@ -1836,7 +1910,7 @@ app.post('/api/auth/change-email/confirm', requireAuth, authLimiter, async (req,
     }
   } catch (err) {
     logger.error('[ChangeEmail] confirm error:', err?.message || err);
-    return res.status(500).json(errorResponse('Could not change your email.'));
+    return sendOtpError(res, err, 'Could not change your email.');
   }
 });
 
@@ -1852,17 +1926,12 @@ app.post('/api/auth/change-phone/request', requireAuth, authLimiter, async (req,
       return res.status(409).json(errorResponse('That phone number is already in use.', 'DUPLICATE'));
     }
 
-    const client = getTwilioClient();
-    if (!client) {
-      return res.status(503).json(errorResponse('SMS service is not configured'));
-    }
-    await client.verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID)
-      .verifications.create({ to: normalized, channel: 'sms' });
+    await otpService.sendOtp({ to: normalized, channel: 'sms' }, otpDeps);
 
     return res.json(successResponse({ sent: true }, 'We sent a code to that number.'));
   } catch (err) {
     logger.error('[ChangePhone] request error:', err?.message || err);
-    return res.status(500).json(errorResponse('Could not send the verification code.'));
+    return sendOtpError(res, err, 'Could not send the verification code.');
   }
 });
 
@@ -1875,13 +1944,8 @@ app.post('/api/auth/change-phone/confirm', requireAuth, authLimiter, async (req,
       return res.status(400).json(errorResponse('Phone number and code are required'));
     }
 
-    const client = getTwilioClient();
-    if (!client) {
-      return res.status(503).json(errorResponse('SMS service is not configured'));
-    }
-    const check = await client.verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID)
-      .verificationChecks.create({ to: normalized, code });
-    if (check.status !== 'approved') {
+    const approved = await otpService.verifyOtp({ to: normalized, code }, otpDeps);
+    if (!approved) {
       return res.status(400).json(errorResponse('That code is incorrect or has expired.'));
     }
 
@@ -1896,7 +1960,7 @@ app.post('/api/auth/change-phone/confirm', requireAuth, authLimiter, async (req,
     }
   } catch (err) {
     logger.error('[ChangePhone] confirm error:', err?.message || err);
-    return res.status(500).json(errorResponse('Could not change your phone number.'));
+    return sendOtpError(res, err, 'Could not change your phone number.');
   }
 });
 
@@ -1908,22 +1972,13 @@ app.post('/api/auth/send-email-otp', authLimiter, async (req, res) => {
       return res.status(400).json(errorResponse('Email is required'));
     }
 
-    const client = getTwilioClient();
-    if (!client) {
-      return res.status(503).json(errorResponse('Verification service is not configured'));
-    }
+    const { provider } = await otpService.sendOtp({ to: email, channel: 'email' }, otpDeps);
 
-    const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
-
-    await client.verify.v2.services(serviceSid)
-      .verifications
-      .create({ to: email, channel: 'email' });
-
-    logger.debug('[OTP] Email verification sent to:', email);
+    logger.debug('[OTP] Email verification sent to:', email, 'via', provider);
     res.json(successResponse({ message: 'Verification code sent to email' }));
   } catch (err) {
     logger.error('[OTP] Send email OTP error:', err.message);
-    res.status(500).json(errorResponse('Failed to send verification code'));
+    return sendOtpError(res, err, 'Failed to send verification code');
   }
 });
 
@@ -1936,26 +1991,20 @@ app.post('/api/auth/verify-email', authLimiter, async (req, res) => {
       return res.status(400).json(errorResponse('Email and verification code are required'));
     }
 
-    const client = getTwilioClient();
-    if (!client) {
-      return res.status(503).json(errorResponse('Verification service is not configured'));
-    }
+    const approved = await otpService.verifyOtp({ to: email, code }, otpDeps);
 
-    const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
-
-    const check = await client.verify.v2.services(serviceSid)
-      .verificationChecks
-      .create({ to: email, code });
-
-    if (check.status === 'approved') {
+    if (approved) {
       logger.debug('[OTP] Email verified:', email);
-      res.json(successResponse(null, 'Email verified successfully'));
+      res.json(successResponse(
+        { verificationToken: issueVerificationToken(email, 'email') },
+        'Email verified successfully',
+      ));
     } else {
       res.status(400).json(errorResponse('Incorrect verification code'));
     }
   } catch (err) {
     logger.error('[OTP] Verify email error:', err.message);
-    res.status(500).json(errorResponse('Verification failed'));
+    return sendOtpError(res, err, 'Verification failed');
   }
 });
 
@@ -13165,6 +13214,23 @@ app.post('/api/companies/:companyId/users/invite', requireAuth, async (req, res)
     ensureRole(role);
     ensureStatus(status);
 
+    // SECURITY (CO-1): an invite may only ever create an 'invited' membership. The
+    // invitee still explicitly accepts — this stops an admin from adding someone as
+    // 'accepted' (no consent) or as 'suspended' via the invite route.
+    if (status !== 'invited') {
+      return res.status(400).json(errorResponse("Invites can only create an 'invited' membership", 'INVALID_STATUS'));
+    }
+
+    // SECURITY (CO-1): only a super_admin may grant the super_admin role, so an
+    // admin can't invite themselves (or anyone) straight to owner. Mirrors the
+    // guard on PATCH /api/companies/:companyId/users/:userId.
+    if (role === 'super_admin') {
+      const requester = await findBusinessMember(companyId, req.user?.id);
+      if (!requester || requester.role !== 'super_admin') {
+        return res.status(403).json(errorResponse('Only a super_admin can grant the super_admin role.', 'FORBIDDEN'));
+      }
+    }
+
     const locIds = normalizeLocationIds(locationIds);
 
     // Business rules
@@ -13241,6 +13307,21 @@ app.post('/api/companies/:companyId/users/invite', requireAuth, async (req, res)
 
     // Create/update business membership
     let bm = await findBusinessMember(companyId, user.id);
+    if (bm) {
+      // SECURITY (CO-1): re-inviting must not become a back door for changing an
+      // existing member. An accepted member's role is only editable through the team
+      // role editor (PATCH .../users/:userId), and only a super_admin may touch an
+      // owner.
+      if (bm.status === 'accepted') {
+        return res.status(409).json(errorResponse('This person is already a member. Use the team role editor to change their role.', 'ALREADY_MEMBER'));
+      }
+      if (bm.role === 'super_admin') {
+        const requester = await findBusinessMember(companyId, req.user?.id);
+        if (!requester || requester.role !== 'super_admin') {
+          return res.status(403).json(errorResponse('Only a super_admin can change a super_admin.', 'FORBIDDEN'));
+        }
+      }
+    }
     if (!bm) {
       bm = await repos.memberRepo.addBusinessMember({
         id: nextId('bm'),
@@ -13344,6 +13425,17 @@ app.post('/api/companies/:companyId/users/:userId/accept', requireAuth, async (r
 
     const bm = await findBusinessMember(companyId, userId);
     if (!bm) return res.status(404).json(errorResponse('Invite not found'));
+
+    // SECURITY (CO-2): only an outstanding invite may be accepted. Already-accepted is an
+    // idempotent success; any other status (esp. 'suspended') must NOT be self-cleared —
+    // otherwise a suspended member could re-instate themselves. 'pending' rows are
+    // user-initiated join requests, approved by an admin via the role-request flow, not here.
+    if (bm.status === 'accepted') {
+      return res.json(successResponse({ businessMember: bm }));
+    }
+    if (bm.status !== 'invited') {
+      return res.status(403).json(errorResponse('This invitation can no longer be accepted.', 'INVALID_STATUS'));
+    }
 
     // Accept business membership
     const updatedBm = await repos.memberRepo.updateBusinessMember(bm.id, { status: 'accepted' });

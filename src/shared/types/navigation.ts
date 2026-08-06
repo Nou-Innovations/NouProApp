@@ -34,6 +34,13 @@ export interface RegistrationUserData {
   phone: string;
   countryCode: string;
   email?: string;
+  /**
+   * Short-lived proof from verify-phone / verify-email, carried through the signup
+   * wizard so register can record which contact details were actually verified
+   * (and, once REQUIRE_VERIFIED_SIGNUP is on, require one).
+   */
+  phoneVerificationToken?: string;
+  emailVerificationToken?: string;
 }
 
 /**

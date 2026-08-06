@@ -21,6 +21,7 @@ import { AppButton, TextButton } from '@/shared/components/ui';
 import PhoneNumberField from '@/shared/components/ui/PhoneNumberField';
 import { KeyboardAwareScreen } from '@/shared/components/layout';
 import { authAPI } from '@/shared/services/api';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'CreateAccount'>;
 
@@ -76,16 +77,31 @@ export default function CreateAccountScreen({ navigation }: Props) {
       email: email.trim() || undefined,
     };
 
-    // Send OTP to phone and navigate to verification screen
+    // Ask the server which channels can actually reach the user BEFORE sending anything.
+    // Previously this always tried SMS and, with Twilio unconfigured, the 503 left the
+    // user stuck on this form with no way forward at all (audit A-9).
     setIsSendingOTP(true);
     try {
-      await authAPI.sendPhoneOTP(userData.phone, userData.countryCode);
-      navigation.navigate('PhoneVerification', {
-        userData,
-        verificationMethod: 'phone',
-      });
+      let caps = { sms: true, email: true };
+      try {
+        caps = await authAPI.getVerificationCapabilities();
+      } catch {
+        // Older backend, or the check itself failed — fall through to the SMS attempt.
+      }
+
+      if (caps.sms) {
+        await authAPI.sendPhoneOTP(userData.phone, userData.countryCode);
+        navigation.navigate('PhoneVerification', { userData, verificationMethod: 'phone' });
+      } else if (caps.email && userData.email) {
+        await authAPI.sendEmailOTP(userData.email);
+        navigation.navigate('EmailVerification', { userData, verificationMethod: 'email' });
+      } else {
+        setError(
+          'We can\'t send verification codes right now. Please try again later or contact support.',
+        );
+      }
     } catch (err: any) {
-      setError(err?.message || 'Failed to send verification code. Please try again.');
+      setError(getApiErrorMessage(err, 'Failed to send verification code. Please try again.'));
     } finally {
       setIsSendingOTP(false);
     }

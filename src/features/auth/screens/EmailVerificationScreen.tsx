@@ -15,13 +15,11 @@ import { Text } from '@/shared/components/ui/Typography';
 import { AppButton, TextButton } from '@/shared/components/ui';
 import CodeInput from '@/shared/components/ui/CodeInput';
 import { authAPI } from '@/shared/services/api';
-import { IS_DEV } from '@/config/env';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'EmailVerification'>;
 
 // Only use mock verification in development
-const VALID_CODE = IS_DEV ? '123456' : null;
 
 export default function EmailVerificationScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
@@ -53,13 +51,11 @@ export default function EmailVerificationScreen({ navigation, route }: Props) {
     setError('');
 
     try {
-      if (IS_DEV && code === VALID_CODE) {
-        navigation.navigate('CreatePassword', { userData });
-        return;
-      }
 
-      await authAPI.verifyEmailOTP(userData.email!, code);
-      navigation.navigate('CreatePassword', { userData });
+      const result = await authAPI.verifyEmailOTP(userData.email!, code);
+      navigation.navigate('CreatePassword', {
+        userData: { ...userData, emailVerificationToken: result?.verificationToken },
+      });
     } catch (err: any) {
       const message = getApiErrorMessage(err, 'Incorrect code. Please try again.');
       setError(message);

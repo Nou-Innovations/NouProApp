@@ -30,6 +30,8 @@ model User {
   industry             String?
   coverPhoto           String?
   profileSlug          String?           @unique
+  emailVerified        Boolean           @default(false)
+  phoneVerified        Boolean           @default(false)
   deletedAt            DateTime? // set when the account is erased/anonymized (GDPR). NULL = active.
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
@@ -121,6 +123,28 @@ model Business {
   companyInvites          CompanyInvite[]
 
   @@index([deletedAt])
+}
+
+/// Short-lived verification codes for the non-Twilio channels (email/console).
+///
+/// The code hash lives server-side ON PURPOSE. The tempting alternative — a stateless
+/// JWT carrying the hash — is unsafe for a 6-digit code: JWT payloads are readable, so
+/// whoever requested the code (possibly an attacker targeting someone else's number)
+/// could brute-force all 10^6 hashes offline and then "verify". `attempts` provides the
+/// per-destination lockout that Twilio used to handle for us; the IP-keyed rate limiter
+/// is not enough on its own.
+model OtpCode {
+  id          String    @id
+  destination String // normalized phone (+230…) or lowercased email
+  channel     String // 'sms' | 'email'
+  codeHash    String
+  attempts    Int       @default(0)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([destination])
+  @@index([expiresAt])
 }
 
 /// Pending invitation for someone who does NOT yet have an account.

@@ -59,6 +59,9 @@ export default function UploadProfilePictureScreen({ navigation, route }: Props)
         countryCode: userData.countryCode,
         email: userData.email || undefined,
         password: password || '',
+        // Carried from the OTP screen so the server can record what was verified.
+        phoneVerificationToken: userData.phoneVerificationToken,
+        emailVerificationToken: userData.emailVerificationToken,
       });
 
       const pendingAuth = unwrapAuthResponse(response);
