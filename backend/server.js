@@ -731,6 +731,47 @@ function stripSensitiveBusinessFields(business) {
   return safe;
 }
 
+/**
+ * Archive (soft-delete) a company inside an existing transaction.
+ *
+ * Shared by DELETE /api/companies/:companyId and by the "last owner leaves" path of
+ * DELETE /api/companies/:companyId/members/me, so the two can never drift apart.
+ *
+ * Deliberately does NOT touch orders, invoices, chats, or ACCEPTED memberships — a
+ * buyer's record of a transaction lives on the seller's row, and accepted memberships
+ * both keep ex-members' history reachable and authorize a later restore.
+ */
+async function archiveCompanyInTx(tx, companyId, archivedAt) {
+await tx.business.update({
+    where: { id: companyId },
+    data: {
+      deletedAt: archivedAt,
+      isPublished: false,
+      // Reset billing or the renewal job keeps charging the stored card.
+      subscriptionTier: 'FREE',
+      currentPeriodEnd: null,
+      peachCardRegistrationId: null,
+    },
+  });
+
+  // Take every public surface down.
+  await tx.location.updateMany({ where: { businessId: companyId }, data: { isPublic: false } });
+  await tx.product.updateMany({ where: { businessId: companyId }, data: { isListed: false } });
+  await tx.feedPost.deleteMany({ where: { businessId: companyId } });
+
+  // Drop actionable cards sitting in OTHER people's notification lists, which would
+  // otherwise 404 on tap. Accepted memberships are deliberately KEPT: they authorize
+  // ex-members to open their own history, and they are how restore proves ownership.
+  await tx.businessMember.deleteMany({ where: { businessId: companyId, status: { not: 'accepted' } } });
+  await tx.roleRequest.deleteMany({ where: { businessId: companyId, status: 'PENDING' } });
+  await tx.businessConnection.deleteMany({
+    where: {
+      status: 'pending',
+      OR: [{ requesterBusinessId: companyId }, { targetBusinessId: companyId }],
+    },
+  });
+}
+
 // SECURITY: the single funnel for serializing ANOTHER user to a viewer.
 //
 // Every stranger-facing route used to hand-roll `const { passwordHash, twoFactorSecret,
@@ -3284,36 +3325,7 @@ app.delete('/api/companies/:companyId', requireAuth, async (req, res) => {
     }
 
     const archivedAt = new Date();
-    await prisma.$transaction(async (tx) => {
-      await tx.business.update({
-        where: { id: companyId },
-        data: {
-          deletedAt: archivedAt,
-          isPublished: false,
-          // Reset billing or the renewal job keeps charging the stored card.
-          subscriptionTier: 'FREE',
-          currentPeriodEnd: null,
-          peachCardRegistrationId: null,
-        },
-      });
-
-      // Take every public surface down.
-      await tx.location.updateMany({ where: { businessId: companyId }, data: { isPublic: false } });
-      await tx.product.updateMany({ where: { businessId: companyId }, data: { isListed: false } });
-      await tx.feedPost.deleteMany({ where: { businessId: companyId } });
-
-      // Drop actionable cards sitting in OTHER people's notification lists, which would
-      // otherwise 404 on tap. Accepted memberships are deliberately KEPT: they authorize
-      // ex-members to open their own history, and they are how restore proves ownership.
-      await tx.businessMember.deleteMany({ where: { businessId: companyId, status: { not: 'accepted' } } });
-      await tx.roleRequest.deleteMany({ where: { businessId: companyId, status: 'PENDING' } });
-      await tx.businessConnection.deleteMany({
-        where: {
-          status: 'pending',
-          OR: [{ requesterBusinessId: companyId }, { targetBusinessId: companyId }],
-        },
-      });
-    });
+    await prisma.$transaction((tx) => archiveCompanyInTx(tx, companyId, archivedAt));
 
     logger.info('[CompanyArchive] Archived company:', companyId, 'by', req.user?.id);
     return res.json(successResponse(
@@ -12799,17 +12811,59 @@ app.patch('/api/companies/:companyId/users/:userId', requireAuth, async (req, re
       updatedBm = await repos.memberRepo.updateBusinessMember(bm.id, bmPatch);
     }
 
-    // Keep this user's existing location assignments aligned with the new
-    // business-level role/status (best-effort; never block the main update).
+    // Keep this user's location assignments consistent with the new business role
+    // (best-effort; never block the main update).
     if (Object.keys(bmPatch).length > 0) {
       try {
         const lms = await repos.memberRepo.listLocationMembersByBusinessAndUser(companyId, userId);
-        for (const lm of lms || []) {
-          await repos.memberRepo.updateLocationMember(lm.id, bmPatch);
+
+        if (role === 'super_admin') {
+          // A super_admin has implicit access to every location, and the location routes
+          // REFUSE to touch a row whose role is super_admin — writing that role into
+          // LocationMember rows made them permanently unmanageable. Remove them instead.
+          for (const lm of lms || []) {
+            await repos.memberRepo.removeLocationMember(lm.id);
+          }
+        } else if (bm.role === 'super_admin' && role && role !== 'super_admin') {
+          // Demoting an owner: without explicit location rows they would silently lose
+          // every location-scoped screen, so assign them to all of the company's locations.
+          const locations = await repos.locationRepo.getByBusinessId(companyId);
+          for (const loc of locations || []) {
+            const existing = await repos.memberRepo.getLocationMember(loc.id, userId);
+            if (existing) {
+              await repos.memberRepo.updateLocationMember(existing.id, bmPatch);
+            } else {
+              await repos.memberRepo.addLocationMember({
+                id: nextId('lm'),
+                businessId: companyId,
+                locationId: loc.id,
+                userId,
+                role: role || bm.role,
+                status: bmPatch.status || bm.status,
+              });
+            }
+          }
+        } else {
+          for (const lm of lms || []) {
+            await repos.memberRepo.updateLocationMember(lm.id, bmPatch);
+          }
         }
       } catch (e) {
         logger.warn('[role-update] failed to align location memberships:', e?.message);
       }
+    }
+
+    // Tell the member their role changed — nothing notified them before.
+    if (role && role !== bm.role) {
+      const roleBiz = await repos.businessRepo.getById(companyId);
+      pushToUsers([userId], {
+        title: role === 'super_admin' ? 'You are now the owner' : 'Your role changed',
+        body: role === 'super_admin'
+          ? `You are now an owner of ${roleBiz?.name || 'the company'}.`
+          : `Your role at ${roleBiz?.name || 'the company'} is now ${role}.`,
+        category: 'team',
+        data: { type: 'status_change', companyId },
+      });
     }
 
     return res.json(successResponse({ businessMember: updatedBm }));
@@ -13127,6 +13181,8 @@ app.delete('/api/companies/:companyId/members/me', requireAuth, async (req, res)
       return res.status(401).json(errorResponse('Authentication required', 'AUTH_REQUIRED'));
     }
 
+    const { archiveCompany } = req.body || {};
+
     const bm = await findBusinessMember(companyId, currentUser.id);
     if (!bm) return res.status(404).json(errorResponse('You are not a member of this business'));
 
@@ -13134,15 +13190,56 @@ app.delete('/api/companies/:companyId/members/me', requireAuth, async (req, res)
       return res.status(400).json(errorResponse('Only accepted members can leave. Use decline for pending invites.'));
     }
 
-    // Prevent leaving if you are the last admin
-    if (bm.role === 'admin' || bm.role === 'super_admin') {
-      const allMembers = await repos.memberRepo.listBusinessMembers(companyId);
-      const remainingAdmins = allMembers.filter(
-        m => (m.role === 'admin' || m.role === 'super_admin') && m.status === 'accepted' && m.userId !== currentUser.id
+    const allMembers = await repos.memberRepo.listBusinessMembers(companyId);
+    const otherAccepted = allMembers.filter(
+      m => m.status === 'accepted' && m.userId !== currentUser.id
+    );
+
+    // A super_admin leaving needs its OWN check. The old guard counted plain admins as
+    // "remaining admins", so an owner could walk out leaving only admins behind — and
+    // because only a super_admin may grant super_admin, the company could then never
+    // have an owner again: no subscription changes, no archive, no staff management.
+    if (bm.role === 'super_admin') {
+      const otherOwners = otherAccepted.filter(m => m.role === 'super_admin');
+
+      if (otherOwners.length === 0) {
+        // Nobody else can own it. Either promote someone first, or archive the company.
+        if (!archiveCompany) {
+          const promotable = otherAccepted
+            .filter(m => m.role === 'admin')
+            .map(m => ({ userId: m.userId, name: m.user?.name || null, role: m.role }));
+          return res.status(409).json({
+            success: false,
+            message: promotable.length
+              ? 'You are the only owner. Make someone else an owner first, or the company will be archived.'
+              : 'You are the only member. Leaving will archive this company.',
+            error: { code: 'LAST_OWNER', message: 'You are the only owner of this company.' },
+            data: { admins: promotable, memberCount: otherAccepted.length },
+          });
+        }
+
+        // Confirmed: archive the company and drop the membership atomically, so we can
+        // never end up with an ownerless-but-live company.
+        const archivedAt = new Date();
+        await prisma.$transaction(async (tx) => {
+          await archiveCompanyInTx(tx, companyId, archivedAt);
+          await tx.locationMember.deleteMany({ where: { businessId: companyId, userId: currentUser.id } });
+          await tx.businessMember.delete({ where: { id: bm.id } });
+        });
+        logger.info('[LeaveCompany] Last owner left; company archived:', companyId);
+        return res.json(successResponse(
+          { removed: bm, archived: true },
+          'You left the company. With no owner remaining, it has been archived.',
+        ));
+      }
+    } else if (bm.role === 'admin') {
+      // An admin may only leave while at least one admin-or-owner remains.
+      const remainingAdmins = otherAccepted.filter(
+        m => m.role === 'admin' || m.role === 'super_admin'
       );
       if (remainingAdmins.length === 0) {
         return res.status(400).json(errorResponse(
-          'You are the last admin. Transfer ownership to another member before leaving.',
+          'You are the last admin. Make someone else an admin before leaving.',
           'LAST_ADMIN'
         ));
       }

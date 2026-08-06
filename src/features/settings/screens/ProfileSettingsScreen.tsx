@@ -125,16 +125,31 @@ export default function ProfileSettingsScreen({ navigation }: ProfileSettingsScr
     }
   };
 
-  const confirmLeaveWorkplace = async () => {
+  const confirmLeaveWorkplace = async (archiveCompany = false) => {
     if (!activeBusiness?.id || isLeaving) return;
     setIsLeaving(true);
     try {
       // DELETE /companies/:id/members/me, then prunes userBusinesses and switches
       // back to personal mode — that mode swap re-renders the shell for us.
-      await removeUserBusiness(activeBusiness.id);
+      await removeUserBusiness(activeBusiness.id, archiveCompany ? { archiveCompany: true } : undefined);
       setShowLeaveDialog(false);
-    } catch (error) {
-      // Where the server's "You are the last admin…" message surfaces.
+    } catch (error: any) {
+      // 409 LAST_OWNER: the company would be left with nobody who can own it.
+      if (error?.status === 409 && error?.response?.error?.code === 'LAST_OWNER') {
+        const admins: { userId: string; name: string | null }[] = error?.response?.data?.admins || [];
+        setShowLeaveDialog(false);
+        AppAlert.alert(
+          admins.length ? 'You are the only owner' : 'This will archive the company',
+          admins.length
+            ? `Make someone else an owner first (Team > tap their role), or leave anyway and ${activeBusiness?.name || 'this company'} will be archived.`
+            : `You are the only member. Leaving will archive ${activeBusiness?.name || 'this company'}.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Leave and archive', style: 'destructive', onPress: () => { void confirmLeaveWorkplace(true); } },
+          ],
+        );
+        return;
+      }
       AppAlert.alert(
         'Cannot Leave Company',
         getApiErrorMessage(error, 'Failed to leave company. Please try again.'),
@@ -235,7 +250,7 @@ export default function ProfileSettingsScreen({ navigation }: ProfileSettingsScr
         title="Leave Workplace?"
         message={`Are you sure you want to leave ${activeBusiness?.name || 'this workplace'}? You will lose access immediately.`}
         primaryButtonText="Leave"
-        onPrimaryAction={confirmLeaveWorkplace}
+        onPrimaryAction={() => { void confirmLeaveWorkplace(); }}
         primaryButtonLoading={isLeaving}
         secondaryButtonText="Cancel"
         onSecondaryAction={() => setShowLeaveDialog(false)}

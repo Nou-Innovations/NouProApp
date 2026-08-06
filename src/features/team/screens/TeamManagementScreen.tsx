@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -201,8 +202,12 @@ export default function TeamManagementScreen() {
     const user = users.find(u => u.id === staff.id);
     // newRole already uses the domain values (super_admin/admin/staff) — no conversion needed.
     AppAlert.alert(
-      'Change Role',
-      `Change ${staff.name}'s role to ${newRole === 'super_admin' ? 'Super Admin' : newRole === 'admin' ? 'Admin' : 'Staff'}?`,
+      newRole === 'super_admin' ? 'Make owner' : 'Change Role',
+      newRole === 'super_admin'
+        // Granting super_admin is effectively co-ownership: they get subscription control
+        // and can archive the company. Say so plainly rather than "role changed to X".
+        ? `${staff.name} will become an owner, with full control including billing and deleting the company. You stay an owner too.`
+        : `Change ${staff.name}'s role to ${newRole === 'admin' ? 'Admin' : 'Staff'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -216,7 +221,7 @@ export default function TeamManagementScreen() {
               fetchUsers();
             } catch (error) {
               console.error('Error updating role:', error);
-              AppAlert.alert('Error', 'Failed to update role. Please try again.');
+              AppAlert.alert('Error', getApiErrorMessage(error, 'Failed to update role. Please try again.'));
             }
           }
         }

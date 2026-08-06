@@ -129,7 +129,7 @@ interface ProfileActions {
   // Business management
   setUserBusinesses: (businesses: UserBusiness[]) => void;
   addUserBusiness: (business: UserBusiness) => void;
-  removeUserBusiness: (businessId: string) => Promise<void>;
+  removeUserBusiness: (businessId: string, options?: { archiveCompany?: boolean }) => Promise<void>;
   updateUserBusiness: (businessId: string, updates: Partial<Business>) => void;
   refreshBusinesses: () => Promise<void>;
   
@@ -534,10 +534,10 @@ export const useProfileStore = create<ProfileStore>()(
       /**
        * Remove a business from user's businesses (calls API, then updates local state)
        */
-      removeUserBusiness: async (businessId: string) => {
+      removeUserBusiness: async (businessId: string, options?: { archiveCompany?: boolean }) => {
         // Call API to leave company (lazy require to avoid circular deps)
         const { leaveCompany } = require('@/features/team/team.service');
-        await leaveCompany(businessId);
+        await leaveCompany(businessId, options || {});
 
         const state = get();
         set({

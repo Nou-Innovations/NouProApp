@@ -184,8 +184,15 @@ export async function cancelInvite(companyId: string, userId: string): Promise<v
 /**
  * Leave a company (self-removal for accepted members)
  */
-export async function leaveCompany(companyId: string): Promise<void> {
-  await del(`/companies/${companyId}/members/me`);
+export async function leaveCompany(
+  companyId: string,
+  options: { archiveCompany?: boolean } = {},
+): Promise<void> {
+  // The API 409s with LAST_OWNER when you are the only owner, returning the admins you
+  // could hand it to. Pass archiveCompany once the user has confirmed they want to leave
+  // anyway — the company is archived and the membership dropped in one transaction, so
+  // it can never be left live-but-ownerless.
+  await del(`/companies/${companyId}/members/me`, options.archiveCompany ? { archiveCompany: true } : undefined);
 }
 
 /**
