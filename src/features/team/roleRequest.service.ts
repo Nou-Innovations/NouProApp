@@ -59,10 +59,13 @@ export async function getRoleRequests(
   businessId: string,
   status?: 'PENDING' | 'APPROVED' | 'REJECTED'
 ): Promise<RoleRequestWithUser[]> {
-  return get<RoleRequestWithUser[]>(
+  // Backend responds with { requests: [...] }, so the unwrapped payload is an
+  // object — returning it raw left callers with a non-array and rendered nothing.
+  const response = await get<{ requests: RoleRequestWithUser[] }>(
     `/companies/${businessId}/role-requests`,
     status ? { status } : undefined
   );
+  return response?.requests || [];
 }
 
 /**

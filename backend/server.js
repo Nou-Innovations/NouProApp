@@ -1922,15 +1922,23 @@ app.patch('/api/auth/me', requireAuth, async (req, res) => {
     if (industry !== undefined) updateData.industry = industry;
     if (coverPhoto !== undefined) updateData.coverPhoto = coverPhoto;
     if (profileSlug !== undefined) {
-      // Uniqueness check for profile slug
-      const { prisma } = require('./src/db/prisma');
-      const existing = await prisma.user.findFirst({
-        where: { profileSlug, NOT: { id: req.user.id } },
-      });
-      if (existing) {
-        return res.status(409).json(errorResponse('This profile URL is already taken'));
+      // Treat empty/whitespace as "clear the slug". profileSlug is nullable+unique,
+      // and Postgres allows many NULLs — so the uniqueness check must only run for a
+      // real slug. Running it on null matched every other slug-less user and made
+      // every profile save fail with 409.
+      const normalizedSlug =
+        typeof profileSlug === 'string' && profileSlug.trim() ? profileSlug.trim() : null;
+
+      if (normalizedSlug) {
+        const { prisma } = require('./src/db/prisma');
+        const existing = await prisma.user.findFirst({
+          where: { profileSlug: normalizedSlug, NOT: { id: req.user.id } },
+        });
+        if (existing) {
+          return res.status(409).json(errorResponse('This profile URL is already taken'));
+        }
       }
-      updateData.profileSlug = profileSlug;
+      updateData.profileSlug = normalizedSlug;
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -12325,6 +12333,16 @@ app.post('/api/companies/:companyId/locations/:locationId/staff', requireAuth, a
 
     // Ensure user is a business member first (business role must exist)
     let bm = await findBusinessMember(companyId, userId);
+
+    // Only a super_admin may grant or change a super_admin role, so an admin
+    // can't elevate themselves or demote/suspend the owner through this route.
+    // (Mirrors the guards on the location and business member PATCH routes.)
+    if (role === 'super_admin' || bm?.role === 'super_admin') {
+      const requester = await findBusinessMember(companyId, req.user?.id);
+      if (!requester || requester.role !== 'super_admin') {
+        return res.status(403).json(errorResponse('Only a super_admin can change a super_admin role.', 'FORBIDDEN'));
+      }
+    }
 
     // If not business member, create it
     if (!bm) {

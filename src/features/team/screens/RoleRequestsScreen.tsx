@@ -163,10 +163,10 @@ export default function RoleRequestsScreen() {
                 avatar={{
                   type: item.user?.avatar ? 'image' : 'initials',
                   userId: item.userId,
-                  userName: item.userName || 'Staff',
-                  imageUri: item.userAvatar,
+                  userName: item.user?.name || item.userName || 'Staff',
+                  imageUri: item.user?.avatar || item.userAvatar,
                 }}
-                title={item.userName || 'Staff Member'}
+                title={item.user?.name || item.userName || 'Staff Member'}
                 subtitle={`Requesting Admin access • ${new Date(item.createdAt).toLocaleDateString()}`}
                 bottomElement={
                   item.message ? (

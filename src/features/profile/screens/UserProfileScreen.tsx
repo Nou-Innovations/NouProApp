@@ -16,7 +16,7 @@ import { AppBottomSheet, SectionTitle, AppButton, ButtonRow, TextButton, type Ap
 import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
 import { ProfileViewType, getProfileAdditionalOptions, getRelationshipAction } from '@/shared/types/profile';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { get as apiGet, post as apiPost } from '@/shared/services/api';
+import { get as apiGet, post as apiPost, patch as apiPatch } from '@/shared/services/api';
 import { reportEntity, blockUser, REPORT_REASONS, type ReportReason } from '@/features/profile/profile.service';
 import { getUserChats, createUserChat } from '@/features/inbox/inbox.service';
 import theme from '@/shared/theme';
@@ -200,7 +200,8 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
             onPress: async () => {
               try {
                 setConnectLoading(true);
-                await apiPost(`/connections/${status.id}/accept`, {});
+                // Backend registers this as PATCH (server.js) — POST 404s.
+                await apiPatch(`/connections/${status.id}/accept`, {});
                 // Refresh profile to update connection status
                 fetchUserProfile();
               } catch (err) {

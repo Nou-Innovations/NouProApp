@@ -1,5 +1,10 @@
 # User Flows Audit — Sign up, Profile, Connections, Companies, Notifications
 
+> **See also: `USER_FLOWS_AUDIT_ROUND2.md`** — a deeper second pass over the same scope (same day) that
+> found **16 further P0s** this round missed, including a privilege-escalation hole and a null-slug bug
+> that makes profile editing fail for every user. Read round 2 first; it also re-verifies which items
+> below are still open.
+
 **Date:** 2026-08-05
 **Scope:** Everything around user interaction with the app: sign up / sign in / account lifecycle, profile viewing & editing, user↔user connections + blocking, joining/entering companies (requests, invites, roles), company↔company connections, search/discovery, notifications and the new-user first-run experience.
 **Method:** Full-stack trace of every flow — frontend screens/services/stores (`src/features/{auth,profile,connections,team,search,notifications}`, `src/modes/personal`, `src/shared`), backend routes (`backend/server.js`), repositories, and Prisma schema. Key findings re-verified by direct reads.
