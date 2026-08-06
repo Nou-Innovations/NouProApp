@@ -186,6 +186,7 @@ import TaskDetailScreen from '@/features/tasks/screens/TaskDetailScreen';
 
 // Screens - Settings
 import ChangePasswordScreen from '@/features/settings/screens/ChangePasswordScreen';
+import ChangeEmailScreen from '@/features/settings/screens/ChangeEmailScreen';
 import SecuritySettingsScreen from '@/features/settings/screens/SecuritySettingsScreen';
 import DeleteAccountScreen from '@/features/settings/screens/DeleteAccountScreen';
 import ProfileSettingsScreen from '@/features/settings/screens/ProfileSettingsScreen';
@@ -541,6 +542,7 @@ function AppNavigator() {
 
         {/* Settings Screens */}
         <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+        <RootStack.Screen name="ChangeEmail" component={ChangeEmailScreen} />
         <RootStack.Screen name="SecuritySettings" component={SecuritySettingsScreen} />
         <RootStack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
         <RootStack.Screen name="TwoFactorAuth" component={TwoFactorAuthScreen} />

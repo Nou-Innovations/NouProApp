@@ -37,6 +37,14 @@ export default function SecuritySettingsScreen({ navigation }: SecuritySettingsS
   const twoFactorEnabled = useProfileStore((state) => state.twoFactorEnabled);
   const biometricEnabled = useProfileStore((state) => state.biometricEnabled);
 
+  const handleChangeEmail = () => {
+    navigation.navigate('ChangeEmail', { mode: 'email' });
+  };
+
+  const handleChangePhone = () => {
+    navigation.navigate('ChangeEmail', { mode: 'phone' });
+  };
+
   const handleChangePassword = () => {
     navigation.navigate('ChangePassword');
   };
@@ -87,6 +95,28 @@ export default function SecuritySettingsScreen({ navigation }: SecuritySettingsS
 
   const renderSecurityOptions = () => (
     <View style={styles.settingsSection}>
+      <TouchableOpacity
+        style={[styles.settingItem, { borderBottomColor: appTheme.colors.borderColor }]}
+        onPress={handleChangeEmail}
+      >
+        <View style={styles.settingLeft}>
+          <Icon name="mail-outline" size={24} color={appTheme.colors.iconColor} />
+          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Change Email</Text>
+        </View>
+        <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.settingItem, { borderBottomColor: appTheme.colors.borderColor }]}
+        onPress={handleChangePhone}
+      >
+        <View style={styles.settingLeft}>
+          <Icon name="call-outline" size={24} color={appTheme.colors.iconColor} />
+          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Change Phone</Text>
+        </View>
+        <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+      </TouchableOpacity>
+
       <TouchableOpacity 
         style={[styles.settingItem, { borderBottomColor: appTheme.colors.borderColor }]} 
         onPress={handleChangePassword}

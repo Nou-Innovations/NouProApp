@@ -1771,6 +1771,135 @@ app.post('/api/auth/verify-phone', authLimiter, async (req, res) => {
 });
 
 // Send email OTP
+// ── Verified email / phone change ────────────────────────────────────────────
+// Email and phone are identity: login is email-only, so an unverified change (or a
+// cleared field) could permanently lock someone out. PATCH /auth/me now refuses to
+// change them; these two pairs do it properly, sending a code to the NEW address first.
+
+// POST /api/auth/change-email/request  Body: { newEmail }
+app.post('/api/auth/change-email/request', requireAuth, authLimiter, async (req, res) => {
+  try {
+    const { newEmail } = req.body || {};
+    const normalized = typeof newEmail === 'string' ? newEmail.trim().toLowerCase() : '';
+    if (!normalized || !normalized.includes('@')) {
+      return res.status(400).json(errorResponse('Enter a valid email address'));
+    }
+
+    const existing = await repos.userRepo.getByEmail(normalized);
+    if (existing && existing.id !== req.user.id) {
+      return res.status(409).json(errorResponse('That email is already in use.', 'DUPLICATE'));
+    }
+
+    const client = getTwilioClient();
+    if (!client) {
+      return res.status(503).json(errorResponse('Verification service is not configured'));
+    }
+    await client.verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID)
+      .verifications.create({ to: normalized, channel: 'email' });
+
+    logger.debug('[ChangeEmail] Code sent to new address for user:', req.user.id);
+    return res.json(successResponse({ sent: true }, 'We sent a code to that address.'));
+  } catch (err) {
+    logger.error('[ChangeEmail] request error:', err?.message || err);
+    return res.status(500).json(errorResponse('Could not send the verification code.'));
+  }
+});
+
+// POST /api/auth/change-email/confirm  Body: { newEmail, code }
+app.post('/api/auth/change-email/confirm', requireAuth, authLimiter, async (req, res) => {
+  try {
+    const { newEmail, code } = req.body || {};
+    const normalized = typeof newEmail === 'string' ? newEmail.trim().toLowerCase() : '';
+    if (!normalized || !code) {
+      return res.status(400).json(errorResponse('Email and code are required'));
+    }
+
+    const client = getTwilioClient();
+    if (!client) {
+      return res.status(503).json(errorResponse('Verification service is not configured'));
+    }
+    const check = await client.verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID)
+      .verificationChecks.create({ to: normalized, code });
+    if (check.status !== 'approved') {
+      return res.status(400).json(errorResponse('That code is incorrect or has expired.'));
+    }
+
+    try {
+      const updated = await repos.userRepo.update(req.user.id, { email: normalized });
+      logger.info('[ChangeEmail] Email changed for user:', req.user.id);
+      return res.json(successResponse(stripSensitiveUserFields(updated, { isSelf: true }), 'Your email has been updated.'));
+    } catch (e) {
+      if (e?.code === 'P2002') {
+        return res.status(409).json(errorResponse('That email is already in use.', 'DUPLICATE'));
+      }
+      throw e;
+    }
+  } catch (err) {
+    logger.error('[ChangeEmail] confirm error:', err?.message || err);
+    return res.status(500).json(errorResponse('Could not change your email.'));
+  }
+});
+
+// POST /api/auth/change-phone/request  Body: { newPhone }
+app.post('/api/auth/change-phone/request', requireAuth, authLimiter, async (req, res) => {
+  try {
+    const { newPhone } = req.body || {};
+    const normalized = typeof newPhone === 'string' ? newPhone.trim() : '';
+    if (!normalized) return res.status(400).json(errorResponse('Enter a valid phone number'));
+
+    const existing = await repos.userRepo.getByPhone(normalized);
+    if (existing && existing.id !== req.user.id) {
+      return res.status(409).json(errorResponse('That phone number is already in use.', 'DUPLICATE'));
+    }
+
+    const client = getTwilioClient();
+    if (!client) {
+      return res.status(503).json(errorResponse('SMS service is not configured'));
+    }
+    await client.verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID)
+      .verifications.create({ to: normalized, channel: 'sms' });
+
+    return res.json(successResponse({ sent: true }, 'We sent a code to that number.'));
+  } catch (err) {
+    logger.error('[ChangePhone] request error:', err?.message || err);
+    return res.status(500).json(errorResponse('Could not send the verification code.'));
+  }
+});
+
+// POST /api/auth/change-phone/confirm  Body: { newPhone, code }
+app.post('/api/auth/change-phone/confirm', requireAuth, authLimiter, async (req, res) => {
+  try {
+    const { newPhone, code } = req.body || {};
+    const normalized = typeof newPhone === 'string' ? newPhone.trim() : '';
+    if (!normalized || !code) {
+      return res.status(400).json(errorResponse('Phone number and code are required'));
+    }
+
+    const client = getTwilioClient();
+    if (!client) {
+      return res.status(503).json(errorResponse('SMS service is not configured'));
+    }
+    const check = await client.verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID)
+      .verificationChecks.create({ to: normalized, code });
+    if (check.status !== 'approved') {
+      return res.status(400).json(errorResponse('That code is incorrect or has expired.'));
+    }
+
+    try {
+      const updated = await repos.userRepo.update(req.user.id, { phone: normalized });
+      return res.json(successResponse(stripSensitiveUserFields(updated, { isSelf: true }), 'Your phone number has been updated.'));
+    } catch (e) {
+      if (e?.code === 'P2002') {
+        return res.status(409).json(errorResponse('That phone number is already in use.', 'DUPLICATE'));
+      }
+      throw e;
+    }
+  } catch (err) {
+    logger.error('[ChangePhone] confirm error:', err?.message || err);
+    return res.status(500).json(errorResponse('Could not change your phone number.'));
+  }
+});
+
 app.post('/api/auth/send-email-otp', authLimiter, async (req, res) => {
   try {
     const { email } = req.body;
@@ -2068,8 +2197,36 @@ app.patch('/api/auth/me', requireAuth, async (req, res) => {
     if (address !== undefined) updateData.address = address;
     if (language !== undefined) updateData.language = language;
     if (privacySettings !== undefined) updateData.privacySettings = privacySettings;
-    if (phone !== undefined) updateData.phone = phone;
-    if (email !== undefined) updateData.email = email;
+    // Email and phone are IDENTITY, not profile fields. Login is email-only, so writing
+    // an empty email here permanently bricked the account — and the profile form sent
+    // `email: value || null`, so simply clearing the field did exactly that.
+    // Changes now go through the verified change-email / change-phone endpoints.
+    if (email !== undefined || phone !== undefined) {
+      // Compare against the DB row, not req.user: the JWT carries `email` but no `phone`,
+      // so comparing to the token would reject every save made by a user who has one.
+      const currentRow = await repos.userRepo.getById(req.user.id);
+
+      if (email !== undefined) {
+        const normalized = typeof email === 'string' ? email.trim().toLowerCase() : '';
+        if (!normalized) {
+          return res.status(400).json(errorResponse(
+            'Your email cannot be removed — it is how you sign in.', 'EMAIL_REQUIRED'));
+        }
+        if (normalized !== String(currentRow?.email || '').toLowerCase()) {
+          return res.status(400).json(errorResponse(
+            'Use the verified email-change flow to change your email address.', 'VERIFICATION_REQUIRED'));
+        }
+      }
+
+      if (phone !== undefined) {
+        const normalizedPhone = typeof phone === 'string' ? phone.trim() : '';
+        const currentPhone = String(currentRow?.phone || '');
+        if (normalizedPhone !== currentPhone) {
+          return res.status(400).json(errorResponse(
+            'Use the verified phone-change flow to change your phone number.', 'VERIFICATION_REQUIRED'));
+        }
+      }
+    }
     if (headline !== undefined) updateData.headline = headline;
     if (bio !== undefined) updateData.bio = bio;
     if (industry !== undefined) updateData.industry = industry;
@@ -2107,6 +2264,10 @@ app.patch('/api/auth/me', requireAuth, async (req, res) => {
 
     res.json(successResponse(safeUser, 'Profile updated successfully'));
   } catch (err) {
+    if (err?.code === 'P2002') {
+      const field = Array.isArray(err?.meta?.target) ? err.meta.target[0] : 'value';
+      return res.status(409).json(errorResponse(`That ${field} is already in use.`, 'DUPLICATE'));
+    }
     logger.error('[UpdateProfile] Error:', err);
     res.status(500).json(errorResponse('Failed to update profile'));
   }

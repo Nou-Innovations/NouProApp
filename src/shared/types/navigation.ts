@@ -308,6 +308,7 @@ export type RootStackParamList = {
   PersonalSettings: undefined;
   BusinessSettings: undefined;
   ChangePassword: undefined;
+  ChangeEmail: { mode?: 'email' | 'phone' } | undefined;
   SecuritySettings: undefined;
   DeleteAccount: undefined;
   ProfileSettings: undefined;

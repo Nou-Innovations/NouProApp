@@ -430,6 +430,27 @@ export const authAPI = {
     return response.data;
   },
 
+  /**
+   * Verified email change. PATCH /auth/me refuses to change email or phone, because
+   * login is email-only and an unverified change (or a cleared field) locks the account
+   * out permanently. Request sends a code to the NEW address; confirm applies it.
+   */
+  requestEmailChange: async (newEmail: string): Promise<void> => {
+    await post<void>('/auth/change-email/request', { newEmail });
+  },
+
+  confirmEmailChange: async (newEmail: string, code: string): Promise<void> => {
+    await post<void>('/auth/change-email/confirm', { newEmail, code });
+  },
+
+  requestPhoneChange: async (newPhone: string): Promise<void> => {
+    await post<void>('/auth/change-phone/request', { newPhone });
+  },
+
+  confirmPhoneChange: async (newPhone: string, code: string): Promise<void> => {
+    await post<void>('/auth/change-phone/confirm', { newPhone, code });
+  },
+
   changePassword: async (currentPassword: string, newPassword: string): Promise<ApiResponse<{ message: string }>> => {
     const response = await apiClient.post('/auth/change-password', {
       currentPassword,

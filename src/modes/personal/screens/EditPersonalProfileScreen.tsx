@@ -174,8 +174,9 @@ export default function EditPersonalProfileScreen() {
     try {
       await apiPatch('/auth/me', {
         name: fullName,
-        email: personalInfo.email || null,
-        phone: personalInfo.phone || null,
+        // email/phone deliberately NOT sent: they are identity, not profile. Sending
+        // `|| null` here is what used to wipe an email and permanently lock the account
+        // out, since login is email-only. They change via the verified flow in Security.
         jobTitle: personalInfo.job_title || null,
         description: personalInfo.description || null,
         address: personalInfo.address || null,
@@ -192,8 +193,6 @@ export default function EditPersonalProfileScreen() {
 
       updateCurrentUser({
         name: fullName,
-        email: personalInfo.email,
-        phone: personalInfo.phone,
         job_title: personalInfo.job_title,
         description: personalInfo.description,
         address: personalInfo.address,
@@ -425,13 +424,17 @@ export default function EditPersonalProfileScreen() {
         <AppTextField
           label="Email"
           value={personalInfo.email}
-          onChangeText={(text) => updateField('email', text)}
+          onChangeText={() => {}}
+          disabled
           placeholder="Enter your email"
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
           autoComplete="email"
         />
+        <Text style={[styles.fieldHint, { color: appTheme.colors.textMuted }]}>
+          Your email is how you sign in. To change it, go to Settings › Security.
+        </Text>
         {renderPrivacyToggle(
           'Show email address on profile',
           personalInfo.show_email_publicly,
@@ -679,6 +682,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginBottom: 20,
+  },
+  fieldHint: {
+    fontSize: theme.fontSize.xs,
+    fontFamily: theme.fonts.primary.regular,
+    marginTop: 6,
   },
   fieldSpacing: {
     marginBottom: 16,
