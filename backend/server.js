@@ -13467,8 +13467,17 @@ app.delete('/api/companies/:companyId/users/:userId/invite', requireAuth, async 
     const { companyId, userId } = req.params;
     if (!(await requireBusinessAdmin(req, res, companyId))) return;
 
-    // Prevent removing the last admin/super_admin
+    // SECURITY (CO-3): an admin must not be able to remove the owner (or another admin's
+    // super_admin). Only a super_admin may remove a member who is admin/super_admin.
     const targetBm = await findBusinessMember(companyId, userId);
+    if (targetBm && (targetBm.role === 'admin' || targetBm.role === 'super_admin')) {
+      const requester = await findBusinessMember(companyId, req.user?.id);
+      if (!requester || requester.role !== 'super_admin') {
+        return res.status(403).json(errorResponse('Only a super_admin can remove an admin or owner.', 'FORBIDDEN'));
+      }
+    }
+
+    // Prevent removing the last admin/super_admin
     if (targetBm && (targetBm.role === 'admin' || targetBm.role === 'super_admin') && targetBm.status === 'accepted') {
       const allMembers = await repos.memberRepo.listBusinessMembers(companyId);
       const remainingAdmins = allMembers.filter(

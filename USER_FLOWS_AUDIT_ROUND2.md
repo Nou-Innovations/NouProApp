@@ -46,8 +46,8 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | A-6 | P1 | **Changing your password silently kills your own session ~30 min later.** `server.js:1519` bumps `tokenVersion`, invalidating the caller's own refresh token, but `ChangePasswordScreen.tsx:71-78` never re-authenticates — it alerts "Success" and goes back. The access token stays valid for 30 min, then the next refresh 401s → A-5 → forced logout out of nowhere. |
 | A-7 | P1 | **Logging out on one device logs you out everywhere.** `POST /auth/logout` does `tokenVersion: { increment: 1 }` (`server.js:1207-1212`), revoking every device's refresh token. No session/device table exists and no UI warns about it. |
 | A-8 | P1 | **Onboarding seeds only the access token, never the refresh token.** `UploadProfilePictureScreen.tsx:71`, `SelectCompanyScreen.tsx:60-62`, `UploadBusinessLogoScreen.tsx:48-51` all set `accessToken` alone; a 401 mid-onboarding finds `refreshToken === null` (`api.ts:169-170`) → `logout()` wipes the store mid-registration. The 4-screen business-creation branch can easily outlive the 30-min token. |
-| A-9 | P1 | **Twilio is a hard single point of failure for signup, with no dev fallback.** `server.js:1560-1564` (and `:1594,:1631,:1659`) return 503 when the Twilio vars are unset, and `CreateAccountScreen.tsx:82-88` only navigates on success — so the user never reaches the OTP screen where the `__DEV__` bypass code lives (`PhoneVerificationScreen.tsx:23`). **Registration is 100% unreachable without Twilio, even in dev.** Email OTP uses the same Verify service, so it isn't an independent fallback. |
-| A-10 | P1 | **Verification is decorative and unrecoverable** (extends round-1 A-8). No `emailVerified`/`phoneVerified` columns exist; the OTP endpoints persist nothing; `register` never checks them. Additionally there is **no post-signup resend path** — the OTP screens are only reachable *before* the account exists, so nothing can ever mark a user verified later. |
+| A-9 | P1 | **FIXED ✅** — **Twilio is a hard single point of failure for signup, with no dev fallback.** `server.js:1560-1564` (and `:1594,:1631,:1659`) return 503 when the Twilio vars are unset, and `CreateAccountScreen.tsx:82-88` only navigates on success — so the user never reaches the OTP screen where the `__DEV__` bypass code lives (`PhoneVerificationScreen.tsx:23`). **Registration is 100% unreachable without Twilio, even in dev.** Email OTP uses the same Verify service, so it isn't an independent fallback. |
+| A-10 | P1 | **FIXED ✅** — **Verification is decorative and unrecoverable** (extends round-1 A-8). No `emailVerified`/`phoneVerified` columns exist; the OTP endpoints persist nothing; `register` never checks them. Additionally there is **no post-signup resend path** — the OTP screens are only reachable *before* the account exists, so nothing can ever mark a user verified later. |
 | A-11 | P1 | **Biometric auto-login can never run.** `App.tsx:732` returns early in both possible states: `staySignedIn: true` → rehydration already set `isSignedIn` → return; `staySignedIn: false` → rehydration forces `biometricEnabled: false` (`profileStore.ts:714`) → return. Even if it ran, `refreshToken()` only restores tokens, never `currentUser`, so `isSignedIn` would stay false. `BiometricLoginScreen.tsx:106-109` lets users enable a feature that does nothing. |
 | A-12 | P2 | Forgot-password's "fail loud" guard is production-only (`server.js:1235`) — on staging with no SMTP it still lies "check your email". |
 | A-13 | P2 | `failedLoginAttempts` is an unbounded in-memory Map with no TTL sweep (`server.js:1063`); email enumeration grows it forever. |
@@ -313,7 +313,21 @@ Invites for people without an account went into a new `CompanyInvite` table inst
 
 ## Still open (P1/P2 polish)
 
-Nothing user-blocking remains. The notable ones: **A-9** (signup is impossible without Twilio, even in dev), **A-4/A-5/A-6/A-7** (refresh behind the IP rate limiter, silent logout with no "session expired", password change killing your own session, logout revoking all devices), **N-11/N-12** (no welcome notification, no notification pagination), and the remaining P2 rows in each section above.
+Nothing user-blocking remains. The notable ones: **A-4/A-5/A-6/A-7** (refresh behind the IP rate limiter, silent logout with no "session expired", password change killing your own session, logout revoking all devices), **N-11/N-12** (no welcome notification, no notification pagination), and the remaining P2 rows in each section above.
+
+---
+
+## Fix log — A-9 / A-10 (2026-08-07)
+
+Twilio was the only OTP provider, and email OTP used the *same* Verify service — so an unconfigured Twilio 503'd all eight OTP endpoints at once and signup was impossible in every build profile (the client-side dev bypass is disabled in TestFlight, and `CreateAccountScreen` only navigated on success, so the user was simply stuck).
+
+- **`backend/src/services/otpService.js`** picks a provider: Twilio → SMTP email (the transport that already sends password resets, independent of Twilio) → console in development → typed error → 503 in production.
+- **`GET /api/auth/verification-capabilities`** lets the client ask which channels work *before* collecting a code, and route to phone or email accordingly. This is what removes the dead end.
+- **Codes live in a new `OtpCode` table, not in a token.** A JWT carrying the code hash would be readable by its holder, and 6 digits brute-force offline in milliseconds — precisely the attacker verifying a number they don't own. The table also carries the per-destination attempt lockout Twilio used to provide.
+- **A-10:** verify-* now return a short-lived signed proof, register validates it against the submitted value, and `User.emailVerified`/`phoneVerified` record the outcome. Enforcement is behind `REQUIRE_VERIFIED_SIGNUP` (default off) because the backend deploys on push while the app ships via EAS — turn it on once the app build is live.
+- Removed the hardcoded `'123456'` dev bypass from both OTP screens.
+
+**Verified:** backend tests **70/70** (12 new), ESLint 0 errors, `tsc` 133 = unchanged baseline.
 
 ---
 
