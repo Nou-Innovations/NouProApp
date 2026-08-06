@@ -1544,6 +1544,51 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       throw createErr;
     }
 
+    // Consume any pending company invites for this email. Invites are stored in
+    // CompanyInvite rather than as passwordless User rows precisely so that signing up
+    // with an invited address just works instead of 409-ing forever.
+    if (dbUser.email) {
+      try {
+        const invites = await prisma.companyInvite.findMany({
+          where: {
+            email: dbUser.email.toLowerCase(),
+            status: 'PENDING',
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+            business: { deletedAt: null },
+          },
+        });
+        for (const inv of invites) {
+          const existingBm = await findBusinessMember(inv.businessId, dbUser.id);
+          if (!existingBm) {
+            await repos.memberRepo.addBusinessMember({
+              id: nextId('bm'),
+              businessId: inv.businessId,
+              userId: dbUser.id,
+              role: inv.role,
+              status: 'invited', // they still choose to accept, as with any invite
+            });
+            for (const locId of inv.locationIds || []) {
+              await repos.memberRepo.addLocationMember({
+                id: nextId('lm'),
+                businessId: inv.businessId,
+                locationId: locId,
+                userId: dbUser.id,
+                role: inv.role,
+                status: 'invited',
+              });
+            }
+          }
+          await prisma.companyInvite.update({
+            where: { id: inv.id },
+            data: { status: 'ACCEPTED' },
+          });
+        }
+      } catch (inviteErr) {
+        // Never fail a signup because an invite could not be attached.
+        logger.error('[Register] Failed to consume invites:', inviteErr?.message || inviteErr);
+      }
+    }
+
     // Build user response object (exclude passwordHash)
     const { passwordHash: _ph, ...safeNewUser } = dbUser;
     const newUser = {
@@ -12999,15 +13044,38 @@ app.post('/api/companies/:companyId/users/invite', requireAuth, async (req, res)
       }
     }
 
-    // Find or create user
-    let user = await findUserByEmail(email);
+    const emailNorm = String(email).trim().toLowerCase();
+    let user = await findUserByEmail(emailNorm);
+
+    // No account yet: record a pending invite instead of creating a passwordless User
+    // row. That row used to make register 409 on this address forever, permanently
+    // locking the invitee out of the platform. POST /auth/register consumes these.
     if (!user) {
-      user = await repos.userRepo.create({
-        id: nextId('usr'),
-        email: String(email).toLowerCase(),
-        name: name || email.split('@')[0],
-        avatar: '',
+      const invite = await prisma.companyInvite.upsert({
+        where: { businessId_email: { businessId: companyId, email: emailNorm } },
+        update: {
+          name: name || null,
+          role,
+          locationIds: locIds,
+          invitedByUserId: req.user?.id || null,
+          status: 'PENDING',
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+        create: {
+          id: nextId('inv'),
+          businessId: companyId,
+          email: emailNorm,
+          name: name || null,
+          role,
+          locationIds: locIds,
+          invitedByUserId: req.user?.id || null,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
       });
+      return res.json(successResponse(
+        { invite, pending: true },
+        'Invitation recorded. They will join automatically when they sign up with this email.',
+      ));
     }
 
     // Create/update business membership
@@ -13065,6 +13133,39 @@ app.post('/api/companies/:companyId/users/invite', requireAuth, async (req, res)
       locationMembers: createdLocationMembers,
       invite: { token: inviteToken, link: inviteLink },
     }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// List pending invites for people who have no account yet.
+// GET /api/companies/:companyId/invites
+app.get('/api/companies/:companyId/invites', requireAuth, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
+    const invites = await prisma.companyInvite.findMany({
+      where: { businessId: companyId, status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json(successResponse({ invites }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Revoke a pending invite.
+// DELETE /api/companies/:companyId/invites/:inviteId
+app.delete('/api/companies/:companyId/invites/:inviteId', requireAuth, async (req, res) => {
+  try {
+    const { companyId, inviteId } = req.params;
+    if (!(await requireBusinessAdmin(req, res, companyId))) return;
+    const invite = await prisma.companyInvite.findUnique({ where: { id: inviteId } });
+    if (!invite || invite.businessId !== companyId) {
+      return res.status(404).json(errorResponse('Invite not found'));
+    }
+    await prisma.companyInvite.update({ where: { id: inviteId }, data: { status: 'REVOKED' } });
+    return res.json(successResponse({ ok: true }, 'Invitation revoked.'));
   } catch (err) {
     return sendError(res, err);
   }

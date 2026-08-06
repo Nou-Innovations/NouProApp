@@ -118,8 +118,40 @@ model Business {
   discounts               Discount[]            @relation("BusinessDiscounts")
   targets                 BusinessTarget[]      @relation("BusinessTargets")
   recipes                 Recipe[]
+  companyInvites          CompanyInvite[]
 
   @@index([deletedAt])
+}
+
+/// Pending invitation for someone who does NOT yet have an account.
+///
+/// Previously the invite route created a User row with a null passwordHash. Because
+/// register 409s on a duplicate email, that permanently blocked the invitee from ever
+/// signing up with their own address — and it let any admin burn arbitrary emails.
+/// Invites now live here and are consumed by POST /auth/register.
+model CompanyInvite {
+  id              String       @id
+  businessId      String
+  email           String
+  name            String?
+  role            String
+  locationIds     String[]     @default([])
+  invitedByUserId String?
+  status          InviteStatus @default(PENDING)
+  expiresAt       DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  business        Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, email])
+  @@index([email])
+  @@index([businessId])
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
 }
 
 model Location {
