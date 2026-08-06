@@ -18,6 +18,7 @@ import { ProfileViewType, getProfileAdditionalOptions, getRelationshipAction } f
 import { useProfileStore } from '@/shared/store/profileStore';
 import { get as apiGet, post as apiPost, patch as apiPatch } from '@/shared/services/api';
 import { reportEntity, blockUser, REPORT_REASONS, type ReportReason } from '@/features/profile/profile.service';
+import { removeConnection } from '@/features/connections/connections.service';
 import { getUserChats, createUserChat } from '@/features/inbox/inbox.service';
 import theme from '@/shared/theme';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
@@ -184,12 +185,49 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     } else {
       // Handle connect based on current status
       const status = user?.connectionStatus;
+      // Both of these used to be dead-end alerts — there was no way anywhere in the app
+      // to disconnect or to cancel a request you'd sent. DELETE /connections/:id
+      // authorizes either party, so it covers both.
       if (status?.status === 'accepted') {
-        AppAlert.alert('Already Connected', `You are already connected with ${user?.name}.`);
+        AppAlert.alert('Connected', `You are connected with ${user?.name}.`, [
+          { text: 'Close', style: 'cancel' },
+          {
+            text: 'Disconnect',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                setConnectLoading(true);
+                await removeConnection(status.id);
+                fetchUserProfile();
+              } catch (err) {
+                AppAlert.alert('Error', getApiErrorMessage(err, 'Failed to remove the connection.'));
+              } finally {
+                setConnectLoading(false);
+              }
+            },
+          },
+        ]);
         return;
       }
       if (status?.status === 'pending' && status.direction === 'sent') {
-        AppAlert.alert('Request Pending', 'Your connection request is already pending.');
+        AppAlert.alert('Request Pending', 'Your connection request is awaiting a response.', [
+          { text: 'Close', style: 'cancel' },
+          {
+            text: 'Cancel request',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                setConnectLoading(true);
+                await removeConnection(status.id);
+                fetchUserProfile();
+              } catch (err) {
+                AppAlert.alert('Error', getApiErrorMessage(err, 'Failed to cancel the request.'));
+              } finally {
+                setConnectLoading(false);
+              }
+            },
+          },
+        ]);
         return;
       }
       if (status?.status === 'pending' && status.direction === 'received') {

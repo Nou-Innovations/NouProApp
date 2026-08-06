@@ -21,20 +21,34 @@ import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import Avatar from '@/shared/components/ui/Avatar';
-import { EmptyState } from '@/shared/components/ui';
+import { EmptyState, AppButton, ButtonRow } from '@/shared/components/ui';
 import { RootStackParamList } from '@/shared/types/navigation';
 import { get } from '@/shared/services/api';
 import { useProfileStore } from '@/shared/store/profileStore';
+import { AppAlert } from '@/shared/services/appAlert';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
+import { unblockUser } from '@/features/profile/profile.service';
+import {
+  getPendingConnectionRequests,
+  acceptConnection,
+  rejectConnection,
+  removeConnection,
+  getBlockedUsers,
+  type PendingConnection,
+  type BlockedUser,
+} from '../connections.service';
 
 type ConnectionsScreenRouteProp = RouteProp<RootStackParamList, 'Connections'>;
 
 // Filter options
-type FilterType = 'all' | 'users' | 'companies';
+type FilterType = 'all' | 'users' | 'companies' | 'requests' | 'blocked';
 
 const FILTERS: { id: FilterType; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'users', label: 'Users' },
   { id: 'companies', label: 'Companies' },
+  { id: 'requests', label: 'Requests' },
+  { id: 'blocked', label: 'Blocked' },
 ];
 
 // Connection type
@@ -69,6 +83,9 @@ export default function ConnectionsScreen() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [allConnections, setAllConnections] = useState<Connection[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<PendingConnection[]>([]);
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
+  const [actioningId, setActioningId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
@@ -112,6 +129,15 @@ export default function ConnectionsScreen() {
       });
 
       setAllConnections([...userConns, ...bizConns]);
+
+      // Pending + blocked are best-effort: a failure there must not blank the
+      // main connections list.
+      const [pending, blocked] = await Promise.all([
+        getPendingConnectionRequests().catch(() => [] as PendingConnection[]),
+        getBlockedUsers().catch(() => [] as BlockedUser[]),
+      ]);
+      setPendingRequests(pending || []);
+      setBlockedUsers(blocked || []);
     } catch {
       setError('Failed to load connections');
     } finally {
@@ -156,6 +182,71 @@ export default function ConnectionsScreen() {
       }
     });
   }, [searchQuery, activeFilter, allConnections]);
+
+  const handleAcceptRequest = async (connectionId: string) => {
+    setActioningId(connectionId);
+    try {
+      await acceptConnection(connectionId);
+      await fetchConnections();
+    } catch (err) {
+      AppAlert.alert('Error', getApiErrorMessage(err, 'Could not accept the request.'));
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleDeclineRequest = async (connectionId: string) => {
+    setActioningId(connectionId);
+    try {
+      await rejectConnection(connectionId);
+      await fetchConnections();
+    } catch (err) {
+      AppAlert.alert('Error', getApiErrorMessage(err, 'Could not decline the request.'));
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleUnblock = (userId: string, name: string) => {
+    AppAlert.alert('Unblock', `Unblock ${name || 'this person'}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Unblock',
+        onPress: async () => {
+          setActioningId(userId);
+          try {
+            await unblockUser(userId);
+            await fetchConnections();
+          } catch (err) {
+            AppAlert.alert('Error', getApiErrorMessage(err, 'Could not unblock this person.'));
+          } finally {
+            setActioningId(null);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDisconnect = (connectionId: string, name: string) => {
+    AppAlert.alert('Remove connection', `Disconnect from ${name || 'this connection'}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Disconnect',
+        style: 'destructive',
+        onPress: async () => {
+          setActioningId(connectionId);
+          try {
+            await removeConnection(connectionId);
+            await fetchConnections();
+          } catch (err) {
+            AppAlert.alert('Error', getApiErrorMessage(err, 'Could not remove the connection.'));
+          } finally {
+            setActioningId(null);
+          }
+        },
+      },
+    ]);
+  };
 
   const handleConnectionPress = (connection: Connection) => {
     if (connection.type === 'user') {
@@ -319,6 +410,71 @@ export default function ConnectionsScreen() {
   };
 
   // Empty state - design.json: connectionsScreen.emptyState
+  // Incoming request row: Accept / Decline inline.
+  const renderRequestItem = ({ item }: { item: PendingConnection }) => (
+    <View style={[styles.connectionItem, { borderBottomColor: appTheme.colors.borderColor }]}>
+      <Avatar
+        userId={item.sender?.id || item.id}
+        userName={item.sender?.name || 'User'}
+        imageUri={item.sender?.avatar || ''}
+        size={48}
+        style={styles.userAvatar}
+      />
+      <View style={styles.connectionInfo}>
+        <Text style={[styles.connectionName, { color: appTheme.colors.text }]}>
+          {item.sender?.name || 'User'}
+        </Text>
+        {!!item.sender?.jobTitle && (
+          <Text style={[styles.connectionSubtitle, { color: appTheme.colors.secondary }]}>
+            {item.sender.jobTitle}
+          </Text>
+        )}
+      </View>
+      <ButtonRow>
+        <AppButton
+          title="Accept"
+          size="small"
+          variant="confirm"
+          disabled={actioningId === item.id}
+          onPress={() => handleAcceptRequest(item.id)}
+        />
+        <AppButton
+          title="Decline"
+          size="small"
+          variant="secondary"
+          disabled={actioningId === item.id}
+          onPress={() => handleDeclineRequest(item.id)}
+        />
+      </ButtonRow>
+    </View>
+  );
+
+  // Blocked row: the only place an unblock is possible — before this, blocking
+  // someone was permanent by accident.
+  const renderBlockedItem = ({ item }: { item: BlockedUser }) => (
+    <View style={[styles.connectionItem, { borderBottomColor: appTheme.colors.borderColor }]}>
+      <Avatar
+        userId={item.user?.id}
+        userName={item.user?.name || 'User'}
+        imageUri={item.user?.avatar || ''}
+        size={48}
+        style={styles.userAvatar}
+      />
+      <View style={styles.connectionInfo}>
+        <Text style={[styles.connectionName, { color: appTheme.colors.text }]}>
+          {item.user?.name || 'User'}
+        </Text>
+      </View>
+      <AppButton
+        title="Unblock"
+        size="small"
+        variant="secondary"
+        disabled={actioningId === item.user?.id}
+        onPress={() => handleUnblock(item.user?.id, item.user?.name || '')}
+      />
+    </View>
+  );
+
   const renderEmptyState = () => {
     let emptyTitle = 'No connections yet';
     let emptyMessage = 'Build your professional network by connecting with others.';
@@ -370,9 +526,23 @@ export default function ConnectionsScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredConnections}
-          keyExtractor={(item) => item.id}
-          renderItem={renderConnectionItem}
+          data={
+            activeFilter === 'requests'
+              ? (pendingRequests as any[])
+              : activeFilter === 'blocked'
+                ? (blockedUsers as any[])
+                : (filteredConnections as any[])
+          }
+          keyExtractor={(item: any) =>
+            activeFilter === 'blocked' ? item.user?.id : item.id
+          }
+          renderItem={
+            activeFilter === 'requests'
+              ? (renderRequestItem as any)
+              : activeFilter === 'blocked'
+                ? (renderBlockedItem as any)
+                : (renderConnectionItem as any)
+          }
           contentContainerStyle={filteredConnections.length === 0 ? styles.emptyContainer : undefined}
           ListEmptyComponent={renderEmptyState}
           showsVerticalScrollIndicator={false}
