@@ -10,6 +10,7 @@ import AppButton from '@/shared/components/ui/AppButton';
 import { ExploreChips } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { createOpportunity, type OpportunityType, OPPORTUNITY_TYPE_LABELS } from '../opportunities.service';
+import { isPaywallError } from '@/shared/utils/apiError';
 
 const TYPE_ORDER: OpportunityType[] = ['buying', 'selling', 'service', 'partnership', 'hiring', 'other'];
 const LABEL_TO_TYPE: Record<string, OpportunityType> = TYPE_ORDER.reduce((acc, t) => {
@@ -46,7 +47,7 @@ export default function CreateOpportunityScreen({ navigation, route }: Props) {
       });
       navigation.goBack();
     } catch (e: any) {
-      const isPaywall = e?.code === 'PAYWALL' || /upgrade/i.test(e?.message || '');
+      const isPaywall = isPaywallError(e) || /upgrade/i.test(e?.message || '');
       AppAlert.alert(isPaywall ? 'Upgrade required' : 'Error', e?.message || 'Failed to post opportunity');
     } finally {
       setSaving(false);

@@ -21,6 +21,7 @@ import { getCustomers } from '@/features/customers';
 import { getDiscounts, Discount as SellerDiscount } from '@/features/discounts';
 import { getProducts } from '@/features/products/products.service';
 import type { UIProduct } from '@/shared/types/product';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 // Item type for selection
 interface SelectedItem {
@@ -574,7 +575,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
       }
       setShowSuccessDialog(true);
     } catch (error: any) {
-      const message = error?.response?.data?.error?.message || `Failed to save ${documentType.toLowerCase()}. Please try again.`;
+      const message = getApiErrorMessage(error, `Failed to save ${documentType.toLowerCase()}. Please try again.`);
       AppAlert.alert('Error', message);
     } finally {
       setIsSaving(false);
@@ -610,7 +611,7 @@ export default function CreateInvoiceScreen({ navigation, route }: Props) {
       }
       setShowSuccessDialog(true);
     } catch (error: any) {
-      const message = error?.response?.data?.error?.message || `Failed to send ${documentType.toLowerCase()}. Please try again.`;
+      const message = getApiErrorMessage(error, `Failed to send ${documentType.toLowerCase()}. Please try again.`);
       AppAlert.alert('Error', message);
     } finally {
       setIsSending(false);

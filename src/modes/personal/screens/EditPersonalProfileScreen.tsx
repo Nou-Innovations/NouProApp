@@ -77,8 +77,6 @@ export default function EditPersonalProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showAreYouSureDialog, setShowAreYouSureDialog] = useState(false);
 
   // Ref guard to prevent infinite loop in beforeRemove listener
   const isNavigatingAwayRef = useRef(false);
@@ -560,18 +558,10 @@ export default function EditPersonalProfileScreen() {
     );
   };
 
+  // Deletion needs the user's password (and a 2FA code when enabled), so it has to go
+  // through the real screen — a confirm modal here could never actually delete anything.
   const handleDeleteAccount = () => {
-    setShowAreYouSureDialog(true);
-  };
-
-  const handleConfirmAreYouSure = () => {
-    setShowAreYouSureDialog(false);
-    setShowDeleteDialog(true);
-  };
-
-  const confirmDeleteAccount = () => {
-    setShowDeleteDialog(false);
-    AppAlert.alert('Delete Account', 'Account deletion process started...');
+    navigation.navigate('DeleteAccount');
   };
 
   const renderAccountSection = () => (
@@ -663,31 +653,6 @@ export default function EditPersonalProfileScreen() {
         }}
       />
 
-      {/* Are You Sure Dialog */}
-      <AppModal
-        visible={showAreYouSureDialog}
-        onClose={() => setShowAreYouSureDialog(false)}
-        variant="confirm"
-        title="Are you sure?"
-        message="You are about to delete your account. This action is irreversible."
-        primaryButtonText="Yes, I'm sure"
-        onPrimaryAction={handleConfirmAreYouSure}
-        secondaryButtonText="No"
-        onSecondaryAction={() => setShowAreYouSureDialog(false)}
-      />
-
-      {/* Delete Confirmation Dialog */}
-      <AppModal
-        visible={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
-        variant="delete"
-        title="Delete Account?"
-        message="This action cannot be undone. All your data will be permanently deleted."
-        primaryButtonText="Delete"
-        onPrimaryAction={confirmDeleteAccount}
-        secondaryButtonText="Cancel"
-        onSecondaryAction={() => setShowDeleteDialog(false)}
-      />
     </SafeAreaView>
   );
 }

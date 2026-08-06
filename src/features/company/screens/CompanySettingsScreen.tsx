@@ -30,6 +30,7 @@ import PaywallModal from '@/shared/components/ui/PaywallModal';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { patch } from '@/shared/services/api';
 import theme from '@/shared/theme';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 interface SettingsOptionProps {
   icon: LucideIcon;
@@ -172,11 +173,10 @@ export default function CompanySettingsScreen() {
       setShowLeaveDialog(false);
     } catch (error: any) {
       setIsLeaving(false);
-      const msg = error?.response?.data?.error
-        || error?.response?.data?.message
-        || error?.message
-        || 'Failed to leave company. Please try again.';
-      AppAlert.alert('Cannot Leave Company', msg);
+      AppAlert.alert(
+        'Cannot Leave Company',
+        getApiErrorMessage(error, 'Failed to leave company. Please try again.'),
+      );
     }
   };
 

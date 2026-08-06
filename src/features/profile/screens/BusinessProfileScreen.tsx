@@ -27,6 +27,7 @@ import MapView, { Marker } from 'react-native-maps';
 import { requestToJoinCompany } from '@/features/notifications/notifications.service';
 import { AppBottomSheet, type AppBottomSheetItem, BusinessHoursTable } from '@/shared/components/ui';
 import { reportEntity, REPORT_REASONS, type ReportReason } from '@/features/profile/profile.service';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const COVER_HEIGHT = SCREEN_WIDTH * (4 / 3); // 3:4 aspect ratio - matching BusinessProfileOwnScreen
@@ -348,7 +349,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
             await sendBusinessConnectionRequest(activeBusiness.id, business.id);
             fetchBusinessData();
           } catch (err: any) {
-            AppAlert.alert('Error', err?.response?.error || 'Failed to send connection request.');
+            AppAlert.alert('Error', getApiErrorMessage(err, 'Failed to send connection request.'));
           } finally {
             setConnectLoading(false);
           }
@@ -408,8 +409,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
               await requestToJoinCompany(businessId);
               AppAlert.alert('Request Sent', `Your request to join ${business?.name || 'the company'} has been sent.`);
             } catch (err: any) {
-              const msg = err?.response?.data?.error?.message || 'Failed to send request. Please try again.';
-              AppAlert.alert('Error', msg);
+              AppAlert.alert('Error', getApiErrorMessage(err, 'Failed to send request. Please try again.'));
             }
           },
         },
@@ -792,8 +792,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       setShowPublicCheckout(false);
       AppAlert.alert('Order placed!', `Your order #${order.id} has been sent to ${business.name}.`);
     } catch (err: any) {
-      const msg = err?.response?.data?.error?.message || err?.response?.error || err?.message || 'Failed to place order. Please try again.';
-      AppAlert.alert('Error', msg);
+      AppAlert.alert('Error', getApiErrorMessage(err, 'Failed to place order. Please try again.'));
     } finally {
       setIsPlacingOrder(false);
     }

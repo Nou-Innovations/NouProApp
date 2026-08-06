@@ -10,6 +10,7 @@ import AppButton from '@/shared/components/ui/AppButton';
 import { ExploreChips, DateSelector, TimeSelector } from '@/shared/components/ui';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { createEvent, type EventType, EVENT_TYPE_LABELS, formatEventDate } from '../events.service';
+import { isPaywallError } from '@/shared/utils/apiError';
 
 const TYPE_ORDER: EventType[] = ['networking', 'workshop', 'coffee_connect', 'conference', 'panel', 'webinar', 'other'];
 const LABEL_TO_TYPE: Record<string, EventType> = TYPE_ORDER.reduce((a, t) => {
@@ -69,7 +70,7 @@ export default function CreateEventScreen({ navigation, route }: Props) {
       });
       navigation.goBack();
     } catch (e: any) {
-      const isPaywall = e?.code === 'PAYWALL' || /upgrade/i.test(e?.message || '');
+      const isPaywall = isPaywallError(e) || /upgrade/i.test(e?.message || '');
       AppAlert.alert(isPaywall ? 'Upgrade required' : 'Error', e?.message || 'Failed to create event');
     } finally {
       setSaving(false);

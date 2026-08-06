@@ -23,6 +23,7 @@ import { getLocation, updateLocation } from '@/features/locations/locations.serv
 import type { BusinessLocation } from '@/shared/types/business';
 import type { RootStackParamList } from '@/shared/types/navigation';
 import { canUseIndependentLocations } from '@/shared/utils/permissions';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -310,7 +311,7 @@ export default function EditLocationScreen() {
       );
     } catch (error: any) {
       console.error('Error updating location:', error);
-      const message = error?.response?.data?.message || error?.message || 'Failed to update location. Please try again.';
+      const message = getApiErrorMessage(error, 'Failed to update location. Please try again.');
       AppAlert.alert('Error', message);
     } finally {
       setIsSubmitting(false);

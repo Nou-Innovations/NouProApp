@@ -8,6 +8,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { AppModal } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 import theme from '@/shared/theme';
 
 interface ProfileSettingsScreenProps {
@@ -73,10 +74,13 @@ export default function ProfileSettingsScreen({ navigation }: ProfileSettingsScr
   // Use profileStore for role checks
   const isSuperAdminRole = useProfileStore((state) => state.isSuperAdmin);
   const isSuperAdmin = isSuperAdminRole();
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
+  const removeUserBusiness = useProfileStore((state) => state.removeUserBusiness);
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
   const [showAreYouSureDialog, setShowAreYouSureDialog] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   const handleLeaveWorkplace = () => {
     setShowLeaveDialog(true);
@@ -99,10 +103,23 @@ export default function ProfileSettingsScreen({ navigation }: ProfileSettingsScr
     AppAlert.alert('Delete Company', 'Company deletion process started...');
   };
 
-  const confirmLeaveWorkplace = () => {
-    setShowLeaveDialog(false);
-    AppAlert.alert('Leave Workplace', 'You have left the workplace.');
-    navigation.goBack();
+  const confirmLeaveWorkplace = async () => {
+    if (!activeBusiness?.id || isLeaving) return;
+    setIsLeaving(true);
+    try {
+      // DELETE /companies/:id/members/me, then prunes userBusinesses and switches
+      // back to personal mode — that mode swap re-renders the shell for us.
+      await removeUserBusiness(activeBusiness.id);
+      setShowLeaveDialog(false);
+    } catch (error) {
+      // Where the server's "You are the last admin…" message surfaces.
+      AppAlert.alert(
+        'Cannot Leave Company',
+        getApiErrorMessage(error, 'Failed to leave company. Please try again.'),
+      );
+    } finally {
+      setIsLeaving(false);
+    }
   };
 
   return (
@@ -171,14 +188,16 @@ export default function ProfileSettingsScreen({ navigation }: ProfileSettingsScr
       {/* Leave Workplace Confirmation Dialog */}
       <AppModal
         visible={showLeaveDialog}
-        onClose={() => setShowLeaveDialog(false)}
+        onClose={() => !isLeaving && setShowLeaveDialog(false)}
         variant="delete"
         title="Leave Workplace?"
-        message="Are you sure you want to leave this workplace?"
+        message={`Are you sure you want to leave ${activeBusiness?.name || 'this workplace'}? You will lose access immediately.`}
         primaryButtonText="Leave"
         onPrimaryAction={confirmLeaveWorkplace}
+        primaryButtonLoading={isLeaving}
         secondaryButtonText="Cancel"
         onSecondaryAction={() => setShowLeaveDialog(false)}
+        secondaryButtonDisabled={isLeaving}
       />
     </SafeAreaView>
   );

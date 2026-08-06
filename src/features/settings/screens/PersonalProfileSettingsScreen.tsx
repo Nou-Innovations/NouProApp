@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LogOut, Trash2, LucideIcon } from 'lucide-react-native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import { AppModal } from '@/shared/components/ui';
 import { authAPI } from '@/shared/services/api';
-import AppButton from '@/shared/components/ui/AppButton';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import theme from '@/shared/theme';
 
@@ -55,9 +53,6 @@ const SettingsOption: React.FC<SettingsOptionProps> = ({
 export default function PersonalProfileSettingsScreen({ navigation }: PersonalProfileSettingsScreenProps) {
   const { theme: appTheme } = useTheme();
 
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showAreYouSureDialog, setShowAreYouSureDialog] = useState(false);
-
   const handleLogout = () => {
     AppAlert.alert(
       'Log Out',
@@ -75,18 +70,10 @@ export default function PersonalProfileSettingsScreen({ navigation }: PersonalPr
     );
   };
 
+  // Deletion needs the user's password (and a 2FA code when enabled), so it has to go
+  // through the real screen — a confirm modal here could never actually delete anything.
   const handleDeleteAccount = () => {
-    setShowAreYouSureDialog(true);
-  };
-
-  const handleConfirmAreYouSure = () => {
-    setShowAreYouSureDialog(false);
-    setShowDeleteDialog(true);
-  };
-
-  const confirmDeleteAccount = () => {
-    setShowDeleteDialog(false);
-    AppAlert.alert('Delete Account', 'Account deletion process started...');
+    navigation.navigate('DeleteAccount');
   };
 
   return (
@@ -119,31 +106,6 @@ export default function PersonalProfileSettingsScreen({ navigation }: PersonalPr
         </View>
       </ScrollView>
 
-      {/* Are You Sure Dialog */}
-      <AppModal
-        visible={showAreYouSureDialog}
-        onClose={() => setShowAreYouSureDialog(false)}
-        variant="confirm"
-        title="Are you sure?"
-        message="You are about to delete your account. This action is irreversible."
-        primaryButtonText="Yes, I'm sure"
-        onPrimaryAction={handleConfirmAreYouSure}
-        secondaryButtonText="No"
-        onSecondaryAction={() => setShowAreYouSureDialog(false)}
-      />
-
-      {/* Delete Confirmation Dialog */}
-      <AppModal
-        visible={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
-        variant="delete"
-        title="Delete Account?"
-        message="This action cannot be undone. All your data will be permanently deleted."
-        primaryButtonText="Delete"
-        onPrimaryAction={confirmDeleteAccount}
-        secondaryButtonText="Cancel"
-        onSecondaryAction={() => setShowDeleteDialog(false)}
-      />
     </SafeAreaView>
   );
 }

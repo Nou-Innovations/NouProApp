@@ -389,7 +389,9 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
     {
       label: 'Settings',
       icon: 'settings-outline',
-      onPress: () => go(activeMode === 'business' ? 'ProfileSettings' : 'PersonalProfileSettings'),
+      // Route to the real settings hubs, not the two-row stubs. This is what puts
+      // Settings > Security > Delete Account behind the main Settings entry point.
+      onPress: () => go(activeMode === 'business' ? 'CompanySettings' : 'PersonalSettings'),
     },
     {
       label: 'Subscription',

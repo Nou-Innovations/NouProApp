@@ -34,7 +34,10 @@ import {
   rejectJoinRequestById,
   acceptJoinRequest,
   rejectJoinRequest,
+  updateTeamMemberRole,
 } from '@/features/team/team.service';
+import { ROLE_DISPLAY_NAMES } from '@/shared/types/roles';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 import {
   acceptBusinessConnectionRequest,
   declineBusinessConnectionRequest,
@@ -431,11 +434,31 @@ export default function NotificationsScreen() {
     setTimeout(() => setShowConfirmDialog(true), 100);
   };
 
-  const handleConfirmRoleChange = () => {
+  const handleConfirmRoleChange = async () => {
     if (pendingRole && selectedNotificationId) {
-      setNotificationRoles((prev) => ({ ...prev, [selectedNotificationId]: pendingRole }));
-      setSuccessMessage(`Role has been changed to ${pendingRole}.`);
-      setShowSuccessDialog(true);
+      const notification = notifications.find((n) => n.id === selectedNotificationId);
+      const businessId = notification?.requestData?.businessId;
+      const userId = notification?.requestData?.userId;
+      // Display label ('Super Admin') -> domain value ('super_admin').
+      const roleValue = (
+        Object.keys(ROLE_DISPLAY_NAMES) as (keyof typeof ROLE_DISPLAY_NAMES)[]
+      ).find((key) => ROLE_DISPLAY_NAMES[key] === pendingRole);
+
+      if (!businessId || !userId || !roleValue) {
+        AppAlert.alert('Error', 'Could not update this role. Please try from Team Management.');
+      } else {
+        try {
+          // locationId omitted on purpose -> business-level PATCH /companies/:id/users/:userId
+          await updateTeamMemberRole(businessId, userId, roleValue);
+          setNotificationRoles((prev) => ({ ...prev, [selectedNotificationId]: pendingRole }));
+          setSuccessMessage(`Role has been changed to ${pendingRole}.`);
+          setShowSuccessDialog(true);
+          await fetchNotifications();
+        } catch (error) {
+          console.error('Error updating member role:', error);
+          AppAlert.alert('Error', getApiErrorMessage(error, 'Failed to update role. Please try again.'));
+        }
+      }
     }
     setShowConfirmDialog(false);
     setPendingRole(null);
@@ -674,7 +697,11 @@ export default function NotificationsScreen() {
               Select Role
             </Text>
             <View style={styles.actionButtonsContainer}>
-              {['Staff', 'Admin', 'Super Admin'].map((role) => {
+              {/* Only a super_admin may grant super_admin — the backend 403s otherwise. */}
+              {(currentUserRole === 'super_admin'
+                ? ['Staff', 'Admin', 'Super Admin']
+                : ['Staff', 'Admin']
+              ).map((role) => {
                 const isSelected = getCurrentRole(selectedNotificationId || '') === role;
                 return (
                   <TouchableOpacity

@@ -343,7 +343,7 @@ const joinRequestLimiter = rateLimit({
   max: 10,
   keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
   skip: (req) => !req.user,
-  message: { success: false, error: 'Too many join requests, please try again later' },
+  message: { success: false, message: 'Too many join requests, please try again later' },
   validate: limiterValidate,
 });
 
@@ -352,7 +352,7 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,                    // 15 attempts per window
   keyGenerator: clientIpKey,
-  message: { success: false, error: 'Too many attempts, please try again later' },
+  message: { success: false, message: 'Too many attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
   validate: limiterValidate,
@@ -364,7 +364,7 @@ const twoFactorLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
-  message: { success: false, error: 'Too many 2FA attempts, please try again later' },
+  message: { success: false, message: 'Too many 2FA attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
   validate: limiterValidate,
@@ -381,7 +381,7 @@ const suggestionLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 5,
   keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
-  message: { success: false, error: 'Too many suggestions, please slow down' },
+  message: { success: false, message: 'Too many suggestions, please slow down' },
   standardHeaders: true,
   legacyHeaders: false,
   validate: limiterValidate,
@@ -393,7 +393,7 @@ const dataExportLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
   keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
-  message: { success: false, error: 'Too many export requests, please try again later' },
+  message: { success: false, message: 'Too many export requests, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
   validate: limiterValidate,
@@ -11987,7 +11987,7 @@ app.get('/api/users/:userId/contacts', requireAuth, async (req, res) => {
     res.json(successResponse(allResults));
   } catch (error) {
     logger.error('[Contacts] Error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch contacts' });
+    res.status(500).json({ success: false, message: 'Failed to fetch contacts' });
   }
 });
 
@@ -12008,7 +12008,7 @@ app.get('/api/companies/:companyId/users', requireAuth, async (req, res) => {
     res.json(successResponse(companyUsers));
   } catch (error) {
     logger.error('[CompanyUsers] Error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch company users' });
+    res.status(500).json({ success: false, message: 'Failed to fetch company users' });
   }
 });
 

@@ -11,6 +11,7 @@ import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { AppModal } from '@/shared/components/ui';
 import { authAPI } from '@/shared/services/api';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 interface TwoFactorAuthScreenProps {
   navigation: any;
@@ -45,7 +46,7 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
         setOtpauthUrl(data.otpauthUrl);
         setIsSettingUp(true);
       } catch (error: any) {
-        const message = error?.response?.data?.message || 'Failed to set up 2FA. Please try again.';
+        const message = getApiErrorMessage(error, 'Failed to set up 2FA. Please try again.');
         AppAlert.alert('Error', message);
       } finally {
         setIsLoading(false);
@@ -72,7 +73,7 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
       setShowDisablePrompt(false);
       AppAlert.alert('Success', 'Two-factor authentication has been disabled.');
     } catch (error: any) {
-      const message = error?.response?.data?.message || 'Failed to disable 2FA.';
+      const message = getApiErrorMessage(error, 'Failed to disable 2FA.');
       AppAlert.alert('Error', message);
     } finally {
       setIsLoading(false);
@@ -95,7 +96,7 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
       setBackupCodes(data.backupCodes || []);
       setShowBackupCodesModal(true);
     } catch (error: any) {
-      const message = error?.response?.data?.message || 'Invalid code. Please try again.';
+      const message = getApiErrorMessage(error, 'Invalid code. Please try again.');
       AppAlert.alert('Error', message);
     } finally {
       setIsLoading(false);

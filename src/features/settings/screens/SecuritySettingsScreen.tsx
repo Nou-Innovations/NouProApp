@@ -19,6 +19,7 @@ import { useProfileStore } from '@/shared/store/profileStore';
 import { authAPI } from '@/shared/services/api';
 import { AppAlert } from '@/shared/services/appAlert';
 import { SectionTitle } from '@/shared/components/ui';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 interface SecuritySettingsScreenProps {
   navigation: any;
@@ -72,7 +73,7 @@ export default function SecuritySettingsScreen({ navigation }: SecuritySettingsS
     } catch (error: any) {
       AppAlert.alert(
         'Export Failed',
-        error?.response?.data?.message || 'Could not export your data. Please try again.',
+        getApiErrorMessage(error, 'Could not export your data. Please try again.'),
       );
     } finally {
       setIsExporting(false);

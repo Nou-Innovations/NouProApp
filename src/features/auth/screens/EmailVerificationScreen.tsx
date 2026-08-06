@@ -16,6 +16,7 @@ import { AppButton, TextButton } from '@/shared/components/ui';
 import CodeInput from '@/shared/components/ui/CodeInput';
 import { authAPI } from '@/shared/services/api';
 import { IS_DEV } from '@/config/env';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'EmailVerification'>;
 
@@ -60,7 +61,7 @@ export default function EmailVerificationScreen({ navigation, route }: Props) {
       await authAPI.verifyEmailOTP(userData.email!, code);
       navigation.navigate('CreatePassword', { userData });
     } catch (err: any) {
-      const message = err?.response?.data?.message || 'Incorrect code. Please try again.';
+      const message = getApiErrorMessage(err, 'Incorrect code. Please try again.');
       setError(message);
       setCode('');
       setCodeInputKey(prev => prev + 1);

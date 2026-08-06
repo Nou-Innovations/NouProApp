@@ -10,6 +10,7 @@ import { AppButton } from '@/shared/components/ui';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useProfileStore } from '@/shared/store/profileStore';
 import theme from '@/shared/theme';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 interface DeleteAccountScreenProps {
   navigation: any;
@@ -33,11 +34,13 @@ export default function DeleteAccountScreen({ navigation }: DeleteAccountScreenP
         [{ text: 'OK', onPress: () => authAPI.logout() }],
       );
     } catch (error: any) {
-      const status = error?.response?.status;
-      const serverMessage = error?.response?.data?.message || error?.message;
+      // ApiError.response is the response BODY, so the status lives at error.status
+      // and the payload at error.response.data (not error.response.data.data).
+      const status = error?.status;
+      const serverMessage = getApiErrorMessage(error, '');
       if (status === 409) {
         // Backend returns data.businesses as [{ id, name }]
-        const businesses: string[] = (error?.response?.data?.data?.businesses || [])
+        const businesses: string[] = (error?.response?.data?.businesses || [])
           .map((b: { name?: string } | string) => (typeof b === 'string' ? b : b?.name))
           .filter(Boolean);
         AppAlert.alert(

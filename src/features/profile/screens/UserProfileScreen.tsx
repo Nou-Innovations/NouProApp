@@ -20,6 +20,7 @@ import { get as apiGet, post as apiPost, patch as apiPatch } from '@/shared/serv
 import { reportEntity, blockUser, REPORT_REASONS, type ReportReason } from '@/features/profile/profile.service';
 import { getUserChats, createUserChat } from '@/features/inbox/inbox.service';
 import theme from '@/shared/theme';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 interface UserProfileScreenProps {
   navigation: any;
@@ -226,8 +227,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
               await apiPost('/connections/request', { receiverId: userId });
               fetchUserProfile();
             } catch (err: any) {
-              const msg = err?.response?.error || 'Failed to send connection request.';
-              AppAlert.alert('Error', msg);
+              AppAlert.alert('Error', getApiErrorMessage(err, 'Failed to send connection request.'));
             } finally {
               setConnectLoading(false);
             }
