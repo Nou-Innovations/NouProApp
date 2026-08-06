@@ -9,9 +9,10 @@ import { get, post, patch, del } from '@/shared/services/api';
  */
 
 export interface PendingConnection {
-  id: string;
+  /** The CONNECTION id (not the sender's user id) — this is what accept/reject take. */
+  connectionId: string;
   sender: { id: string; name?: string; avatar?: string; jobTitle?: string };
-  createdAt: string;
+  requestedAt: string;
 }
 
 export interface BlockedUser {

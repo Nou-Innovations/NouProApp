@@ -731,6 +731,42 @@ function stripSensitiveBusinessFields(business) {
   return safe;
 }
 
+// SECURITY: the single funnel for serializing ANOTHER user to a viewer.
+//
+// Every stranger-facing route used to hand-roll `const { passwordHash, twoFactorSecret,
+// twoFactorBackupCodes, ...safe } = user`, which left 8 more columns on the wire —
+// email, phone, address, privacySettings, tokenVersion, lastLoginAt, twoFactorEnabled
+// and deletedAt. /connections/pending was the worst case: you received a stranger's raw
+// contact details *before* accepting their request, including the privacySettings blob
+// saying they'd opted out of sharing them.
+//
+// `privacy` gates the contact fields exactly like GET /users/:userId does: they are
+// included only for yourself, for an accepted connection, or when the owner made them
+// public. Do NOT use this for self-serving routes (login, register, /auth/me) — those
+// legitimately return your own email.
+function stripSensitiveUserFields(user, { isSelf = false, isConnected = false } = {}) {
+  if (!user) return user;
+  const {
+    passwordHash, twoFactorSecret, twoFactorBackupCodes,
+    tokenVersion, lastLoginAt, twoFactorEnabled,
+    ...safe
+  } = user;
+
+  safe.isDeleted = !!safe.deletedAt;
+  delete safe.deletedAt;
+
+  if (!isSelf && !isConnected) {
+    const privacy = safe.privacySettings || {};
+    if (!privacy.show_email_publicly) delete safe.email;
+    if (!privacy.show_phone_publicly) delete safe.phone;
+    if (!privacy.show_address_publicly) delete safe.address;
+  }
+  // The viewer never needs to know how the owner configured their privacy.
+  delete safe.privacySettings;
+
+  return safe;
+}
+
 // applyPricePrivacy(), applyPricePrivacyBatch()
 // → moved to src/domain/pricePrivacy.js (imported at top of file).
 
@@ -2040,26 +2076,30 @@ app.get('/api/users/search', requireAuth, async (req, res) => {
       return res.json(successResponse([]));
     }
 
+    // Blocks are bidirectional — neither party should surface in the other's search.
+    const blockedIds = new Set(await repos.blockRepo.getBlockedIds(req.user.id));
+
     const users = await prisma.user.findMany({
       where: {
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { email: { contains: q, mode: 'insensitive' } },
-        ],
+        // Deliberately NOT matching on email: `?q=someone@example.com` returning a hit
+        // confirms that address has an account here, which is an enumeration oracle.
+        name: { contains: q, mode: 'insensitive' },
         NOT: { id: req.user.id },
         deletedAt: null, // hide erased/anonymized accounts from people discovery
       },
       select: {
+        // No email: it was returned unconditionally, ignoring show_email_publicly.
+        // Neither search screen renders it.
         id: true,
         name: true,
-        email: true,
         avatar: true,
+        jobTitle: true,
       },
       take: 20,
       orderBy: { name: 'asc' },
     });
 
-    return res.json(successResponse(users));
+    return res.json(successResponse(users.filter((u) => !blockedIds.has(u.id))));
   } catch (err) {
     return sendError(res, err);
   }
@@ -2340,18 +2380,28 @@ app.get('/api/users/:userId', requireAuth, async (req, res) => {
       return res.status(404).json(errorResponse('User not found'));
     }
 
-    const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = user;
-
-    // Check privacy: if not connected, strip private fields
     const isSelf = req.user.id === req.params.userId;
-    const isConnected = isSelf ? true : await repos.connectionRepo.areConnected(req.user.id, req.params.userId);
-    const privacy = user.privacySettings || {};
 
-    if (!isSelf && !isConnected) {
-      if (!privacy.show_email_publicly) delete safeUser.email;
-      if (!privacy.show_phone_publicly) delete safeUser.phone;
-      if (!privacy.show_address_publicly) delete safeUser.address;
+    // Blocks are bidirectional: neither party may open the other's profile.
+    if (!isSelf && await repos.blockRepo.isBlocked(req.user.id, req.params.userId)) {
+      return res.status(404).json(errorResponse('User not found'));
     }
+
+    // Anonymized (deleted) account: return a tombstone, not a live-looking profile.
+    if (user.deletedAt && !isSelf) {
+      return res.json(successResponse({
+        id: user.id,
+        name: user.name || 'Deleted user',
+        isDeleted: true,
+      }));
+    }
+
+    const isConnected = isSelf ? true : await repos.connectionRepo.areConnected(req.user.id, req.params.userId);
+    const safeUser = stripSensitiveUserFields(user, { isSelf, isConnected });
+    // So the profile ⋯ menu can offer Unblock instead of only ever offering Block.
+    safeUser.isBlockedByMe = isSelf
+      ? false
+      : await repos.blockRepo.isBlocked(req.user.id, req.params.userId);
 
     // Get connection count
     const connectionsCount = await repos.connectionRepo.countByUserId(req.params.userId);
@@ -3462,7 +3512,8 @@ app.get('/api/connections', requireAuth, async (req, res) => {
       })
       .map(conn => {
         const otherUser = conn.senderId === req.user.id ? conn.receiver : conn.sender;
-        const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = otherUser;
+        // Accepted connections: contact fields are allowed through.
+        const safeUser = stripSensitiveUserFields(otherUser, { isConnected: true });
         return {
           connectionId: conn.id,
           user: safeUser,
@@ -3481,7 +3532,8 @@ app.get('/api/connections/pending', requireAuth, async (req, res) => {
   try {
     const pending = await repos.connectionRepo.listPending(req.user.id);
     const result = pending.map(conn => {
-      const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeSender } = conn.sender;
+      // NOT connected yet — the requester must not see contact details until accepted.
+      const safeSender = stripSensitiveUserFields(conn.sender);
       return {
         connectionId: conn.id,
         sender: safeSender,
@@ -3598,7 +3650,7 @@ app.get('/api/blocks', requireAuth, async (req, res) => {
   try {
     const blocks = await repos.blockRepo.listBlocked(req.user.id);
     const result = blocks.map((b) => {
-      const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = b.blocked;
+      const safeUser = stripSensitiveUserFields(b.blocked);
       return { blockedAt: b.createdAt, user: safeUser };
     });
     res.json(successResponse(result));
@@ -6365,9 +6417,9 @@ app.get('/api/profile/:slug', optionalAuth, async (req, res) => {
       return res.status(404).json(errorResponse('Profile not found'));
     }
 
-    // Strip sensitive fields
-    const { passwordHash, twoFactorSecret, twoFactorBackupCodes, twoFactorEnabled, ...safeProfile } = profile;
-    res.json(successResponse(safeProfile));
+    // Anonymous route: apply the same privacy gate as GET /users/:userId. Previously
+    // this shipped email/phone/address/privacySettings/tokenVersion to any caller.
+    res.json(successResponse(stripSensitiveUserFields(profile)));
   } catch (e) {
     logger.error('Error fetching public profile:', e);
     res.status(500).json(errorResponse('Failed to fetch profile'));

@@ -414,7 +414,7 @@ export default function ConnectionsScreen() {
   const renderRequestItem = ({ item }: { item: PendingConnection }) => (
     <View style={[styles.connectionItem, { borderBottomColor: appTheme.colors.borderColor }]}>
       <Avatar
-        userId={item.sender?.id || item.id}
+        userId={item.sender?.id || item.connectionId}
         userName={item.sender?.name || 'User'}
         imageUri={item.sender?.avatar || ''}
         size={48}
@@ -435,15 +435,15 @@ export default function ConnectionsScreen() {
           title="Accept"
           size="small"
           variant="confirm"
-          disabled={actioningId === item.id}
-          onPress={() => handleAcceptRequest(item.id)}
+          disabled={actioningId === item.connectionId}
+          onPress={() => handleAcceptRequest(item.connectionId)}
         />
         <AppButton
           title="Decline"
           size="small"
           variant="secondary"
-          disabled={actioningId === item.id}
-          onPress={() => handleDeclineRequest(item.id)}
+          disabled={actioningId === item.connectionId}
+          onPress={() => handleDeclineRequest(item.connectionId)}
         />
       </ButtonRow>
     </View>
@@ -534,7 +534,11 @@ export default function ConnectionsScreen() {
                 : (filteredConnections as any[])
           }
           keyExtractor={(item: any) =>
-            activeFilter === 'blocked' ? item.user?.id : item.id
+            activeFilter === 'blocked'
+              ? item.user?.id
+              : activeFilter === 'requests'
+                ? item.connectionId
+                : item.id
           }
           renderItem={
             activeFilter === 'requests'

@@ -17,7 +17,7 @@ import { useProfileViewType } from '@/shared/hooks/useProfileViewType';
 import { ProfileViewType, getProfileAdditionalOptions, getRelationshipAction } from '@/shared/types/profile';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { get as apiGet, post as apiPost, patch as apiPatch } from '@/shared/services/api';
-import { reportEntity, blockUser, REPORT_REASONS, type ReportReason } from '@/features/profile/profile.service';
+import { reportEntity, blockUser, unblockUser, REPORT_REASONS, type ReportReason } from '@/features/profile/profile.service';
 import { removeConnection } from '@/features/connections/connections.service';
 import { getUserChats, createUserChat } from '@/features/inbox/inbox.service';
 import theme from '@/shared/theme';
@@ -43,6 +43,8 @@ interface UserProfileData {
   address?: string;
   connectionsCount?: number;
   connectionStatus?: { id: string; status: string; direction: string } | null;
+  isBlockedByMe?: boolean;
+  isDeleted?: boolean;
   experiences?: {
     business_id: string;
     business_name: string;
@@ -286,11 +288,17 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
   };
 
   // Action menu items for bottom sheet
-  const moreOptionsItems: AppBottomSheetItem[] = getProfileAdditionalOptions(viewType).map((option) => ({
-    id: option.toLowerCase().replace(/\s/g, '-'),
-    title: option,
-    variant: option === 'Block' ? 'destructive' : 'default',
-  }));
+  const moreOptionsItems: AppBottomSheetItem[] = getProfileAdditionalOptions(viewType).map((option) => {
+    // The backend now reports whether the viewer has blocked this person, so the menu
+    // can offer the way back out. Before this it only ever said "Block", which made
+    // blocking permanent by accident.
+    const title = option === 'Block' && user?.isBlockedByMe ? 'Unblock' : option;
+    return {
+      id: title.toLowerCase().replace(/\s/g, '-'),
+      title,
+      variant: title === 'Block' ? 'destructive' : 'default',
+    };
+  });
 
   // Only show the ⋯ menu when there are actual options to show. SELF profiles have
   // no additional options, so this prevents the menu from opening an empty bottom sheet.
@@ -330,10 +338,29 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     }
   };
 
+  const handleUnblockUser = () => {
+    AppAlert.alert('Unblock', `Unblock ${user?.name || 'this user'}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Unblock',
+        onPress: async () => {
+          try {
+            await unblockUser(userId);
+            fetchUserProfile();
+          } catch (err) {
+            AppAlert.alert('Could not unblock', getApiErrorMessage(err, 'Something went wrong. Please try again.'));
+          }
+        },
+      },
+    ]);
+  };
+
   const handleMoreOptionAction = (title: string) => {
     setIsMoreOptionsVisible(false);
     if (title === 'Block') {
       handleBlockUser();
+    } else if (title === 'Unblock') {
+      handleUnblockUser();
     } else if (title === 'Report') {
       setReportSheetVisible(true);
     } else if (title === 'Share') {
