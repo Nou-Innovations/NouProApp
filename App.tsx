@@ -39,6 +39,13 @@ import { AppDialogHost } from '@/shared/components/ui';
 
 // Stores
 import { useProfileStore } from '@/shared/store/profileStore';
+import {
+  navigationRef,
+  resolvePushTarget,
+  navigateToPushTarget,
+  setPendingPushTarget,
+  consumePendingPushTarget,
+} from '@/shared/services/pushRouting';
 import { useBusinessStore } from '@/shared/store/businessStore';
 
 // Navigation
@@ -412,7 +419,7 @@ function AppNavigator() {
   };
 
   return (
-    <NavigationContainer theme={navTheme} linking={linking}>
+    <NavigationContainer ref={navigationRef} theme={navTheme} linking={linking}>
       <RootStack.Navigator
         initialRouteName="MainTabs"
         screenOptions={{ 
@@ -773,6 +780,41 @@ const AppWithTheme = () => {
 
     initPush();
   }, [isSignedIn, currentUser?.notifications_on]);
+
+  // Push TAPS. Registered regardless of auth state: a tap can arrive on a cold start or
+  // while logged out, in which case the target is parked and replayed after sign-in.
+  useEffect(() => {
+    const { addNotificationResponseListener } = require('@/shared/services/pushNotifications');
+    const Notifications = require('expo-notifications');
+
+    // Cold start: the tap that launched the app already happened.
+    Notifications.getLastNotificationResponseAsync()
+      .then((response: any) => {
+        const data = response?.notification?.request?.content?.data;
+        const target = resolvePushTarget(data);
+        if (target) setPendingPushTarget(target);
+      })
+      .catch(() => {});
+
+    const responseSub = addNotificationResponseListener((response: any) => {
+      const data = response?.notification?.request?.content?.data;
+      navigateToPushTarget(resolvePushTarget(data));
+    });
+
+    // (Foreground arrivals refresh the badge inside NotificationContext.)
+    return () => {
+      responseSub?.remove?.();
+    };
+  }, []);
+
+  // Replay a tap that arrived before the app was signed in / navigation was ready.
+  useEffect(() => {
+    if (!isSignedIn) return;
+    const timer = setTimeout(() => {
+      navigateToPushTarget(consumePendingPushTarget());
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [isSignedIn]);
 
   // Load resources (fonts, images, services)
   useEffect(() => {

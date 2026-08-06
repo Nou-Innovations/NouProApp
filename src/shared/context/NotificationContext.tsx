@@ -1,4 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import * as Notifications from 'expo-notifications';
+import { useProfileStore } from '@/shared/store/profileStore';
+import { getNotifications } from '@/features/notifications/notifications.service';
 
 // Notification Context Type
 export interface NotificationContextType {
@@ -17,6 +20,8 @@ export interface NotificationContextType {
   markInvoicesAsRead: () => void;
   markItemAsViewed: (itemId: string) => void;
   isItemViewed: (itemId: string) => boolean;
+  /** Re-fetch the unread count from the server (app launch, foreground push, after reads). */
+  refreshUnreadCount: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
@@ -35,6 +40,7 @@ const NotificationContext = createContext<NotificationContextType>({
   markInvoicesAsRead: () => {},
   markItemAsViewed: () => {},
   isItemViewed: () => false,
+  refreshUnreadCount: async () => {},
 });
 
 export const useNotifications = () => useContext(NotificationContext);
@@ -52,6 +58,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 
   const markAllAsRead = useCallback(() => {
     setUnreadCount(0);
+    Notifications.setBadgeCountAsync(0).catch(() => {});
   }, []);
 
   const markInboxAsRead = useCallback(() => {
@@ -73,6 +80,45 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   const isItemViewed = useCallback((itemId: string) => {
     return viewedItems.has(itemId);
   }, [viewedItems]);
+
+  /**
+   * Source the badge from the server rather than from whichever screen happens to be
+   * mounted. The Notifications screen is a lazy tab, so before this the badge was
+   * always 0 at launch no matter how many invites were waiting.
+   */
+  const refreshUnreadCount = useCallback(async () => {
+    const userId = useProfileStore.getState().currentUser?.id;
+    if (!userId) return;
+    try {
+      const items = await getNotifications(userId);
+      const count = (items || []).filter((n: { read?: boolean }) => !n.read).length;
+      setUnreadCount(count);
+      Notifications.setBadgeCountAsync(count).catch(() => {});
+    } catch {
+      // Badge accuracy is not worth surfacing an error for.
+    }
+  }, []);
+
+  // Fetch once the user is signed in, and whenever they sign in again.
+  const isSignedIn = useProfileStore(
+    (state) => Boolean(state.accessToken && state.currentUser),
+  );
+  useEffect(() => {
+    if (!isSignedIn) {
+      setUnreadCount(0);
+      Notifications.setBadgeCountAsync(0).catch(() => {});
+      return;
+    }
+    void refreshUnreadCount();
+  }, [isSignedIn, refreshUnreadCount]);
+
+  // A push arriving while the app is open should move the badge immediately.
+  useEffect(() => {
+    const sub = Notifications.addNotificationReceivedListener(() => {
+      void refreshUnreadCount();
+    });
+    return () => sub.remove();
+  }, [refreshUnreadCount]);
 
   // Memoize setter functions to prevent infinite re-renders
   const setUnreadCountMemo = useCallback((count: number) => {
@@ -107,7 +153,8 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       markInvoicesAsRead, 
       viewedItems, 
       markItemAsViewed, 
-      isItemViewed 
+      isItemViewed,
+      refreshUnreadCount 
     }}>
       {children}
     </NotificationContext.Provider>

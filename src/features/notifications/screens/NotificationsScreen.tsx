@@ -255,7 +255,7 @@ export default function NotificationsScreen() {
 
   const navigation = useNavigation<any>();
   const { theme: appTheme } = useTheme();
-  const { markAllAsRead, setUnreadCount } = useNotifications();
+  const { setUnreadCount, refreshUnreadCount } = useNotifications();
   const insets = useSafeAreaInsets();
 
   const currentUser = useProfileStore((state) => state.currentUser);
@@ -482,9 +482,15 @@ export default function NotificationsScreen() {
   );
 
   const handleNotificationPress = async (notification: Notification) => {
-    // Mark as read in the backend when the user taps the notification
+    // Mark as read on the server AND in the list, so the unread highlight and the
+    // badge update immediately instead of waiting for a manual pull-to-refresh.
     if (!notification.read && currentUser?.id) {
-      markNotificationRead(currentUser.id, notification.id).catch(() => {});
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n)),
+      );
+      markNotificationRead(currentUser.id, notification.id)
+        .then(() => refreshUnreadCount())
+        .catch(() => {});
     }
     switch (notification.type) {
       case 'staff_request':
@@ -592,10 +598,13 @@ export default function NotificationsScreen() {
     setRefreshing(false);
   }, [fetchNotifications]);
 
+  // Previously this called markAllAsRead() on focus, which zeroed the badge client-side
+  // while every row stayed unread on the server — and because the effect only refired on
+  // a CHANGE, the badge then stayed stuck at 0 forever. Refresh the real count instead.
   useFocusEffect(
     React.useCallback(() => {
-      markAllAsRead();
-    }, [markAllAsRead]),
+      void refreshUnreadCount();
+    }, [refreshUnreadCount]),
   );
 
   const filterStatuses = isPersonalMode ? PERSONAL_FILTERS : BUSINESS_FILTERS;

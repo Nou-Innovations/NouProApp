@@ -738,6 +738,32 @@ function stripSensitiveBusinessFields(business) {
 // MEMBERSHIP ENFORCEMENT MIDDLEWARE
 // ============================================================================
 
+// Fire-and-forget push notification. Deliberately never awaited by callers and never
+// throws: a push failure must not roll back or 500 the action that triggered it.
+// `category` maps to NotificationPreference columns (messages/deliveries/invoices/
+// orders/team/system) — social + membership events use 'system' and 'team'.
+function pushToUsers(userIds, { title, body, category, data }) {
+  const ids = (userIds || []).filter(Boolean);
+  if (ids.length === 0) return;
+  Promise.resolve()
+    .then(() => pushService.sendToUsers({ userIds: ids, title, body, category, data }, repos))
+    .catch((err) => logger.error('[Push] send failed:', err?.message || err));
+}
+
+// Accepted admin/super_admin user ids for a business — who should hear about
+// company-level events (connection requests, join requests).
+async function getBusinessAdminUserIds(businessId) {
+  try {
+    const members = await repos.memberRepo.listBusinessMembers(businessId);
+    return (members || [])
+      .filter((m) => m.status === 'accepted' && (m.role === 'admin' || m.role === 'super_admin'))
+      .map((m) => m.userId);
+  } catch (err) {
+    logger.error('[Push] admin lookup failed:', err?.message || err);
+    return [];
+  }
+}
+
 // Require user to be a member of the business
 async function requireBusinessMembership(req, res, businessId) {
   const user = await getUserFromRequest(req);
@@ -3339,6 +3365,12 @@ app.post('/api/connections/request', requireAuth, async (req, res) => {
     }
 
     const connection = await repos.connectionRepo.sendRequest(req.user.id, receiverId);
+    pushToUsers([receiverId], {
+      title: 'New connection request',
+      body: `${req.user.name || 'Someone'} wants to connect with you.`,
+      category: 'system',
+      data: { type: 'connection_request', connectionId: connection.id, userId: req.user.id },
+    });
     res.status(201).json(successResponse(connection, 'Connection request sent'));
   } catch (err) {
     logger.error('[ConnectionRequest] Error:', err);
@@ -3361,6 +3393,12 @@ app.patch('/api/connections/:id/accept', requireAuth, async (req, res) => {
     }
 
     const updated = await repos.connectionRepo.acceptRequest(req.params.id);
+    pushToUsers([connection.senderId], {
+      title: 'Connection accepted',
+      body: `${req.user.name || 'Someone'} accepted your connection request.`,
+      category: 'system',
+      data: { type: 'connection_accepted', connectionId: connection.id, userId: req.user.id },
+    });
     res.json(successResponse(updated, 'Connection accepted'));
   } catch (err) {
     logger.error('[ConnectionAccept] Error:', err);
@@ -3607,6 +3645,14 @@ app.post('/api/business-connections/request', requireAuth, async (req, res) => {
     }
 
     const connection = await repos.connectionRepo.sendBusinessRequest(requesterBusinessId, targetBusinessId);
+    const targetAdmins = await getBusinessAdminUserIds(targetBusinessId);
+    const requesterBiz = await repos.businessRepo.getById(requesterBusinessId);
+    pushToUsers(targetAdmins, {
+      title: 'New partner request',
+      body: `${requesterBiz?.name || 'A company'} wants to connect with your company.`,
+      category: 'team',
+      data: { type: 'business_connection_request', connectionId: connection.id, companyId: targetBusinessId },
+    });
     res.status(201).json(successResponse(connection, 'Business connection request sent'));
   } catch (err) {
     logger.error('[BizConnectionRequest] Error:', err);
@@ -3628,6 +3674,14 @@ app.patch('/api/business-connections/:id/accept', requireAuth, async (req, res) 
     }
 
     const updated = await repos.connectionRepo.acceptBusinessRequest(req.params.id);
+    const requesterAdmins = await getBusinessAdminUserIds(connection.requesterBusinessId);
+    const targetBiz = await repos.businessRepo.getById(connection.targetBusinessId);
+    pushToUsers(requesterAdmins, {
+      title: 'Partner request accepted',
+      body: `${targetBiz?.name || 'A company'} accepted your connection request.`,
+      category: 'team',
+      data: { type: 'business_connection_accepted', connectionId: connection.id, companyId: connection.targetBusinessId },
+    });
     res.json(successResponse(updated, 'Business connection accepted'));
   } catch (err) {
     logger.error('[BizConnectionAccept] Error:', err);
@@ -12889,6 +12943,16 @@ app.post('/api/companies/:companyId/users/invite', requireAuth, async (req, res)
     const inviteToken = nextId('invite');
     const inviteLink = `/invite?companyId=${companyId}&userId=${user.id}&token=${inviteToken}`;
 
+    const invitingBiz = await repos.businessRepo.getById(companyId);
+    if (status === 'invited') {
+      pushToUsers([user.id], {
+        title: 'Company invitation',
+        body: `You have been invited to join ${invitingBiz?.name || 'a company'}.`,
+        category: 'team',
+        data: { type: 'invite_received', companyId },
+      });
+    }
+
     return res.json(successResponse({
       user,
       businessMember: bm,
@@ -12915,6 +12979,14 @@ app.post('/api/companies/:companyId/users/:userId/accept', requireAuth, async (r
 
     // Accept business membership
     const updatedBm = await repos.memberRepo.updateBusinessMember(bm.id, { status: 'accepted' });
+
+    const acceptAdmins = await getBusinessAdminUserIds(companyId);
+    pushToUsers(acceptAdmins.filter((id) => id !== userId), {
+      title: 'Invitation accepted',
+      body: `${currentUser.name || 'Someone'} joined your company.`,
+      category: 'team',
+      data: { type: 'join_accepted', companyId, userId },
+    });
 
     // Accept all location assignments for this business+user
     const locMembers = await repos.memberRepo.listLocationMembersByBusinessAndUser(companyId, userId);
@@ -13266,6 +13338,21 @@ app.patch('/api/companies/:companyId/role-requests/:requestId', requireAuth, asy
       }
     }
 
+    // Tell the requester the outcome. `existing` is the request row loaded above.
+    const wasApproved = status === 'APPROVED';
+    const resolvedBiz = await repos.businessRepo.getById(businessId);
+    pushToUsers([updated.userId], {
+      title: wasApproved ? 'Request approved' : 'Request declined',
+      body: wasApproved
+        ? `You are now a member of ${resolvedBiz?.name || 'the company'}.`
+        : `Your request to join ${resolvedBiz?.name || 'the company'} was declined.`,
+      category: 'team',
+      data: {
+        type: wasApproved ? 'join_request_accepted' : 'join_request_rejected',
+        requestId: updated.id,
+        companyId: businessId,
+      },
+    });
     return res.json(successResponse(updated, 'Role request resolved'));
   } catch (err) {
     return sendError(res, err);
@@ -13321,6 +13408,13 @@ app.post('/api/companies/:companyId/request-membership', requireAuth, joinReques
       message: message || null,
     });
 
+    const admins = await getBusinessAdminUserIds(businessId);
+    pushToUsers(admins, {
+      title: 'New join request',
+      body: `${req.user?.name || 'Someone'} asked to join your company.`,
+      category: 'team',
+      data: { type: 'join_request', requestId: request.id, companyId: businessId },
+    });
     return res.json(successResponse(request, 'Join request sent'));
   } catch (err) {
     return sendError(res, err);

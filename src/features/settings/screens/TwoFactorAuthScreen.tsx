@@ -10,6 +10,7 @@ import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { AppModal } from '@/shared/components/ui';
+import AppTextField from '@/shared/components/ui/AppTextField';
 import { authAPI } from '@/shared/services/api';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
 
@@ -326,14 +327,30 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
         variant="confirm"
         title="Disable Two-Factor Authentication"
         message="Enter your password to disable two-factor authentication. This will make your account less secure."
-        primaryButtonText={isLoading ? 'Disabling...' : 'Disable'}
+        primaryButtonText="Disable"
         onPrimaryAction={handleDisable2FA}
+        primaryButtonLoading={isLoading}
+        primaryButtonDisabled={!disablePassword.trim()}
         secondaryButtonText="Cancel"
         onSecondaryAction={() => {
           setShowDisablePrompt(false);
           setDisablePassword('');
         }}
-      />
+        secondaryButtonDisabled={isLoading}
+      >
+        {/* Without this field the modal could never collect a password, so
+            handleDisable2FA always bailed on its own empty-password guard and
+            2FA could never actually be turned off. */}
+        <AppTextField
+          label="Password"
+          value={disablePassword}
+          onChangeText={setDisablePassword}
+          placeholder="Enter your password"
+          secureTextEntry
+          leftIcon="lock-closed-outline"
+          autoCapitalize="none"
+        />
+      </AppModal>
     </SafeAreaView>
   );
 }
