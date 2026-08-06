@@ -7,7 +7,7 @@
 
 **Severity:** **P0** = broken or user-visibly wrong for everyone who tries it · **P1** = real bug or missing piece users will hit · **P2** = polish / integrity.
 
-**Status:** Batch 1 (S-1, P-1, P-2, C-1, M-2), Batch 2 (P-4, P-5, M-1, A-2, A-3, C-2) and Batch 3 (A-1, N-2, N-3, N-5, N-9, C-3) are **FIXED** — see the fix logs at the bottom. Everything else is open.
+**Status:** Batches 1–4 are **FIXED** — every P0 in this document, plus P-6, P-12, C-4, C-8, M-4 and M-5. See the fix logs at the bottom. What remains is P1/P2 polish, listed in "Still open" below.
 
 ---
 
@@ -66,13 +66,13 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | **P-3** | **P0** | **"Edit workplace" is a permanent dead end.** `EditPersonalProfileScreen.tsx:271` navigates with `{ businessId }`, but `EditWorkExperienceScreen.tsx:26` reads `route.params.experienceId` → `undefined` → the lookup at `:53` never matches → "Experience not found" forever. Worse, the list is built from `userBusinesses` (company memberships), whose ids live in a different table than `WorkExperience` — so renaming the param alone can't fix it; the data model has to be reconciled first. |
 | **P-4** | **P0** | **FIXED ✅** — **"Leave workplace" and "Delete company" are fake.** `ProfileSettingsScreen.tsx:102-106` shows *"You have left the workplace."* and navigates back — with no API call. `:97-100` does the same for *"Company deletion process started…"*. A real `leaveCompany` exists (`profileStore.ts:531-534`) and a real `DELETE /companies/:id/members/me` exists (`server.js:12800`). |
 | **P-5** | **P0** | **FIXED ✅** — **The sidebar's "Settings" leads to a stub with a fake "Delete account".** `SidebarContent.tsx:392` routes personal mode to `PersonalProfileSettings` — a two-row screen whose `confirmDeleteAccount` (`PersonalProfileSettingsScreen.tsx:87-90`) just alerts *"Account deletion process started…"*. This is a **second** copy of the round-1 PR-5 stub, and it sits behind the app's most discoverable Settings entry point, while the real settings hub is reachable only from the gear icon on the profile screen and the working `DeleteAccountScreen` is buried under Security. **App Store 5.1.1(v) risk** — account deletion must actually delete. |
-| P-6 | P1 | **Email/phone are freely editable, unverified, and can lock you out.** `PATCH /auth/me` assigns them blind (`server.js:1918-1919`). Clearing the email field sets `email = null`, and login is email-only → the account becomes unreachable. No OTP, no password re-auth, and a uniqueness collision throws P2002 → generic 500 instead of a usable 409. No dedicated change-email/phone screen exists. |
+| P-6 | P1 | **FIXED ✅** — **Email/phone are freely editable, unverified, and can lock you out.** `PATCH /auth/me` assigns them blind (`server.js:1918-1919`). Clearing the email field sets `email = null`, and login is email-only → the account becomes unreachable. No OTP, no password re-auth, and a uniqueness collision throws P2002 → generic 500 instead of a usable 409. No dedicated change-email/phone screen exists. |
 | P-7 | P1 | **Avatar upload failure is completely silent on the profile screen.** `PersonalProfileScreen.tsx:89-101` has **no `else`** for `uploadResult.success === false`, and the catch blocks only `console.error`. With the Supabase bucket still unprovisioned, the spinner runs, stops, and nothing changes — zero feedback. (The Edit-Profile copy of the same flow *does* alert — inconsistent.) |
 | P-8 | P1 | **Avatars die on the next deploy.** With Supabase unset, uploads fall back to local disk served from `/uploads` (`server.js:13566`, `:278`). Other users *can* see them — until Render's ephemeral disk is wiped on redeploy, after which every avatar 404s and silently falls back to initials. |
 | P-9 | P1 | **`currentUser` is never re-synced from the server.** `authAPI.getCurrentUser()` has zero callers; `refreshBusinesses()` fetches `/auth/me` but discards `response.user` (`profileStore.ts:519-524`). So `connections_count` is frozen at login value, edits made on another device never appear, and `twoFactorEnabled` can desync. |
 | P-10 | P1 | **`headline`, `bio` and `industry` are editable but rendered nowhere** — not on your own profile, not on anyone else's (`UserProfileData` doesn't even declare them). A user can write a 2000-character bio that no one, including themselves, can ever read. |
 | P-11 | P1 | **Work experiences added via `AddWorkExperience` are invisible.** The POST is real (`server.js:5759`) but nothing renders `WorkExperience` rows — every list iterates `userBusinesses` or server-derived `BusinessMember` rows instead. Data is written and never shown (except in the GDPR export). |
-| P-12 | P1 | **Blocking is a one-way trip.** After blocking, the ⋯ menu still says "Block" (never "Unblock"), the profile renders normally, and Message stays enabled (failing server-side with a generic message). `unblockUser` and `GET /api/blocks` have zero callers. And the blocked user is **unaffected**: `GET /api/users/:userId` and `/api/users/search` never consult `blockRepo`, so they still find you and open your profile (round-1 C-7, confirmed open). |
+| P-12 | P1 | **FIXED ✅** — **Blocking is a one-way trip.** After blocking, the ⋯ menu still says "Block" (never "Unblock"), the profile renders normally, and Message stays enabled (failing server-side with a generic message). `unblockUser` and `GET /api/blocks` have zero callers. And the blocked user is **unaffected**: `GET /api/users/:userId` and `/api/users/search` never consult `blockRepo`, so they still find you and open your profile (round-1 C-7, confirmed open). |
 | P-13 | P1 | **"Privacy Policy" is a placeholder alert** (`PersonalSettingsScreen.tsx:104-106`) though the backend already serves `/legal/*`. Store-review blocker. |
 | P-14 | P1 | **A Sentry test-error button ships in user settings** (`PersonalSettingsScreen.tsx:350-366`), labelled "temporary", tappable by any user. |
 | P-15 | P2 | Notification preferences fail silently in both directions — load errors substitute all-`true` defaults, save errors silently revert the switch (`NotificationPreferencesScreen.tsx:40-72`). |
@@ -91,11 +91,11 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | **C-1** | **P0** | **FIXED ✅** — **Accepting a connection request from a profile always fails.** `UserProfileScreen.tsx:203` sends `POST /connections/:id/accept`, but the backend only registers `app.patch` for that path (`server.js:3162`; the sole `app.post` under `/api/connections` is `/request`). Express 404s → "Failed to accept connection request." The Accept button on profiles is 100% dead. The Notifications screen uses the correct verb, which is why round 1 didn't catch it. |
 | **C-2** | **P0** | **FIXED ✅** — **Any backend error on "Connect" crashes the dialog.** `UserProfileScreen.tsx:228` reads `err?.response?.error` — and since `ApiError.response` is the body, `.error` is the **object** `{ code, message }` (`backend/src/utils/response.js:17-21`). That object is passed into `AppModal`'s `<Text>{message}</Text>` → *"Objects are not valid as a React child."* Triggered by every 409 (already pending / already connected) and 403 (blocked) — i.e. any time the profile data is stale. Correct read is `err.message`. |
 | C-3 | P1 | **FIXED ✅** — **Still zero connection-management UI** (round-1 C-3/C-4/C-5 confirmed unchanged). No pending-requests tab, no cancel-sent, no disconnect, no unblock, no blocked list. `GET /connections/pending`, `DELETE /connections/:id`, `DELETE /users/:id/block` and `GET /blocks` all have **zero** callers. The "Pending" and "Connected" buttons are alert dead-ends. |
-| C-4 | P1 | **`GET /connections/pending` leaks a stranger's full user record.** `server.js:3257-3264` strips only `passwordHash`, `twoFactorSecret` and `twoFactorBackupCodes` from an `include: { sender: true }`, so before you accept, you receive the requester's `email`, `phone`, `address`, `privacySettings`, `tokenVersion`, `lastLoginAt` and `deletedAt` — bypassing the privacy gate `GET /users/:userId` applies. Same over-sharing in `GET /connections`. |
+| C-4 | P1 | **FIXED ✅** — **`GET /connections/pending` leaks a stranger's full user record.** `server.js:3257-3264` strips only `passwordHash`, `twoFactorSecret` and `twoFactorBackupCodes` from an `include: { sender: true }`, so before you accept, you receive the requester's `email`, `phone`, `address`, `privacySettings`, `tokenVersion`, `lastLoginAt` and `deletedAt` — bypassing the privacy gate `GET /users/:userId` applies. Same over-sharing in `GET /connections`. |
 | C-5 | P1 | **Unlimited request spam; declining achieves nothing.** No rate limiter on `POST /connections/request`, and a `rejected` row is deleted and re-created on re-request (`server.js:3149-3151`) — the sender's button even reverts to "Connect". Mirror the 7-day cooldown that role requests already have. |
 | C-6 | P1 | **`ConnectionsScreen` ignores `route.params.userId`.** All four callers pass a real id (`UserProfileScreen.tsx:437`, `BusinessProfileScreen.tsx:1031`, and both own-profile screens) and every one lands on *your own* connections. Fixing it also needs a backend change — `GET /connections` is hard-scoped to `req.user.id`. |
 | C-7 | P1 | **Two rows for one relationship are possible.** `@@unique([senderId, receiverId])` is direction-specific and the check-then-write isn't transactional, so simultaneous A→B and B→A both succeed. Afterwards status lookups use `findFirst` → nondeterministic, and `blockUser` removes only one row, leaving a live request from a blocked user. |
-| C-8 | P1 | **Soft-deleted users leak into connection lists** — `userRepo.getById` has no `deletedAt` filter, unlike search which explicitly excludes them. |
+| C-8 | P1 | **FIXED ✅** — **Soft-deleted users leak into connection lists** — `userRepo.getById` has no `deletedAt` filter, unlike search which explicitly excludes them. |
 | C-9 | P2 | "Connection accepted" notifications use `createdAt` (when the request was *sent*), so an acceptance of a 31-day-old request produces no notification at all, and a 20-day-old one reads "20 days ago". `acceptRequest` doesn't touch `updatedAt` either. |
 | C-10 | P2 | Pending user↔user requests are typed `company_request`, forcing the frontend to sniff payload shape to choose an endpoint — the exact fragility that caused round-1's B-1. There is also no "your request was declined" signal at all. |
 | C-11 | P2 | Pull-to-refresh spinner never appears (`refreshing={loading}` while `loading` also swaps in a full-screen spinner). The empty-state "Find people" CTA goes to the business/product Explore surface, which has no people and no Connect action. |
@@ -108,9 +108,9 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 |---|---|---|
 | **M-1** | **P0** | **FIXED ✅** — **Assigning a role after someone joins is fake.** The `join_accepted` card renders a role dropdown (`NotificationsScreen.tsx:167-182`) captioned *"joined your company — assign their role"*, and `handleConfirmRoleChange` (`:434-443`) writes to local state and shows *"Role has been changed to Admin."* — **with no API call anywhere in the function**. The admin believes they granted a role; the server never hears about it. |
 | **M-2** | **P0** | **FIXED ✅** — **`RoleRequestsScreen` is permanently blank.** `RoleRequestsScreen.tsx:48-49` does `setRequests(data)` where `data` is the unwrapped `{ requests: [...] }` **object** (`server.js:12944` returns `successResponse({ requests })`). So `requests.length` is `undefined`, the empty-state branch is skipped, and the FlatList renders zero rows with no message. `team.service.ts:231` shows the correct pattern (`response?.requests \|\| []`). This is the *only* dedicated surface for staff→admin upgrade requests. Rows also read `item.userName`/`item.userAvatar`, which the repo never returns (it returns a nested `user`). |
-| M-3 | P1 | **Admin can remove the owner, and no ownership-transfer endpoint exists.** `DELETE /companies/:id/users/:userId/invite` (`server.js:12735`) only checks that ≥1 admin-or-super_admin remains, so an admin can delete the owner's membership. The error text says *"Transfer ownership first"* — grep finds no such endpoint anywhere. |
-| M-4 | P1 | **The owner can leave and permanently orphan the company.** `server.js:12816-12827` counts `admin \|\| super_admin` as "remaining admins", so a super_admin can leave with only a plain admin left — and `server.js:12482-12487` then forbids anyone from ever granting `super_admin` again. Unrecoverable without direct DB access. |
-| M-5 | P1 | **Email invites create a shadow account that blocks the invitee from ever signing up.** `server.js:12645-12653` creates a `User` with the email and no `passwordHash`; `POST /auth/register` then rejects that email with 409 (`server.js:1410-1414`). The invitee can never register. It's also an account-squatting primitive — any admin can burn arbitrary email addresses. **This is the endpoint the missing invite UI (round-1 M-3) would expose**, so it must be fixed before that UI ships. |
+| M-3 | P1 | **RESOLVED BY DESIGN ✅** — co-owners replace transfer; see the Batch 4 log. — **Admin can remove the owner, and no ownership-transfer endpoint exists.** `DELETE /companies/:id/users/:userId/invite` (`server.js:12735`) only checks that ≥1 admin-or-super_admin remains, so an admin can delete the owner's membership. The error text says *"Transfer ownership first"* — grep finds no such endpoint anywhere. |
+| M-4 | P1 | **FIXED ✅** — **The owner can leave and permanently orphan the company.** `server.js:12816-12827` counts `admin \|\| super_admin` as "remaining admins", so a super_admin can leave with only a plain admin left — and `server.js:12482-12487` then forbids anyone from ever granting `super_admin` again. Unrecoverable without direct DB access. |
+| M-5 | P1 | **FIXED ✅** — **Email invites create a shadow account that blocks the invitee from ever signing up.** `server.js:12645-12653` creates a `User` with the email and no `passwordHash`; `POST /auth/register` then rejects that email with 409 (`server.js:1410-1414`). The invitee can never register. It's also an account-squatting primitive — any admin can burn arbitrary email addresses. **This is the endpoint the missing invite UI (round-1 M-3) would expose**, so it must be fixed before that UI ships. |
 | M-6 | P1 | **Staff can never leave a company.** The only Leave UI is inside `CompanySettingsScreen`, wrapped in `BusinessAdminGuard` and reachable only in business mode — which staff are hard-blocked from entering. The backend route works and is unreachable. |
 | M-7 | P1 | **Adding a member directly is silent and consent-free** — `server.js:12330-12337` creates the `BusinessMember` outright with `status='accepted'` by default, no invite, no consent, no notification. Only `invited` rows generate a notification. |
 | M-8 | P1 | **The mode-scoped notification split hides half these flows.** `invite_received` / `join_request_accepted` / `join_request_rejected` render only in **personal** mode; `staff_request` / `join_accepted` / `invite_pending` only in **business** mode (`server.js:14441` vs `:14691`). An admin working in business mode never sees an invite addressed to them — and with the badge still cosmetic (N-5), it can sit unseen indefinitely. |
@@ -267,6 +267,53 @@ Built as a **soft delete**, because `Order.buyerBusinessId` / `Invoice.clientBus
 7. Connections → **Requests** tab: Accept/Decline work. **Blocked** tab: Unblock works.
 8. On a connected profile, tap "Connected" → Disconnect. On a pending one, tap "Pending" → Cancel request.
 9. Invite someone to a company / approve a join request → **they get a push**.
+
+---
+
+## Fix log — Batch 4 (2026-08-06/07)
+
+**Phase A — a regression + the privacy batch**
+
+| ID | What changed |
+|---|---|
+| *(regression)* | The Requests tab shipped in Batch 3 could never work: `/connections/pending` returns `{ connectionId, sender, requestedAt }` but the TS type declared `{ id, … }`, so Accept/Decline passed `undefined`. Fixed the type and all three consumers. |
+| **C-4** | Added `stripSensitiveUserFields()` beside `stripSensitiveBusinessFields` as the single funnel for serializing *another* user. Drops `passwordHash`, 2FA secrets, `tokenVersion`, `lastLoginAt`, `twoFactorEnabled`; converts `deletedAt` → `isDeleted`; and gates email/phone/address on `show_*_publicly` unless you are the owner or an accepted connection. Applied to `/users/:userId`, `/connections`, `/connections/pending`, `/blocks` and `/profile/:slug`. Self-serving routes are untouched. **`/profile/:slug` was the worst case and wasn't in the audit** — it's `optionalAuth`, so it was shipping contact details and `tokenVersion` to anonymous callers. |
+| **S-4** | `/users/search` no longer returns `email` **or matches on it** — querying an exact address used to confirm whether it had an account here. |
+| **P-12** | Blocks are now enforced on profiles and search (they were only enforced on connections and chat). A blocked profile 404s, and `/users/:userId` returns `isBlockedByMe` so the ⋯ menu offers **Unblock**. |
+| **C-8** | A deleted account returns a tombstone rather than a live-looking profile with a synthetic `deleted-*@deleted.nou.pro` email. |
+
+**Phase B — ownership (M-4, and M-3 resolved by design)**
+
+No transfer endpoint. Per Arnaud's design, **co-owners are allowed**: an owner promotes someone else to owner, then leaves.
+
+The leave route counted plain admins as "remaining admins", so an owner could leave with only admins behind — and since only a super_admin can grant super_admin, the company could then never have an owner again (no subscription changes, no archive, no staff management). Leaving as the sole owner now 409s `LAST_OWNER` with the admins you could hand it to; both leave screens offer *"make someone an owner first"* or *"leave and archive"*, and archiving runs with the membership removal in one transaction. Also fixed: granting super_admin wrote that role into `LocationMember` rows, which the location routes refuse to touch — making them permanently unmanageable. Role changes now send a push.
+
+**Phase C — invites (M-5)**
+
+Invites for people without an account went into a new `CompanyInvite` table instead of creating a passwordless `User` row that made register 409 on that address **forever**. `POST /auth/register` consumes pending invites, so signing up with an invited email just works. Invites expire after 30 days and can be listed/revoked.
+
+**Phase D — verified email/phone change (P-6)**
+
+`PATCH /auth/me` assigned email/phone blind, and the profile form sent `email: value || null` — so clearing the field permanently locked the account out, since login is email-only. Identity changes now go through `/auth/change-email/{request,confirm}` (code to the *new* address, applied only on confirm) via a new **Settings › Security › Change Email/Phone** screen; the profile field is read-only. `PATCH /auth/me` refuses identity changes and maps P2002 to a 409 instead of a 500.
+
+**Verified:** `node --check` OK · `prisma validate` OK · backend tests **58/58** · ESLint **0 errors** · `tsc` **133 = unchanged baseline**.
+
+### Smoke-test checklist for Batch 4
+
+1. Connections → Requests → **Accept actually works** (the Batch-3 regression).
+2. Open a stranger's profile: no email/phone unless they made it public. Block them → profile 404s, ⋯ offers **Unblock**.
+3. Search a user by their exact email → no longer finds them.
+4. Log out and open a public profile link (`/api/profile/:slug`) → no contact details.
+5. As owner, promote an admin to owner → they can reach company settings, and their location access still works.
+6. Try to leave as the only owner → offered "make X owner" or "leave and archive"; test both.
+7. Invite a brand-new email → **no account is created**; that person signs up normally and lands in the company as invited.
+8. Settings › Security › Change Email → code goes to the new address; the change only applies after confirming. Clearing the email on the profile form is no longer possible.
+
+---
+
+## Still open (P1/P2 polish)
+
+Nothing user-blocking remains. The notable ones: **A-9** (signup is impossible without Twilio, even in dev), **A-4/A-5/A-6/A-7** (refresh behind the IP rate limiter, silent logout with no "session expired", password change killing your own session, logout revoking all devices), **N-11/N-12** (no welcome notification, no notification pagination), and the remaining P2 rows in each section above.
 
 ---
 
