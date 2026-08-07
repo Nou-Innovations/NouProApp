@@ -4,8 +4,9 @@ import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useBusinessStore } from '@/shared/store/businessStore';
+import { useProfileStore } from '@/shared/store/profileStore';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AppButton from '@/shared/components/ui/AppButton';
 import { AppBottomSheet, AppModal, ListItemCard, SectionTitle } from '@/shared/components/ui';
@@ -83,8 +84,21 @@ const TIME_OPTIONS = generateTimeOptions();
 export default function CompanyEditScreen() {
   const { theme: appTheme } = useTheme();
   const navigation = useNavigation();
-  const currentCompany = useBusinessStore((state) => state.currentCompany);
+  const route = useRoute<any>();
+  const businesses = useBusinessStore((state) => state.businesses);
+  const storeCurrentCompany = useBusinessStore((state) => state.currentCompany);
   const updateBusiness = useBusinessStore((state) => state.updateBusiness);
+  const activeBusinessId = useProfileStore((state) => state.activeBusiness?.id);
+
+  // CO-19: edit the company the user actually intends to edit. `businessStore.currentCompany`
+  // is just `businesses[0]` from the global directory listing, never synced with the active
+  // business — so a multi-company owner edited the wrong company and a first-run user could
+  // even see a stranger's data. Resolve by the route's businessId (passed by every caller),
+  // falling back to the active business, then to the store default.
+  const targetBusinessId = route.params?.businessId || activeBusinessId || storeCurrentCompany?.id;
+  const currentCompany =
+    (targetBusinessId && businesses.find((b: any) => b.id === targetBusinessId)) ||
+    storeCurrentCompany;
 
   // Parse stored phone number into country code + local number
   const rawPhone = currentCompany?.phone || '';
@@ -398,7 +412,12 @@ export default function CompanyEditScreen() {
   };
 
   const handleSave = async () => {
-    if (!currentCompany?.id || isSaving) return;
+    if (isSaving) return;
+    const saveBusinessId = targetBusinessId || currentCompany?.id;
+    if (!saveBusinessId) {
+      AppAlert.alert('Error', 'No company selected to edit. Please reopen this screen from your company profile.');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -448,7 +467,7 @@ export default function CompanyEditScreen() {
         },
       };
 
-      const success = await updateBusiness(currentCompany.id, payload);
+      const success = await updateBusiness(saveBusinessId, payload);
       if (success) {
         // Update original values so change detection resets
         originalInfoRef.current = {

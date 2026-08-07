@@ -211,3 +211,30 @@ All backend-only, in `backend/server.js` (+ one repo file). Verified: `node --ch
 6. **Chat list** — as staff not in an admin-only group, that group is absent from the company chat list and from search; the activity-feed and trade chats are still listed.
 
 ---
+
+## Fix log — Batch B (P1 broken features, 2026-08-07)
+
+Backend in `backend/server.js`; frontend in `src/features/{explore,connections,company}`. Verified: `node --check` OK · backend tests **70/70** · `tsc --noEmit` **133 = unchanged baseline** (no touched file implicated) · eslint **0 errors** on the 5 touched frontend files.
+
+| ID | What changed |
+|---|---|
+| **CO-13 / CO-14** | The two divergent business-connection APIs are resolved by repointing the frontend to the canonical **Group A** (`/business-connections/*`, which pushes admins, strips sensitive fields, and lets a rejected pair reconnect). `explore.service.ts` no longer sends the target id where the caller's own belongs (every Connect used to 403 silently) — `connectToBusiness(myId, targetId)` now delegates to `sendBusinessConnectionRequest`; connect/disconnect and the "connected" set all use Group A (accepted-only, so pending/rejected no longer render as connected). `ConnectionsScreen` reads Group A too, so partner rows finally populate industry/description. Group B routes are now caller-less (left in place; flag for later removal). |
+| **CO-15** | `PATCH .../products/:productId` now threads `isListed` (both spellings), `isDisplayable` and `status` through the field whitelist, so listing/unlisting an existing product works (it silently no-opped before) and the previously-dead `maxListedProducts` quota check goes live. Also un-breaks `updateProductStatus`. |
+| **CO-16** | `POST .../products/carry` now refuses to clone a source product that isn't listed or whose owner is archived (the idempotent return for an existing copy stays first, so owners of a copy of a since-unlisted product aren't broken). |
+| **CO-17** | New B2B orders now surface: the in-app aggregator includes status `NEW` (rendered as "New order received"), and a dedicated push goes to the **seller's admins** under the `orders` preference — previously the only order signal rode the chat event under `messages`, so muting Messages killed order alerts and the `orders` preference was never used. |
+| **CO-18** | `getStaffCount` now counts seats as `accepted` + `invited` members **plus** non-expired pending `CompanyInvite` rows — rejected/suspended/pending/locked no longer burn seats, and email invites reserve their seat at invite time (registration converts a counted invite 1:1 into a counted `invited` member, closing the old cap-bypass). |
+| **CO-19** | `CompanyEditScreen` now resolves the target company from the route's `businessId` (→ active business → store default) instead of `businesses[0]` of the global directory, so a multi-company owner edits the right company and a first-run user can't be shown a stranger's data; save is pinned to that id and no longer silently no-ops when unset. *(Known follow-up: invoice-settings fields still load from the settings-stripped `GET /companies` list; fetching `GET /companies/:id` for full settings is a later polish.)* |
+| **CO-20** | `ConnectionsScreen` gains a working **Disconnect** (long-press a partner company → `DELETE /business-connections/:id`, which had zero callers) and surfaces **incoming partner-company requests** in the Requests tab with inline Accept/Decline (previously reachable only from the notification feed). |
+| **CO-21** | User-level blocks are now enforced on the company surface: `POST /business-connections/request` and `POST /businesses/:id/follow` refuse when the caller has blocked (or been blocked by) any owner/admin of the target. A dedicated company-level block model remains a deferred product decision. |
+
+### Smoke-test checklist for Batch B
+
+1. **Explore connect** — tap Connect on a business in Explore → request sent (target admins get a push); the button no longer flickers-and-reverts. Disconnect from Explore removes it. Reconnect after a rejection works.
+2. **Connections screen** — the Companies tab shows partners with industry/description; long-press a company → Disconnect; the Requests tab lists incoming partner-company requests with Accept/Decline.
+3. **Product listing** — toggle a product's "listed" in the catalogue → it sticks; listing past your plan's limit → paywall.
+4. **Carry** — carrying an unlisted/foreign product → 403; carrying a listed one still works.
+5. **New order** — place a B2B order from a buyer account → the seller sees "New order received" in notifications and (if Orders push is on) a push, even with Messages muted.
+6. **Seats** — reject a join request on a full plan → you can still invite someone (rejected no longer holds a seat).
+7. **Edit company** — as an owner of two companies, switch to company B, Edit profile → you're editing B, and Save persists to B.
+
+---

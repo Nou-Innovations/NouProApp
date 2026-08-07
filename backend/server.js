@@ -662,9 +662,25 @@ async function findBusiness(companyId) {
 }
 
 // Get staff count for a business (Prisma-backed)
+// Count the paid seats a company is using. A seat is consumed by an accepted member, an
+// outstanding 'invited' member, OR a still-pending email invite (a CompanyInvite that hasn't
+// been consumed yet). CO-18: previously this counted every status except 'suspended', so
+// rejected/locked/pending join-requests wrongly burned seats and a company that rejected
+// applicants could no longer hire; and the CompanyInvite rows were not counted at all, so N
+// email invites slipped under the cap and materialized past the limit at registration. A
+// pending invite reserves the seat now and converts 1:1 into an 'invited' member on signup
+// (the invite flips to ACCEPTED), so there is no double-count and no bypass.
 async function getStaffCount(companyId) {
   const members = await repos.memberRepo.listBusinessMembers(companyId);
-  return members.filter(m => m.status !== 'suspended').length;
+  const seatMembers = members.filter(m => m.status === 'accepted' || m.status === 'invited').length;
+  const pendingInvites = await prisma.companyInvite.count({
+    where: {
+      businessId: companyId,
+      status: 'PENDING',
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+  });
+  return seatMembers + pendingInvites;
 }
 
 // Validation functions (throw on invalid)
@@ -4012,6 +4028,16 @@ app.post('/api/business-connections/request', requireAuth, async (req, res) => {
       return res.status(404).json(errorResponse('Target business not found'));
     }
 
+    // CO-21: user-level block enforcement. If the requesting user has blocked (or been
+    // blocked by — isBlocked is symmetric) any owner/admin of the target company, refuse the
+    // connection. A dedicated company-level block model is a separate product decision.
+    const targetAdmins = await getBusinessAdminUserIds(targetBusinessId);
+    for (const adminId of targetAdmins) {
+      if (await repos.blockRepo.isBlocked(req.user.id, adminId)) {
+        return res.status(403).json(errorResponse('You cannot connect with this company', 'BLOCKED'));
+      }
+    }
+
     // Check for existing
     const existing = await repos.connectionRepo.findExistingBusinessConnection(requesterBusinessId, targetBusinessId);
     if (existing) {
@@ -4025,7 +4051,6 @@ app.post('/api/business-connections/request', requireAuth, async (req, res) => {
     }
 
     const connection = await repos.connectionRepo.sendBusinessRequest(requesterBusinessId, targetBusinessId);
-    const targetAdmins = await getBusinessAdminUserIds(targetBusinessId);
     const requesterBiz = await repos.businessRepo.getById(requesterBusinessId);
     pushToUsers(targetAdmins, {
       title: 'New partner request',
@@ -4167,6 +4192,15 @@ app.post('/api/businesses/:businessId/follow', requireAuth, async (req, res) => 
     const business = await repos.businessRepo.getActiveById(businessId);
     if (!business) {
       return res.status(404).json(errorResponse('Business not found'));
+    }
+
+    // CO-21: user-level block enforcement — a user who has blocked (or been blocked by) an
+    // owner/admin of this business can't follow it.
+    const bizAdmins = await getBusinessAdminUserIds(businessId);
+    for (const adminId of bizAdmins) {
+      if (await repos.blockRepo.isBlocked(userId, adminId)) {
+        return res.status(403).json(errorResponse('You cannot follow this company', 'BLOCKED'));
+      }
     }
 
     // Check if already following
@@ -4835,10 +4869,21 @@ app.post('/api/companies/:companyId/products/carry', requireAuth, async (req, re
       return res.status(400).json(errorResponse('You already own this product'));
     }
 
-    // Idempotent — return the existing carried copy if one exists.
+    // Idempotent — return the existing carried copy if one exists (kept ahead of the
+    // visibility checks so owners of a copy of a since-unlisted product aren't broken).
     const existing = await repos.productRepo.getCarriedCopy(companyId, sourceProductId);
     if (existing) {
       return res.json(successResponse(existing));
+    }
+
+    // CO-16: only a LISTED product from an ACTIVE (non-archived) company may be newly
+    // carried — otherwise any company could clone another's private/internal product.
+    if ((source.isListed ?? source.is_listed ?? source.isDisplayable) !== true) {
+      return res.status(403).json(errorResponse('This product is not available to carry', 'NOT_LISTED'));
+    }
+    const sourceBiz = await repos.businessRepo.getActiveById(source.businessId);
+    if (!sourceBiz) {
+      return res.status(404).json(errorResponse('Source product not found'));
     }
 
     const now = new Date().toISOString();
@@ -4879,7 +4924,12 @@ app.patch('/api/companies/:companyId/products/:productId', requireAuth, async (r
     // legacy stockQuantity — stock lives per-location on the Stock model, via
     // PATCH /locations/:locationId/stock/:productId) are ignored rather than
     // forwarded, because prisma.product.update throws on unknown columns.
-    const { name, description, unit, price, taxRate, sku, barcode } = req.body;
+    const { name, description, unit, price, taxRate, sku, barcode, status, isDisplayable } = req.body;
+    // CO-15: isListed is the toggle the catalogue UI drives (products.service.ts sends
+    // `is_listed` or `isDisplayable`). It was never in the whitelist, so listing/unlisting an
+    // existing product silently no-opped and the quota check below was dead. Accept both
+    // spellings and coerce to boolean.
+    const rawIsListed = req.body.isListed !== undefined ? req.body.isListed : req.body.is_listed;
     const patch = {
       ...(name !== undefined && { name }),
       ...(description !== undefined && { description }),
@@ -4888,6 +4938,9 @@ app.patch('/api/companies/:companyId/products/:productId', requireAuth, async (r
       ...(taxRate !== undefined && { taxRate }),
       ...(sku !== undefined && { sku }),
       ...(barcode !== undefined && { barcode }),
+      ...(status !== undefined && { status }),
+      ...(isDisplayable !== undefined && { isDisplayable: !!isDisplayable }),
+      ...(rawIsListed !== undefined && { isListed: !!rawIsListed }),
     };
 
     const product = await repos.productRepo.getById(productId);
@@ -7386,6 +7439,21 @@ app.post('/api/companies/:companyId/orders', requireAuth, async (req, res) => {
     } catch (msgErr) {
       logger.error('Failed to create order event message:', msgErr);
       // Don't fail the order creation if message creation fails
+    }
+
+    // CO-17: notify the SELLER's admins of an inbound B2B order under the 'orders'
+    // preference. The order event above only pushes chat participants under category
+    // 'messages', so a seller who muted Messages got no order alert at all and the 'orders'
+    // preference was never exercised. B2C / seller-created orders skip this (the seller made
+    // them). pushToUsers is fire-and-forget and never throws into this handler.
+    if (isB2B) {
+      const sellerAdmins = await getBusinessAdminUserIds(req.params.companyId);
+      pushToUsers(sellerAdmins, {
+        title: 'New order received',
+        body: `${created.buyerBusinessName || created.customerName || 'A customer'} placed order #${created.id}.`,
+        category: 'orders',
+        data: { type: 'order_update', orderId: created.id, businessId: req.params.companyId },
+      });
     }
 
     res.status(201).json(successResponse(created, 'Order created successfully'));
@@ -15506,10 +15574,11 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
           })
         : Promise.resolve([]),
 
-      // 9. Recent order status updates — DB-filtered
+      // 9. Recent order status updates — DB-filtered. CO-17: include NEW so a freshly placed
+      // B2B order (which always starts as NEW) actually surfaces in the seller's list.
       allBusinessIds.length > 0
         ? prisma.order.findMany({
-            where: { businessId: { in: allBusinessIds }, status: { in: ['CANCELED', 'REJECTED', 'DONE', 'PENDING', 'ACCEPTED'] } },
+            where: { businessId: { in: allBusinessIds }, status: { in: ['NEW', 'CANCELED', 'REJECTED', 'DONE', 'PENDING', 'ACCEPTED'] } },
             orderBy: { updatedAt: 'desc' },
             select: { id: true, status: true, customerName: true, businessId: true, updatedAt: true, createdAt: true },
             take: 10,
@@ -15629,11 +15698,15 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
 
     // 9. Recent order updates
     for (const order of extract(8)) {
+      const isNew = order.status === 'NEW';
       const statusLabel = { CANCELED: 'Canceled', REJECTED: 'Rejected', DONE: 'Completed', PENDING: 'Pending', ACCEPTED: 'Accepted' }[order.status] || order.status;
       notifications.push({
         id: `order-update-${order.id}`, type: 'order_update',
-        title: `Order ${statusLabel.toLowerCase()}`,
-        description: `Order #${order.id} is now ${statusLabel.toLowerCase()}${order.customerName ? ` — ${order.customerName}` : ''}`,
+        title: isNew ? 'New order received' : `Order ${statusLabel.toLowerCase()}`,
+        description: isNew
+          ? `New order #${order.id}${order.customerName ? ` — ${order.customerName}` : ''}`
+          : `Order #${order.id} is now ${statusLabel.toLowerCase()}${order.customerName ? ` — ${order.customerName}` : ''}`,
+        // NEW orders sort by createdAt (a NEW order's updatedAt == createdAt anyway).
         time: formatRelativeTime(order.updatedAt || order.createdAt), timestamp: order.updatedAt || order.createdAt, read: false, avatar: null,
         requestData: { orderId: order.id, businessId: order.businessId },
       });

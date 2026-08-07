@@ -66,3 +66,48 @@ export async function declineBusinessConnectionRequest(
 ): Promise<{ id: string; status: string }> {
   return patch(`/business-connections/${connectionId}/reject`, {});
 }
+
+/**
+ * Remove a business connection (canonical Group-A route). The backend authorizes either
+ * party, so this covers both "cancel a request we sent" and "disconnect a partner".
+ */
+export async function removeBusinessConnection(connectionId: string): Promise<void> {
+  await del(`/business-connections/${connectionId}`);
+}
+
+/** Accepted partner companies of my business. */
+export interface BusinessConnection {
+  connectionId: string;
+  business: {
+    id: string;
+    name?: string;
+    logoUrl?: string | null;
+    industry?: string | null;
+    description?: string | null;
+    isDeleted?: boolean;
+  };
+  connectedAt?: string;
+}
+
+export async function getBusinessConnections(myBusinessId: string): Promise<BusinessConnection[]> {
+  return get<BusinessConnection[]>(`/business-connections/${myBusinessId}`);
+}
+
+/** Incoming partner requests still awaiting my company's decision. */
+export interface PendingBusinessConnection {
+  connectionId: string;
+  requesterBusiness: {
+    id: string;
+    name?: string;
+    logoUrl?: string | null;
+    industry?: string | null;
+    description?: string | null;
+  };
+  requestedAt: string;
+}
+
+export async function getPendingBusinessConnections(
+  myBusinessId: string,
+): Promise<PendingBusinessConnection[]> {
+  return get<PendingBusinessConnection[]>(`/business-connections/${myBusinessId}/pending`);
+}

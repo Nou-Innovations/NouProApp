@@ -88,7 +88,7 @@ export function useExploreDiscovery() {
       setConnectOverrides((p) => ({ ...p, [id]: next }));
       try {
         if (current) await disconnectFromBusiness(id, myId);
-        else await connectToBusiness(id);
+        else await connectToBusiness(myId, id);
       } catch {
         setConnectOverrides((p) => ({ ...p, [id]: current }));
       }

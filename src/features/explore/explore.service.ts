@@ -3,10 +3,18 @@
  *
  * Thin wrappers over existing backend endpoints for B2B discovery:
  * - business directory / recommended / nearby  → GET /companies/search (q/category/city)
- * - business connect / disconnect              → /companies/:id/connections (same endpoints the
- *   feed's optimistic connect uses)
+ * - business connect / disconnect              → the canonical /business-connections/* routes
+ *   (Group A: pushes the target's admins, strips sensitive fields, and lets a previously
+ *   rejected pair reconnect). The old /companies/:id/connections calls here were inverted —
+ *   they passed the TARGET id where the caller's own business id belonged, so every Connect
+ *   403'd silently.
  */
-import { get, post, del } from '@/shared/services/api';
+import { get } from '@/shared/services/api';
+import {
+  getBusinessConnections,
+  sendBusinessConnectionRequest,
+  removeBusinessConnection,
+} from '@/features/connections/connections.service';
 
 export interface ExploreBusiness {
   id: string;
@@ -39,21 +47,17 @@ export async function searchBusinesses(params: SearchBusinessesParams = {}): Pro
   return get<ExploreBusiness[]>('/companies/search', query);
 }
 
-interface RawConnection {
-  id: string;
-  requesterBusinessId?: string;
-  targetBusinessId?: string;
-  status?: string;
-}
-
-/** Set of business ids my business is connected to (the "other side" of each connection). */
+/**
+ * Set of business ids my business is connected to. Group A returns ACCEPTED connections only,
+ * so — unlike the old unfiltered Group-B call — pending/rejected pairs no longer show as
+ * "Connected" in Explore.
+ */
 export async function getConnectedBusinessIds(myBusinessId: string): Promise<Set<string>> {
   try {
-    const conns = await get<RawConnection[]>(`/companies/${myBusinessId}/connections`);
+    const conns = await getBusinessConnections(myBusinessId);
     const ids = new Set<string>();
     (conns || []).forEach((c) => {
-      const other = c.requesterBusinessId === myBusinessId ? c.targetBusinessId : c.requesterBusinessId;
-      if (other) ids.add(other);
+      if (c.business?.id) ids.add(c.business.id);
     });
     return ids;
   } catch {
@@ -61,14 +65,13 @@ export async function getConnectedBusinessIds(myBusinessId: string): Promise<Set
   }
 }
 
-export async function connectToBusiness(targetBusinessId: string): Promise<void> {
-  await post(`/companies/${targetBusinessId}/connections`, {});
+/** Send a partner request from MY business to the target. */
+export async function connectToBusiness(myBusinessId: string, targetBusinessId: string): Promise<void> {
+  await sendBusinessConnectionRequest(myBusinessId, targetBusinessId);
 }
 
 export async function disconnectFromBusiness(targetBusinessId: string, myBusinessId: string): Promise<void> {
-  const conns = await get<RawConnection[]>(`/companies/${targetBusinessId}/connections`);
-  const mine = (conns || []).find(
-    (c) => c.requesterBusinessId === myBusinessId || c.targetBusinessId === myBusinessId,
-  );
-  if (mine) await del(`/companies/${targetBusinessId}/connections/${mine.id}`);
+  const conns = await getBusinessConnections(myBusinessId);
+  const mine = (conns || []).find((c) => c.business?.id === targetBusinessId);
+  if (mine) await removeBusinessConnection(mine.connectionId);
 }

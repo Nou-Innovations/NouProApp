@@ -34,7 +34,13 @@ import {
   rejectConnection,
   removeConnection,
   getBlockedUsers,
+  getBusinessConnections,
+  getPendingBusinessConnections,
+  removeBusinessConnection,
+  acceptBusinessConnectionRequest,
+  declineBusinessConnectionRequest,
   type PendingConnection,
+  type PendingBusinessConnection,
   type BlockedUser,
 } from '../connections.service';
 
@@ -71,6 +77,8 @@ interface CompanyConnection extends BaseConnection {
   type: 'company';
   industry?: string;
   description?: string;
+  /** The BusinessConnection id — needed to disconnect. */
+  connectionId?: string;
 }
 
 type Connection = UserConnection | CompanyConnection;
@@ -84,6 +92,7 @@ export default function ConnectionsScreen() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [allConnections, setAllConnections] = useState<Connection[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingConnection[]>([]);
+  const [pendingBizRequests, setPendingBizRequests] = useState<PendingBusinessConnection[]>([]);
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,13 +103,15 @@ export default function ConnectionsScreen() {
     setLoading(true);
     setError(null);
     try {
+      // CO-14: business connections now come from the canonical Group-A route, which
+      // returns accepted-only and the OTHER company already resolved + stripped
+      // ({ connectionId, business }) — the old /companies/:id/connections call returned
+      // raw rows that never populated industry/description.
       const [userList, bizList] = await Promise.all([
         get<{ connectionId: string; user: any; connectedAt: string }[]>('/connections'),
         activeBusiness?.id
-          ? // Without the status filter the endpoint returns pending/rejected
-            // rows too, which would render as if already connected.
-            get<any[]>(`/companies/${activeBusiness.id}/connections`, { status: 'accepted' })
-          : Promise.resolve([] as any[]),
+          ? getBusinessConnections(activeBusiness.id).catch(() => [])
+          : Promise.resolve([]),
       ]);
 
       // Backend returns Prisma User fields: { id, name, avatar, jobTitle }
@@ -113,30 +124,29 @@ export default function ConnectionsScreen() {
         type: 'user' as const,
       }));
 
-      const bizConns: CompanyConnection[] = (bizList || []).map((c: any) => {
-        // Determine the "other" business in the connection
-        const otherBiz = c.requesterBusinessId === activeBusiness?.id
-          ? c.targetBusiness
-          : c.requesterBusiness;
-        return {
-          id: otherBiz?.id || c.id,
-          name: otherBiz?.name || 'Unknown Business',
-          industry: otherBiz?.industry || undefined,
-          description: otherBiz?.description || undefined,
-          avatar_url: otherBiz?.logoUrl || '',
-          type: 'company' as const,
-        };
-      });
+      const bizConns: CompanyConnection[] = (bizList || []).map((c) => ({
+        id: c.business?.id || c.connectionId,
+        name: c.business?.name || 'Unknown Business',
+        industry: c.business?.industry || undefined,
+        description: c.business?.description || undefined,
+        avatar_url: c.business?.logoUrl || '',
+        connectionId: c.connectionId,
+        type: 'company' as const,
+      }));
 
       setAllConnections([...userConns, ...bizConns]);
 
-      // Pending + blocked are best-effort: a failure there must not blank the
-      // main connections list.
-      const [pending, blocked] = await Promise.all([
+      // Pending (user + company) + blocked are best-effort: a failure there must not blank
+      // the main connections list.
+      const [pending, bizPending, blocked] = await Promise.all([
         getPendingConnectionRequests().catch(() => [] as PendingConnection[]),
+        activeBusiness?.id
+          ? getPendingBusinessConnections(activeBusiness.id).catch(() => [] as PendingBusinessConnection[])
+          : Promise.resolve([] as PendingBusinessConnection[]),
         getBlockedUsers().catch(() => [] as BlockedUser[]),
       ]);
       setPendingRequests(pending || []);
+      setPendingBizRequests(bizPending || []);
       setBlockedUsers(blocked || []);
     } catch {
       setError('Failed to load connections');
@@ -246,6 +256,54 @@ export default function ConnectionsScreen() {
         },
       },
     ]);
+  };
+
+  // CO-20: disconnect a partner company (the Group-B path had no working UI at all).
+  const handleDisconnectCompany = (connectionId: string | undefined, name: string) => {
+    if (!connectionId) return;
+    AppAlert.alert('Remove connection', `Disconnect from ${name || 'this company'}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Disconnect',
+        style: 'destructive',
+        onPress: async () => {
+          setActioningId(connectionId);
+          try {
+            await removeBusinessConnection(connectionId);
+            await fetchConnections();
+          } catch (err) {
+            AppAlert.alert('Error', getApiErrorMessage(err, 'Could not remove the connection.'));
+          } finally {
+            setActioningId(null);
+          }
+        },
+      },
+    ]);
+  };
+
+  // CO-20: accept/decline an incoming partner-company request.
+  const handleAcceptBizRequest = async (connectionId: string) => {
+    setActioningId(connectionId);
+    try {
+      await acceptBusinessConnectionRequest(connectionId);
+      await fetchConnections();
+    } catch (err) {
+      AppAlert.alert('Error', getApiErrorMessage(err, 'Could not accept the request.'));
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleDeclineBizRequest = async (connectionId: string) => {
+    setActioningId(connectionId);
+    try {
+      await declineBusinessConnectionRequest(connectionId);
+      await fetchConnections();
+    } catch (err) {
+      AppAlert.alert('Error', getApiErrorMessage(err, 'Could not decline the request.'));
+    } finally {
+      setActioningId(null);
+    }
   };
 
   const handleConnectionPress = (connection: Connection) => {
@@ -379,6 +437,7 @@ export default function ConnectionsScreen() {
     <TouchableOpacity
       style={[styles.connectionItem, { borderBottomColor: appTheme.colors.borderColor }]}
       onPress={() => handleConnectionPress(item)}
+      onLongPress={() => handleDisconnectCompany(item.connectionId, item.name)}
       activeOpacity={0.7}
     >
       <Avatar
@@ -447,6 +506,58 @@ export default function ConnectionsScreen() {
         />
       </ButtonRow>
     </View>
+  );
+
+  // CO-20: incoming partner-company request row (Accept / Decline inline). Before this the
+  // only surface for these was the notification feed.
+  const renderBizRequestItem = (item: PendingBusinessConnection) => (
+    <View style={[styles.connectionItem, { borderBottomColor: appTheme.colors.borderColor }]}>
+      <Avatar
+        userId={item.requesterBusiness?.id || item.connectionId}
+        userName={item.requesterBusiness?.name || 'Company'}
+        imageUri={item.requesterBusiness?.logoUrl || ''}
+        size={48}
+        style={styles.companyAvatar}
+      />
+      <View style={styles.connectionInfo}>
+        <Text style={[styles.connectionName, { color: appTheme.colors.text }]}>
+          {item.requesterBusiness?.name || 'Company'}
+        </Text>
+        <Text style={[styles.connectionSubtitle, { color: appTheme.colors.secondary }]}>
+          {item.requesterBusiness?.industry || 'Wants to connect'}
+        </Text>
+      </View>
+      <ButtonRow>
+        <AppButton
+          title="Accept"
+          size="small"
+          variant="confirm"
+          disabled={actioningId === item.connectionId}
+          onPress={() => handleAcceptBizRequest(item.connectionId)}
+        />
+        <AppButton
+          title="Decline"
+          size="small"
+          variant="secondary"
+          disabled={actioningId === item.connectionId}
+          onPress={() => handleDeclineBizRequest(item.connectionId)}
+        />
+      </ButtonRow>
+    </View>
+  );
+
+  // Requests tab renders both user and company incoming requests.
+  const renderAnyRequestItem = ({ item }: { item: any }) =>
+    item.__kind === 'company'
+      ? renderBizRequestItem(item as PendingBusinessConnection)
+      : renderRequestItem({ item: item as PendingConnection });
+
+  const combinedRequests = useMemo(
+    () => [
+      ...pendingRequests.map((r) => ({ ...r, __kind: 'user' as const })),
+      ...pendingBizRequests.map((r) => ({ ...r, __kind: 'company' as const })),
+    ],
+    [pendingRequests, pendingBizRequests],
   );
 
   // Blocked row: the only place an unblock is possible — before this, blocking
@@ -528,7 +639,7 @@ export default function ConnectionsScreen() {
         <FlatList
           data={
             activeFilter === 'requests'
-              ? (pendingRequests as any[])
+              ? (combinedRequests as any[])
               : activeFilter === 'blocked'
                 ? (blockedUsers as any[])
                 : (filteredConnections as any[])
@@ -537,12 +648,12 @@ export default function ConnectionsScreen() {
             activeFilter === 'blocked'
               ? item.user?.id
               : activeFilter === 'requests'
-                ? item.connectionId
+                ? `${item.__kind}-${item.connectionId}`
                 : item.id
           }
           renderItem={
             activeFilter === 'requests'
-              ? (renderRequestItem as any)
+              ? (renderAnyRequestItem as any)
               : activeFilter === 'blocked'
                 ? (renderBlockedItem as any)
                 : (renderConnectionItem as any)
