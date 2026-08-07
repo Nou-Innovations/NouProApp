@@ -10,7 +10,9 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList, FullBusinessData } from '@/shared/types/navigation';
@@ -32,6 +34,19 @@ interface BusinessHour {
   timeSlots: TimeSlot[];
 }
 
+const parseTimeToDate = (timeString: string): Date => {
+  const [hours, minutes] = timeString.split(':').map(Number);
+  const date = new Date();
+  date.setHours(hours || 0, minutes || 0, 0, 0);
+  return date;
+};
+
+const formatDateToTime = (date: Date): string => {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
 const DEFAULT_BUSINESS_HOURS: BusinessHour[] = [
   { day: 'Sunday', isOpen: false, timeSlots: [{ open: '09:00', close: '17:00' }] },
   { day: 'Monday', isOpen: true, timeSlots: [{ open: '08:00', close: '17:00' }] },
@@ -49,11 +64,25 @@ export default function BusinessHoursScreen({ navigation, route }: Props) {
   
   // State
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>(DEFAULT_BUSINESS_HOURS);
+  // Which time is being edited, if any (CO-23: onboarding hours were read-only before).
+  const [editing, setEditing] = useState<{ dayIndex: number; type: 'open' | 'close' } | null>(null);
 
   // Toggle day open/closed
   const toggleDayOpen = (dayIndex: number, isOpen: boolean) => {
     const updatedHours = [...businessHours];
     updatedHours[dayIndex] = { ...updatedHours[dayIndex], isOpen };
+    setBusinessHours(updatedHours);
+  };
+
+  // Commit a picked time back into the day's single slot.
+  const handleTimeChange = (event: { type: string }, selected?: Date) => {
+    // Android fires 'dismissed' on cancel; close and keep the old value.
+    if (Platform.OS === 'android') setEditing(null);
+    if (event?.type === 'dismissed' || !selected || !editing) return;
+    const { dayIndex, type } = editing;
+    const updatedHours = [...businessHours];
+    const slot = { ...updatedHours[dayIndex].timeSlots[0], [type]: formatDateToTime(selected) };
+    updatedHours[dayIndex] = { ...updatedHours[dayIndex], timeSlots: [slot] };
     setBusinessHours(updatedHours);
   };
 
@@ -107,9 +136,19 @@ export default function BusinessHoursScreen({ navigation, route }: Props) {
                   {hour.day}
                 </Text>
                 {hour.isOpen ? (
-                  <Text style={[styles.dayTime, { color: appTheme.colors.textSecondary }]}>
-                    {hour.timeSlots[0].open} - {hour.timeSlots[0].close}
-                  </Text>
+                  <View style={styles.timeRow}>
+                    <TouchableOpacity onPress={() => setEditing({ dayIndex: index, type: 'open' })}>
+                      <Text style={[styles.timePill, { color: appTheme.colors.primary, borderColor: appTheme.colors.borderColor }]}>
+                        {hour.timeSlots[0].open}
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.timeDash, { color: appTheme.colors.textMuted }]}>–</Text>
+                    <TouchableOpacity onPress={() => setEditing({ dayIndex: index, type: 'close' })}>
+                      <Text style={[styles.timePill, { color: appTheme.colors.primary, borderColor: appTheme.colors.borderColor }]}>
+                        {hour.timeSlots[0].close}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 ) : (
                   <Text style={[styles.dayTime, { color: appTheme.colors.textMuted }]}>
                     Closed
@@ -131,8 +170,25 @@ export default function BusinessHoursScreen({ navigation, route }: Props) {
 
         {/* Note */}
         <Text style={[styles.note, { color: appTheme.colors.textMuted }]}>
-          You can customize specific time slots for each day later in your business settings.
+          Tap a time to change it. You can add multiple time slots per day later in your business settings.
         </Text>
+
+        {editing && (
+          <View>
+            <DateTimePicker
+              value={parseTimeToDate(businessHours[editing.dayIndex].timeSlots[0][editing.type])}
+              mode="time"
+              is24Hour
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleTimeChange}
+            />
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity style={styles.doneButton} onPress={() => setEditing(null)}>
+                <Text style={[styles.doneText, { color: appTheme.colors.primary }]}>Done</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {/* Bottom Button */}
@@ -197,6 +253,33 @@ const styles = StyleSheet.create({
   dayTime: {
     fontSize: 14,
     fontFamily: theme.fonts.primary.regular,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timePill: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.semiBold,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    overflow: 'hidden',
+  },
+  timeDash: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.regular,
+  },
+  doneButton: {
+    alignSelf: 'flex-end',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  doneText: {
+    fontSize: 16,
+    fontFamily: theme.fonts.primary.semiBold,
   },
   note: {
     fontSize: 14,

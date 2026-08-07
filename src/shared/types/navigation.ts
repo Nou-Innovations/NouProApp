@@ -323,8 +323,7 @@ export type RootStackParamList = {
   TwoFactorAuth: undefined;
   BiometricLogin: undefined;
   NotificationPreferences: undefined;
-  SubscriptionSettings: undefined;
-  
+
   // Team management
   TeamManagement: { businessId: string } | undefined;
   InviteStaff: undefined;
@@ -346,11 +345,9 @@ export type RootStackParamList = {
   CheckoutScreen: { checkoutUrl: string; paymentType: 'SUBSCRIPTION' | 'INVOICE_PAYMENT'; checkoutId: string };
   
   // Business creation/editing
-  CreateBusiness: undefined;
   EditBusiness: { businessId: string };
   CompanySettings: undefined;
-  CompanyEdit: undefined;
-  
+
   // Profile editing
   EditPersonalProfile: undefined;
   AddWorkExperience: undefined;

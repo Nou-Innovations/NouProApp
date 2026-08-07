@@ -288,10 +288,19 @@ export default function TeamManagementScreen() {
     );
   };
 
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = users.filter(user => {
+    const matchesSearch =
+      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    // CO-25: the location dropdown now actually filters the list (it was wired to nothing).
+    // super_admins have implicit access to every location, so they always show; everyone else
+    // matches when assigned to the selected location.
+    if (!selectedLocationId) return true;
+    if (user.role === 'super_admin') return true;
+    const locs = user.locationIds || (user.locationId ? [user.locationId] : []);
+    return locs.includes(selectedLocationId);
+  });
 
   const usersByRole = {
     superAdmin: filteredUsers.filter(user => user.role === 'super_admin'),

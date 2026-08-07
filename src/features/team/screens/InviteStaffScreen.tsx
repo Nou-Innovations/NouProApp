@@ -1,111 +1,216 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Share } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Share, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Icon } from '@/shared/utils/icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import { AppButton } from '@/shared/components/ui';
+import { AppButton, AppTextField, ChipGroup, SectionTitle } from '@/shared/components/ui';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
+import {
+  inviteStaff,
+  getCompanyInvites,
+  revokeCompanyInvite,
+  type TeamMemberRole,
+  type CompanyInvite,
+} from '../team.service';
+import { getLocations, type BusinessLocation } from '@/features/locations/locations.service';
 
-// NOTE (R4): the invite-by-email flow was removed — it never actually sent email, so
-// invitees were never notified. The working path is sharing this link: the recipient opens
-// it, requests to join, and an admin approves the request in Team Management. Real
-// email-based invites are deferred (see APP_AUDIT_2026-06-26.md §5).
+// The invite form + pending email-invites list. Backed by the CompanyInvite table: inviting
+// an address with no account records a pending invite (consumed automatically at signup);
+// inviting an existing account creates an 'invited' membership and pushes them. The share
+// link below is kept as a lightweight alternative (open → request to join → admin approves).
 export default function InviteStaffScreen() {
   const navigation = useNavigation();
   const { theme: appTheme } = useTheme();
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
+  const companyId = activeBusiness?.id;
 
-  const inviteLink = `https://noupro.app/join/${activeBusiness?.id || 'company'}`;
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<TeamMemberRole>('staff');
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
+  const [locations, setLocations] = useState<BusinessLocation[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<CompanyInvite[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleCopyLink = async () => {
+  const inviteLink = `https://noupro.app/join/${companyId || 'company'}`;
+
+  const loadData = useCallback(async () => {
+    if (!companyId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
-      await Share.share({
-        message: `Join our team on NouPro! ${inviteLink}`,
-        url: inviteLink,
-      });
-    } catch (error) {
+      const [locs, invites] = await Promise.all([
+        getLocations(companyId).catch(() => [] as BusinessLocation[]),
+        getCompanyInvites(companyId).catch(() => [] as CompanyInvite[]),
+      ]);
+      setLocations(locs || []);
+      setPendingInvites(invites || []);
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleShareLink = async () => {
+    try {
+      await Share.share({ message: `Join our team on NouPro! ${inviteLink}`, url: inviteLink });
+    } catch {
       AppAlert.alert('Share Link', inviteLink);
     }
   };
 
-  const steps: { icon: string; title: string; description: string }[] = [
-    {
-      icon: 'share-social-outline',
-      title: 'Share the link',
-      description: 'Send the invite link to the people you want on your team.',
-    },
-    {
-      icon: 'person-add-outline',
-      title: 'They request to join',
-      description: 'When they open the link they ask to join your company.',
-    },
-    {
-      icon: 'checkmark-circle-outline',
-      title: 'You approve them',
-      description: 'Approve pending requests in Team Management to add them.',
-    },
+  const handleInvite = async () => {
+    if (!companyId || submitting) return;
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+      AppAlert.alert('Invalid email', 'Please enter a valid email address.');
+      return;
+    }
+    // Staff and admins must be assigned to at least one location (the backend enforces this).
+    if (selectedLocationIds.length === 0) {
+      AppAlert.alert('Pick a location', 'Choose at least one location for this person.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await inviteStaff(companyId, trimmedEmail, name.trim(), role, selectedLocationIds);
+      setEmail('');
+      setName('');
+      setSelectedLocationIds([]);
+      await loadData();
+      AppAlert.alert(
+        'Invitation sent',
+        res?.pending
+          ? `We'll add ${trimmedEmail} to your team automatically when they sign up with this email.`
+          : `${trimmedEmail} has been invited and notified.`,
+      );
+    } catch (err) {
+      AppAlert.alert('Could not invite', getApiErrorMessage(err, 'Failed to send the invitation.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRevoke = (invite: CompanyInvite) => {
+    if (!companyId) return;
+    AppAlert.alert('Revoke invite', `Revoke the invitation to ${invite.email}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Revoke',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await revokeCompanyInvite(companyId, invite.id);
+            await loadData();
+          } catch (err) {
+            AppAlert.alert('Error', getApiErrorMessage(err, 'Could not revoke the invitation.'));
+          }
+        },
+      },
+    ]);
+  };
+
+  const roleOptions = [
+    { value: 'staff', label: 'Staff' },
+    { value: 'admin', label: 'Admin' },
   ];
+  const locationOptions = locations.map((l) => ({ value: l.id, label: l.name }));
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: appTheme.colors.background }]} edges={['top']}>
       <SecondaryHeader
         title="Invite Staff"
-        leftAction={{
-          icon: 'chevron-left',
-          onPress: () => navigation.goBack(),
-          accessibilityLabel: 'Go back',
-        }}
+        leftAction={{ icon: 'chevron-left', onPress: () => navigation.goBack(), accessibilityLabel: 'Go back' }}
       />
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <Text style={[styles.title, { color: appTheme.colors.text }]}>
-            With more people it's better!
-          </Text>
-          <Text style={[styles.subtitle, { color: appTheme.colors.textSecondary }]}>
-            Share your invite link so people can request to join your company.
-          </Text>
-        </View>
-
-        {/* Copy Link Button */}
-        <AppButton
-          title="Share invite link"
-          onPress={handleCopyLink}
-          iconLeft="link-outline"
-          fullWidth
-          style={styles.copyLinkButton}
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+        <SectionTitle style={styles.firstSection}>Invite by email</SectionTitle>
+        <AppTextField
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="person@company.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <AppTextField
+          label="Name (optional)"
+          value={name}
+          onChangeText={setName}
+          placeholder="Their name"
         />
 
-        {/* How it works */}
-        <View style={styles.steps}>
-          {steps.map((step, index) => (
-            <View
-              key={step.title}
-              style={[
-                styles.stepRow,
-                index < steps.length - 1 && { borderBottomColor: appTheme.colors.borderColor, borderBottomWidth: 1 },
-              ]}
-            >
-              <View style={[styles.stepIcon, { backgroundColor: `${appTheme.colors.primary}15` }]}>
-                <Icon name={step.icon} size={22} color={appTheme.colors.primary} />
+        <Text style={[styles.fieldLabel, { color: appTheme.colors.text }]}>Role</Text>
+        <ChipGroup options={roleOptions} value={role} onChange={(v) => setRole(v as TeamMemberRole)} />
+
+        <Text style={[styles.fieldLabel, { color: appTheme.colors.text }]}>Locations</Text>
+        {loading ? (
+          <ActivityIndicator color={appTheme.colors.primary} style={styles.inlineLoader} />
+        ) : locationOptions.length === 0 ? (
+          <Text style={[styles.helperText, { color: appTheme.colors.textSecondary }]}>
+            Add a location first so you can assign staff to it.
+          </Text>
+        ) : (
+          <ChipGroup multiple options={locationOptions} value={selectedLocationIds} onChange={setSelectedLocationIds} />
+        )}
+
+        <AppButton
+          title="Send invitation"
+          onPress={handleInvite}
+          loading={submitting}
+          disabled={submitting || locationOptions.length === 0}
+          fullWidth
+          style={styles.submitButton}
+        />
+
+        {/* Pending email invites */}
+        {pendingInvites.length > 0 && (
+          <View style={styles.pendingSection}>
+            <SectionTitle style={styles.sectionSpacing}>Pending invites</SectionTitle>
+            {pendingInvites.map((invite) => (
+              <View
+                key={invite.id}
+                style={[styles.pendingRow, { borderBottomColor: appTheme.colors.borderColor }]}
+              >
+                <View style={styles.pendingInfo}>
+                  <Text style={[styles.pendingEmail, { color: appTheme.colors.text }]}>{invite.email}</Text>
+                  <Text style={[styles.pendingMeta, { color: appTheme.colors.textSecondary }]}>
+                    {invite.role === 'admin' ? 'Admin' : 'Staff'} · invited
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => handleRevoke(invite)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={[styles.revokeText, { color: appTheme.colors.error }]}>Revoke</Text>
+                </TouchableOpacity>
               </View>
-              <View style={styles.stepText}>
-                <Text style={[styles.stepTitle, { color: appTheme.colors.text }]}>{step.title}</Text>
-                <Text style={[styles.stepDescription, { color: appTheme.colors.textSecondary }]}>
-                  {step.description}
-                </Text>
-              </View>
-            </View>
-          ))}
+            ))}
+          </View>
+        )}
+
+        {/* Share-link alternative */}
+        <View style={styles.linkSection}>
+          <SectionTitle style={styles.sectionSpacing}>Or share a join link</SectionTitle>
+          <Text style={[styles.helperText, { color: appTheme.colors.textSecondary }]}>
+            The recipient opens the link, requests to join, and you approve them in Team Management.
+          </Text>
+          <AppButton
+            title="Share invite link"
+            onPress={handleShareLink}
+            iconLeft="link-outline"
+            variant="secondary"
+            fullWidth
+            style={styles.submitButton}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -113,63 +218,35 @@ export default function InviteStaffScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 12,
-    paddingBottom: 32,
-  },
-  heroSection: {
-    marginTop: 12,
-    marginBottom: 32,
-    paddingHorizontal: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontFamily: theme.fonts.primary.bold,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
+  container: { flex: 1 },
+  content: { flex: 1 },
+  contentContainer: { padding: 16, paddingBottom: 40 },
+  firstSection: { marginBottom: 12 },
+  fieldLabel: {
     fontSize: 14,
+    fontFamily: theme.fonts.primary.semiBold,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  inlineLoader: { alignSelf: 'flex-start', marginVertical: 8 },
+  helperText: {
+    fontSize: 13,
     fontFamily: theme.fonts.primary.regular,
-    textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
+    marginBottom: 8,
   },
-  copyLinkButton: {
-    marginBottom: 32,
-  },
-  steps: {
-    paddingHorizontal: 4,
-  },
-  stepRow: {
+  submitButton: { marginTop: 24 },
+  pendingSection: { marginTop: 32 },
+  sectionSpacing: { marginBottom: 8 },
+  pendingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
   },
-  stepIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  stepText: {
-    flex: 1,
-  },
-  stepTitle: {
-    fontSize: 16,
-    fontFamily: theme.fonts.primary.semiBold,
-    marginBottom: 2,
-  },
-  stepDescription: {
-    fontSize: 14,
-    fontFamily: theme.fonts.primary.regular,
-    lineHeight: 20,
-  },
+  pendingInfo: { flex: 1 },
+  pendingEmail: { fontSize: 15, fontFamily: theme.fonts.primary.semiBold },
+  pendingMeta: { fontSize: 13, fontFamily: theme.fonts.primary.regular, marginTop: 2 },
+  revokeText: { fontSize: 14, fontFamily: theme.fonts.primary.semiBold },
+  linkSection: { marginTop: 36 },
 });

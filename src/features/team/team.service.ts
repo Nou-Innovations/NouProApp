@@ -153,13 +153,19 @@ export async function assignStaffToLocation(
 // INVITE WORKFLOW
 // ============================================================================
 
+/**
+ * Invite a staff member by email. If the address has no account yet, the backend records a
+ * pending CompanyInvite (consumed automatically when they sign up) and returns
+ * `{ pending: true }`. If the account exists, an 'invited' membership is created and the
+ * invitee gets a push. Returns `pending` so the UI can tell the two apart.
+ */
 export async function inviteStaff(
   companyId: string,
   email: string,
   name: string,
   role: TeamMemberRole,
   locationIds: string[]
-): Promise<{ user: any; invite: { token: string; link: string } }> {
+): Promise<{ pending?: boolean; invite?: any; user?: any }> {
   return post(`/companies/${companyId}/users/invite`, {
     email,
     name,
@@ -167,6 +173,28 @@ export async function inviteStaff(
     locationIds,
     status: 'invited',
   });
+}
+
+export interface CompanyInvite {
+  id: string;
+  email: string;
+  name?: string | null;
+  role: string;
+  locationIds: string[];
+  status: 'PENDING' | 'ACCEPTED' | 'REVOKED';
+  expiresAt?: string | null;
+  createdAt: string;
+}
+
+/** Pending email invites for people who don't have an account yet. */
+export async function getCompanyInvites(companyId: string): Promise<CompanyInvite[]> {
+  const res = await get<{ invites: CompanyInvite[] }>(`/companies/${companyId}/invites`);
+  return res?.invites || [];
+}
+
+/** Revoke a pending email invite. */
+export async function revokeCompanyInvite(companyId: string, inviteId: string): Promise<void> {
+  await del(`/companies/${companyId}/invites/${inviteId}`);
 }
 
 export async function acceptJoinRequest(companyId: string, userId: string): Promise<void> {
@@ -328,6 +356,8 @@ const teamService = {
   assignStaffToLocation,
   // Invites
   inviteStaff,
+  getCompanyInvites,
+  revokeCompanyInvite,
   acceptJoinRequest,
   rejectJoinRequest,
   cancelInvite,

@@ -238,3 +238,36 @@ Backend in `backend/server.js`; frontend in `src/features/{explore,connections,c
 7. **Edit company** — as an owner of two companies, switch to company B, Edit profile → you're editing B, and Save persists to B.
 
 ---
+
+## Fix log — Batch C (feature completion / UX, 2026-08-07)
+
+Frontend only. Verified: `tsc --noEmit` **133 = unchanged baseline** (no touched file adds a net-new error) · eslint **0 errors** on all touched files.
+
+| ID | What changed |
+|---|---|
+| **CO-22** | **Real staff-invite UI.** `InviteStaffScreen` is now a working form — email, optional name, role (Staff/Admin), and a required location multi-select — that calls `POST /companies/:id/users/invite`, so the `CompanyInvite` backend is finally reachable from the app. It also lists **pending email invites** with a Revoke action (`GET`/`DELETE /companies/:id/invites`), tells the user whether the invite was recorded (no account yet) or sent to an existing account, and keeps the share-link as a secondary option. `team.service` gained `getCompanyInvites`/`revokeCompanyInvite` and a corrected `inviteStaff` return type. Reachable from Team Management's Invite button + empty-state CTA. |
+| **CO-23** | **Onboarding business hours are editable.** `BusinessHoursScreen` open/close times are now tappable and open a native time picker (with an iOS "Done" affordance), so a new company no longer ships with identical hardcoded hours. |
+| **CO-24** | **Vehicles reachable from the sidebar.** Added a "Vehicles" row to the Business section of the workspace sidebar (it was only reachable from Company Settings). |
+| **CO-25** | **Team location filter works.** The location dropdown now actually filters the staff list (super_admins always shown; others match their assigned location) — it was wired to nothing, and the fetched `locations` state was write-only. |
+| **CO-26** | **Role guard on `CompanyEditScreen`.** Wrapped the company-profile/invoice-settings editor in `BusinessAdminGuard` so a staff member who reaches it is blocked (defense-in-depth on top of the existing business-mode gate + backend membership checks). *(The Add/Edit Location and Add Transport screens are left unwrapped: staff are already hard-blocked from business mode and the backend enforces membership, so wrapping their multi-modal JSX would add regression risk for a path that isn't currently reachable — tracked as low-priority.)* |
+| **CO-27** | **Small stubs fixed.** Company Settings "Privacy Policy" now opens the hosted legal page (`<origin>/legal/privacy`) instead of showing a developer placeholder string; `CompanyEditScreen`'s "Upgrade plan" CTA is driven by the real `activeBusiness.plan` (was a dead `'free'` mock shown to every plan) and the hardcoded Unsplash banner fallback is gone (no stock photo persisted as a real `bannerUrl`). *(RoleRequests approving as `admin` is not a real bug — `requestedRole` is typed to the literal `'admin'` and no super_admin-request path exists.)* |
+| **CO-29** (partial) | Removed the phantom navigation-type entries `CreateBusiness`, `CompanyEdit`, and `SubscriptionSettings` (declared, never registered, never navigated to). |
+
+### Smoke-test checklist for Batch C
+
+1. **Invite** — Team Management → Invite → enter an email, pick a role + location(s), Send → success; the pending invite appears with a Revoke button. Invite an unregistered email → "we'll add them when they sign up"; that person signs up and lands in the company as invited.
+2. **Onboarding hours** — during business creation, tap a day's open/close time → the picker changes it; the new time shows.
+3. **Sidebar** — business mode → the sidebar's Business section now has "Vehicles".
+4. **Team filter** — pick a location in the Team dropdown → the list narrows to that location's staff (plus owners).
+5. **Privacy policy** — Company Settings → Privacy Policy → the hosted page opens.
+6. **Upgrade CTA** — on a paid plan, Edit Business Profile no longer shows "Upgrade plan".
+
+### Still open (low-priority polish, tracked)
+
+- **CO-26** for `AddLocationScreen` / `EditLocationScreen` / `AddTransportScreen` (mitigated; see note above).
+- **CO-28** — surface plan limits (locations/staff counts) at the "+" buttons instead of only 403-ing on submit.
+- **CO-29** (remainder) — dead-code removal (`ManageLocationsModal`, `team/InviteTeamModal`, duplicate `team/AssignStaffModal`, `CompanyDropdown`, now-unused `team.service` exports) and folding `EditLocationScreen` into its barrel.
+- **CO-19** follow-up — fetch `GET /companies/:id` for full invoice settings on the edit screen.
+- Deferred items from the findings tables (Twilio-free signup, push-token dedup, `maxVehicles`, archived-company notification suppression, company-level blocks, notification pagination).
+
+---

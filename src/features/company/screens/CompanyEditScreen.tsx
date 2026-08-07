@@ -7,6 +7,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useBusinessStore } from '@/shared/store/businessStore';
 import { useProfileStore } from '@/shared/store/profileStore';
+import { BusinessAdminGuard } from '@/shared/guards/BusinessAdminGuard';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AppButton from '@/shared/components/ui/AppButton';
 import { AppBottomSheet, AppModal, ListItemCard, SectionTitle } from '@/shared/components/ui';
@@ -88,14 +89,14 @@ export default function CompanyEditScreen() {
   const businesses = useBusinessStore((state) => state.businesses);
   const storeCurrentCompany = useBusinessStore((state) => state.currentCompany);
   const updateBusiness = useBusinessStore((state) => state.updateBusiness);
-  const activeBusinessId = useProfileStore((state) => state.activeBusiness?.id);
+  const activeBusiness = useProfileStore((state) => state.activeBusiness);
 
   // CO-19: edit the company the user actually intends to edit. `businessStore.currentCompany`
   // is just `businesses[0]` from the global directory listing, never synced with the active
   // business — so a multi-company owner edited the wrong company and a first-run user could
   // even see a stranger's data. Resolve by the route's businessId (passed by every caller),
   // falling back to the active business, then to the store default.
-  const targetBusinessId = route.params?.businessId || activeBusinessId || storeCurrentCompany?.id;
+  const targetBusinessId = route.params?.businessId || activeBusiness?.id || storeCurrentCompany?.id;
   const currentCompany =
     (targetBusinessId && businesses.find((b: any) => b.id === targetBusinessId)) ||
     storeCurrentCompany;
@@ -133,7 +134,9 @@ export default function CompanyEditScreen() {
   ];
 
   // Initial values
-  const initialCoverImage = currentCompany?.banner_url || 'https://images.unsplash.com/photo-1596178065887-1198b6148b2b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80';
+  // CO-27: no hardcoded Unsplash fallback — an empty cover stays empty instead of persisting
+  // a stock photo as the company's real bannerUrl on save.
+  const initialCoverImage = currentCompany?.banner_url || '';
   const initialProfileImage = currentCompany?.logo_url || '';
   const initialCompanyName = currentCompany?.name || '';
   const initialBusinessDescription = currentCompany?.description || '';
@@ -214,8 +217,9 @@ export default function CompanyEditScreen() {
   } | null>(null);
   const [tempSelectedTime, setTempSelectedTime] = useState<Date>(new Date());
 
-  // Mock business plan
-  const [businessPlan, setBusinessPlan] = useState<'free' | 'premium' | 'enterprise'>('free');
+  // CO-27: the real plan drives whether the "Upgrade" CTA shows (was a dead 'free' mock, so
+  // every company — including paying ones — saw "Upgrade plan").
+  const businessPlan = activeBusiness?.plan || 'free';
 
   // Check for changes
   useEffect(() => {
@@ -1065,6 +1069,9 @@ export default function CompanyEditScreen() {
   );
 
   return (
+    // CO-26: block a staff member who somehow reaches this screen from editing the company
+    // profile / invoice settings (defense-in-depth on top of the business-mode gate).
+    <BusinessAdminGuard>
     <SafeAreaView
       style={[styles.container, { backgroundColor: appTheme.colors.background }]}
       edges={['top']}
@@ -1193,6 +1200,7 @@ export default function CompanyEditScreen() {
         }}
       />
     </SafeAreaView>
+    </BusinessAdminGuard>
   );
 }
 

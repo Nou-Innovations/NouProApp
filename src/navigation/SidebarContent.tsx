@@ -450,6 +450,7 @@ export default function SidebarContent(props: DrawerContentComponentProps) {
             { label: 'Customers', icon: 'people-outline', route: 'Customers', onPress: () => go('Customers') },
             { label: 'Team', icon: 'person-add-outline', route: 'TeamManagement', onPress: () => go('TeamManagement', { businessId: activeBusiness!.id }) },
             { label: 'Locations', icon: 'location-outline', route: 'Locations', onPress: () => go('Locations') },
+            { label: 'Vehicles', icon: 'car-outline', route: 'Transports', onPress: () => go('Transports') },
             { label: 'Analytics', icon: 'bar-chart-outline', route: 'BusinessAnalytics', onPress: () => go('BusinessAnalytics') },
             { label: 'Variance', icon: 'pie-chart-outline', route: 'Variance', onPress: () => go('Variance') },
             { label: 'Subscription', icon: 'card-outline', route: 'SubscriptionHub', onPress: () => go('SubscriptionHub') },

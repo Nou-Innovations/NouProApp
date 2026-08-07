@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch, Linking } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
+import { API_CONFIG } from '@/shared/config/api';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import {
@@ -176,8 +177,18 @@ export default function CompanySettingsScreen() {
     navigation.navigate('SecuritySettings');
   };
 
-  const handlePrivacyPolicy = () => {
-    AppAlert.alert('Privacy Policy', 'Navigate to privacy policy screen');
+  const handlePrivacyPolicy = async () => {
+    // CO-27: this used to show a developer placeholder string. Open the hosted privacy page
+    // the backend serves at <origin>/legal/privacy (baseUrl ends in /api).
+    const origin = (API_CONFIG.baseUrl || '').replace(/\/api\/?$/, '');
+    const url = `${origin}/legal/privacy`;
+    try {
+      const ok = await Linking.canOpenURL(url);
+      if (ok) await Linking.openURL(url);
+      else AppAlert.alert('Privacy Policy', 'Could not open the privacy policy right now.');
+    } catch {
+      AppAlert.alert('Privacy Policy', 'Could not open the privacy policy right now.');
+    }
   };
 
   const handleProfile = () => {
