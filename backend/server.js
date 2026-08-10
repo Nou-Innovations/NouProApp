@@ -127,6 +127,37 @@ async function sendOtpEmail(toEmail, code) {
   });
 }
 
+/**
+ * SECURITY (AUTH-2): tell the OLD address that the account's email was changed.
+ *
+ * Changing the email is the last step of a full account takeover — after it, password
+ * reset goes to the attacker. The victim has no other way to notice. Best-effort by
+ * design: a send failure must never block or reverse the change the user just authorised.
+ */
+async function sendContactChangedNotice(toEmail, { newValue, what = 'email' }) {
+  const transporter = getEmailTransporter();
+  if (!transporter || !toEmail) {
+    logger.debug(`[Email] Would notify ${toEmail} that their ${what} changed`);
+    return;
+  }
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || 'NouPro <noreply@noupro.app>',
+    to: toEmail,
+    subject: `Your NouPro ${what} was changed`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #000;">Your ${what} was changed</h2>
+        <p>The ${what} on your NouPro account was just changed to <strong>${newValue}</strong>.</p>
+        <p>All other devices have been signed out.</p>
+        <p style="margin-top:24px;color:#666;font-size:14px;">
+          If this wasn't you, contact support immediately — whoever made this change can
+          now receive your password-reset emails.
+        </p>
+      </div>
+    `,
+  });
+}
+
 async function sendPasswordResetEmail(toEmail, resetToken) {
   const transporter = getEmailTransporter();
   const appUrl = process.env.APP_BASE_URL || 'https://nouproapp.onrender.com';
@@ -185,7 +216,7 @@ const repos = getRepos();
 const { prisma } = require('./src/db/prisma');
 
 // Services
-const { orderStatus: orderStatusService, eventMessages, pushService, storageService, stockService, otpService, sessionService } = require('./src/services');
+const { orderStatus: orderStatusService, eventMessages, pushService, storageService, stockService, otpService, sessionService, passwordResetService } = require('./src/services');
 
 // Authentication middleware
 const { requireAuth, optionalAuth, generateToken, verifyToken, isNonAccessToken } = require('./src/middleware/auth');
@@ -415,6 +446,32 @@ const refreshLimiter = rateLimit({
     return clientIpKey(req);
   },
   message: { success: false, message: 'Too many refresh attempts, please try again shortly' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: limiterValidate,
+});
+
+// SECURITY (AUTH-5): the 2FA login step gets its own per-USER limiter.
+//
+// It used to sit behind authLimiter, which is keyed by IP. That is the wrong axis for a
+// second-factor check: a distributed attacker holding a valid password gets the full
+// 15-attempt allowance from every IP they control, against a 6-digit TOTP that accepts a
+// ±1 window (3 live codes at any moment). Keying on the account under attack caps the
+// total regardless of how many source addresses are used.
+//
+// Same decode-don't-verify trick as refreshLimiter: the tempToken's `sub` is only a bucket
+// label, so an unverified value is fine, and the route verifies it properly straight after.
+const twoFactorVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => {
+    try {
+      const decoded = jwt.decode(req.body?.tempToken);
+      if (decoded?.sub) return `2fa:${decoded.sub}`;
+    } catch { /* fall through to IP */ }
+    return clientIpKey(req);
+  },
+  message: { success: false, message: 'Too many verification attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
   validate: limiterValidate,
@@ -1366,6 +1423,43 @@ function validatePassword(password) {
 const failedLoginAttempts = new Map(); // email -> { count, lastAttempt }
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+/**
+ * SECURITY (AUTH-4): the map is now written on EVERY failed login, including ones for
+ * addresses that don't exist here — that is what stops the 429 from being an
+ * account-existence oracle. But it also means the keys are attacker-supplied, so the map
+ * needs a ceiling or it becomes a memory-growth vector. Expired entries are swept on
+ * write; if the sweep isn't enough we drop the oldest.
+ *
+ * Still per-process, so it does not hold across multiple Render instances. That is a real
+ * gap (tracked as ABUSE-5, shared limiter store) and not something to half-build here.
+ */
+const MAX_LOCKOUT_ENTRIES = 10000;
+
+/** Record a failed attempt for `key`, sweeping expired entries and bounding the map. */
+function recordFailedLogin(key) {
+  const now = Date.now();
+  if (failedLoginAttempts.size >= MAX_LOCKOUT_ENTRIES) {
+    for (const [k, v] of failedLoginAttempts) {
+      if (now - v.lastAttempt >= LOCKOUT_DURATION_MS) failedLoginAttempts.delete(k);
+    }
+    // Map preserves insertion order, so the first key is the least recently added.
+    while (failedLoginAttempts.size >= MAX_LOCKOUT_ENTRIES) {
+      const oldest = failedLoginAttempts.keys().next().value;
+      if (oldest === undefined) break;
+      failedLoginAttempts.delete(oldest);
+    }
+  }
+  const current = failedLoginAttempts.get(key) || { count: 0, lastAttempt: 0 };
+  failedLoginAttempts.set(key, { count: current.count + 1, lastAttempt: now });
+}
+
+/**
+ * SECURITY (AUTH-4): a real bcrypt hash to compare against when the account doesn't exist
+ * or has no password, so the miss path costs the same as the hit path. Without it,
+ * response timing separates "no such user" (fast) from "wrong password" (~cost-12 slow)
+ * even once the status codes match. Generated once at boot; the value is irrelevant.
+ */
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('nou-pro-timing-equalizer', 12);
 
 // Auth Routes
 app.post('/api/auth/login', authLimiter, async (req, res) => {
@@ -1396,29 +1490,23 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
     // Look up user from database
     const dbUser = await repos.userRepo.getByEmail(email);
-    if (!dbUser) {
-      if (process.env.NODE_ENV !== 'production') {
-        logger.debug('[Login] User not found:', email);
-      }
-      return res.status(401).json(errorResponse('Invalid credentials'));
-    }
-    
-    // Verify password
-    if (!dbUser.passwordHash) {
-      if (process.env.NODE_ENV !== 'production') {
-        logger.debug('[Login] No password hash set for:', email);
-      }
-      return res.status(401).json(errorResponse('Invalid credentials'));
-    }
-    const passwordValid = await bcrypt.compare(password, dbUser.passwordHash);
-    
+
+    // SECURITY (AUTH-4): the "user doesn't exist" and "user has no password" branches used
+    // to return 401 WITHOUT recording an attempt and WITHOUT running bcrypt. That made the
+    // lockout an account-existence oracle — five wrong guesses then a 6th returning 429
+    // proved the account was real, where a plain 401 proved it wasn't. Both branches now
+    // fall through to the same recording code and burn the same bcrypt time as a real miss.
+    const loginKey = email.toLowerCase();
+    const hashToCompare = dbUser?.passwordHash || DUMMY_PASSWORD_HASH;
+    const passwordMatches = await bcrypt.compare(password, hashToCompare);
+    const passwordValid = passwordMatches && !!dbUser && !!dbUser.passwordHash;
+
     if (!passwordValid) {
-      // Track failed attempt
-      const key = email.toLowerCase();
-      const current = failedLoginAttempts.get(key) || { count: 0, lastAttempt: 0 };
-      failedLoginAttempts.set(key, { count: current.count + 1, lastAttempt: Date.now() });
+      recordFailedLogin(loginKey);
       if (process.env.NODE_ENV !== 'production') {
-        logger.debug('[Login] Invalid password for:', email);
+        if (!dbUser) logger.debug('[Login] User not found:', email);
+        else if (!dbUser.passwordHash) logger.debug('[Login] No password hash set for:', email);
+        else logger.debug('[Login] Invalid password for:', email);
       }
       return res.status(401).json(errorResponse('Invalid credentials'));
     }
@@ -1557,6 +1645,12 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
       email: dbUser.email
     }, { expiresIn: '15m' });
 
+    // SECURITY (AUTH-3): record the token so it can be consumed exactly once. A JWT alone
+    // cannot be revoked, so before this the emailed link stayed valid for its full 15
+    // minutes no matter how many times it was used. issue() also supersedes this user's
+    // older live links. If this write fails we must NOT send a link we cannot invalidate.
+    await passwordResetService.issue(dbUser.id, resetToken);
+
     // A transient send failure (transporter exists but SMTP errored) is logged
     // to Sentry, but we still return the uniform success message so the response
     // doesn't reveal whether the account exists.
@@ -1601,6 +1695,15 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
 
     if (result.user.claims.type !== 'password_reset') {
       return res.status(401).json(errorResponse('Invalid token type'));
+    }
+
+    // SECURITY (AUTH-3): claim the token BEFORE changing anything. This is a conditional
+    // update, so it is atomic — a replayed link, an already-used link, an expired one, or
+    // one superseded by a newer request all return null here. The message is deliberately
+    // identical to the signature-failure case above: distinguishing them would be an oracle.
+    const consumedUserId = await passwordResetService.consume(token);
+    if (!consumedUserId || consumedUserId !== result.user.id) {
+      return res.status(401).json(errorResponse('Invalid or expired reset link. Please request a new one.'));
     }
 
     // Look up user
@@ -2222,24 +2325,144 @@ app.post('/api/auth/change-email/request', requireAuth, authLimiter, async (req,
   }
 });
 
-// POST /api/auth/change-email/confirm  Body: { newEmail, code }
+/**
+ * SECURITY (AUTH-2): re-authenticate before a security-sensitive self-service change.
+ *
+ * Returns true if the caller proved they know the current password. Writes its own
+ * response and returns false otherwise, so callers do `if (!(await ...)) return;`.
+ *
+ * Accounts created by invite (and any future SSO path) legitimately have
+ * `passwordHash === null`. They cannot satisfy a password check, so requiring one would
+ * lock them out of ever changing their own contact details. They are allowed through —
+ * strictly no worse than before this fix — and the residual gap is tracked as AUTH-14.
+ */
+async function requireCurrentPassword(res, dbUser, password) {
+  if (!dbUser?.passwordHash) return true;
+  if (!password || typeof password !== 'string') {
+    res.status(400).json(errorResponse('Your current password is required to make this change.', 'PASSWORD_REQUIRED'));
+    return false;
+  }
+  const ok = await bcrypt.compare(password, dbUser.passwordHash);
+  if (!ok) {
+    res.status(401).json(errorResponse('Current password is incorrect'));
+    return false;
+  }
+  return true;
+}
+
+/**
+ * SECURITY (AUTH-5): verify a second factor — TOTP first, then a one-time backup code —
+ * and CONSUME the backup code when that is what matched.
+ *
+ * This exists because the two call sites had drifted apart. `/2fa/verify` spliced the used
+ * code out of the stored list; `DELETE /api/users/me` checked the same list and did not,
+ * so a backup code presented there stayed valid forever — the opposite of "one-time".
+ * Single implementation, so they cannot disagree again.
+ *
+ * @returns {Promise<boolean>} true if the code was valid (and consumed, if a backup code)
+ */
+async function verifyTwoFactorCode(dbUser, code) {
+  if (!dbUser?.twoFactorSecret || !code) return false;
+  const { authenticator } = require('otplib');
+  authenticator.options = { window: 1 };
+  if (authenticator.verify({ token: code, secret: dbUser.twoFactorSecret })) return true;
+
+  if (!dbUser.twoFactorBackupCodes) return false;
+  try {
+    const hashedCodes = JSON.parse(dbUser.twoFactorBackupCodes);
+    for (let i = 0; i < hashedCodes.length; i++) {
+      if (await bcrypt.compare(code, hashedCodes[i])) {
+        hashedCodes.splice(i, 1);
+        await repos.userRepo.update(dbUser.id, {
+          twoFactorBackupCodes: JSON.stringify(hashedCodes),
+        });
+        return true;
+      }
+    }
+  } catch { /* malformed backup codes -> treat as no match */ }
+  return false;
+}
+
+/**
+ * SECURITY (AUTH-2): after a verified email/phone change, drop every OTHER session and
+ * hand the caller a fresh token pair.
+ *
+ * Two things must both happen. Revoking is the security half — an attacker who changed
+ * the address keeps no foothold, and a victim who did it deliberately boots the attacker.
+ * Re-minting is the correctness half: `tokenVersion` was bumped, and the access token
+ * carries `email` as a claim, so without a new pair the caller's own refresh dies at the
+ * next rotation. That regression was already shipped once (audit A-6) via change-password.
+ *
+ * The new access token MUST be built from `updatedUser`, not the pre-change row.
+ */
+async function rotateSessionsAfterContactChange(req, updatedUser) {
+  const callerSid = req.user?.claims?.sid || null;
+  await sessionService.revokeAllForUser(updatedUser.id, { exceptSessionId: callerSid }).catch(() => {});
+  disconnectUserSockets(updatedUser.id, callerSid);
+
+  if (!callerSid) return null;
+  return {
+    token: generateToken({
+      sub: updatedUser.id,
+      type: 'access',
+      email: updatedUser.email,
+      name: updatedUser.name,
+      sid: callerSid,
+    }),
+    refreshToken: generateToken({
+      sub: updatedUser.id,
+      type: 'refresh',
+      tv: updatedUser.tokenVersion ?? 0,
+      sid: callerSid,
+    }, { expiresIn: `${sessionService.SESSION_TTL_DAYS}d` }),
+  };
+}
+
+// POST /api/auth/change-email/confirm  Body: { newEmail, code, currentPassword }
 app.post('/api/auth/change-email/confirm', requireAuth, authLimiter, async (req, res) => {
   try {
-    const { newEmail, code } = req.body || {};
+    const { newEmail, code, currentPassword } = req.body || {};
     const normalized = typeof newEmail === 'string' ? newEmail.trim().toLowerCase() : '';
     if (!normalized || !code) {
       return res.status(400).json(errorResponse('Email and code are required'));
     }
+
+    // SECURITY (AUTH-2): re-authenticate BEFORE consuming the OTP. Owning a valid access
+    // token was previously enough to move the account's email to an attacker-controlled
+    // address — after which forgot-password hands over the account permanently.
+    const dbUser = await repos.userRepo.getById(req.user.id);
+    if (!dbUser) return res.status(404).json(errorResponse('User not found'));
+    if (!(await requireCurrentPassword(res, dbUser, currentPassword))) return;
 
     const approved = await otpService.verifyOtp({ to: normalized, code }, otpDeps);
     if (!approved) {
       return res.status(400).json(errorResponse('That code is incorrect or has expired.'));
     }
 
+    const previousEmail = dbUser.email;
+
     try {
-      const updated = await repos.userRepo.update(req.user.id, { email: normalized });
+      // emailVerified: the OTP just proved control of this address. tokenVersion: a
+      // contact change invalidates every other device.
+      const updated = await repos.userRepo.update(req.user.id, {
+        email: normalized,
+        emailVerified: true,
+        tokenVersion: { increment: 1 },
+      });
+      const tokens = await rotateSessionsAfterContactChange(req, updated);
+
+      // Best-effort, and deliberately after the change is committed: the old address is
+      // the victim's only signal if this was a takeover.
+      if (previousEmail && previousEmail !== normalized) {
+        sendContactChangedNotice(previousEmail, { newValue: normalized, what: 'email' })
+          .catch((e) => { logger.error('[ChangeEmail] notice failed:', e?.message || e); Sentry.captureException(e); });
+      }
+
       logger.info('[ChangeEmail] Email changed for user:', req.user.id);
-      return res.json(successResponse(stripSensitiveUserFields(updated, { isSelf: true }), 'Your email has been updated.'));
+      return res.json(successResponse({
+        ...stripSensitiveUserFields(updated, { isSelf: true }),
+        ...(tokens ? { tokens } : {}),
+      }, 'Your email has been updated.'));
     } catch (e) {
       if (e?.code === 'P2002') {
         return res.status(409).json(errorResponse('That email is already in use.', 'DUPLICATE'));
@@ -2276,11 +2499,16 @@ app.post('/api/auth/change-phone/request', requireAuth, authLimiter, async (req,
 // POST /api/auth/change-phone/confirm  Body: { newPhone, code }
 app.post('/api/auth/change-phone/confirm', requireAuth, authLimiter, async (req, res) => {
   try {
-    const { newPhone, code } = req.body || {};
+    const { newPhone, code, currentPassword } = req.body || {};
     const normalized = typeof newPhone === 'string' ? newPhone.trim() : '';
     if (!normalized || !code) {
       return res.status(400).json(errorResponse('Phone number and code are required'));
     }
+
+    // SECURITY (AUTH-2): same reasoning as change-email — re-authenticate before the OTP.
+    const dbUser = await repos.userRepo.getById(req.user.id);
+    if (!dbUser) return res.status(404).json(errorResponse('User not found'));
+    if (!(await requireCurrentPassword(res, dbUser, currentPassword))) return;
 
     const approved = await otpService.verifyOtp({ to: normalized, code }, otpDeps);
     if (!approved) {
@@ -2288,8 +2516,24 @@ app.post('/api/auth/change-phone/confirm', requireAuth, authLimiter, async (req,
     }
 
     try {
-      const updated = await repos.userRepo.update(req.user.id, { phone: normalized });
-      return res.json(successResponse(stripSensitiveUserFields(updated, { isSelf: true }), 'Your phone number has been updated.'));
+      const updated = await repos.userRepo.update(req.user.id, {
+        phone: normalized,
+        phoneVerified: true,
+        tokenVersion: { increment: 1 },
+      });
+      const tokens = await rotateSessionsAfterContactChange(req, updated);
+
+      // The phone itself can't receive a notice from here (no SMS on this path), so the
+      // account's email address is the one channel the victim still controls.
+      if (dbUser.email) {
+        sendContactChangedNotice(dbUser.email, { newValue: normalized, what: 'phone number' })
+          .catch((e) => { logger.error('[ChangePhone] notice failed:', e?.message || e); Sentry.captureException(e); });
+      }
+
+      return res.json(successResponse({
+        ...stripSensitiveUserFields(updated, { isSelf: true }),
+        ...(tokens ? { tokens } : {}),
+      }, 'Your phone number has been updated.'));
     } catch (e) {
       if (e?.code === 'P2002') {
         return res.status(409).json(errorResponse('That phone number is already in use.', 'DUPLICATE'));
@@ -2358,6 +2602,11 @@ app.post('/api/auth/2fa/setup', requireAuth, twoFactorLimiter, async (req, res) 
     const dbUser = await repos.userRepo.getById(req.user.id);
     if (!dbUser) return res.status(404).json(errorResponse('User not found'));
 
+    // SECURITY (AUTH-5): enrolling a second factor is as sensitive as removing one, and
+    // /2fa/disable already requires the password. Without this, a stolen access token lets
+    // an attacker enrol THEIR authenticator and lock the real owner out of their account.
+    if (!(await requireCurrentPassword(res, dbUser, req.body?.currentPassword))) return;
+
     if (dbUser.twoFactorEnabled) {
       return res.status(400).json(errorResponse('Two-factor authentication is already enabled'));
     }
@@ -2401,6 +2650,11 @@ app.post('/api/auth/2fa/verify-setup', requireAuth, twoFactorLimiter, async (req
       return res.status(400).json(errorResponse('2FA setup not initiated'));
     }
 
+    // SECURITY (AUTH-5): this is the step that actually flips twoFactorEnabled, so it
+    // needs the same re-auth as /2fa/setup — otherwise the password check there is
+    // bypassable by calling this route directly with a secret from an earlier session.
+    if (!(await requireCurrentPassword(res, dbUser, req.body?.currentPassword))) return;
+
     // Verify the TOTP code (allow 1 window tolerance)
     authenticator.options = { window: 1 };
     const isValid = authenticator.verify({ token: code, secret: dbUser.twoFactorSecret });
@@ -2408,9 +2662,12 @@ app.post('/api/auth/2fa/verify-setup', requireAuth, twoFactorLimiter, async (req
       return res.status(400).json(errorResponse('Invalid verification code. Please try again.'));
     }
 
-    // Generate 8 backup codes
+    // Generate 8 backup codes.
+    // SECURITY (AUTH-5): 16 bytes, not 4. The old 4-byte codes were 32 bits of entropy —
+    // brute-forceable against an endpoint that (until this batch) had no per-user attempt
+    // counter, and each /2fa/verify call compares the input against all 8 of them.
     const backupCodes = Array.from({ length: 8 }, () =>
-      crypto.randomBytes(4).toString('hex')
+      crypto.randomBytes(16).toString('hex')
     );
 
     // Hash backup codes before storing
@@ -2448,6 +2705,12 @@ app.post('/api/auth/2fa/disable', requireAuth, twoFactorLimiter, async (req, res
     const dbUser = await repos.userRepo.getById(req.user.id);
     if (!dbUser) return res.status(404).json(errorResponse('User not found'));
 
+    // SECURITY (AUTH-5): guard the null hash explicitly. bcryptjs happens to return false
+    // for a null digest rather than throwing, so this behaved correctly by accident —
+    // but the same call in change-password is guarded, and accidents are not a policy.
+    if (!dbUser.passwordHash) {
+      return res.status(401).json(errorResponse('Invalid password'));
+    }
     const valid = await bcrypt.compare(password, dbUser.passwordHash);
     if (!valid) {
       return res.status(401).json(errorResponse('Invalid password'));
@@ -2469,7 +2732,7 @@ app.post('/api/auth/2fa/disable', requireAuth, twoFactorLimiter, async (req, res
 });
 
 // Verify 2FA code during login
-app.post('/api/auth/2fa/verify', authLimiter, async (req, res) => {
+app.post('/api/auth/2fa/verify', authLimiter, twoFactorVerifyLimiter, async (req, res) => {
   try {
     const { authenticator } = require('otplib');
     const { tempToken, code } = req.body;
@@ -2494,24 +2757,8 @@ app.post('/api/auth/2fa/verify', authLimiter, async (req, res) => {
     }
 
     // Try TOTP code first (allow 1 window tolerance)
-    authenticator.options = { window: 1 };
-    let isValid = authenticator.verify({ token: code, secret: dbUser.twoFactorSecret });
-
-    // If TOTP fails, try backup codes
-    if (!isValid && dbUser.twoFactorBackupCodes) {
-      const hashedCodes = JSON.parse(dbUser.twoFactorBackupCodes);
-      for (let i = 0; i < hashedCodes.length; i++) {
-        const match = await bcrypt.compare(code, hashedCodes[i]);
-        if (match) {
-          isValid = true;
-          hashedCodes.splice(i, 1);
-          await repos.userRepo.update(dbUser.id, {
-            twoFactorBackupCodes: JSON.stringify(hashedCodes),
-          });
-          break;
-        }
-      }
-    }
+    // TOTP, falling back to a one-time backup code (consumed on use). See AUTH-5.
+    const isValid = await verifyTwoFactorCode(dbUser, code);
 
     if (!isValid) {
       return res.status(400).json(errorResponse('Invalid verification code'));
@@ -2877,18 +3124,9 @@ app.delete('/api/users/me', requireAuth, async (req, res) => {
       if (!twoFactorCode || typeof twoFactorCode !== 'string') {
         return res.status(401).json(errorResponse('Two-factor authentication code is required', 'UNAUTHORIZED'));
       }
-      const { authenticator } = require('otplib');
-      authenticator.options = { window: 1 };
-      let codeValid = authenticator.verify({ token: twoFactorCode, secret: dbUser.twoFactorSecret });
-      // Fall back to one-time backup codes (same pattern as /2fa/verify).
-      if (!codeValid && dbUser.twoFactorBackupCodes) {
-        try {
-          const hashedCodes = JSON.parse(dbUser.twoFactorBackupCodes);
-          for (let i = 0; i < hashedCodes.length; i++) {
-            if (await bcrypt.compare(twoFactorCode, hashedCodes[i])) { codeValid = true; break; }
-          }
-        } catch { /* malformed backup codes -> treat as no match */ }
-      }
+      // SECURITY (AUTH-5): shared with /2fa/verify. This path previously accepted a backup
+      // code WITHOUT consuming it, so the same code could delete-guard forever.
+      const codeValid = await verifyTwoFactorCode(dbUser, twoFactorCode);
       if (!codeValid) {
         return res.status(401).json(errorResponse('Invalid two-factor authentication code', 'UNAUTHORIZED'));
       }

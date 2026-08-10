@@ -81,10 +81,12 @@ Single source of truth for status. Update a row in the same commit as its fix.
 | `TEN-3` | 🟠 | `/users/:userId/contacts`: no self-check + email-based user enumeration | `server.js:12924` | A | **FIXED** (2026-08-10) |
 | `INJ-1` | 🟠 | Reflected XSS, unauthenticated, on the payment checkout page | `server.js:16989` | A | **FIXED** (2026-08-10) |
 | `INJ-4` | 🟡 | Helmet's default CSP blocked the Peach widget — checkout form never rendered | `server.js:16989` | A | **FIXED** (2026-08-10) |
-| `AUTH-2` | 🟠 | Email/phone change requires no re-auth and revokes no sessions | `server.js:2210`, `:2261` | B | OPEN |
-| `AUTH-3` | 🟠 | Password-reset token is replayable and survives the `tokenVersion` bump | `server.js:1585`, `:1607` | B | OPEN |
-| `AUTH-4` | 🟠 | Login lockout is a user-enumeration oracle + targeted lockout DoS | `server.js:1374`-`1417` | B | OPEN |
-| `AUTH-5` | 🟠 | 2FA: setup needs no password, verify keyed only by IP, 32-bit backup codes | `server.js:2338`, `:2400`, `:2456` | B | OPEN |
+| `AUTH-2` | 🟠 | Email/phone change requires no re-auth and revokes no sessions | `server.js:2422`, `:2500` | B1 | **FIXED** (2026-08-10) |
+| `AUTH-3` | 🟠 | Password-reset token is replayable and survives the `tokenVersion` bump | `server.js:1652`, `services/passwordResetService.js:1` | B1 | **FIXED** (2026-08-10) |
+| `AUTH-4` | 🟠 | Login lockout is a user-enumeration oracle + targeted lockout DoS | `server.js:1465` | B1 | **FIXED** (2026-08-10) |
+| `AUTH-5` | 🟠 | 2FA: setup needs no password, verify keyed only by IP, 32-bit backup codes | `server.js:2598`, `:2735` | B1 | **FIXED** (2026-08-10) |
+| `AUTH-14` | 🟡 | Accounts with no password (invite/SSO) are exempted from the new re-auth checks — they cannot satisfy one, so requiring it would lock them out permanently | `server.js:2339` | — | OPEN (accepted) |
+| `AUTH-15` | 🟠 | `DELETE /api/users/me` accepted a 2FA **backup code without consuming it**, so one code guarded deletion forever. Found while implementing `AUTH-5`; not in the original audit | `server.js:2339` | B1 | **FIXED** (2026-08-10) |
 | `ABUSE-1` | 🟠 | Blanket `trust proxy` + unconditional `CF-Connecting-IP` → IP rate limits bypassable | `server.js:256`, `:350` | B | VERIFY |
 | `EXP-2` | 🟠 | Uploads: unauthenticated static `/uploads`, public bucket, weak-RNG paths | `server.js:314`, `services/storageService.js:67` | A-ops/E | OPEN |
 | `MOB-1` | 🟠 | SecureStore silently degrades to plaintext AsyncStorage | `src/shared/store/profileStore.ts:30` | C | OPEN |
@@ -294,7 +296,7 @@ One row each, deliberately. Prose for 40 P2s is what makes an audit go unread.
 | `AUTH-6` | Register leaks account existence with distinct per-identifier messages | `server.js:1737`-`1746` | Uniform 409 |
 | `AUTH-7` | Email lookup is case-sensitive while writers lowercase → duplicate accounts, silent login failures | `userRepo.prisma.js:19`-`23` | Normalize on write and lookup; add a functional unique index |
 | `AUTH-8` | No rate limit on `change-password` or `DELETE /users/me`, each doing bcrypt cost 12 | `server.js:1865`, `:2832` | Per-user limiter (brute-force + CPU DoS) |
-| `AUTH-9` | `2fa/disable` 500s instead of 401 when `passwordHash` is null | `server.js:2435` | Null-guard as the login path does at `:1399` |
+| `AUTH-9` | ✅ **FIXED 2026-08-10 (B1).** `2fa/disable` relied on bcryptjs returning false for a null digest rather than guarding it | `server.js:2625` | Done: explicit null guard, matching change-password |
 | `AUTH-10` | Refresh tokens not hashed at rest, no reuse detection, and `touch` slides expiry forever (no absolute lifetime) | `sessionService.js:59`-`65` | Store a digest, add `absoluteExpiresAt`; deliberate trade-off — see the file's own comment |
 | `AUTH-11` | No session-pruning job despite an index built for it | `sessionService.js` | Add to the automation cron |
 | `AUTH-12` | `requireAuth` never revalidates the session/`tokenVersion` — up to 30 min revocation lag even after `AUTH-1` | `auth.js:82`-`96` | Cached `sid` liveness check |
@@ -445,7 +447,8 @@ Append one row per batch as it lands. **Update the §4 index status in the same 
 | Date | Batch | IDs closed | Commit | Notes |
 |---|---|---|---|---|
 | 2026-08-10 | A (partial) | `AUTH-1` phase 1, `EXP-1`, `OPS-1` (code) | `2cc8d42f` | All three P0s. 14-test token-type matrix added at `src/middleware/auth.test.js`; suite 95/95 green. **The sweep found a 13th leaky `include` the audit's count of 12 missed** (`memberRepo.prisma.js` `getByUserId`) — fixed too. |
-| 2026-08-10 | A (rest) | `TEN-1`, `TEN-2`, `TEN-3`, `INJ-1`, `INJ-4` | see `git log` | Batch A complete. Suite 101/101 green (+6 checkout-id cases). **Two fix designs in this doc were wrong and were corrected during implementation** — see below. New follow-up logged as `EXP-8`. |
+| 2026-08-10 | B1 | `AUTH-2`, `AUTH-3`, `AUTH-4`, `AUTH-5`, `AUTH-9`, `AUTH-15` | see `git log` | Auth correctness. **First migration of the audit**: `20260810200000_add_password_reset_token` (additive). Suite 109/109 (+8). Found and fixed `AUTH-15` — backup codes were accepted-but-not-consumed by account deletion. `AUTH-14` accepted as a known residual. |
+| 2026-08-10 | A (rest) | `TEN-1`, `TEN-2`, `TEN-3`, `INJ-1`, `INJ-4` | `b2ad7a5e` | Batch A complete. Suite 101/101 green (+6 checkout-id cases). **Two fix designs in this doc were wrong and were corrected during implementation** — see below. New follow-up logged as `EXP-8`. |
 
 **Corrections to this document, found while implementing Batch A** — both would have caused an outage if followed literally:
 
@@ -465,4 +468,8 @@ Three one-line changes, each marked with a `PHASE 2` comment:
 
 Then update the last test in `backend/src/middleware/auth.test.js` (`PHASE 1: a legacy untyped access token is still accepted`) to assert the opposite.
 
-**Batch A is now complete.** Next up is Batch B (session & recovery integrity), which needs a migration for the reset-token table.
+**Batch A is complete. Batch B1 (auth correctness) is complete.** Remaining: **B2** — `ABUSE-2` (automation key), `ABUSE-3` (OTP throttle), `AUTH-8` (bcrypt-route limiters), and `ABUSE-1` once the Cloudflare-ingress question in §3 is answered.
+
+### B1 corrections to this document
+
+**`AUTH-4` was implemented differently from the recommendation, deliberately.** This doc proposed returning an identical `401` when an account is locked. That removes the oracle but means a legitimate user who finally types the right password still sees "invalid credentials" — indistinguishable from data loss. The shipped fix instead **records failed attempts for unknown and passwordless emails too**, so the `429` fires identically whether or not the account exists. Same oracle closed, no UX damage. A dummy bcrypt compare equalises timing, and the attempt map is now bounded (recording attacker-supplied keys would otherwise be a memory-growth vector).

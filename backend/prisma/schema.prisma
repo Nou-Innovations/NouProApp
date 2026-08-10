@@ -54,6 +54,7 @@ model User {
   chatParticipants     ChatParticipant[]
   readReceipts         ReadReceipt[]
   sessions             Session[]
+  passwordResetTokens  PasswordResetToken[]
 }
 
 model Business {
@@ -170,6 +171,31 @@ model OtpCode {
   createdAt   DateTime  @default(now())
 
   @@index([destination])
+  @@index([expiresAt])
+}
+
+/// Single-use password-reset tokens (audit AUTH-3).
+///
+/// The reset token is a JWT, which gives us signature and expiry for free — but a JWT
+/// alone cannot be revoked or consumed, so the emailed link worked REPEATEDLY for its
+/// full 15 minutes. Anyone who saw it (mail scanner, Referer leak, shared inbox) could
+/// replay it, and the `tokenVersion` bump on reset did not help because the token carries
+/// no `tv` claim.
+///
+/// Only the SHA-256 of the token is stored: this table must never be a second copy of a
+/// live credential. `consumedAt` is set by a conditional updateMany, so two concurrent
+/// redemptions cannot both win without needing a transaction.
+model PasswordResetToken {
+  id         String    @id
+  userId     String
+  tokenHash  String // SHA-256 hex of the JWT; the raw token is never persisted
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([userId])
   @@index([expiresAt])
 }
 

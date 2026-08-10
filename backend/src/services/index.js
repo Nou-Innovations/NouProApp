@@ -16,6 +16,7 @@ const paymentService = require('./paymentService');
 const subscriptionRenewal = require('./subscriptionRenewal');
 const otpService = require('./otpService');
 const sessionService = require('./sessionService');
+const passwordResetService = require('./passwordResetService');
 
 module.exports = {
   orderStatus,
@@ -29,4 +30,5 @@ module.exports = {
   subscriptionRenewal,
   otpService,
   sessionService,
+  passwordResetService,
 };
