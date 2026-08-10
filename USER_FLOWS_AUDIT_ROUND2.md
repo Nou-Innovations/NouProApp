@@ -41,10 +41,10 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | **A-1** | **P0** | **FIXED ✅** — **2FA can never be turned off.** The "enter your password to disable" modal (`TwoFactorAuthScreen.tsx:319-335`) renders `AppModal` with only `title`/`message` — **no password input**. `AppModal` supports a `children` slot for exactly this (`AppModal.tsx:30-31`), but none is passed, so `disablePassword` is only ever `''` and `handleDisable2FA` always hits its own guard (`:60-63` → "Please enter your password"). The backend `POST /auth/2fa/disable` (`server.js:1771`) is fine and unreachable. Once a user enables 2FA they are locked into it. |
 | **A-2** | **P0** | **FIXED ✅** — **Every rate-limit hit shows `"Request failed with status code 429"`.** The limiters set `message: { success: false, error: '...' }` (`server.js:346,355,367,384,396`) — no `message` key inside the body — but the client reads `error.response?.data?.message` (`api.ts:122`). So the written text "Too many attempts, please try again later" is never displayed. Affects login, register, refresh, forgot-password, all four OTP endpoints, 2FA verify, data export and join requests. |
 | **A-3** | **P0** | **FIXED ✅** — **Deleting your account as a sole owner shows a raw error code.** `DeleteAccountScreen.tsx:36` reads `error?.response?.status`, but `ApiError.response` is the *body* and the status lives at `error.status` (`api.ts:46-51`). Both branches are dead, so the backend's 409 — whose `message` is the literal string `OWNERSHIP_TRANSFER_REQUIRED` (`server.js:2214`) — falls to the generic branch and the user sees an alert titled **"Error"** saying **"OWNERSHIP_TRANSFER_REQUIRED"**. The helpful "transfer ownership of X first" text and the business list in `data.businesses` are never shown. The 401 "wrong password" branch is dead the same way. |
-| A-4 | P1 | **Refresh sits behind the per-IP auth limiter, and a 429 there force-logs-you-out.** `server.js:1322` applies `authLimiter` (15 req/15 min per IP) to `/auth/refresh`, and `api.ts:141-143` retries refresh up to 2× on network error — one Render cold start burns 3 slots. On exhaustion the interceptor's `catch { return null }` (`api.ts:179`) treats 429 identically to "invalid token" → `logout()`. Behind office NAT/CGNAT, users share the key and get logged out at random. |
-| A-5 | P1 | **Refresh failure = silent logout, no message, plus a duplicate error.** `api.ts:203` logs out, then `api.ts:219` still throws to the caller — so the screen renders an error state on the same tick the tree is swapped for the auth navigator. The user lands on the Launch screen with no explanation; "session expired" is never shown anywhere. |
-| A-6 | P1 | **Changing your password silently kills your own session ~30 min later.** `server.js:1519` bumps `tokenVersion`, invalidating the caller's own refresh token, but `ChangePasswordScreen.tsx:71-78` never re-authenticates — it alerts "Success" and goes back. The access token stays valid for 30 min, then the next refresh 401s → A-5 → forced logout out of nowhere. |
-| A-7 | P1 | **Logging out on one device logs you out everywhere.** `POST /auth/logout` does `tokenVersion: { increment: 1 }` (`server.js:1207-1212`), revoking every device's refresh token. No session/device table exists and no UI warns about it. |
+| A-4 | P1 | **FIXED ✅** — **Refresh sits behind the per-IP auth limiter, and a 429 there force-logs-you-out.** `server.js:1322` applies `authLimiter` (15 req/15 min per IP) to `/auth/refresh`, and `api.ts:141-143` retries refresh up to 2× on network error — one Render cold start burns 3 slots. On exhaustion the interceptor's `catch { return null }` (`api.ts:179`) treats 429 identically to "invalid token" → `logout()`. Behind office NAT/CGNAT, users share the key and get logged out at random. |
+| A-5 | P1 | **FIXED ✅** — **Refresh failure = silent logout, no message, plus a duplicate error.** `api.ts:203` logs out, then `api.ts:219` still throws to the caller — so the screen renders an error state on the same tick the tree is swapped for the auth navigator. The user lands on the Launch screen with no explanation; "session expired" is never shown anywhere. |
+| A-6 | P1 | **FIXED ✅** — **Changing your password silently kills your own session ~30 min later.** `server.js:1519` bumps `tokenVersion`, invalidating the caller's own refresh token, but `ChangePasswordScreen.tsx:71-78` never re-authenticates — it alerts "Success" and goes back. The access token stays valid for 30 min, then the next refresh 401s → A-5 → forced logout out of nowhere. |
+| A-7 | P1 | **FIXED ✅** — **Logging out on one device logs you out everywhere.** `POST /auth/logout` does `tokenVersion: { increment: 1 }` (`server.js:1207-1212`), revoking every device's refresh token. No session/device table exists and no UI warns about it. |
 | A-8 | P1 | **Onboarding seeds only the access token, never the refresh token.** `UploadProfilePictureScreen.tsx:71`, `SelectCompanyScreen.tsx:60-62`, `UploadBusinessLogoScreen.tsx:48-51` all set `accessToken` alone; a 401 mid-onboarding finds `refreshToken === null` (`api.ts:169-170`) → `logout()` wipes the store mid-registration. The 4-screen business-creation branch can easily outlive the 30-min token. |
 | A-9 | P1 | **FIXED ✅** — **Twilio is a hard single point of failure for signup, with no dev fallback.** `server.js:1560-1564` (and `:1594,:1631,:1659`) return 503 when the Twilio vars are unset, and `CreateAccountScreen.tsx:82-88` only navigates on success — so the user never reaches the OTP screen where the `__DEV__` bypass code lives (`PhoneVerificationScreen.tsx:23`). **Registration is 100% unreachable without Twilio, even in dev.** Email OTP uses the same Verify service, so it isn't an independent fallback. |
 | A-10 | P1 | **FIXED ✅** — **Verification is decorative and unrecoverable** (extends round-1 A-8). No `emailVerified`/`phoneVerified` columns exist; the OTP endpoints persist nothing; `register` never checks them. Additionally there is **no post-signup resend path** — the OTP screens are only reachable *before* the account exists, so nothing can ever mark a user verified later. |
@@ -328,6 +328,33 @@ Twilio was the only OTP provider, and email OTP used the *same* Verify service �
 - Removed the hardcoded `'123456'` dev bypass from both OTP screens.
 
 **Verified:** backend tests **70/70** (12 new), ESLint 0 errors, `tsc` 133 = unchanged baseline.
+
+---
+
+## Fix log — A-4 → A-7 (2026-08-07)
+
+Four findings, one root cause: `tokenVersion` was the only revocation mechanism and it is global. Nothing stored a session server-side.
+
+| ID | What changed |
+|---|---|
+| **A-7** | New `Session` table; refresh tokens carry a `sid`, so logout ends **that device only**. Adds Settings → Security → **Signed-in devices** with per-device and "sign out all others" actions — previously a lost phone could only be handled by changing your password. |
+| **A-6** | Change-password now revokes every *other* session, keeps the caller's, and returns a fresh token pair the client re-seeds. It finally does what it's for (locking out whoever has your password) instead of silently signing *you* out 30 minutes later. |
+| **A-5** | The refresh result is discriminated: only a 401/403 from `/auth/refresh` counts as revoked. Rate limits, 5xx, cold starts and network failures keep you signed in. A real revocation now shows *"Your session expired. Please sign in again."* — the server has always had that message; nothing displayed it. |
+| **A-4** | `/auth/refresh` gets its own limiter keyed **per user** (60/15min) instead of sharing a 15/15min per-IP bucket with 13 other routes. Combined with A-5, this ends the random-logout class of bug. |
+
+**Deliberate non-goals:** no strict rotation / reuse detection (the client persists rotated tokens fire-and-forget and two paths bypass its single-flight lock — invalidate-on-use would turn ordinary races into false "token theft" logouts), and no DB lookup in `requireAuth` (hot path on ~920 routes), so a revoked device keeps its **access** token for up to 30 minutes. Its live socket is dropped immediately.
+
+**Backward compatibility:** refresh tokens already in the wild have no `sid`. Requiring one would have signed out every user on deploy, so they are accepted on the `tokenVersion` check and silently upgraded to a session on their next refresh.
+
+**Verified:** backend tests **81/81** (11 new), ESLint 0 errors, `tsc` 133 = unchanged baseline.
+
+### Smoke tests
+
+1. Sign in on two devices, log out on one → the other stays signed in.
+2. Change your password → you stay signed in; the second device drops within ~30 min.
+3. Stop the backend and use the app → a retryable error, **not** a logout.
+4. Settings → Security → Signed-in devices: both listed, current one marked; sign one out remotely.
+5. **Do this first after deploying:** an already-signed-in user must NOT be logged out.
 
 ---
 
