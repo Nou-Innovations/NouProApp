@@ -58,7 +58,13 @@ export default function SelectCompanyScreen({ navigation, route }: Props) {
   // (same pattern as UploadBusinessLogoScreen). login() overwrites it later.
   useEffect(() => {
     if (pendingAuth?.token && !useProfileStore.getState().accessToken) {
-      useProfileStore.setState({ accessToken: pendingAuth.token });
+      // Both tokens: without the refresh token a 401 here is read as "revoked" and
+      // logs the user out mid-registration (A-8). Raw setState, not setTokens() —
+      // setTokens persists to SecureStore and abandoning the wizard would strand them.
+      useProfileStore.setState({
+        accessToken: pendingAuth.token,
+        ...(pendingAuth.refreshToken ? { refreshToken: pendingAuth.refreshToken } : {}),
+      });
     }
   }, [pendingAuth?.token]);
 
@@ -128,7 +134,15 @@ export default function SelectCompanyScreen({ navigation, route }: Props) {
 
     if (pendingAuth) {
       try {
-        const fresh = await authAPI.refreshTokenIfNeeded(pendingAuth.token, pendingAuth.refreshToken);
+        // Prefer whatever is in the store: if the interceptor refreshed at any point during
+        // onboarding, the route params are now stale and would overwrite good tokens with
+        // old ones. That self-heals only because refresh tokens aren't invalidated on use —
+        // don't leave onboarding quietly depending on that.
+        const seeded = useProfileStore.getState();
+        const fresh = await authAPI.refreshTokenIfNeeded(
+          seeded.accessToken || pendingAuth.token,
+          seeded.refreshToken || pendingAuth.refreshToken,
+        );
         login(
           pendingAuth.user,
           fresh.token,

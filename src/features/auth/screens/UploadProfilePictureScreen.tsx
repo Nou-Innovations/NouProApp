@@ -69,9 +69,15 @@ export default function UploadProfilePictureScreen({ navigation, route }: Props)
       // Best-effort avatar upload — must never block a successful registration.
       if (withProfilePicture && profileImage && pendingAuth.token) {
         try {
-          // Seed the token so uploadImage() and the PATCH are authenticated
-          // (same pattern as UploadBusinessLogoScreen). login() overwrites it later.
-          useProfileStore.setState({ accessToken: pendingAuth.token });
+          // Seed BOTH tokens. Seeding only the access token meant a 401 here found
+          // refreshToken === null, which the interceptor reads as "revoked" -> logout(),
+          // wiping the store mid-registration after the account already exists (A-8).
+          // Raw setState on purpose: setTokens() would persist to SecureStore, so
+          // abandoning the wizard would leave tokens on disk with no currentUser.
+          useProfileStore.setState({
+            accessToken: pendingAuth.token,
+            ...(pendingAuth.refreshToken ? { refreshToken: pendingAuth.refreshToken } : {}),
+          });
           const avatarUrl = await uploadImage(profileImage);
           await patch('/auth/me', { avatar: avatarUrl });
           // Reflect it on the pending user so login() shows it immediately.

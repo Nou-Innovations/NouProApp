@@ -728,6 +728,15 @@ export const useProfileStore = create<ProfileStore>()(
               activeMode: 'personal',
               biometricEnabled: false,
             });
+          } else if (accessToken && !state?.currentUser) {
+            // ORPHAN TOKENS: credentials on disk with no user record. This happens when
+            // someone abandons the signup wizard after an authenticated call refreshed
+            // (the interceptor persists via setTokens), because currentUser is only set
+            // by login() at the very end. Restoring them would attach credentials to
+            // every request for an account the app knows nothing about, and isSignedIn
+            // stays false so nothing would ever clean them up. Drop them.
+            secureDelete('noupro_access_token').catch(() => {});
+            secureDelete('noupro_refresh_token').catch(() => {});
           } else if (accessToken) {
             // Refresh token if expired before restoring session
             let freshAccessToken = accessToken;

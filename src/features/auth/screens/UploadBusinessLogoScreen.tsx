@@ -51,7 +51,13 @@ export default function UploadBusinessLogoScreen({ navigation, route }: Props) {
     // Temporarily set the pending token so the Axios interceptor can pick it up.
     const isLoggedIn = !!useProfileStore.getState().accessToken;
     if (!isLoggedIn && pendingAuth?.token) {
-      useProfileStore.setState({ accessToken: pendingAuth.token });
+      // Both tokens. This branch is the riskiest: BasicInfo -> Location -> Hours -> Logo
+      // can easily outlive the 30-minute access token, and POST /companies is the last
+      // call in it. Without a refresh token that 401 wiped the whole registration (A-8).
+      useProfileStore.setState({
+        accessToken: pendingAuth.token,
+        ...(pendingAuth.refreshToken ? { refreshToken: pendingAuth.refreshToken } : {}),
+      });
     }
 
     // Upload logo if provided
@@ -103,7 +109,7 @@ export default function UploadBusinessLogoScreen({ navigation, route }: Props) {
       }
       // Clear the temporarily set token on failure so it doesn't pollute the store
       if (!fromProfileSwitcher) {
-        useProfileStore.setState({ accessToken: null });
+        useProfileStore.setState({ accessToken: null, refreshToken: null });
       }
       AppAlert.alert(
         'Failed to create business',
@@ -130,7 +136,15 @@ export default function UploadBusinessLogoScreen({ navigation, route }: Props) {
       rootNavigation.goBack();
     } else if (pendingAuth) {
       // Refresh token if it may have expired during the onboarding flow
-      const fresh = await authAPI.refreshTokenIfNeeded(pendingAuth.token, pendingAuth.refreshToken);
+      // Prefer whatever is in the store: if the interceptor refreshed at any point during
+      // onboarding, the route params are now stale and would overwrite good tokens with
+      // old ones. That self-heals only because refresh tokens aren't invalidated on use —
+      // don't leave onboarding quietly depending on that.
+      const seeded = useProfileStore.getState();
+      const fresh = await authAPI.refreshTokenIfNeeded(
+        seeded.accessToken || pendingAuth.token,
+        seeded.refreshToken || pendingAuth.refreshToken,
+      );
       // Include the newly created business in the login call
       const businesses = createdBusiness
         ? [createdBusiness, ...(pendingAuth.businesses || [])]
