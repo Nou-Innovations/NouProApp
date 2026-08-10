@@ -48,7 +48,7 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | A-8 | P1 | **FIXED ✅** — **Onboarding seeds only the access token, never the refresh token.** `UploadProfilePictureScreen.tsx:71`, `SelectCompanyScreen.tsx:60-62`, `UploadBusinessLogoScreen.tsx:48-51` all set `accessToken` alone; a 401 mid-onboarding finds `refreshToken === null` (`api.ts:169-170`) → `logout()` wipes the store mid-registration. The 4-screen business-creation branch can easily outlive the 30-min token. |
 | A-9 | P1 | **FIXED ✅** — **Twilio is a hard single point of failure for signup, with no dev fallback.** `server.js:1560-1564` (and `:1594,:1631,:1659`) return 503 when the Twilio vars are unset, and `CreateAccountScreen.tsx:82-88` only navigates on success — so the user never reaches the OTP screen where the `__DEV__` bypass code lives (`PhoneVerificationScreen.tsx:23`). **Registration is 100% unreachable without Twilio, even in dev.** Email OTP uses the same Verify service, so it isn't an independent fallback. |
 | A-10 | P1 | **FIXED ✅** — **Verification is decorative and unrecoverable** (extends round-1 A-8). No `emailVerified`/`phoneVerified` columns exist; the OTP endpoints persist nothing; `register` never checks them. Additionally there is **no post-signup resend path** — the OTP screens are only reachable *before* the account exists, so nothing can ever mark a user verified later. |
-| A-11 | P1 | **Biometric auto-login can never run.** `App.tsx:732` returns early in both possible states: `staySignedIn: true` → rehydration already set `isSignedIn` → return; `staySignedIn: false` → rehydration forces `biometricEnabled: false` (`profileStore.ts:714`) → return. Even if it ran, `refreshToken()` only restores tokens, never `currentUser`, so `isSignedIn` would stay false. `BiometricLoginScreen.tsx:106-109` lets users enable a feature that does nothing. |
+| A-11 | P1 | **FIXED ✅** — **Biometric auto-login can never run.** `App.tsx:732` returns early in both possible states: `staySignedIn: true` → rehydration already set `isSignedIn` → return; `staySignedIn: false` → rehydration forces `biometricEnabled: false` (`profileStore.ts:714`) → return. Even if it ran, `refreshToken()` only restores tokens, never `currentUser`, so `isSignedIn` would stay false. `BiometricLoginScreen.tsx:106-109` lets users enable a feature that does nothing. |
 | A-12 | P2 | Forgot-password's "fail loud" guard is production-only (`server.js:1235`) — on staging with no SMTP it still lies "check your email". |
 | A-13 | P2 | `failedLoginAttempts` is an unbounded in-memory Map with no TTL sweep (`server.js:1063`); email enumeration grows it forever. |
 | A-14 | P2 | `logout()` resets `staySignedIn` to `true` via `set({ ...initialState })` (`profileStore.ts:359`) — an explicit opt-out is forgotten on every logout. |
@@ -389,6 +389,22 @@ Purely a wiring gap: real legal copy already existed in three synced places (`Pr
 **Needs a human, not code:** `TermsScreen`'s own header flags that the governing-law jurisdiction is written generically and the legal entity name in Contact is unconfirmed. Both want counsel review before launch. The domain story is also inconsistent (`nou.pro` in the copy, `noupro.app` for email/invites, `noupro.com` for share links, `nouproapp.onrender.com` actually serving `/legal/*`) — worth settling before the store listing points at one.
 
 **Verified:** ESLint 0 errors, `tsc` 133 = unchanged baseline. Frontend only.
+
+---
+
+## Fix log — A-11 (2026-08-07)
+
+The toggle enabled a feature nothing consumed: the auto-login effect early-returned in every reachable state, and on the one path that could fire it called an API that never sets `currentUser`, so Face ID succeeded and nothing happened. Turning off "Stay signed in" also force-disabled biometrics *and persisted that*, killing them permanently.
+
+Biometric sign-in and App Lock are now one mechanism — a **lock gate** over the signed-in tree — with different triggers.
+
+- **What biometric sign-in honestly is:** Face ID proves possession of the device, so it unlocks a session already on it (persisted user/businesses + tokens in SecureStore). No network, works offline. This is also why it can't weaken 2FA — the stored refresh token was minted *after* 2FA passed, and if it's revoked the fallback is the password screen, which enforces 2FA as before.
+- **App Lock** (WhatsApp-style) re-locks after the app has been in the background past a chosen timeout (Immediately / 1 / 5 / 15 min).
+- **Three rehydration fixes:** stop force-disabling biometrics when "Stay signed in" is off (that pairing now means "don't stay *unlocked*"); exempt biometrics from the orphan-token sweep added in the A-8 work, which would otherwise delete the state a locked session needs; start locked when either protection is on.
+- **The iOS trap:** `AppState` fires `inactive` for transient interruptions *including the Face ID sheet*, so arming the lock on `inactive` would re-lock the instant you unlocked — an infinite loop at "Immediately". Only `background` counts as leaving.
+- `isLocked` is deliberately **not** persisted, so a crash can't strand someone behind a lock screen. Cancel/failure offers retry and "Use password instead". The stored biometric user id is finally used — a mismatch forces a password login, so an old key can't unlock a different account.
+
+**Verified:** ESLint 0 errors, `tsc` 133 = unchanged baseline. **Needs a real device** — simulators report no biometric hardware, so the toggle doesn't even render there.
 
 ---
 
