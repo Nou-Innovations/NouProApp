@@ -73,8 +73,8 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | P-10 | P1 | **`headline`, `bio` and `industry` are editable but rendered nowhere** — not on your own profile, not on anyone else's (`UserProfileData` doesn't even declare them). A user can write a 2000-character bio that no one, including themselves, can ever read. |
 | P-11 | P1 | **Work experiences added via `AddWorkExperience` are invisible.** The POST is real (`server.js:5759`) but nothing renders `WorkExperience` rows — every list iterates `userBusinesses` or server-derived `BusinessMember` rows instead. Data is written and never shown (except in the GDPR export). |
 | P-12 | P1 | **FIXED ✅** — **Blocking is a one-way trip.** After blocking, the ⋯ menu still says "Block" (never "Unblock"), the profile renders normally, and Message stays enabled (failing server-side with a generic message). `unblockUser` and `GET /api/blocks` have zero callers. And the blocked user is **unaffected**: `GET /api/users/:userId` and `/api/users/search` never consult `blockRepo`, so they still find you and open your profile (round-1 C-7, confirmed open). |
-| P-13 | P1 | **"Privacy Policy" is a placeholder alert** (`PersonalSettingsScreen.tsx:104-106`) though the backend already serves `/legal/*`. Store-review blocker. |
-| P-14 | P1 | **A Sentry test-error button ships in user settings** (`PersonalSettingsScreen.tsx:350-366`), labelled "temporary", tappable by any user. |
+| P-13 | P1 | **FIXED ✅** — **"Privacy Policy" is a placeholder alert** (`PersonalSettingsScreen.tsx:104-106`) though the backend already serves `/legal/*`. Store-review blocker. |
+| P-14 | P1 | **FIXED ✅** — **A Sentry test-error button ships in user settings** (`PersonalSettingsScreen.tsx:350-366`), labelled "temporary", tappable by any user. |
 | P-15 | P2 | Notification preferences fail silently in both directions — load errors substitute all-`true` defaults, save errors silently revert the switch (`NotificationPreferencesScreen.tsx:40-72`). |
 | P-16 | P2 | `language` and `coverPhoto` have schema columns and API support but no UI anywhere. "Show this workplace on profile" toggles are still local-only (round-1 PR-6). No "remove photo" option exists. |
 | P-17 | P2 | No server-side validation of `name` (empty accepted) or `profileSlug` (no length cap, charset check, or reserved words like `me`/`admin`/`search`). |
@@ -374,6 +374,21 @@ The wizard seeded only the access token, so a 401 mid-onboarding read as "revoke
 1. Sign up via the **create a business** branch, pausing a few minutes on the Hours screen so the access token ages — creating the business at the end must succeed.
 2. Start signup, reach ChoosePath, force-quit, reopen → clean Launch screen, no half-authenticated state.
 3. Normal signup and normal login still work end to end.
+
+---
+
+## Fix log — P-13 / P-14 (2026-08-07)
+
+Purely a wiring gap: real legal copy already existed in three synced places (`PrivacyScreen.tsx`, `TermsScreen.tsx`, and the hosted `backend/public/legal/*.html` the store listings link to). Nothing was written.
+
+- The in-app legal screens were registered **only on the AuthStack**, and the two navigators are mutually exclusive — so navigating to them from Settings would have failed at runtime once signed in. Now registered on the RootStack too and typed in `RootStackParamList` (both param lists on purpose: signup reaches them pre-auth, Settings post-auth). The screens only call `navigation.goBack()`, which behaves identically in either stack.
+- **Both settings screens converge on in-app.** CompanySettings had been fixed under CO-27 by opening the hosted page in a browser; personal was never done — so the same row behaved differently per mode.
+- Added the missing **Terms of Service** row to both screens; neither had one.
+- **P-14:** removed the "Send test error to Sentry (temporary)" row that shipped to real users a few lines below Privacy.
+
+**Needs a human, not code:** `TermsScreen`'s own header flags that the governing-law jurisdiction is written generically and the legal entity name in Contact is unconfirmed. Both want counsel review before launch. The domain story is also inconsistent (`nou.pro` in the copy, `noupro.app` for email/invites, `noupro.com` for share links, `nouproapp.onrender.com` actually serving `/legal/*`) — worth settling before the store listing points at one.
+
+**Verified:** ESLint 0 errors, `tsc` 133 = unchanged baseline. Frontend only.
 
 ---
 
