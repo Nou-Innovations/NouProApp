@@ -4768,6 +4768,22 @@ app.get('/api/businesses/:businessId/followers', requireAuth, async (req, res) =
   }
 });
 
+// Every business the caller follows, as a flat id list.
+// Explore needs to label a whole page of cards Follow/Following; without this it would
+// have to fire one follow-status request per card.
+app.get('/api/users/me/follows', requireAuth, async (req, res) => {
+  try {
+    const follows = await prisma.businessFollow.findMany({
+      where: { userId: req.user.id },
+      select: { businessId: true },
+    });
+    return res.json(successResponse({ businessIds: follows.map((f) => f.businessId) }));
+  } catch (err) {
+    logger.error('[Follows] list error:', err?.message || err);
+    return res.status(500).json(errorResponse('Failed to load follows'));
+  }
+});
+
 // Check follow status
 app.get('/api/businesses/:businessId/follow-status', requireAuth, async (req, res) => {
   try {

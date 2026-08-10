@@ -9,6 +9,15 @@ export async function unfollowBusiness(businessId: string): Promise<{ followersC
   return del(`/businesses/${businessId}/follow`);
 }
 
+/**
+ * Every business the current user follows, as a Set for O(1) lookups.
+ * Explore labels a whole page of cards at once; per-card status calls would be N requests.
+ */
+export async function getFollowedBusinessIds(): Promise<Set<string>> {
+  const res = await get<{ businessIds: string[] }>('/users/me/follows');
+  return new Set(res?.businessIds || []);
+}
+
 export async function getFollowStatus(businessId: string): Promise<FollowStatus> {
   return get<FollowStatus>(`/businesses/${businessId}/follow-status`);
 }

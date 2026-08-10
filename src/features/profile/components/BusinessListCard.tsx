@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, ActivityIndicator } from 'react-native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
@@ -17,6 +17,14 @@ interface BusinessListCardProps {
   logo?: string;
   industry?: string;
   isConnected?: boolean;
+  /**
+   * Which relationship this card offers. In personal mode a person FOLLOWS a business
+   * (docs/PROFILES.md) — Explore used to say "Connect" regardless, and connecting needs
+   * a company, so the button did nothing for anyone without one.
+   */
+  action?: 'connect' | 'follow';
+  /** Request in flight — the button was previously always enabled with no feedback. */
+  pending?: boolean;
   productsCount?: number;
   rating?: number;
   featured?: boolean;
@@ -30,6 +38,8 @@ export function BusinessListCard({
   logo,
   industry,
   isConnected = false,
+  action = 'connect',
+  pending = false,
   productsCount,
   rating,
   featured = false,
@@ -74,7 +84,9 @@ export function BusinessListCard({
     );
   };
 
-  // Connect Button
+  // Relationship button — Follow/Following in personal mode, Connect/Connected in business mode.
+  const activeLabel = action === 'follow' ? 'Following' : 'Connected';
+  const idleLabel = action === 'follow' ? 'Follow' : 'Connect';
   const connectButton = (
     <TouchableOpacity
       style={[
@@ -82,17 +94,25 @@ export function BusinessListCard({
         isConnected
           ? { backgroundColor: appTheme.colors.surface }
           : { backgroundColor: appTheme.colors.primary },
+        pending && { opacity: 0.6 },
       ]}
       onPress={onConnect}
+      disabled={pending || !onConnect}
+      accessibilityRole="button"
+      accessibilityLabel={`${isConnected ? activeLabel : idleLabel} ${name}`}
     >
-      <Text
-        style={[
-          styles.connectButtonText,
-          { color: isConnected ? appTheme.colors.text : '#FFFFFF' },
-        ]}
-      >
-        {isConnected ? 'Connected' : 'Connect'}
-      </Text>
+      {pending ? (
+        <ActivityIndicator size="small" color={isConnected ? appTheme.colors.text : '#FFFFFF'} />
+      ) : (
+        <Text
+          style={[
+            styles.connectButtonText,
+            { color: isConnected ? appTheme.colors.text : '#FFFFFF' },
+          ]}
+        >
+          {isConnected ? activeLabel : idleLabel}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 

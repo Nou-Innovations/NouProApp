@@ -190,6 +190,8 @@ export default function BusinessExploreScreen() {
     refresh,
     isConnected,
     toggleConnect,
+    isPending,
+    action,
     myCity,
   } = useExploreDiscovery();
 
@@ -234,6 +236,8 @@ export default function BusinessExploreScreen() {
       logo={b.logoUrl || undefined}
       industry={b.industry || b.category || undefined}
       isConnected={isConnected(b.id)}
+      action={action}
+      pending={isPending(b.id)}
       productsCount={b.productsCount}
       onPress={() => goBusiness(b.id)}
       onConnect={() => toggleConnect(b.id)}
