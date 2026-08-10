@@ -76,10 +76,11 @@ Single source of truth for status. Update a row in the same commit as its fix.
 | `AUTH-1` | 🔴 | JWT token-type confusion → 2FA bypass, revocation bypass, reset-link = access token | `src/middleware/auth.js:82` | A/B | **FIXED phase 1** (2026-08-10) · phase 2 scheduled |
 | `EXP-1` | 🔴 | bcrypt hashes + TOTP secrets returned over the API | `src/repositories/prisma/memberRepo.prisma.js:13` | A | **FIXED** (2026-08-10) |
 | `OPS-1` | 🔴 | Seed sets every user's password to `password`; Prisma seed hook bypasses the prod guard | `prisma/seed.js:80`, `package.json:18` | A-ops | **Code FIXED** (2026-08-10) · data rotation still OWNER |
-| `TEN-1` | 🟠 | IDOR: checkout created against any tenant's invoice | `server.js:17152` | A | OPEN |
-| `TEN-2` | 🟠 | Collections read routes have no membership check (leaks cost prices) | `server.js:5488`, `:5499` | A | OPEN |
-| `TEN-3` | 🟠 | `/users/:userId/contacts`: no self-check + email-based user enumeration | `server.js:12914` | A | OPEN |
-| `INJ-1` | 🟠 | Reflected XSS, unauthenticated, on the payment checkout page | `server.js:16953` | A | OPEN |
+| `TEN-1` | 🟠 | IDOR: checkout created against any tenant's invoice | `server.js:17217` | A | **FIXED** (2026-08-10) |
+| `TEN-2` | 🟠 | Collections read routes have no membership check (leaks cost prices) | `server.js:5488`, `:5505` | A | **FIXED** (2026-08-10) |
+| `TEN-3` | 🟠 | `/users/:userId/contacts`: no self-check + email-based user enumeration | `server.js:12924` | A | **FIXED** (2026-08-10) |
+| `INJ-1` | 🟠 | Reflected XSS, unauthenticated, on the payment checkout page | `server.js:16989` | A | **FIXED** (2026-08-10) |
+| `INJ-4` | 🟡 | Helmet's default CSP blocked the Peach widget — checkout form never rendered | `server.js:16989` | A | **FIXED** (2026-08-10) |
 | `AUTH-2` | 🟠 | Email/phone change requires no re-auth and revokes no sessions | `server.js:2210`, `:2261` | B | OPEN |
 | `AUTH-3` | 🟠 | Password-reset token is replayable and survives the `tokenVersion` bump | `server.js:1585`, `:1607` | B | OPEN |
 | `AUTH-4` | 🟠 | Login lockout is a user-enumeration oracle + targeted lockout DoS | `server.js:1374`-`1417` | B | OPEN |
@@ -314,7 +315,8 @@ One row each, deliberately. Prose for 40 P2s is what makes an audit go unread.
 | `EXP-7` | Upload error details (bucket names, RLS policy text) returned to the client | `server.js:14844`-`14845` | Log detail, return generic + correlation id |
 | `INJ-2` | Only 8 of 352 routes use the zod `validateBody` helper added by SEC-3 | `server.js:1110`-`1214` | Extend incrementally; prioritise write routes |
 | `INJ-3` | `qtyOnHand`, analytics targets, invoice `taxRate`/`discountAmount` accept NaN and negatives → 500s, negative stock, negative invoice totals, corrupt ledger | `server.js:8360`, `:15684`, `:10870` | `Number.isFinite` + range clamps |
-| `INJ-4` | Helmet's **default CSP is active** and will block the Peach WebView's cross-origin + inline scripts — a live functional payment bug, not just hardening | `server.js:286`-`288` | Route-specific CSP allowing the Peach origin + a nonce |
+| `INJ-4` | ✅ **FIXED 2026-08-10.** Helmet's default CSP was blocking the Peach WebView's cross-origin + inline scripts — a live functional payment bug, not just hardening | `server.js:286`-`288` | Done: route-specific CSP on the checkout page allowing the Peach origin + a per-request nonce |
+| `EXP-8` | Contact rows for a user you share no company with, who keeps their email private, now render a blank subtitle — the subtitle is `role \|\| email \|\| ''` and `TEN-3`'s privacy fix legitimately removed the email. Not a security issue; a UX consequence of closing one | `NewChatModalList.tsx:203`, `:222`, `CreateGroupChatScreen.tsx:207` | Pick a non-sensitive fallback (company name, or drop the line) — mobile change, needs an OTA |
 | `INJ-5` | Invoice totals are client-computed and only re-derived **when a price list applies**; otherwise persisted as sent, then charged | `server.js:10855`-`10882`, `:11123`-`11126`; `CreateInvoiceScreen.tsx:536`-`549` | Always recompute server-side; reject mismatches |
 | `INJ-6` | Procurement PO/PR totals taken on trust | `server.js:8731`, `:9033` | Recompute server-side |
 | `INJ-7` | Dead-but-dangerous type: `CreateOrderPayload` still carries `unitPrice`/`subtotal`/`totalAmount`; `createOrder()` has zero call sites | `src/shared/types/order.ts:232`-`239` | Delete the price fields so nobody re-adopts them |
@@ -442,7 +444,13 @@ Append one row per batch as it lands. **Update the §4 index status in the same 
 
 | Date | Batch | IDs closed | Commit | Notes |
 |---|---|---|---|---|
-| 2026-08-10 | A (partial) | `AUTH-1` phase 1, `EXP-1`, `OPS-1` (code) | see `git log` | All three P0s. 14-test token-type matrix added at `src/middleware/auth.test.js`; suite 95/95 green. **The sweep found a 13th leaky `include` the audit's count of 12 missed** (`memberRepo.prisma.js` `getByUserId`) — fixed too. |
+| 2026-08-10 | A (partial) | `AUTH-1` phase 1, `EXP-1`, `OPS-1` (code) | `2cc8d42f` | All three P0s. 14-test token-type matrix added at `src/middleware/auth.test.js`; suite 95/95 green. **The sweep found a 13th leaky `include` the audit's count of 12 missed** (`memberRepo.prisma.js` `getByUserId`) — fixed too. |
+| 2026-08-10 | A (rest) | `TEN-1`, `TEN-2`, `TEN-3`, `INJ-1`, `INJ-4` | see `git log` | Batch A complete. Suite 101/101 green (+6 checkout-id cases). **Two fix designs in this doc were wrong and were corrected during implementation** — see below. New follow-up logged as `EXP-8`. |
+
+**Corrections to this document, found while implementing Batch A** — both would have caused an outage if followed literally:
+
+1. **`TEN-1` — "add `requireBusinessMembership(invoice.businessId)`" was wrong.** `Invoice` carries both `businessId` (issuer) and `clientBusinessId` (the party billed), and the caller of this route is the *recipient* (`InvoiceDetailsScreen.tsx:217`: "Pay invoice via Peach Payments (for invoice recipients)"). Scoping to the issuer would have closed the IDOR by making it impossible for anyone to pay an invoice. The shipped fix authorizes **either** party via `isBusinessMember`, and deliberately ignores the client-supplied `req.body.businessId`.
+2. **`TEN-3` — removing email must be split in two.** The email *predicate* in the `where` clause is dead code (no caller ever passes `?search=`), so dropping it is a zero-behaviour-change enumeration fix. But `email` in the *response* is live — it is the rendered subtitle fallback in the contact picker. Conflating the two would have silently blanked UI. Both were handled, separately; the UI consequence is tracked as `EXP-8`.
 
 ### ⏭ Scheduled follow-up — `AUTH-1` phase 2 (do NOT skip)
 
@@ -457,4 +465,4 @@ Three one-line changes, each marked with a `PHASE 2` comment:
 
 Then update the last test in `backend/src/middleware/auth.test.js` (`PHASE 1: a legacy untyped access token is still accepted`) to assert the opposite.
 
-Remaining Batch A work, still OPEN: `TEN-1`, `TEN-2`, `TEN-3`, `INJ-1`.
+**Batch A is now complete.** Next up is Batch B (session & recovery integrity), which needs a migration for the reset-token table.

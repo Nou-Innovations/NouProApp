@@ -153,11 +153,37 @@ async function chargeStoredCard({ registrationId, amount, currency = 'MUR', orde
 }
 
 /**
+ * SECURITY (INJ-1): a Peach checkout id is an opaque token — alphanumerics with at most
+ * `.`, `_` and `-`. Anything else is an injection attempt, not a checkout.
+ *
+ * The id arrives as a URL path param on an UNAUTHENTICATED route and is interpolated into
+ * both a <script src> attribute and a JS string literal, so an unvalidated value was a
+ * reflected XSS that executed on the API's own origin — the same origin the payment page
+ * runs on. Validated at the route AND here, so this function is safe regardless of caller.
+ */
+const CHECKOUT_ID_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+
+function isValidCheckoutId(checkoutId) {
+  return typeof checkoutId === 'string' && CHECKOUT_ID_PATTERN.test(checkoutId);
+}
+
+/**
  * Generate the checkout HTML page content for embedding in a WebView
  * @param {string} checkoutId
+ * @param {object} [opts]
+ * @param {string} [opts.nonce] - CSP nonce for the inline script (see INJ-4 at the route)
  * @returns {string} - HTML string
+ * @throws {Error} if checkoutId fails validation
  */
-function generateCheckoutHtml(checkoutId) {
+function generateCheckoutHtml(checkoutId, { nonce = '' } = {}) {
+  if (!isValidCheckoutId(checkoutId)) {
+    throw new Error('INVALID_CHECKOUT_ID');
+  }
+  // Belt and braces on top of the pattern check: encodeURIComponent for the URL context,
+  // JSON.stringify for the JS-literal context. Never hand-quote either.
+  const idForUrl = encodeURIComponent(checkoutId);
+  const idForJs = JSON.stringify(checkoutId);
+  const nonceAttr = nonce ? ` nonce="${encodeURIComponent(nonce)}"` : '';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -172,11 +198,11 @@ function generateCheckoutHtml(checkoutId) {
   <div id="checkout-container">
     <p class="loading">Loading payment form...</p>
   </div>
-  <script src="${PEACH_API_URL}/v1/paymentWidgets.js?checkoutId=${checkoutId}"></script>
-  <script>
+  <script src="${PEACH_API_URL}/v1/paymentWidgets.js?checkoutId=${idForUrl}"></script>
+  <script${nonceAttr}>
     var checkout = new window.wpwl.Checkout({
-      checkoutId: '${checkoutId}',
-      entityId: '${PEACH_ENTITY_ID}',
+      checkoutId: ${idForJs},
+      entityId: ${JSON.stringify(PEACH_ENTITY_ID)},
       element: '#checkout-container',
       onCompleted: function(data) {
         window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -214,4 +240,6 @@ module.exports = {
   decidePaymentOutcome,
   chargeStoredCard,
   generateCheckoutHtml,
+  isValidCheckoutId,
+  PEACH_API_URL,
 };

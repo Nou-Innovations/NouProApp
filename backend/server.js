@@ -5487,6 +5487,12 @@ app.delete('/api/companies/:companyId/brands/:brandId', requireAuth, async (req,
 // List collections for a company
 app.get('/api/companies/:companyId/collections', requireAuth, async (req, res) => {
   try {
+    // SECURITY (TEN-2): every sibling write route on this resource checks membership; the
+    // two reads were missed. collectionRepo embeds full Product rows INCLUDING costPrice,
+    // so without this any authenticated user could enumerate company ids and read a
+    // competitor's internal margins.
+    if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
+
     const collections = await repos.collectionRepo.getByBusinessId(req.params.companyId);
     res.json(successResponse(collections));
   } catch (e) {
@@ -5499,6 +5505,10 @@ app.get('/api/companies/:companyId/collections', requireAuth, async (req, res) =
 app.get('/api/companies/:companyId/collections/:collectionId', requireAuth, async (req, res) => {
   try {
     const { companyId, collectionId } = req.params;
+    // SECURITY (TEN-2): the businessId check below only proves the collection belongs to
+    // the company in the path — not that the CALLER belongs to it. Both are required.
+    if (!(await requireBusinessMembership(req, res, companyId))) return;
+
     const collection = await repos.collectionRepo.getById(collectionId);
     if (!collection || collection.businessId !== companyId) {
       return res.status(404).json(errorResponse('Collection not found'));
@@ -12914,6 +12924,14 @@ app.get('/api/users/:userId/locations', requireAuth, async (req, res) => {
 app.get('/api/users/:userId/contacts', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
+
+    // SECURITY (TEN-3): userId drives every query below but was never compared to the
+    // authenticated caller, so passing a victim's id returned THEIR contact graph — who
+    // they work with and in what role. Every other /api/users/:userId/* route does compare.
+    if (userId !== req.user?.id) {
+      return res.status(403).json(errorResponse('You can only view your own contacts', 'ACCESS_DENIED'));
+    }
+
     const { search } = req.query;
     const searchTerm = search ? search.toString().trim() : '';
 
@@ -12926,9 +12944,12 @@ app.get('/api/users/:userId/contacts', requireAuth, async (req, res) => {
     const userWhere = { id: { not: userId }, deletedAt: null };
     const businessWhere = { deletedAt: null };
     if (searchTerm) {
+      // SECURITY (TEN-3): deliberately NOT matching on email. `?search=someone@example.com`
+      // returning a hit confirms that address has an account here — an enumeration oracle.
+      // /api/users/search refuses email matching for exactly this reason; this route was
+      // the only remaining email `contains` predicate in the file.
       userWhere.OR = [
         { name: { contains: searchTerm, mode: 'insensitive' } },
-        { email: { contains: searchTerm, mode: 'insensitive' } },
       ];
       businessWhere.OR = [
         { name: { contains: searchTerm, mode: 'insensitive' } },
@@ -12936,11 +12957,13 @@ app.get('/api/users/:userId/contacts', requireAuth, async (req, res) => {
       ];
     }
 
-    // 2) Fetch users, businesses, and shared members in parallel (all DB-filtered)
-    const [matchedUsers, matchedBusinesses, allMembersInMyBusinesses] = await Promise.all([
+    // 2) Fetch users, businesses, shared members and blocks in parallel (all DB-filtered)
+    const [matchedUsers, matchedBusinesses, allMembersInMyBusinesses, blockedIdList] = await Promise.all([
       prisma.user.findMany({
         where: userWhere,
-        select: { id: true, name: true, avatar: true, email: true },
+        // privacySettings is selected only to honour show_email_publicly below — it is
+        // never returned to the client (the viewer doesn't need the owner's config).
+        select: { id: true, name: true, avatar: true, email: true, privacySettings: true },
         take: 100,
         orderBy: { name: 'asc' },
       }),
@@ -12957,7 +12980,12 @@ app.get('/api/users/:userId/contacts', requireAuth, async (req, res) => {
             select: { userId: true, businessId: true, role: true },
           })
         : Promise.resolve([]),
+      // SECURITY (TEN-3): blocks are bidirectional and were not honoured here at all,
+      // unlike /api/users/search and the chats list. getBlockedIds covers both directions
+      // and degrades to [] on error, so this can never 500 the contact picker.
+      repos.blockRepo.getBlockedIds(req.user.id),
     ]);
+    const blockedIds = new Set(blockedIdList);
 
     // Build a map: userId -> { businessId, role } for connection status
     const sharedMemberMap = new Map();
@@ -12967,19 +12995,27 @@ app.get('/api/users/:userId/contacts', requireAuth, async (req, res) => {
       }
     }
 
-    // Map user results with connection info
-    const userResults = matchedUsers.map(u => {
-      const shared = sharedMemberMap.get(u.id);
-      return {
-        id: u.id,
-        name: u.name || 'Unknown',
-        avatar: u.avatar || null,
-        email: u.email || null,
-        type: 'user',
-        is_connected: !!shared,
-        role: shared ? shared.role : null,
-      };
-    });
+    // Map user results with connection info.
+    // SECURITY (TEN-3): drop blocked users entirely, and honour show_email_publicly —
+    // this route previously returned every user's email unconditionally, ignoring their
+    // privacy setting. Same rule as stripSensitiveUserFields(): a connected viewer (you
+    // share an accepted business) sees the address; otherwise only if the owner opted in.
+    const userResults = matchedUsers
+      .filter(u => !blockedIds.has(u.id))
+      .map(u => {
+        const shared = sharedMemberMap.get(u.id);
+        const privacy = u.privacySettings || {};
+        const maySeeEmail = !!shared || privacy.show_email_publicly === true;
+        return {
+          id: u.id,
+          name: u.name || 'Unknown',
+          avatar: u.avatar || null,
+          email: maySeeEmail ? (u.email || null) : null,
+          type: 'user',
+          is_connected: !!shared,
+          role: shared ? shared.role : null,
+        };
+      });
 
     // Map business results with membership info
     const userBusinessIdSet = new Set(userBusinessIds);
@@ -16950,8 +16986,48 @@ app.post('/api/payments/create-checkout', requireAuth, async (req, res) => {
 });
 
 // Serve the checkout HTML page for WebView rendering
-app.get('/api/payments/checkout-page/:checkoutId', (req, res) => {
-  const html = peachPayments.generateCheckoutHtml(req.params.checkoutId);
+app.get('/api/payments/checkout-page/:checkoutId', publicReadLimiter, (req, res) => {
+  const { checkoutId } = req.params;
+
+  // SECURITY (INJ-1): unauthenticated route whose path param is reflected into HTML.
+  // Without this, `/checkout-page/a'});alert(document.domain);//` executed attacker JS on
+  // the API's own origin — the origin the payment form itself runs on.
+  if (!peachPayments.isValidCheckoutId(checkoutId)) {
+    return res.status(400).type('text/plain').send('Invalid checkout id');
+  }
+
+  // SECURITY (INJ-4): helmet's DEFAULT CSP (`default-src 'self'`) applies to every response,
+  // which blocks both the cross-origin Peach widget script and our inline bootstrap — i.e.
+  // the payment form silently never renders. Override it for this route only.
+  //
+  // Deliberately NOT locked to the Peach origin beyond script-src. A 3-D Secure challenge
+  // redirects/iframes to the CARDHOLDER'S ISSUING BANK, whose domain is unknowable ahead of
+  // time and differs per card — so pinning frame-src/form-action/connect-src to Peach would
+  // break 3DS authentication and therefore real payments. `https:` keeps the ecosystem
+  // working while still forbidding cleartext.
+  //
+  // The XSS itself is already closed at the input layer by isValidCheckoutId() above; this
+  // header is defence in depth, and a CSP that breaks card payments would be a bad trade.
+  // The meaningful restriction here is script-src: the inline bootstrap runs only with the
+  // per-request nonce, so an injected inline script would not execute even if one got in.
+  const nonce = crypto.randomBytes(16).toString('base64');
+  const peachOrigin = peachPayments.PEACH_API_URL;
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self' https:",
+      `script-src 'nonce-${nonce}' ${peachOrigin} https:`,
+      "style-src 'unsafe-inline' https:",
+      "img-src https: data:",
+      "connect-src https:",
+      "frame-src https:",
+      "form-action https:",
+      "object-src 'none'",
+      "base-uri 'none'",
+    ].join('; ')
+  );
+
+  const html = peachPayments.generateCheckoutHtml(checkoutId, { nonce });
   res.setHeader('Content-Type', 'text/html');
   res.send(html);
 });
@@ -17161,6 +17237,26 @@ app.post('/api/payments/invoice-checkout', requireAuth, async (req, res) => {
     if (!invoice) {
       return res.status(404).json(errorResponse('Invoice not found'));
     }
+
+    // SECURITY (TEN-1): this route had NO authorization at all — any authenticated user
+    // who guessed an invoiceId got a live checkout and a Payment row under someone else's
+    // businessId. Authorize against the invoice itself; never against req.body.businessId,
+    // which is client-supplied and must not decide access.
+    //
+    // Both parties legitimately reach this route, so both are accepted:
+    //   - clientBusinessId: the RECIPIENT paying the invoice (the normal case — see
+    //     InvoiceDetailsScreen "Pay invoice via Peach Payments (for invoice recipients)")
+    //   - businessId:       the ISSUER driving a checkout on their own invoice
+    // A null clientBusinessId means an off-platform client, who has no account to
+    // authenticate with — so only the issuer qualifies. That is correct, not a gap.
+    const callerId = req.user?.id;
+    const isClient = !!invoice.clientBusinessId
+      && await isBusinessMember(invoice.clientBusinessId, callerId);
+    const isIssuer = await isBusinessMember(invoice.businessId, callerId);
+    if (!isClient && !isIssuer) {
+      return res.status(403).json(errorResponse('You do not have access to this invoice', 'ACCESS_DENIED'));
+    }
+
     if (invoice.status === 'PAID') {
       return res.status(400).json(errorResponse('Invoice is already paid'));
     }
