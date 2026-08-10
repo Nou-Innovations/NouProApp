@@ -24,8 +24,19 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'dark',
+    // Native splash: a solid brand-brown screen, no visible mark. This is deliberate.
+    // LaunchScreen's first frame is also solid #1A1714 (bgOpacity and logoScale both
+    // start at 0), so the native -> JS handoff is invisible: the warehouse photo and
+    // the NOUPRO wordmark then fade in as designed. A logo here would instead pop away
+    // the instant LaunchScreen mounts.
+    //
+    // `splash-none.png` is a fully transparent square, NOT a logo. Leaving `image` out
+    // entirely would be the obvious way to get a bare colour, but expo-splash-screen
+    // 0.30 then writes an empty <subviews/> into SplashScreen.storyboard, and its own
+    // removeImageFromSplashScreen() crashes reading that back on the next prebuild.
+    // An invisible image keeps the storyboard round-trippable.
     splash: {
-      image: './assets/launch/splash-logo.png',
+      image: './assets/launch/splash-none.png',
       resizeMode: 'contain',
       backgroundColor: '#1A1714',
     },
@@ -110,11 +121,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             'NouPro accesses your contacts only when you choose to share a contact card in a chat.',
         },
       ],
+      // Must mirror the `splash` block above — see the comment there for why the image
+      // is a transparent square. (The plugin's option is `resizeMode`; the previously
+      // used `imageResizeMode` is not a valid key and was silently ignored.)
       [
         'expo-splash-screen',
         {
-          image: './assets/launch/splash-logo.png',
-          imageResizeMode: 'contain',
+          image: './assets/launch/splash-none.png',
+          resizeMode: 'contain',
           backgroundColor: '#1A1714',
         },
       ],

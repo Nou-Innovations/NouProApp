@@ -317,6 +317,7 @@ export type RootStackParamList = {
   ChangePassword: undefined;
   ChangeEmail: { mode?: 'email' | 'phone' } | undefined;
   SecuritySettings: undefined;
+  SignedInDevices: undefined;
   DeleteAccount: undefined;
   ProfileSettings: undefined;
   PersonalProfileSettings: undefined;

@@ -53,6 +53,7 @@ model User {
   chatMessages         Message[]
   chatParticipants     ChatParticipant[]
   readReceipts         ReadReceipt[]
+  sessions             Session[]
 }
 
 model Business {
@@ -123,6 +124,31 @@ model Business {
   companyInvites          CompanyInvite[]
 
   @@index([deletedAt])
+}
+
+/// One signed-in device.
+///
+/// Before this, `tokenVersion` was the ONLY revocation mechanism and it is global — so
+/// logging out on one device signed you out everywhere (A-7), and changing your password
+/// silently signed YOU out ~30 minutes later (A-6). Refresh tokens now carry a `sid` and
+/// revocation happens per row.
+///
+/// Deliberately no refresh-token hash / reuse detection: the client writes rotated tokens
+/// to SecureStore fire-and-forget and two code paths bypass the single-flight refresh
+/// lock, so invalidate-on-use would turn ordinary races into false "token theft" logouts.
+model Session {
+  id         String    @id
+  userId     String
+  deviceName String? // e.g. "iPhone 15 Pro"
+  platform   String? // ios | android
+  lastUsedAt DateTime  @default(now())
+  revokedAt  DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 /// Short-lived verification codes for the non-Twilio channels (email/console).

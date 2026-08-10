@@ -38,6 +38,15 @@ export interface ApiErrorResponse {
 }
 
 /** Custom error with typed response */
+export interface SignedInDevice {
+  id: string;
+  deviceName: string | null;
+  platform: string | null;
+  lastUsedAt: string;
+  createdAt: string;
+  isCurrent: boolean;
+}
+
 export class ApiError extends Error {
   status: number;
   code: string;
@@ -107,8 +116,13 @@ const createApiClient = (): AxiosInstance => {
   );
 
   // Track whether a token refresh is in progress to prevent infinite loops
+  /** Why a refresh failed. 'transient' must NOT sign the user out. */
+  type RefreshOutcome =
+    | { ok: true; token: string }
+    | { ok: false; reason: 'revoked' | 'transient' };
+
   let isRefreshing = false;
-  let refreshPromise: Promise<string | null> | null = null;
+  let refreshPromise: Promise<RefreshOutcome> | null = null;
 
   // Response interceptor: unwrap data, handle errors
   client.interceptors.response.use(
@@ -161,23 +175,32 @@ const createApiClient = (): AxiosInstance => {
           throw new ApiError(message, status, code, error.response?.data);
         }
 
-        // Attempt token refresh (once, not recursively)
+        // Attempt token refresh (once, not recursively).
+        //
+        // The result is DISCRIMINATED on purpose. This used to `catch { return null }`,
+        // which made a 429, a 500 and a genuinely revoked session indistinguishable —
+        // all three logged the user out. A busy server or one crowded office wifi could
+        // therefore sign people out at random (audit A-5).
         if (!isRefreshing) {
           isRefreshing = true;
-          refreshPromise = (async () => {
+          refreshPromise = (async (): Promise<RefreshOutcome> => {
             try {
               const refreshToken = useProfileStore.getState().refreshToken;
-              if (!refreshToken) return null;
+              if (!refreshToken) return { ok: false, reason: 'revoked' };
 
               const resp = await client.post('/auth/refresh', { refreshToken });
               const tokenData = resp.data?.data || resp.data;
               if (tokenData?.token) {
                 useProfileStore.getState().setTokens(tokenData.token, tokenData.refreshToken);
-                return tokenData.token as string;
+                return { ok: true, token: tokenData.token as string };
               }
-              return null;
-            } catch {
-              return null;
+              return { ok: false, reason: 'revoked' };
+            } catch (refreshErr: any) {
+              const refreshStatus = refreshErr?.response?.status;
+              // Only the server saying "this token is no good" means signed out.
+              // Anything else — rate limit, 5xx, cold start, no network — is transient.
+              const isRevoked = refreshStatus === 401 || refreshStatus === 403;
+              return { ok: false, reason: isRevoked ? 'revoked' : 'transient' };
             } finally {
               isRefreshing = false;
               // Don't null refreshPromise here — other 401 handlers may still be awaiting it
@@ -187,20 +210,32 @@ const createApiClient = (): AxiosInstance => {
 
         // Capture ref before awaiting — prevents reading null if finally already ran
         const pendingRefresh = refreshPromise;
-        const newToken = pendingRefresh ? await pendingRefresh : null;
-        if (newToken && error.config) {
+        const outcome: RefreshOutcome = pendingRefresh
+          ? await pendingRefresh
+          : { ok: false, reason: 'transient' };
+
+        if (outcome.ok && error.config) {
           // Retry the original request with the new token
-          error.config.headers.Authorization = `Bearer ${newToken}`;
+          error.config.headers.Authorization = `Bearer ${outcome.token}`;
           return client.request(error.config);
         }
 
-        // Refresh failed -- remove push token locally (no API call: token is already invalid,
-        // calling the backend would trigger another 401 and create a recursive loop)
-        try {
-          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-          await AsyncStorage.removeItem('noupro_push_token');
-        } catch {}
-        useProfileStore.getState().logout();
+        if (outcome.ok === false && outcome.reason === 'revoked') {
+          // Genuinely signed out. Remove the push token locally (no API call: the token
+          // is already invalid, so calling the backend would 401 recursively).
+          try {
+            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+            await AsyncStorage.removeItem('noupro_push_token');
+          } catch {}
+          // Tell the user why they were bounced — this reason has never been shown.
+          useProfileStore.getState().logout('session_expired');
+          // Return instead of falling through to the throw below: the screen is being
+          // unmounted this very tick, and throwing makes it flash an alert on the way out.
+          return Promise.reject(
+            new ApiError('Your session expired. Please sign in again.', 401, 'SESSION_EXPIRED'),
+          );
+        }
+        // Transient: keep the user signed in and let the caller surface a retryable error.
       }
 
       // Detect PAYWALL errors and emit event for reactive PaywallModal display
@@ -344,8 +379,23 @@ export function unwrapAuthResponse(response: { data?: AuthResponseData } & Parti
  * Note: These return raw API response. Use profileStore.login() to set state after success.
  */
 export const authAPI = {
+  /**
+   * What to label this device as in Settings > Signed-in devices.
+   * expo-device is already a dependency (used by the push registration).
+   */
+  _deviceInfo: (): { deviceName?: string; platform: string } => {
+    try {
+      const Device = require('expo-device');
+      const { Platform } = require('react-native');
+      return { deviceName: Device.modelName || undefined, platform: Platform.OS };
+    } catch {
+      const { Platform } = require('react-native');
+      return { platform: Platform.OS };
+    }
+  },
+
   login: async (email: string, password: string): Promise<ApiResponse<AuthResponseData>> => {
-    const response = await apiClient.post('/auth/login', { email, password });
+    const response = await apiClient.post('/auth/login', { email, password, ...authAPI._deviceInfo() });
     return response.data;
   },
 
@@ -362,7 +412,7 @@ export const authAPI = {
     phoneVerificationToken?: string;
     emailVerificationToken?: string;
   }): Promise<ApiResponse<AuthResponseData>> => {
-    const response = await apiClient.post('/auth/register', userData);
+    const response = await apiClient.post('/auth/register', { ...userData, ...authAPI._deviceInfo() });
     return response.data;
   },
 
@@ -444,6 +494,21 @@ export const authAPI = {
    * Called before collecting a code so the client can route to a channel that works,
    * instead of dead-ending on a 503 when Twilio isn't configured.
    */
+  /** Devices currently signed in to this account. */
+  getSessions: async (): Promise<{ sessions: SignedInDevice[] }> => {
+    return get<{ sessions: SignedInDevice[] }>('/auth/sessions');
+  },
+
+  /** Sign out one device. */
+  revokeSession: async (sessionId: string): Promise<void> => {
+    await del(`/auth/sessions/${sessionId}`);
+  },
+
+  /** Sign out every device except this one. */
+  revokeOtherSessions: async (): Promise<{ revoked: number }> => {
+    return del<{ revoked: number }>('/auth/sessions');
+  },
+
   getVerificationCapabilities: async (): Promise<{ sms: boolean; email: boolean }> => {
     return get<{ sms: boolean; email: boolean }>('/auth/verification-capabilities');
   },
@@ -494,7 +559,7 @@ export const authAPI = {
   },
 
   verify2FA: async (tempToken: string, code: string): Promise<ApiResponse<AuthResponseData>> => {
-    const response = await apiClient.post('/auth/2fa/verify', { tempToken, code });
+    const response = await apiClient.post('/auth/2fa/verify', { tempToken, code, ...authAPI._deviceInfo() });
     return response.data;
   },
 

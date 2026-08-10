@@ -8,6 +8,8 @@ import { authAPI } from '@/shared/services/api';
 import AppTextField from '@/shared/components/ui/AppTextField';
 import { AppButton } from '@/shared/components/ui';
 import theme from '@/shared/theme';
+import { useProfileStore } from '@/shared/store/profileStore';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 interface ChangePasswordScreenProps {
   navigation: any;
@@ -69,6 +71,13 @@ export default function ChangePasswordScreen({ navigation }: ChangePasswordScree
 
     try {
       const response = await authAPI.changePassword(currentPassword, newPassword);
+      // The server signs out every OTHER device and hands us a fresh pair, so the person
+      // who just changed their password stays signed in. Without this they were silently
+      // signed out ~30 minutes later, when their now-revoked refresh token first failed.
+      const data = (response as any)?.data;
+      if (data?.token) {
+        useProfileStore.getState().setTokens(data.token, data.refreshToken);
+      }
       
       const message = response?.data?.message || response?.message || 'Password changed successfully';
       AppAlert.alert(
@@ -77,7 +86,7 @@ export default function ChangePasswordScreen({ navigation }: ChangePasswordScree
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (error: any) {
-      const errorMessage = error?.response?.message || error?.message || 'An unexpected error occurred. Please try again.';
+      const errorMessage = getApiErrorMessage(error, 'An unexpected error occurred. Please try again.');
       AppAlert.alert('Error', errorMessage);
       console.error('Password change error:', error);
     } finally {

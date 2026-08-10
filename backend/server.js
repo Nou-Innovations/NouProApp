@@ -67,6 +67,8 @@ if (process.env.JWT_SECRET === 'your-secret-here-generate-with-openssl-rand-base
 // EMAIL SERVICE - Nodemailer for transactional emails
 // ============================================================================
 const nodemailer = require('nodemailer');
+// Used only to DECODE (never verify) a refresh token for the rate-limiter bucket key.
+const jwt = require('jsonwebtoken');
 
 let emailTransporter = null;
 
@@ -387,6 +389,32 @@ const authLimiter = rateLimit({
   max: 15,                    // 15 attempts per window
   keyGenerator: clientIpKey,
   message: { success: false, message: 'Too many attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: limiterValidate,
+});
+
+// Token refresh gets its OWN limiter, keyed per USER rather than per IP.
+//
+// It used to share authLimiter: 15 requests / 15 min for an entire IP, across 14 auth
+// routes. Behind office wifi or carrier CGNAT everyone shares that bucket, and the client
+// retries refresh twice on network error — so one Render cold start could burn 3 of the
+// 15 and a busy office would randomly sign people out, because a 429 on refresh is
+// indistinguishable from a revoked token (audit A-4).
+//
+// The key comes from decoding (not verifying) the refresh token: it is only a bucket
+// label, so an unverified `sub` is fine, and we fall back to IP when it is unparseable.
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  keyGenerator: (req) => {
+    try {
+      const decoded = jwt.decode(req.body?.refreshToken);
+      if (decoded?.sub) return `refresh:${decoded.sub}`;
+    } catch { /* fall through to IP */ }
+    return clientIpKey(req);
+  },
+  message: { success: false, message: 'Too many refresh attempts, please try again shortly' },
   standardHeaders: true,
   legacyHeaders: false,
   validate: limiterValidate,
@@ -1227,6 +1255,10 @@ io.use((socket, next) => {
   }
 
   socket.userId = userId;
+  // Which device this socket belongs to, so a revoked session can be disconnected
+  // without dropping the user's other devices. The handshake is only verified once,
+  // so without this a revoked device keeps streaming messages until the socket drops.
+  socket.sessionId = result.user.claims?.sid || null;
   // Store user name for typing indicators (from JWT claims)
   socket.userName = result.user.name || result.user.email || 'Someone';
   next();
@@ -1423,16 +1455,10 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       .filter(Boolean);
     
     // Generate real JWT tokens
-    const token = generateToken({ 
-      sub: dbUser.id, 
-      email: dbUser.email,
-      name: dbUser.name 
+    const { token, refreshToken } = await issueSessionTokens(dbUser, {
+      deviceName: req.body?.deviceName,
+      platform: req.body?.platform,
     });
-    const refreshToken = generateToken({ 
-      sub: dbUser.id,
-      type: 'refresh',
-      tv: dbUser.tokenVersion ?? 0
-    }, { expiresIn: '30d' });
     
     // Update lastLoginAt
     await repos.userRepo.update(dbUser.id, { lastLoginAt: new Date() }).catch(err => {
@@ -1469,13 +1495,20 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 });
 
 app.post('/api/auth/logout', requireAuth, async (req, res) => {
-  // Invalidate all refresh tokens for this user by bumping their token version.
-  // Existing access tokens remain valid until they expire (max 30 min), but no
-  // new access token can be minted from an old refresh token.
+  // End THIS device's session only. This used to bump tokenVersion, which revoked every
+  // refresh token the user had — so signing out on your phone signed you out on your
+  // laptop too (audit A-7).
   try {
-    await repos.userRepo.update(req.user.id, { tokenVersion: { increment: 1 } });
+    const sid = req.user?.claims?.sid;
+    if (sid) {
+      await sessionService.revoke(sid);
+    } else {
+      // Pre-session token: there is nothing identifying the device, so fall back to the
+      // old global bump. Errs toward revoking too much, which is the safe direction.
+      await repos.userRepo.update(req.user.id, { tokenVersion: { increment: 1 } });
+    }
   } catch (err) {
-    logger.error('[Logout] Failed to bump token version:', err.message);
+    logger.error('[Logout] Failed to end session:', err.message);
   }
   if (process.env.NODE_ENV !== 'production') {
     logger.debug('[Logout] User logged out:', req.user.id);
@@ -1572,6 +1605,9 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
     // Hash and store new password, and invalidate all existing sessions
     const passwordHash = await bcrypt.hash(newPassword, 12);
     await repos.userRepo.update(dbUser.id, { passwordHash, tokenVersion: { increment: 1 } });
+    // A reset happens when you've lost access — sign every device out, including this one.
+    await sessionService.revokeAllForUser(dbUser.id).catch(() => {});
+    disconnectUserSockets(dbUser.id);
 
     logger.debug('[ResetPassword] Password reset for user:', dbUser.id);
 
@@ -1583,7 +1619,7 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
 });
 
 // Refresh access token
-app.post('/api/auth/refresh', authLimiter, async (req, res) => {
+app.post('/api/auth/refresh', refreshLimiter, async (req, res) => {
   try {
     const { refreshToken } = req.body;
     
@@ -1615,23 +1651,52 @@ app.post('/api/auth/refresh', authLimiter, async (req, res) => {
       return res.status(401).json(errorResponse('Session has been revoked. Please log in again.'));
     }
 
+    // Per-device session check. A revoked or expired session cannot mint new tokens —
+    // this is what makes "log out on one device" and "sign out that device remotely"
+    // work without touching the other devices.
+    let sessionId = result.user.claims.sid || null;
+
+    if (sessionId) {
+      const session = await sessionService.getById(sessionId);
+      if (!sessionService.isUsable(session) || session.userId !== dbUser.id) {
+        return res.status(401).json(errorResponse('Session has been revoked. Please log in again.'));
+      }
+      await sessionService.touch(sessionId).catch(() => {});
+    } else {
+      // BACKWARD COMPATIBILITY: every refresh token minted before sessions existed has
+      // no `sid`. Requiring one would sign out every logged-in user on deploy. Accept on
+      // the tokenVersion check alone (already done above) and silently upgrade them to a
+      // real session — they never notice.
+      const session = await sessionService.createSession({
+        userId: dbUser.id,
+        deviceName: req.body?.deviceName,
+        platform: req.body?.platform,
+      });
+      sessionId = session.id;
+      logger.debug('[Refresh] Upgraded a pre-session token to a session for user:', dbUser.id);
+    }
+
     // Generate a new access token
-    const newToken = generateToken({ 
-      sub: dbUser.id, 
+    const newToken = generateToken({
+      sub: dbUser.id,
       email: dbUser.email,
-      name: dbUser.name 
+      name: dbUser.name,
+      sid: sessionId,
     });
-    
+
     if (process.env.NODE_ENV !== 'production') {
       logger.debug('[Refresh] Generated new token for user:', dbUser.id);
     }
-    
-    // Generate a new refresh token (rotation)
+
+    // Rotate the refresh token. Deliberately NOT invalidate-on-use: the client persists
+    // rotated tokens fire-and-forget and two code paths bypass its single-flight lock,
+    // so strict rotation would turn ordinary races into false "token theft" logouts.
     const newRefreshToken = generateToken({
       sub: dbUser.id,
       type: 'refresh',
-      tv: dbUser.tokenVersion ?? 0
-    }, { expiresIn: '30d' });
+      tv: dbUser.tokenVersion ?? 0,
+      sid: sessionId,
+    }, { expiresIn: `${sessionService.SESSION_TTL_DAYS}d` });
 
     res.json(successResponse({
       token: newToken,
@@ -1775,16 +1840,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     };
     
     // Generate real JWT tokens
-    const token = generateToken({ 
-      sub: dbUser.id, 
-      email: dbUser.email,
-      name: dbUser.name 
+    const { token, refreshToken } = await issueSessionTokens(dbUser, {
+      deviceName: req.body?.deviceName,
+      platform: req.body?.platform,
     });
-    const refreshToken = generateToken({ 
-      sub: dbUser.id,
-      type: 'refresh',
-      tv: dbUser.tokenVersion ?? 0
-    }, { expiresIn: '30d' });
     
     if (process.env.NODE_ENV !== 'production') {
       logger.debug('[Register] Created user:', dbUser.id, dbUser.email);
@@ -1845,11 +1904,41 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     
     // Hash and store new password, and invalidate all existing sessions
     const newPasswordHash = await bcrypt.hash(newPassword, 12);
-    await repos.userRepo.update(dbUser.id, { passwordHash: newPasswordHash, tokenVersion: { increment: 1 } });
+    // Bumping tokenVersion is what also kills any pre-session devices; the caller gets a
+    // fresh pair below so they are not caught by it.
+    const updatedUser = await repos.userRepo.update(dbUser.id, {
+      passwordHash: newPasswordHash,
+      tokenVersion: { increment: 1 },
+    });
+
+    // Changing your password is how you lock out someone who has it — so every OTHER
+    // device is signed out, while the device you did it from stays signed in. Previously
+    // this silently signed the caller out ~30 minutes later instead (audit A-6).
+    const callerSid = req.user?.claims?.sid || null;
+    await sessionService.revokeAllForUser(dbUser.id, { exceptSessionId: callerSid }).catch(() => {});
+    disconnectUserSockets(dbUser.id, callerSid);
+
+    let tokens = null;
+    if (callerSid) {
+      tokens = {
+        token: generateToken({
+          sub: dbUser.id, email: dbUser.email, name: dbUser.name, sid: callerSid,
+        }),
+        refreshToken: generateToken({
+          sub: dbUser.id, type: 'refresh',
+          tv: updatedUser?.tokenVersion ?? (dbUser.tokenVersion ?? 0) + 1,
+          sid: callerSid,
+        }, { expiresIn: `${sessionService.SESSION_TTL_DAYS}d` }),
+      };
+    }
     
     logger.debug('[ChangePassword] Password updated for user:', dbUser.id);
     
-    res.json(successResponse({ message: 'Password changed successfully' }, 'Password changed successfully'));
+    // Returning tokens lets the client re-seed and stay signed in.
+    res.json(successResponse(
+      { message: 'Password changed successfully', ...(tokens || {}) },
+      'Password changed successfully',
+    ));
   } catch (err) {
     logger.error('[ChangePassword] Error:', err);
     res.status(500).json(errorResponse('Failed to change password. Please try again.'));
@@ -1896,6 +1985,61 @@ function sendOtpError(res, err, fallbackMessage) {
   return res.status(500).json(errorResponse(fallbackMessage));
 }
 
+/**
+ * Start a device session and mint the token pair for it.
+ *
+ * `sid` goes into BOTH tokens: the refresh token so /auth/refresh can check the session
+ * is still live, and the access token so logout knows which device to end without the
+ * client having to hand over its refresh token.
+ */
+async function issueSessionTokens(dbUser, { deviceName, platform } = {}) {
+  const session = await sessionService.createSession({
+    userId: dbUser.id,
+    deviceName,
+    platform,
+  });
+  const token = generateToken({
+    sub: dbUser.id,
+    email: dbUser.email,
+    name: dbUser.name,
+    sid: session.id,
+  });
+  const refreshToken = generateToken({
+    sub: dbUser.id,
+    type: 'refresh',
+    tv: dbUser.tokenVersion ?? 0,
+    sid: session.id,
+  }, { expiresIn: `${sessionService.SESSION_TTL_DAYS}d` });
+  return { token, refreshToken, session };
+}
+
+/**
+ * Drop live sockets for revoked sessions.
+ *
+ * The Socket.IO handshake verifies the access token once and never re-checks it, so a
+ * device whose session was revoked would otherwise keep receiving messages until its
+ * socket happened to drop. Best-effort — never let this break the calling request.
+ *
+ * @param {string} userId
+ * @param {string|null} exceptSessionId  session to keep (the caller's own device)
+ */
+function disconnectUserSockets(userId, exceptSessionId = null) {
+  try {
+    const room = io.sockets.adapter.rooms.get(`user:${userId}`);
+    if (!room) return;
+    for (const socketId of room) {
+      const sock = io.sockets.sockets.get(socketId);
+      if (!sock) continue;
+      // Pre-session sockets have no sessionId; disconnect them too, since we cannot
+      // tell whether they belong to a revoked device.
+      if (exceptSessionId && sock.sessionId === exceptSessionId) continue;
+      sock.disconnect(true);
+    }
+  } catch (err) {
+    logger.warn('[Sockets] Could not disconnect revoked sessions:', err?.message || err);
+  }
+}
+
 /** Mint proof that a contact detail was verified, for register to check later.
  *  Safe to hand to the client: it contains no secret, only the fact of a passed check.
  *  Mirrors the existing 'password_reset' / '2fa_pending' token pattern. */
@@ -1918,6 +2062,61 @@ function isContactVerified(token, expectedTo) {
 // works, instead of dead-ending on a 503 (audit A-9).
 app.get('/api/auth/verification-capabilities', (req, res) => {
   return res.json(successResponse(otpService.getVerificationCapabilities(otpDeps)));
+});
+
+// ============================================================================
+// SIGNED-IN DEVICES (per-device sessions)
+// ============================================================================
+
+// List this user's live sessions, most recently used first.
+app.get('/api/auth/sessions', requireAuth, async (req, res) => {
+  try {
+    const currentSid = req.user?.claims?.sid || null;
+    const sessions = await sessionService.listForUser(req.user.id);
+    return res.json(successResponse({
+      sessions: sessions.map((sn) => ({
+        id: sn.id,
+        deviceName: sn.deviceName,
+        platform: sn.platform,
+        lastUsedAt: sn.lastUsedAt,
+        createdAt: sn.createdAt,
+        isCurrent: sn.id === currentSid,
+      })),
+    }));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Sign out one device.
+app.delete('/api/auth/sessions/:sessionId', requireAuth, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const session = await sessionService.getById(sessionId);
+    if (!session || session.userId !== req.user.id) {
+      return res.status(404).json(errorResponse('Session not found'));
+    }
+    await sessionService.revoke(sessionId);
+    disconnectUserSockets(req.user.id, req.user?.claims?.sid || null);
+    return res.json(successResponse({ ok: true }, 'That device has been signed out.'));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Sign out every OTHER device.
+app.delete('/api/auth/sessions', requireAuth, async (req, res) => {
+  try {
+    const currentSid = req.user?.claims?.sid || null;
+    const result = await sessionService.revokeAllForUser(req.user.id, { exceptSessionId: currentSid });
+    disconnectUserSockets(req.user.id, currentSid);
+    return res.json(successResponse(
+      { revoked: result?.count ?? 0 },
+      'Your other devices have been signed out.',
+    ));
+  } catch (err) {
+    return sendError(res, err);
+  }
 });
 
 // Send phone OTP via SMS
@@ -2318,16 +2517,10 @@ app.post('/api/auth/2fa/verify', authLimiter, async (req, res) => {
       })
       .filter(Boolean);
 
-    const token = generateToken({
-      sub: dbUser.id,
-      email: dbUser.email,
-      name: dbUser.name,
+    const { token, refreshToken } = await issueSessionTokens(dbUser, {
+      deviceName: req.body?.deviceName,
+      platform: req.body?.platform,
     });
-    const refreshToken = generateToken({
-      sub: dbUser.id,
-      type: 'refresh',
-      tv: dbUser.tokenVersion ?? 0,
-    }, { expiresIn: '30d' });
 
     await repos.userRepo.update(dbUser.id, { lastLoginAt: new Date() }).catch(() => {});
 
@@ -2782,6 +2975,11 @@ app.delete('/api/users/me', requireAuth, async (req, res) => {
         },
       });
     });
+
+    // Session rows are FK-cascaded only on a hard delete; this is an anonymization, so
+    // revoke them explicitly and drop any live sockets.
+    await sessionService.revokeAllForUser(userId).catch(() => {});
+    disconnectUserSockets(userId);
 
     logger.info('[AccountDeletion] Account erased/anonymized:', userId);
     return res.json(successResponse(null, 'Your account has been deleted.'));

@@ -45,6 +45,10 @@ export default function SecuritySettingsScreen({ navigation }: SecuritySettingsS
     navigation.navigate('ChangeEmail', { mode: 'phone' });
   };
 
+  const handleSignedInDevices = () => {
+    navigation.navigate('SignedInDevices');
+  };
+
   const handleChangePassword = () => {
     navigation.navigate('ChangePassword');
   };
@@ -124,6 +128,22 @@ export default function SecuritySettingsScreen({ navigation }: SecuritySettingsS
         <View style={styles.settingLeft}>
           <Icon name="lock-closed-outline" size={24} color={appTheme.colors.iconColor} />
           <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Change Password</Text>
+        </View>
+        <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.settingItem, { borderBottomColor: appTheme.colors.borderColor }]}
+        onPress={handleSignedInDevices}
+      >
+        <View style={styles.settingLeft}>
+          <Icon name="phone-portrait-outline" size={24} color={appTheme.colors.iconColor} />
+          <View style={styles.settingTextContainer}>
+            <Text style={[styles.settingTitle, { color: appTheme.colors.text }]}>Signed-in devices</Text>
+            <Text style={[styles.settingDescription, { color: appTheme.colors.textLight }]}>
+              See where you&apos;re logged in and sign out remotely
+            </Text>
+          </View>
         </View>
         <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
       </TouchableOpacity>

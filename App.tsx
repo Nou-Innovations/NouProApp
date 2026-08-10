@@ -188,6 +188,7 @@ import TaskDetailScreen from '@/features/tasks/screens/TaskDetailScreen';
 import ChangePasswordScreen from '@/features/settings/screens/ChangePasswordScreen';
 import ChangeEmailScreen from '@/features/settings/screens/ChangeEmailScreen';
 import SecuritySettingsScreen from '@/features/settings/screens/SecuritySettingsScreen';
+import SignedInDevicesScreen from '@/features/settings/screens/SignedInDevicesScreen';
 import DeleteAccountScreen from '@/features/settings/screens/DeleteAccountScreen';
 import ProfileSettingsScreen from '@/features/settings/screens/ProfileSettingsScreen';
 import PersonalProfileSettingsScreen from '@/features/settings/screens/PersonalProfileSettingsScreen';
@@ -544,6 +545,7 @@ function AppNavigator() {
         <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
         <RootStack.Screen name="ChangeEmail" component={ChangeEmailScreen} />
         <RootStack.Screen name="SecuritySettings" component={SecuritySettingsScreen} />
+        <RootStack.Screen name="SignedInDevices" component={SignedInDevicesScreen} />
         <RootStack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
         <RootStack.Screen name="TwoFactorAuth" component={TwoFactorAuthScreen} />
         <RootStack.Screen name="BiometricLogin" component={BiometricLoginScreen} />

@@ -15,6 +15,7 @@ const transferStatus = require('./transferStatus');
 const paymentService = require('./paymentService');
 const subscriptionRenewal = require('./subscriptionRenewal');
 const otpService = require('./otpService');
+const sessionService = require('./sessionService');
 
 module.exports = {
   orderStatus,
@@ -27,4 +28,5 @@ module.exports = {
   paymentService,
   subscriptionRenewal,
   otpService,
+  sessionService,
 };

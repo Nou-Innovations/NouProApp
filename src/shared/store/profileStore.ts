@@ -51,6 +51,9 @@ const secureDelete = async (key: string): Promise<void> => {
 /**
  * Profile Store State
  */
+/** Why a logout happened. `null` = the user chose to sign out. */
+export type LogoutReason = 'session_expired';
+
 interface ProfileState {
   // ========== Authentication ==========
   // Auth tokens (persisted to AsyncStorage)
@@ -92,6 +95,9 @@ interface ProfileState {
 
   // True once SecureStore tokens have been loaded (prevents API calls before auth is ready)
   isRehydrated: boolean;
+
+  /** Why the last logout happened, so the auth screen can explain it. Cleared on login. */
+  logoutReason: LogoutReason | null;
 }
 
 /**
@@ -114,7 +120,11 @@ interface ProfileActions {
   // Full login - sets user, tokens, and businesses in one call
   login: (user: User, accessToken: string, refreshToken?: string, businesses?: UserBusiness[], isNewUser?: boolean) => void;
   // Full logout - clears everything
-  logout: () => void;
+  /**
+   * @param reason 'session_expired' when the server revoked the session, so the auth
+   *   screen can explain why the user was bounced instead of silently reappearing.
+   */
+  logout: (reason?: LogoutReason) => void;
   // Clear new user flag (after showing welcome message)
   clearNewUserFlag: () => void;
   
@@ -233,6 +243,7 @@ const initialState: ProfileState = {
   error: null,
   isNewUser: false,
   isRehydrated: false,
+  logoutReason: null,
 };
 
 /**
@@ -309,6 +320,7 @@ export const useProfileStore = create<ProfileStore>()(
           userBusinesses: normalizedBusinesses,
           isInitialized: true,
           error: null,
+          logoutReason: null, // a successful sign-in clears any "session expired" notice
           isNewUser: isNewUser ?? false,
           twoFactorEnabled: !!(user as any).twoFactorEnabled,
         });
@@ -326,7 +338,7 @@ export const useProfileStore = create<ProfileStore>()(
       /**
        * Full logout - clears all auth state and resets all feature stores
        */
-      logout: () => {
+      logout: (reason?: LogoutReason) => {
         // Best-effort: unregister this device's push token so it stops
         // receiving this account's notifications. Fire-and-forget with the
         // token captured now — the store is cleared synchronously below.
@@ -359,6 +371,8 @@ export const useProfileStore = create<ProfileStore>()(
         set({
           ...initialState,
           isInitialized: true, // Keep initialized to prevent dev seed re-run
+          // Survives the reset so the auth screen can explain an involuntary logout.
+          logoutReason: reason ?? null,
         });
       },
 
