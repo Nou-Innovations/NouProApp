@@ -45,7 +45,7 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | A-5 | P1 | **FIXED ✅** — **Refresh failure = silent logout, no message, plus a duplicate error.** `api.ts:203` logs out, then `api.ts:219` still throws to the caller — so the screen renders an error state on the same tick the tree is swapped for the auth navigator. The user lands on the Launch screen with no explanation; "session expired" is never shown anywhere. |
 | A-6 | P1 | **FIXED ✅** — **Changing your password silently kills your own session ~30 min later.** `server.js:1519` bumps `tokenVersion`, invalidating the caller's own refresh token, but `ChangePasswordScreen.tsx:71-78` never re-authenticates — it alerts "Success" and goes back. The access token stays valid for 30 min, then the next refresh 401s → A-5 → forced logout out of nowhere. |
 | A-7 | P1 | **FIXED ✅** — **Logging out on one device logs you out everywhere.** `POST /auth/logout` does `tokenVersion: { increment: 1 }` (`server.js:1207-1212`), revoking every device's refresh token. No session/device table exists and no UI warns about it. |
-| A-8 | P1 | **Onboarding seeds only the access token, never the refresh token.** `UploadProfilePictureScreen.tsx:71`, `SelectCompanyScreen.tsx:60-62`, `UploadBusinessLogoScreen.tsx:48-51` all set `accessToken` alone; a 401 mid-onboarding finds `refreshToken === null` (`api.ts:169-170`) → `logout()` wipes the store mid-registration. The 4-screen business-creation branch can easily outlive the 30-min token. |
+| A-8 | P1 | **FIXED ✅** — **Onboarding seeds only the access token, never the refresh token.** `UploadProfilePictureScreen.tsx:71`, `SelectCompanyScreen.tsx:60-62`, `UploadBusinessLogoScreen.tsx:48-51` all set `accessToken` alone; a 401 mid-onboarding finds `refreshToken === null` (`api.ts:169-170`) → `logout()` wipes the store mid-registration. The 4-screen business-creation branch can easily outlive the 30-min token. |
 | A-9 | P1 | **FIXED ✅** — **Twilio is a hard single point of failure for signup, with no dev fallback.** `server.js:1560-1564` (and `:1594,:1631,:1659`) return 503 when the Twilio vars are unset, and `CreateAccountScreen.tsx:82-88` only navigates on success — so the user never reaches the OTP screen where the `__DEV__` bypass code lives (`PhoneVerificationScreen.tsx:23`). **Registration is 100% unreachable without Twilio, even in dev.** Email OTP uses the same Verify service, so it isn't an independent fallback. |
 | A-10 | P1 | **FIXED ✅** — **Verification is decorative and unrecoverable** (extends round-1 A-8). No `emailVerified`/`phoneVerified` columns exist; the OTP endpoints persist nothing; `register` never checks them. Additionally there is **no post-signup resend path** — the OTP screens are only reachable *before* the account exists, so nothing can ever mark a user verified later. |
 | A-11 | P1 | **Biometric auto-login can never run.** `App.tsx:732` returns early in both possible states: `staySignedIn: true` → rehydration already set `isSignedIn` → return; `staySignedIn: false` → rehydration forces `biometricEnabled: false` (`profileStore.ts:714`) → return. Even if it ran, `refreshToken()` only restores tokens, never `currentUser`, so `isSignedIn` would stay false. `BiometricLoginScreen.tsx:106-109` lets users enable a feature that does nothing. |
@@ -355,6 +355,25 @@ Four findings, one root cause: `tokenVersion` was the only revocation mechanism 
 3. Stop the backend and use the app → a retryable error, **not** a logout.
 4. Settings → Security → Signed-in devices: both listed, current one marked; sign one out remotely.
 5. **Do this first after deploying:** an already-signed-in user must NOT be logged out.
+
+---
+
+## Fix log — A-8 (2026-08-07)
+
+The wizard seeded only the access token, so a 401 mid-onboarding read as "revoked", called `logout()` and wiped the store **after the account already existed on the server**. All three seed sites now set both tokens.
+
+- **Raw `setState`, not `setTokens()`** — `setTokens` persists to SecureStore, and the wizard's use of raw `setState` is an accidental but real safety property: abandoning signup must not leave credentials on disk.
+- The business-create failure path now clears **both** tokens.
+- **Rehydration drops tokens restored without a `currentUser`.** That orphan state was already reachable: a mid-wizard 401 that refreshes *successfully* persists via the interceptor's `setTokens`, so abandoning signup left credentials on disk with no user record, attached to every request, with `isSignedIn` false so nothing cleaned them up.
+- The terminal `login()` calls prefer the store's tokens over the (possibly stale) route params, so onboarding no longer quietly depends on refresh tokens not being invalidated on use.
+
+**Verified:** backend tests 81/81, ESLint 0 errors, `tsc` 133 = unchanged baseline. No backend or schema change.
+
+### Smoke tests
+
+1. Sign up via the **create a business** branch, pausing a few minutes on the Hours screen so the access token ages — creating the business at the end must succeed.
+2. Start signup, reach ChoosePath, force-quit, reopen → clean Launch screen, no half-authenticated state.
+3. Normal signup and normal login still work end to end.
 
 ---
 
