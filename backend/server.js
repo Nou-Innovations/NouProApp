@@ -3280,23 +3280,27 @@ app.get('/api/users/:userId', requireAuth, async (req, res) => {
     // Get connection status with requester
     const connectionStatus = isSelf ? null : await repos.connectionRepo.getStatus(req.user.id, req.params.userId);
 
-    // Get user's businesses (public info for experience section, parallel fetch)
-    const memberships = await repos.memberRepo.getByUserId(req.params.userId);
-    const acceptedMs = memberships.filter(m => m.status === 'accepted');
-    const bizResults = await Promise.all(acceptedMs.map(m => repos.businessRepo.getById(m.businessId)));
-    const experiences = acceptedMs
-      .map((m, i) => {
-        const biz = bizResults[i];
-        if (!biz) return null;
-        return {
-          business_id: biz.id,
-          business_name: biz.name,
-          business_logo: biz.logoUrl,
-          role: m.role,
-          started_at: m.createdAt,
-        };
-      })
-      .filter(Boolean);
+    // The profile timeline is now real WorkExperience rows, not a derivation from
+    // memberships. Memberships project into that table (see workExperienceRepo), which
+    // is what gives these entries real dates — the derived version had none, so every
+    // row rendered "Present - Present" — and what makes the "show on profile" switch
+    // mean something.
+    const experienceRows = await repos.workExperienceRepo.getByUserId(req.params.userId, {
+      visibleOnly: !isSelf,
+    });
+    const experiences = experienceRows.map((e) => ({
+      id: e.id,
+      business_id: e.linkedBusinessId,
+      business_name: e.linkedBusiness?.name || e.companyName,
+      business_logo: e.linkedBusiness?.logoUrl || e.companyLogo,
+      role: e.position,
+      started_at: e.startDate,
+      ended_at: e.endDate,
+      is_current: e.isCurrent,
+      origin: e.origin,
+      // An archived company keeps its name on the timeline but stops being tappable.
+      is_deleted: Boolean(e.linkedBusiness?.deletedAt),
+    }));
 
     res.json(successResponse({
       ...safeUser,
@@ -6951,10 +6955,19 @@ app.delete('/api/companies/:companyId/transports/:transportId', requireAuth, asy
 
 // --- Work Experience ---
 
-// List user's work experiences (public)
+// List a user's work experiences
 app.get('/api/users/:userId/experiences', requireAuth, async (req, res) => {
   try {
-    const experiences = await repos.workExperienceRepo.getByUserId(req.params.userId);
+    const isSelf = req.user.id === req.params.userId;
+    // Blocks are bidirectional. GET /users/:userId already enforced this; this sibling
+    // route did not, so a blocked user could still read the timeline.
+    if (!isSelf && await repos.blockRepo.isBlocked(req.user.id, req.params.userId)) {
+      return res.status(404).json(errorResponse('User not found'));
+    }
+    // Only the owner sees entries they've hidden from their profile.
+    const experiences = await repos.workExperienceRepo.getByUserId(req.params.userId, {
+      visibleOnly: !isSelf,
+    });
     res.json(successResponse(experiences));
   } catch (e) {
     logger.error('Error fetching experiences:', e);
@@ -6989,6 +7002,9 @@ app.post('/api/users/me/experiences', requireAuth, async (req, res) => {
       endDate: endDate ? new Date(endDate) : null,
       isCurrent: isCurrent || false,
       linkedBusinessId: linkedBusinessId || null,
+      // Hand-typed entries are MANUAL; MEMBERSHIP rows are only ever written by the
+      // membership projection in memberRepo, never by this route.
+      origin: 'MANUAL',
     });
 
     res.status(201).json(successResponse(created));
@@ -7006,18 +7022,23 @@ app.patch('/api/users/me/experiences/:id', requireAuth, async (req, res) => {
       return res.status(404).json(errorResponse('Work experience not found'));
     }
 
-    const { companyName, companyLogo, position, description, industry, location, startDate, endDate, isCurrent, linkedBusinessId } = req.body;
+    const { companyName, companyLogo, position, description, industry, location, startDate, endDate, isCurrent, linkedBusinessId, isVisible } = req.body;
+    // A MEMBERSHIP row is owned by the membership: its company, dates and current-ness
+    // follow the actual membership, so editing them here would let the timeline drift
+    // from the org it mirrors. Visibility and free-text notes stay editable.
+    const isMembershipRow = experience.origin === 'MEMBERSHIP';
     const patch = {
-      ...(companyName !== undefined && { companyName: companyName.trim() }),
-      ...(companyLogo !== undefined && { companyLogo }),
-      ...(position !== undefined && { position: position.trim() }),
+      ...(!isMembershipRow && companyName !== undefined && { companyName: companyName.trim() }),
+      ...(!isMembershipRow && companyLogo !== undefined && { companyLogo }),
+      ...(!isMembershipRow && position !== undefined && { position: position.trim() }),
       ...(description !== undefined && { description }),
       ...(industry !== undefined && { industry }),
       ...(location !== undefined && { location }),
-      ...(startDate !== undefined && { startDate: new Date(startDate) }),
-      ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
-      ...(isCurrent !== undefined && { isCurrent }),
-      ...(linkedBusinessId !== undefined && { linkedBusinessId }),
+      ...(!isMembershipRow && startDate !== undefined && { startDate: new Date(startDate) }),
+      ...(!isMembershipRow && endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
+      ...(!isMembershipRow && isCurrent !== undefined && { isCurrent }),
+      ...(!isMembershipRow && linkedBusinessId !== undefined && { linkedBusinessId }),
+      ...(isVisible !== undefined && { isVisible: Boolean(isVisible) }),
     };
 
     const updated = await repos.workExperienceRepo.update(req.params.id, patch);
@@ -7034,6 +7055,17 @@ app.delete('/api/users/me/experiences/:id', requireAuth, async (req, res) => {
     const experience = await repos.workExperienceRepo.getById(req.params.id);
     if (!experience || experience.userId !== req.user.id) {
       return res.status(404).json(errorResponse('Work experience not found'));
+    }
+
+    // A MEMBERSHIP row mirrors a real company membership — you leave the company, you
+    // don't delete the history. Deleting here would strip the entry while leaving the
+    // membership (and its permissions) fully intact, which is what the old edit screen
+    // did under a button labelled "Leave Company". Hide it instead, or leave the company.
+    if (experience.origin === 'MEMBERSHIP') {
+      return res.status(400).json(errorResponse(
+        'This entry comes from a company you belong to. Leave the company, or hide it from your profile.',
+        'MEMBERSHIP_EXPERIENCE',
+      ));
     }
 
     await repos.workExperienceRepo.delete(req.params.id);

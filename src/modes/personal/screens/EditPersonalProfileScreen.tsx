@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
-import { useProfileStore, getRoleDisplayName } from '@/shared/store/profileStore';
+import { useProfileStore } from '@/shared/store/profileStore';
 import Avatar from '@/shared/components/ui/Avatar';
 import { AppModal, SectionTitle, AppButton } from '@/shared/components/ui';
 import AppTextField from '@/shared/components/ui/AppTextField';
@@ -15,6 +15,8 @@ import { KeyboardAwareScreen } from '@/shared/components/layout';
 import ImageUploadField from '@/shared/components/ui/ImageUploadField';
 import { imageService } from '@/shared/services/imageService';
 import { patch as apiPatch, authAPI } from '@/shared/services/api';
+import { getExperiences, updateExperience } from '@/features/profile/services/profile.service';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 import { LogOut, Trash2 } from 'lucide-react-native';
 
 export default function EditPersonalProfileScreen() {
@@ -24,7 +26,30 @@ export default function EditPersonalProfileScreen() {
   // Profile store
   const currentUser = useProfileStore((state) => state.currentUser);
   const updateCurrentUser = useProfileStore((state) => state.updateCurrentUser);
-  const userBusinesses = useProfileStore((state) => state.userBusinesses);
+  // The timeline is real WorkExperience rows now. It used to render `userBusinesses`
+  // (company memberships), which is why entries added via "Add work experience" never
+  // appeared (P-11) and why the edit screen was handed a Business id (P-3).
+  const [experiences, setExperiences] = useState<any[]>([]);
+  const [experiencesLoading, setExperiencesLoading] = useState(true);
+
+  const loadExperiences = useCallback(async () => {
+    if (!currentUser?.id) return;
+    try {
+      const rows = await getExperiences(currentUser.id);
+      setExperiences(rows || []);
+    } catch {
+      // Non-fatal: the rest of the edit form still works.
+    } finally {
+      setExperiencesLoading(false);
+    }
+  }, [currentUser?.id]);
+
+  // Refetch on focus so adding or editing an entry is reflected on return.
+  useFocusEffect(
+    useCallback(() => {
+      void loadExperiences();
+    }, [loadExperiences]),
+  );
 
   // Store original values for comparison
   const originalInfoRef = useRef({
@@ -60,15 +85,6 @@ export default function EditPersonalProfileScreen() {
     bio: currentUser?.bio || '',
     industry: currentUser?.industry || '',
     profile_slug: currentUser?.profile_slug || '',
-  });
-
-  // Work experience visibility toggles
-  const [workplaceVisibility, setWorkplaceVisibility] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    userBusinesses.forEach(ub => {
-      initial[ub.business.id] = true;
-    });
-    return initial;
   });
 
   // Track states
@@ -263,16 +279,25 @@ export default function EditPersonalProfileScreen() {
     navigation.navigate('AddWorkExperience');
   };
 
-  const handleEditWorkExperience = (businessId: string) => {
-    // @ts-ignore
-    navigation.navigate('EditWorkExperience', { businessId });
+  /** Persist the visibility switch. It used to be local state that no save ever sent. */
+  const handleToggleExperienceVisibility = async (experienceId: string, value: boolean) => {
+    setExperiences((prev) =>
+      prev.map((e) => (e.id === experienceId ? { ...e, isVisible: value } : e)),
+    );
+    try {
+      await updateExperience(experienceId, { isVisible: value });
+    } catch (err) {
+      // Put it back if the server refused, rather than showing a lie.
+      setExperiences((prev) =>
+        prev.map((e) => (e.id === experienceId ? { ...e, isVisible: !value } : e)),
+      );
+      AppAlert.alert('Error', getApiErrorMessage(err, 'Could not update visibility.'));
+    }
   };
 
-  const toggleWorkplaceVisibility = (businessId: string) => {
-    setWorkplaceVisibility(prev => ({
-      ...prev,
-      [businessId]: !prev[businessId],
-    }));
+  const handleEditWorkExperience = (experienceId: string) => {
+    // @ts-ignore -- this screen uses an untyped useNavigation()
+    navigation.navigate('EditWorkExperience', { experienceId });
   };
 
   const renderPrivacyToggle = (
@@ -466,17 +491,17 @@ export default function EditPersonalProfileScreen() {
         Work Experiences
       </SectionTitle>
 
-      {userBusinesses.length === 0 ? (
+      {experiencesLoading ? null : experiences.length === 0 ? (
         <Text style={[styles.emptyText, { color: appTheme.colors.textMuted }]}>
           No work experiences added yet
         </Text>
       ) : (
-        userBusinesses.map((ub, index) => (
+        experiences.map((exp, index) => (
           <View
-            key={ub.business.id}
+            key={exp.id}
             style={[
               styles.experienceCardWrapper,
-              index !== userBusinesses.length - 1 && { marginBottom: 12 },
+              index !== experiences.length - 1 && { marginBottom: 12 },
             ]}
           >
             <TouchableOpacity
@@ -484,24 +509,26 @@ export default function EditPersonalProfileScreen() {
                 styles.experienceCard,
                 { backgroundColor: appTheme.colors.surface },
               ]}
-              onPress={() => handleEditWorkExperience(ub.business.id)}
+              onPress={() => handleEditWorkExperience(exp.id)}
               activeOpacity={0.7}
             >
               <Avatar
-                userId={ub.business.id}
-                userName={ub.business.name}
-                imageUri={ub.business.logo_url}
+                userId={exp.linkedBusinessId || exp.id}
+                userName={exp.linkedBusiness?.name || exp.companyName}
+                imageUri={exp.linkedBusiness?.logoUrl || exp.companyLogo}
                 size={48}
               />
               <View style={styles.experienceInfo}>
                 <Text style={[styles.experienceName, { color: appTheme.colors.text }]}>
-                  {ub.business.name}
+                  {exp.linkedBusiness?.name || exp.companyName}
                 </Text>
                 <Text style={[styles.experienceRole, { color: appTheme.colors.textSecondary }]}>
-                  {getRoleDisplayName(ub.role)}
+                  {exp.position}
                 </Text>
                 <Text style={[styles.experienceDate, { color: appTheme.colors.textMuted }]}>
-                  {formatExperienceDate(ub.start_date)} - {formatExperienceDate(ub.end_date)}
+                  {/* Real dates at last — the membership-derived rows had none, so every
+                      row used to read "Present - Present". */}
+                  {formatExperienceDate(exp.startDate)} - {exp.isCurrent ? 'Present' : formatExperienceDate(exp.endDate)}
                 </Text>
               </View>
               <Icon
@@ -514,8 +541,8 @@ export default function EditPersonalProfileScreen() {
               <Text style={[
                 styles.workplaceToggleText,
                 {
-                  color: (workplaceVisibility[ub.business.id] ?? true) ? appTheme.colors.text : appTheme.colors.textSecondary,
-                  fontFamily: (workplaceVisibility[ub.business.id] ?? true) ? theme.fonts.primary.medium : theme.fonts.primary.regular,
+                  color: exp.isVisible !== false ? appTheme.colors.text : appTheme.colors.textSecondary,
+                  fontFamily: exp.isVisible !== false ? theme.fonts.primary.medium : theme.fonts.primary.regular,
                 }
               ]}>
                 Show this workplace on profile
@@ -524,8 +551,8 @@ export default function EditPersonalProfileScreen() {
                 trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.switchTrackOn }}
                 thumbColor={appTheme.colors.switchThumb}
                 ios_backgroundColor={appTheme.colors.switchTrackOff}
-                onValueChange={() => toggleWorkplaceVisibility(ub.business.id)}
-                value={workplaceVisibility[ub.business.id] ?? true}
+                onValueChange={(value) => handleToggleExperienceVisibility(exp.id, value)}
+                value={exp.isVisible !== false}
               />
             </View>
           </View>

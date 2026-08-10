@@ -56,26 +56,78 @@ async function getBusinessMember(businessId, userId) {
   });
 }
 
+/**
+ * Keep the profile timeline in step with membership state (audit P-3 / P-11).
+ *
+ * Done HERE rather than at the ~5 route call sites so that every path — create company,
+ * invite accept, join-request approval, staff assign, and anything added later — projects
+ * automatically. A route-level patch would silently miss the next new caller, which is
+ * exactly how the two models drifted apart in the first place.
+ *
+ * Always best-effort: a timeline write must never fail or roll back the membership change
+ * that triggered it.
+ */
+async function syncMembershipExperience(userId, businessId, { role, status, startedAt }) {
+  try {
+    const workExperienceRepo = require('./workExperienceRepo.prisma');
+    if (status === 'accepted') {
+      const business = await prisma.business.findUnique({
+        where: { id: businessId },
+        select: { id: true, name: true, logoUrl: true },
+      });
+      if (!business) return;
+      await workExperienceRepo.upsertMembershipExperience({ userId, business, role, startedAt });
+    } else {
+      // Suspended / invited / removed: the person is no longer actively there.
+      await workExperienceRepo.closeMembershipExperience(userId, businessId);
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[memberRepo] timeline sync failed:', err?.message || err);
+  }
+}
+
 async function addBusinessMember(data) {
-  return prisma.businessMember.create({
+  const created = await prisma.businessMember.create({
     data,
     include: safeUserInclude
   });
+  await syncMembershipExperience(created.userId, created.businessId, {
+    role: created.role,
+    status: created.status,
+    startedAt: created.createdAt,
+  });
+  return created;
 }
 
 async function updateBusinessMember(id, patch) {
-  return prisma.businessMember.update({
+  const updated = await prisma.businessMember.update({
     where: { id },
     data: patch,
     include: safeUserInclude
   });
+  // Covers the invite-accept transition (invited -> accepted) and role changes.
+  await syncMembershipExperience(updated.userId, updated.businessId, {
+    role: updated.role,
+    status: updated.status,
+    startedAt: updated.createdAt,
+  });
+  return updated;
 }
 
 async function removeBusinessMember(id) {
   try {
+    // Read first: after the delete there is no row to tell us whose timeline to close.
+    const existing = await prisma.businessMember.findUnique({
+      where: { id },
+      select: { userId: true, businessId: true },
+    });
     await prisma.businessMember.delete({
       where: { id }
     });
+    if (existing) {
+      await syncMembershipExperience(existing.userId, existing.businessId, { status: 'removed' });
+    }
     return true;
   } catch (e) {
     return false;

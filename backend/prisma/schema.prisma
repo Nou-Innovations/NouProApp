@@ -123,6 +123,7 @@ model Business {
   targets                 BusinessTarget[]      @relation("BusinessTargets")
   recipes                 Recipe[]
   companyInvites          CompanyInvite[]
+  workExperiences         WorkExperience[]
 
   @@index([deletedAt])
 }
@@ -261,24 +262,50 @@ model Location {
 
 // ── Professional Profile Models ──
 
+/// The single source of truth for a profile's work timeline.
+///
+/// There used to be two disjoint notions of "workplace": company memberships
+/// (BusinessMember) and typed-in entries (this table). The Add screen wrote here, every
+/// display read memberships, and the Edit screen — the only reader of these rows — was
+/// handed a Business id, so it always said "Experience not found" (audit P-3 / P-11).
+///
+/// Now a membership PROJECTS into this table as an `origin: MEMBERSHIP` row: created when
+/// the membership is accepted, closed (endDate set, isCurrent false) when the person
+/// leaves. Leaving a company is history, not an erasure, so the row is never deleted.
 model WorkExperience {
-  id               String    @id @default(uuid())
+  id               String              @id @default(uuid())
   userId           String
   companyName      String
   companyLogo      String?
   position         String
-  description      String?   @db.Text
+  description      String?             @db.Text
   industry         String?
   location         String?
   startDate        DateTime
   endDate          DateTime?
-  isCurrent        Boolean   @default(false)
+  isCurrent        Boolean             @default(false)
   linkedBusinessId String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// MEMBERSHIP rows are owned by the membership: the company name/logo are locked and
+  /// removing one means leaving the company. MANUAL rows are free-text CV entries.
+  origin           WorkExperienceOrigin @default(MANUAL)
+  /// Backs the "Show this workplace on profile" switch, which previously had nowhere
+  /// to write and silently reset on every mount.
+  isVisible        Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Real relation now — this was a bare string with no FK, so nothing validated it and
+  /// a linked row couldn't render the live logo or deep-link to the company.
+  linkedBusiness   Business?           @relation(fields: [linkedBusinessId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([linkedBusinessId])
+  @@unique([userId, linkedBusinessId, origin])
+}
+
+enum WorkExperienceOrigin {
+  MEMBERSHIP
+  MANUAL
 }
 
 model Education {

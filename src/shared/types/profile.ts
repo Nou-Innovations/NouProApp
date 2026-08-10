@@ -205,6 +205,16 @@ export interface WorkExperience {
   endDate?: string; // ISO date, null = current
   isCurrent: boolean;
   linkedBusinessId?: string;
+  /**
+   * MEMBERSHIP rows mirror a company you belong to: the company, role and dates follow
+   * the membership, and removing one means leaving the company. MANUAL rows are
+   * free-text CV entries you own outright.
+   */
+  origin?: 'MEMBERSHIP' | 'MANUAL';
+  /** Backs the "Show this workplace on profile" switch. */
+  isVisible?: boolean;
+  /** Present on linked rows so the timeline can show the live logo and deep-link. */
+  linkedBusiness?: { id: string; name: string; logoUrl?: string | null; deletedAt?: string | null };
   createdAt: string;
   updatedAt: string;
 }
@@ -222,7 +232,10 @@ export interface CreateWorkExperienceDTO {
   linkedBusinessId?: string;
 }
 
-export interface UpdateWorkExperienceDTO extends Partial<CreateWorkExperienceDTO> {}
+export interface UpdateWorkExperienceDTO extends Partial<CreateWorkExperienceDTO> {
+  /** Toggle whether this entry shows on the public profile. */
+  isVisible?: boolean;
+}
 
 /**
  * Education entry on a user's professional profile

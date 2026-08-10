@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -100,10 +101,19 @@ export default function EditWorkExperienceScreen() {
     setHasChanges(changed);
   }, [role, description, industry, location, startDate, endDate, isCurrentRole]);
 
+  // Membership-origin rows are owned by the company relationship, not by the CV editor.
+  const isMembershipRow = experience?.origin === 'MEMBERSHIP';
+
   const handleSave = async () => {
     setIsRemoving(false);
     try {
-      await updateExperience(experienceId, {
+      // A membership row's company, role and dates follow the actual membership — the
+      // server rejects changes to them — so only send the free-text fields.
+      await updateExperience(experienceId, isMembershipRow ? {
+        description: description.trim() || undefined,
+        industry: industry.trim() || undefined,
+        location: location.trim() || undefined,
+      } : {
         position: role.trim(),
         description: description.trim() || undefined,
         industry: industry.trim() || undefined,
@@ -126,13 +136,21 @@ export default function EditWorkExperienceScreen() {
   const confirmDelete = async () => {
     setIsRemoving(true);
     try {
-      await deleteExperience(experienceId);
+      if (isMembershipRow) {
+        // This entry mirrors a real company membership. The button used to say
+        // "Leave Company" and call deleteExperience — which stripped the CV line and
+        // left the membership (and its permissions) fully intact. Actually leave.
+        if (experience?.linkedBusinessId) {
+          await removeUserBusiness(experience.linkedBusinessId);
+        }
+      } else {
+        await deleteExperience(experienceId);
+      }
       setShowDeleteDialog(false);
       navigation.goBack();
     } catch (error: any) {
       setIsRemoving(false);
-      const msg = error?.message || 'Failed to remove experience. Please try again.';
-      AppAlert.alert('Error', msg);
+      AppAlert.alert('Error', getApiErrorMessage(error, 'Failed to remove experience. Please try again.'));
     }
   };
 
@@ -300,7 +318,7 @@ export default function EditWorkExperienceScreen() {
             />
             {/* Leave / Remove Button */}
             <AppButton
-              title={isCurrentRole ? 'Leave Company' : 'Remove Experience'}
+              title={isMembershipRow ? 'Leave Company' : 'Remove Experience'}
               onPress={handleDelete}
               variant="destructive"
               fullWidth
