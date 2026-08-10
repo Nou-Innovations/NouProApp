@@ -18,7 +18,6 @@ import { useBusinessStore } from '@/shared/store/businessStore';
 import { authAPI } from '@/shared/services/api';
 import Avatar from '@/shared/components/ui/Avatar';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
-import * as Sentry from '@sentry/react-native';
 import { DemoModeBadge } from '@/shared/components/ui/DemoModeBadge';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -102,7 +101,13 @@ export default function PersonalSettingsScreen() {
   };
 
   const handlePrivacyPolicy = () => {
-    AppAlert.alert('Privacy Policy', 'Navigate to privacy policy screen');
+    // @ts-ignore
+    navigation.navigate('Privacy');
+  };
+
+  const handleTerms = () => {
+    // @ts-ignore
+    navigation.navigate('Terms');
   };
 
   const handleLogout = () => {
@@ -347,23 +352,18 @@ export default function PersonalSettingsScreen() {
         <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
       </TouchableOpacity>
 
-      {/* TEMPORARY: Sentry wiring test — REMOVE once error reporting is confirmed. */}
+      {/* Terms of Service */}
       <TouchableOpacity
         style={[styles.settingRow, { borderBottomColor: appTheme.colors.borderColor }]}
-        onPress={() => {
-          Sentry.captureException(new Error('NouPro Sentry test error ' + new Date().toISOString()));
-          AppAlert.alert(
-            'Test error sent',
-            'Check your Sentry dashboard (nou-innovations) under Issues in ~1 minute — a "NouPro Sentry test error" should appear.'
-          );
-        }}
+        onPress={handleTerms}
       >
         <View style={styles.settingLeft}>
-          <Icon name="bug-outline" size={24} color={appTheme.colors.iconColor} />
-          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Send test error to Sentry (temporary)</Text>
+          <Icon name="document-text-outline" size={24} color={appTheme.colors.iconColor} />
+          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Terms of Service</Text>
         </View>
         <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
       </TouchableOpacity>
+
 
       {/* Log Out */}
       <TouchableOpacity

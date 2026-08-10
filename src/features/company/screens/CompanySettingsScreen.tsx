@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch, Linking } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
-import { API_CONFIG } from '@/shared/config/api';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import {
@@ -177,18 +176,17 @@ export default function CompanySettingsScreen() {
     navigation.navigate('SecuritySettings');
   };
 
-  const handlePrivacyPolicy = async () => {
-    // CO-27: this used to show a developer placeholder string. Open the hosted privacy page
-    // the backend serves at <origin>/legal/privacy (baseUrl ends in /api).
-    const origin = (API_CONFIG.baseUrl || '').replace(/\/api\/?$/, '');
-    const url = `${origin}/legal/privacy`;
-    try {
-      const ok = await Linking.canOpenURL(url);
-      if (ok) await Linking.openURL(url);
-      else AppAlert.alert('Privacy Policy', 'Could not open the privacy policy right now.');
-    } catch {
-      AppAlert.alert('Privacy Policy', 'Could not open the privacy policy right now.');
-    }
+  // Open the in-app legal screens rather than kicking the user out to a browser.
+  // This used to open the hosted page (CO-27); personal settings now does the same
+  // thing in-app, so both modes behave identically.
+  const handlePrivacyPolicy = () => {
+    // @ts-ignore
+    navigation.navigate('Privacy');
+  };
+
+  const handleTerms = () => {
+    // @ts-ignore
+    navigation.navigate('Terms');
   };
 
   const handleProfile = () => {
@@ -325,6 +323,11 @@ export default function CompanySettingsScreen() {
             icon={FileText}
             title="Privacy Policy"
             onPress={handlePrivacyPolicy}
+          />
+          <SettingsOption
+            icon={FileText}
+            title="Terms of Service"
+            onPress={handleTerms}
           />
           <SettingsOption
             icon={User}

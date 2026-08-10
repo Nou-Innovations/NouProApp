@@ -318,6 +318,10 @@ export type RootStackParamList = {
   ChangeEmail: { mode?: 'email' | 'phone' } | undefined;
   SecuritySettings: undefined;
   SignedInDevices: undefined;
+  // Legal — intentionally present in BOTH this list and AuthStackParamList: the signup
+  // checkbox reaches them pre-auth, Settings reaches them post-auth.
+  Terms: undefined;
+  Privacy: undefined;
   DeleteAccount: undefined;
   ProfileSettings: undefined;
   PersonalProfileSettings: undefined;

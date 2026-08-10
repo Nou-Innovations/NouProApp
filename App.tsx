@@ -553,6 +553,11 @@ function AppNavigator() {
         <RootStack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
         <RootStack.Screen name="PersonalProfileSettings" component={PersonalProfileSettingsScreen} />
         <RootStack.Screen name="PersonalSettings" component={PersonalSettingsScreen} />
+        {/* Legal — also registered on the AuthStack for the signup checkbox. Settings
+            needs them here too: the two navigators are mutually exclusive, so the
+            AuthStack copies are unreachable once the user is signed in. */}
+        <RootStack.Screen name="Terms" component={TermsScreen} />
+        <RootStack.Screen name="Privacy" component={PrivacyScreen} />
         <RootStack.Screen name="PersonalDeliveryDetail" component={PersonalDeliveryDetailScreen} />
         {/* CompanySettings is a hidden tab in BusinessTabNavigator (sidebar shell) */}
         <RootStack.Screen name="EditBusiness" component={CompanyEditScreen} />
