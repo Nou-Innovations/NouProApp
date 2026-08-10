@@ -21,7 +21,48 @@ const logger = require('../utils/logger');
 const jwt = require('jsonwebtoken');
 
 /**
+ * SECURITY (AUTH-1): token types that must NEVER authenticate an ordinary request.
+ *
+ * Every token kind is signed with the same JWT_SECRET and carries the real user id in
+ * `sub`, so without this check any of them works as an access token. That made 2FA
+ * worthless (the pre-TOTP `2fa_pending` ticket authenticated everything), turned a
+ * password-reset link into a 15-minute API key, and let a 30-day refresh token bypass
+ * the session/tokenVersion revocation that only runs on /api/auth/refresh.
+ *
+ * This is the deny-list half of a two-phase rollout. A token with NO `type` claim is
+ * still accepted, because access tokens minted before this shipped have no `type` and
+ * rejecting them would sign out every logged-in user. That is safe: all four confusable
+ * kinds set `type` explicitly, so denying them blocks the whole attack.
+ *
+ * PHASE 2 (deploy >= 24h after this one): access tokens now carry `type: 'access'` at
+ * all three mint sites, and they live 30 minutes, so untyped tokens are extinct shortly
+ * after this deploys. Swap the three `isNonAccessToken()` call sites for a strict
+ * `claims.type === 'access'` allow-list. Sites: requireAuth and optionalAuth below, plus
+ * the Socket.IO handshake in server.js.
+ */
+const NON_ACCESS_TOKEN_TYPES = new Set([
+  'refresh',
+  'password_reset',
+  '2fa_pending',
+  'contact_verified',
+]);
+
+/**
+ * True if these claims belong to a special-purpose token that must not authenticate
+ * a normal request. Each such flow validates its own `type` at its own endpoint.
+ */
+function isNonAccessToken(claims) {
+  return !!claims && NON_ACCESS_TOKEN_TYPES.has(claims.type);
+}
+
+/**
  * Extract and verify JWT token from Authorization header
+ *
+ * NOTE: deliberately does NOT check the token `type`. Five flows share this primitive
+ * and each asserts its own expected type at its endpoint (password reset, refresh, 2FA
+ * verify, contact verification, socket handshake). Enforcing a type here would break
+ * all of them at once. Callers that need an ACCESS token must use isNonAccessToken().
+ *
  * @param {string} authHeader - Authorization header value
  * @returns {{ user: object } | { error: string }}
  */
@@ -85,9 +126,19 @@ function requireAuth(req, res, next) {
 
   if (result.error) {
     const statusCode = result.error === 'JWT_SECRET_MISSING' ? 500 : 401;
-    return res.status(statusCode).json({ 
+    return res.status(statusCode).json({
       error: result.error,
       message: getErrorMessage(result.error),
+    });
+  }
+
+  // SECURITY (AUTH-1): a special-purpose token (refresh / password reset / 2FA-pending /
+  // contact-verified) must never authenticate a normal request. PHASE 2: replace with a
+  // strict `result.user.claims?.type !== 'access'` allow-list.
+  if (isNonAccessToken(result.user.claims)) {
+    return res.status(401).json({
+      error: 'INVALID_TOKEN',
+      message: getErrorMessage('INVALID_TOKEN'),
     });
   }
 
@@ -111,6 +162,14 @@ function optionalAuth(req, res, next) {
   }
 
   const result = verifyToken(authHeader);
+  // SECURITY (AUTH-1): same rule as requireAuth, but this middleware must not throw —
+  // it gates routes that legitimately serve anonymous callers, so a special-purpose
+  // token degrades to anonymous rather than 401.
+  // PHASE 2: replace with a strict `claims?.type === 'access'` allow-list.
+  if (result.user && isNonAccessToken(result.user.claims)) {
+    req.user = null;
+    return next();
+  }
   req.user = result.user || null;
   next();
 }
@@ -156,4 +215,6 @@ module.exports = {
   optionalAuth,
   verifyToken,
   generateToken,
+  isNonAccessToken,
+  NON_ACCESS_TOKEN_TYPES,
 };

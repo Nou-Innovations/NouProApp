@@ -73,13 +73,13 @@ Single source of truth for status. Update a row in the same commit as its fix.
 
 | ID | Sev | Finding | Primary evidence | Batch | Status |
 |---|---|---|---|---|---|
-| `AUTH-1` | 🔴 | JWT token-type confusion → 2FA bypass, revocation bypass, reset-link = access token | `src/middleware/auth.js:82` | A/B | OPEN |
-| `EXP-1` | 🔴 | bcrypt hashes + TOTP secrets returned over the API | `src/repositories/prisma/memberRepo.prisma.js:13` | A | OPEN |
-| `OPS-1` | 🔴 | Seed sets every user's password to `password`; Prisma seed hook bypasses the prod guard | `prisma/seed.js:80`, `package.json:18` | A-ops | OWNER |
-| `TEN-1` | 🟠 | IDOR: checkout created against any tenant's invoice | `server.js:17123` | A | OPEN |
-| `TEN-2` | 🟠 | Collections read routes have no membership check (leaks cost prices) | `server.js:5472`, `:5483` | A | OPEN |
-| `TEN-3` | 🟠 | `/users/:userId/contacts`: no self-check + email-based user enumeration | `server.js:12898` | A | OPEN |
-| `INJ-1` | 🟠 | Reflected XSS, unauthenticated, on the payment checkout page | `server.js:16924` | A | OPEN |
+| `AUTH-1` | 🔴 | JWT token-type confusion → 2FA bypass, revocation bypass, reset-link = access token | `src/middleware/auth.js:82` | A/B | **FIXED phase 1** (2026-08-10) · phase 2 scheduled |
+| `EXP-1` | 🔴 | bcrypt hashes + TOTP secrets returned over the API | `src/repositories/prisma/memberRepo.prisma.js:13` | A | **FIXED** (2026-08-10) |
+| `OPS-1` | 🔴 | Seed sets every user's password to `password`; Prisma seed hook bypasses the prod guard | `prisma/seed.js:80`, `package.json:18` | A-ops | **Code FIXED** (2026-08-10) · data rotation still OWNER |
+| `TEN-1` | 🟠 | IDOR: checkout created against any tenant's invoice | `server.js:17152` | A | OPEN |
+| `TEN-2` | 🟠 | Collections read routes have no membership check (leaks cost prices) | `server.js:5488`, `:5499` | A | OPEN |
+| `TEN-3` | 🟠 | `/users/:userId/contacts`: no self-check + email-based user enumeration | `server.js:12914` | A | OPEN |
+| `INJ-1` | 🟠 | Reflected XSS, unauthenticated, on the payment checkout page | `server.js:16953` | A | OPEN |
 | `AUTH-2` | 🟠 | Email/phone change requires no re-auth and revokes no sessions | `server.js:2210`, `:2261` | B | OPEN |
 | `AUTH-3` | 🟠 | Password-reset token is replayable and survives the `tokenVersion` bump | `server.js:1585`, `:1607` | B | OPEN |
 | `AUTH-4` | 🟠 | Login lockout is a user-enumeration oracle + targeted lockout DoS | `server.js:1374`-`1417` | B | OPEN |
@@ -219,20 +219,22 @@ Why 24 hours and not 30 days: access tokens live 30 minutes (`auth.js:147`), and
 
 ## 7. 🟠 P1 — tenant isolation & injection
 
+> **Line numbers below were re-pointed on 2026-08-10** after the P0 fixes shifted `server.js`. Citations inside the §6 P0 write-ups are left at their pre-fix values as a historical record — those findings are closed.
+
 ### `TEN-1` — IDOR: create a checkout against any tenant's invoice
-`POST /api/payments/invoice-checkout` (`server.js:17123`-`17167`) loads the invoice by id with `prisma.invoice.findUnique({ where: { id: invoiceId } })` and — verified across the entire handler — **never checks membership**. Any authenticated user who obtains or guesses an `invoiceId` gets a live checkout and creates a `Payment` row under **another tenant's** `businessId`, disclosing the invoice amount and currency. The manual-payment sibling at `server.js:10684`-`10692` does it correctly and is the template.
+`POST /api/payments/invoice-checkout` (`server.js:17152`) loads the invoice by id with `prisma.invoice.findUnique({ where: { id: invoiceId } })` and — verified across the entire handler — **never checks membership**. Any authenticated user who obtains or guesses an `invoiceId` gets a live checkout and creates a `Payment` row under **another tenant's** `businessId`, disclosing the invoice amount and currency. The manual-payment sibling at `server.js:10684`-`10692` does it correctly and is the template.
 **Fix:** after the lookup, `requireBusinessMembership(req, res, invoice.businessId)`.
 
 ### `TEN-2` — collections readable across tenants, with cost prices
-`server.js:5472`-`5480` and `:5483`-`5496` carry only `requireAuth`. Every sibling write route on the same resource checks membership (`:5502`, `:5546`, `:5577`, `:5597`, `:5631`) — the two reads were missed. `collectionRepo.getById/getByBusinessId` include full `Product` rows **including `costPrice`**, the exact internal data that `applyPricePrivacy` exists to protect elsewhere. The 404-on-mismatch at `:5487` only checks the collection belongs to the *path* company, not that the caller does.
+`server.js:5488` and `:5499` carry only `requireAuth`. Every sibling write route on the same resource checks membership (`:5514`, `:5559`, `:5590`, `:5610`, `:5644`) — the two reads were missed. `collectionRepo.getById/getByBusinessId` include full `Product` rows **including `costPrice`**, the exact internal data that `applyPricePrivacy` exists to protect elsewhere. The 404-on-mismatch at `:5487` only checks the collection belongs to the *path* company, not that the caller does.
 **Fix:** add `requireBusinessMembership` to both.
 
 ### `TEN-3` — contacts route: no self-check, plus email enumeration
-`server.js:12898`-`12993`. The `userId` path param is never compared to `req.user.id` — unlike every other `/api/users/:userId/*` route. Passing a victim's id returns *their* business memberships and each matched user's relationship to *their* companies. Separately, the user search matches on **email**, returning `{id, name, avatar, email}` for up to 100 users — directly contradicting the deliberate anti-enumeration design of `/api/users/search`, which documents at `server.js:2694`-`2699` why it refuses to match on email. It also ignores blocks, which `/api/users/search` honours.
+`server.js:12914`. The `userId` path param is never compared to `req.user.id` — unlike every other `/api/users/:userId/*` route. Passing a victim's id returns *their* business memberships and each matched user's relationship to *their* companies. Separately, the user search matches on **email**, returning `{id, name, avatar, email}` for up to 100 users — directly contradicting the deliberate anti-enumeration design of `/api/users/search`, which documents at `server.js:2694`-`2699` why it refuses to match on email. It also ignores blocks, which `/api/users/search` honours.
 **Fix:** add the self-check, drop the email predicate, apply block filtering.
 
 ### `INJ-1` — reflected XSS, unauthenticated, on the API origin
-`GET /api/payments/checkout-page/:checkoutId` (`server.js:16924`-`16928`) — no auth, no rate limit, no validation — passes the raw path param to `generateCheckoutHtml()` (`services/peachPayments.js:160`-`178`), which interpolates it into **both** a `<script src="...">` attribute and a JS string literal, served as `text/html`.
+`GET /api/payments/checkout-page/:checkoutId` (`server.js:16953`) — no auth, no rate limit, no validation — passes the raw path param to `generateCheckoutHtml()` (`services/peachPayments.js:160`-`178`), which interpolates it into **both** a `<script src="...">` attribute and a JS string literal, served as `text/html`.
 **Fix:** validate against `/^[A-Za-z0-9._-]{1,64}$/` and JSON-encode before interpolation. While there, add a route-specific CSP — see `INJ-4` in §9, which is a live functional bug on the same route.
 
 ---
@@ -440,4 +442,19 @@ Append one row per batch as it lands. **Update the §4 index status in the same 
 
 | Date | Batch | IDs closed | Commit | Notes |
 |---|---|---|---|---|
-| _(empty — audit authored 2026-08-10)_ | | | | |
+| 2026-08-10 | A (partial) | `AUTH-1` phase 1, `EXP-1`, `OPS-1` (code) | see `git log` | All three P0s. 14-test token-type matrix added at `src/middleware/auth.test.js`; suite 95/95 green. **The sweep found a 13th leaky `include` the audit's count of 12 missed** (`memberRepo.prisma.js` `getByUserId`) — fixed too. |
+
+### ⏭ Scheduled follow-up — `AUTH-1` phase 2 (do NOT skip)
+
+Phase 1 shipped a **deny-list**: tokens whose `type` is `refresh` / `password_reset` / `2fa_pending` / `contact_verified` are rejected, while a token with **no** `type` claim is still accepted so that already-logged-in users aren't signed out.
+
+Phase 2 flips that to a strict allow-list (`claims.type === 'access'`). Safe to ship **≥24h after** the phase-1 deploy: access tokens live 30 minutes and every mint path now stamps `type: 'access'`, so untyped tokens are extinct ~30 minutes after phase 1 went out.
+
+Three one-line changes, each marked with a `PHASE 2` comment:
+1. `requireAuth` — `backend/src/middleware/auth.js`
+2. `optionalAuth` — `backend/src/middleware/auth.js`
+3. Socket.IO handshake — `backend/server.js`
+
+Then update the last test in `backend/src/middleware/auth.test.js` (`PHASE 1: a legacy untyped access token is still accepted`) to assert the opposite.
+
+Remaining Batch A work, still OPEN: `TEN-1`, `TEN-2`, `TEN-3`, `INJ-1`.

@@ -188,7 +188,7 @@ const { prisma } = require('./src/db/prisma');
 const { orderStatus: orderStatusService, eventMessages, pushService, storageService, stockService, otpService, sessionService } = require('./src/services');
 
 // Authentication middleware
-const { requireAuth, optionalAuth, generateToken, verifyToken } = require('./src/middleware/auth');
+const { requireAuth, optionalAuth, generateToken, verifyToken, isNonAccessToken } = require('./src/middleware/auth');
 
 // ---------------------------------------------------------------------------
 // Extracted helper modules (Phase 1 modularization).
@@ -1250,6 +1250,13 @@ io.use((socket, next) => {
     logger.warn(`[Socket] Auth failed for userId=${userId}: ${result.error}`);
     return next(new Error('Invalid token'));
   }
+  // SECURITY (AUTH-1): the handshake is the third sink for token-type confusion. Without
+  // this, a 2fa_pending or password_reset token opened a fully authenticated real-time
+  // socket. PHASE 2: replace with a strict `claims?.type === 'access'` allow-list.
+  if (isNonAccessToken(result.user.claims)) {
+    logger.warn(`[Socket] Rejected non-access token for userId=${userId}`);
+    return next(new Error('Invalid token'));
+  }
   if (result.user.id !== userId) {
     return next(new Error('userId mismatch'));
   }
@@ -1677,8 +1684,11 @@ app.post('/api/auth/refresh', refreshLimiter, async (req, res) => {
     }
 
     // Generate a new access token
+    // SECURITY (AUTH-1): `type: 'access'` marks this as an ordinary session token so the
+    // auth middleware can tell it apart from refresh / reset / 2FA-pending tokens.
     const newToken = generateToken({
       sub: dbUser.id,
+      type: 'access',
       email: dbUser.email,
       name: dbUser.name,
       sid: sessionId,
@@ -1921,8 +1931,9 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     let tokens = null;
     if (callerSid) {
       tokens = {
+        // SECURITY (AUTH-1): see issueSessionTokens — every access token carries type:'access'.
         token: generateToken({
-          sub: dbUser.id, email: dbUser.email, name: dbUser.name, sid: callerSid,
+          sub: dbUser.id, type: 'access', email: dbUser.email, name: dbUser.name, sid: callerSid,
         }),
         refreshToken: generateToken({
           sub: dbUser.id, type: 'refresh',
@@ -1998,8 +2009,13 @@ async function issueSessionTokens(dbUser, { deviceName, platform } = {}) {
     deviceName,
     platform,
   });
+  // SECURITY (AUTH-1): `type: 'access'` is what lets requireAuth/optionalAuth/the socket
+  // handshake distinguish a real session token from a refresh, password-reset, 2FA-pending
+  // or contact-verified token — all of which are signed with the same secret and carry the
+  // same `sub`. Without it, any of them authenticated every route.
   const token = generateToken({
     sub: dbUser.id,
+    type: 'access',
     email: dbUser.email,
     name: dbUser.name,
     sid: session.id,
@@ -13002,11 +13018,24 @@ app.get('/api/companies/:companyId/users', requireAuth, async (req, res) => {
     const members = await repos.memberRepo.listBusinessMembers(req.params.companyId);
     const acceptedMembers = members.filter(m => m.status === 'accepted');
     
-    // listBusinessMembers includes { user } via Prisma include, so extract user objects
+    // SECURITY (EXP-1): this is the one route that served raw Prisma User rows. It used to
+    // `.map(m => m.user)` straight into the response, which — because listBusinessMembers
+    // included every User scalar — handed every colleague's passwordHash and twoFactorSecret
+    // to any accepted member, staff included. The repo now selects a safe subset, and this
+    // builds an explicit DTO on top, matching the sibling at GET /companies/:id/members.
+    // Do NOT reintroduce a bare spread of the user object here.
     const companyUsers = acceptedMembers
       .map(m => m.user)
-      .filter(Boolean);
-    
+      .filter(Boolean)
+      .map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        avatar: u.avatar,
+        jobTitle: u.jobTitle,
+        headline: u.headline,
+      }));
+
     res.json(successResponse(companyUsers));
   } catch (error) {
     logger.error('[CompanyUsers] Error:', error);
