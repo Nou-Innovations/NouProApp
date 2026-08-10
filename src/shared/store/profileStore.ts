@@ -98,6 +98,19 @@ interface ProfileState {
 
   /** Why the last logout happened, so the auth screen can explain it. Cleared on login. */
   logoutReason: LogoutReason | null;
+
+  // ========== App Lock ==========
+  /** WhatsApp-style screen lock: re-lock when the app is left for longer than the timeout. */
+  appLockEnabled: boolean;
+  /** How long the app may sit in the background before it re-locks. */
+  appLockTimeoutMs: number;
+  /**
+   * A session exists but is hidden behind the lock screen. Runtime only — never
+   * persisted, so a crash can't strand someone in a locked state they can't leave.
+   */
+  isLocked: boolean;
+  /** When the app last went to the background, for the timeout comparison. */
+  lastBackgroundedAt: number | null;
 }
 
 /**
@@ -156,6 +169,16 @@ interface ProfileActions {
   // Security settings (Personal mode only)
   setTwoFactorEnabled: (value: boolean) => void;
   setBiometricEnabled: (value: boolean) => void;
+
+  // App Lock
+  setAppLockEnabled: (value: boolean) => void;
+  setAppLockTimeout: (ms: number) => void;
+  /** Hide the app behind the lock screen (launch, or returning after the timeout). */
+  lockApp: () => void;
+  /** Biometric check passed — reveal the app. */
+  unlockApp: () => void;
+  /** Stamp the moment the app went to the background. */
+  noteBackgrounded: () => void;
   
   // Computed getters (as functions since Zustand doesn't support true getters)
   isPersonalMode: () => boolean;
@@ -244,6 +267,10 @@ const initialState: ProfileState = {
   isNewUser: false,
   isRehydrated: false,
   logoutReason: null,
+  appLockEnabled: false,
+  appLockTimeoutMs: 5 * 60 * 1000, // 5 minutes
+  isLocked: false,
+  lastBackgroundedAt: null,
 };
 
 /**
@@ -622,6 +649,25 @@ export const useProfileStore = create<ProfileStore>()(
        */
       setBiometricEnabled: (value: boolean) => set({ biometricEnabled: value }),
 
+      // ========== App Lock ==========
+      setAppLockEnabled: (value: boolean) => set({ appLockEnabled: value }),
+      setAppLockTimeout: (ms: number) => set({ appLockTimeoutMs: ms }),
+      lockApp: () => set({ isLocked: true }),
+      unlockApp: () => {
+        set({ isLocked: false, lastBackgroundedAt: null });
+        // The locked-session rehydration path deliberately skips the socket connect,
+        // so make sure chat is live once the app is actually revealed.
+        const { currentUser, accessToken } = get();
+        if (currentUser?.id && accessToken) {
+          try {
+            chatService.connect({ userId: currentUser.id, token: accessToken });
+          } catch {
+            // Chat is best-effort; never block an unlock on it.
+          }
+        }
+      },
+      noteBackgrounded: () => set({ lastBackgroundedAt: Date.now() }),
+
       // ========== Computed Getters ==========
 
       /**
@@ -692,6 +738,10 @@ export const useProfileStore = create<ProfileStore>()(
         staySignedIn: state.staySignedIn,
         twoFactorEnabled: state.twoFactorEnabled,
         biometricEnabled: state.biometricEnabled,
+        // The two settings persist; isLocked/lastBackgroundedAt deliberately do NOT,
+        // so a crash can never strand someone behind a lock screen.
+        appLockEnabled: state.appLockEnabled,
+        appLockTimeoutMs: state.appLockTimeoutMs,
         activeMode: state.activeMode,
         activeBusinessId: state.activeBusinessId,
         currentUser: state.currentUser,
@@ -709,7 +759,13 @@ export const useProfileStore = create<ProfileStore>()(
           const accessToken = await secureGet('noupro_access_token');
           const refreshToken = await secureGet('noupro_refresh_token');
 
-          if (!state.staySignedIn) {
+          // "Stay signed in" off + biometrics ON is a meaningful pairing: don't stay
+          // *unlocked*. Keep the session and hide it behind the lock screen instead of
+          // wiping it — this branch used to also force biometricEnabled:false AND persist
+          // that, so turning off "stay signed in" silently killed biometrics for good.
+          if (!state.staySignedIn && state.biometricEnabled && accessToken) {
+            useProfileStore.setState({ accessToken, refreshToken, isLocked: true });
+          } else if (!state.staySignedIn) {
             // Clear auth data if user didn't want to stay signed in
             await secureDelete('noupro_access_token');
             await secureDelete('noupro_refresh_token');
@@ -728,7 +784,7 @@ export const useProfileStore = create<ProfileStore>()(
               activeMode: 'personal',
               biometricEnabled: false,
             });
-          } else if (accessToken && !state?.currentUser) {
+          } else if (accessToken && !state?.currentUser && !state?.biometricEnabled) {
             // ORPHAN TOKENS: credentials on disk with no user record. This happens when
             // someone abandons the signup wizard after an authenticated call refreshed
             // (the interceptor persists via setTokens), because currentUser is only set
@@ -756,8 +812,13 @@ export const useProfileStore = create<ProfileStore>()(
                 // If refresh fails, continue with existing token
               }
             }
-            // Restore tokens from SecureStore
-            useProfileStore.setState({ accessToken: freshAccessToken, refreshToken });
+            // Restore tokens from SecureStore. Start locked when either protection is
+            // on — the lock screen is what makes biometric sign-in reachable at all.
+            useProfileStore.setState({
+              accessToken: freshAccessToken,
+              refreshToken,
+              isLocked: Boolean(state.biometricEnabled || state.appLockEnabled),
+            });
             // Reconnect socket for persisted sessions
             if (state.currentUser?.id) {
               chatService.connect({ userId: state.currentUser.id, token: freshAccessToken });

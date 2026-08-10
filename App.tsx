@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
-import { View, StyleSheet, Text as RNText, TextInput as RNTextInput } from 'react-native';
+import { View, StyleSheet, Text as RNText, TextInput as RNTextInput, AppState } from 'react-native';
 
 // Match the Figma design exactly: render text at the exact px we set and do NOT
 // let the OS "Text Size" / accessibility setting scale fonts (RN defaults to
@@ -58,9 +58,7 @@ import { userAvatarService } from '@/shared/services/userAvatarService';
 import { offlineQueue } from '@/features/inbox/services/offlineQueue';
 import { syncOrderStatusMeta } from '@/shared/services/orderStatusSync';
 import { syncSubscriptionPricing } from '@/shared/services/subscriptionPricingSync';
-import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
-import { authAPI } from '@/shared/services/api';
 
 // Screens - Auth
 import LoginScreen from '@/features/auth/screens/LoginScreen';
@@ -79,6 +77,7 @@ import ForgotPasswordScreen from '@/features/auth/screens/ForgotPasswordScreen';
 import TwoFactorVerifyScreen from '@/features/auth/screens/TwoFactorVerifyScreen';
 import TermsScreen from '@/features/auth/screens/TermsScreen';
 import PrivacyScreen from '@/features/auth/screens/PrivacyScreen';
+import AppLockScreen from '@/features/auth/screens/AppLockScreen';
 import LaunchScreenWrapper from '@/features/auth/screens/LaunchScreenWrapper';
 
 // Screens - Inbox
@@ -734,8 +733,8 @@ const AppWithTheme = () => {
   const accessToken = useProfileStore((state) => state.accessToken);
   const login = useProfileStore((state) => state.login);
   const logout = useProfileStore((state) => state.logout);
-  const biometricEnabled = useProfileStore((state) => state.biometricEnabled);
-  const staySignedIn = useProfileStore((state) => state.staySignedIn);
+  const isLocked = useProfileStore((state) => state.isLocked);
+  const appLockEnabled = useProfileStore((state) => state.appLockEnabled);
   const isRehydrated = useProfileStore((state) => state.isRehydrated);
 
   // Force logout removed - JWT auth is now properly implemented
@@ -743,33 +742,38 @@ const AppWithTheme = () => {
   // Determine if user is signed in
   const isSignedIn = Boolean(accessToken && currentUser);
 
-  // Biometric auto-login: prompt biometric auth on app launch if enabled
+  // App Lock: re-lock after the app has been away longer than the timeout.
+  //
+  // This replaces a biometric auto-login effect that could never run — its guard
+  // early-returned in every reachable state, and on the one path that did fire it
+  // called an API that never set currentUser, so Face ID succeeded and nothing
+  // happened (audit A-11). Locking is now a gate over the signed-in tree, and the
+  // lock screen is what makes biometric sign-in reachable at all.
   useEffect(() => {
-    if (!resourcesReady || isSignedIn || !biometricEnabled || !staySignedIn) return;
+    if (!appLockEnabled) return;
 
-    const attemptBiometricLogin = async () => {
-      try {
-        const storedUserId = await SecureStore.getItemAsync('noupro_biometric_user_id');
-        if (!storedUserId) return;
-
-        const LocalAuthentication = await import('expo-local-authentication');
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: 'Sign in to NouPro',
-          cancelLabel: 'Use Password',
-          disableDeviceFallback: false,
-        });
-
-        if (result.success) {
-          // refreshToken() reads the stored refresh token and sets fresh access token
-          await authAPI.refreshToken();
-        }
-      } catch (error) {
-        console.error('Biometric auto-login failed:', error);
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const store = useProfileStore.getState();
+      // Only 'background' counts as leaving. iOS also fires 'inactive' for transient
+      // interruptions — the app switcher preview, Control Centre, and crucially the
+      // Face ID sheet itself. Arming the lock on 'inactive' would re-lock the moment
+      // the user unlocked, which at the "Immediately" setting is an infinite loop.
+      if (nextState === 'background') {
+        if (!store.isLocked) store.noteBackgrounded();
+        return;
       }
-    };
+      if (nextState === 'active') {
+        const since = store.lastBackgroundedAt;
+        // Only lock if we actually left — and only past the user's timeout, so
+        // glancing at another app for a moment doesn't demand Face ID.
+        if (since && Date.now() - since >= store.appLockTimeoutMs) {
+          store.lockApp();
+        }
+      }
+    });
 
-    attemptBiometricLogin();
-  }, [resourcesReady, isSignedIn, biometricEnabled, staySignedIn]);
+    return () => subscription.remove();
+  }, [appLockEnabled]);
 
   // Push notification initialization: register token when user is signed in with notifications enabled
   useEffect(() => {
@@ -928,6 +932,12 @@ const AppWithTheme = () => {
   const renderScreen = () => {
     if (!isSignedIn) {
       return <AuthNavigatorWithContainer />;
+    }
+
+    // Locked: a session exists but stays hidden until biometrics pass. Sits above the
+    // main tree so nothing behind it renders or fetches while locked.
+    if (isLocked) {
+      return <AppLockScreen />;
     }
 
     switch (currentScreen) {

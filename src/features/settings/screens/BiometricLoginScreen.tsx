@@ -12,6 +12,14 @@ import { useProfileStore } from '@/shared/store/profileStore';
 
 const BIOMETRIC_USER_KEY = 'noupro_biometric_user_id';
 
+/** How long NouPro may sit in the background before it asks again. */
+const LOCK_TIMEOUTS = [
+  { label: 'Immediately', ms: 0 },
+  { label: '1 min', ms: 60 * 1000 },
+  { label: '5 min', ms: 5 * 60 * 1000 },
+  { label: '15 min', ms: 15 * 60 * 1000 },
+];
+
 interface BiometricLoginScreenProps {
   navigation: any;
 }
@@ -25,6 +33,10 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
   const biometricEnabled = useProfileStore((state) => state.biometricEnabled);
   const setBiometricEnabled = useProfileStore((state) => state.setBiometricEnabled);
   const currentUser = useProfileStore((state) => state.currentUser);
+  const appLockEnabled = useProfileStore((state) => state.appLockEnabled);
+  const setAppLockEnabled = useProfileStore((state) => state.setAppLockEnabled);
+  const appLockTimeoutMs = useProfileStore((state) => state.appLockTimeoutMs);
+  const setAppLockTimeout = useProfileStore((state) => state.setAppLockTimeout);
 
   // Device capability states
   const [isCompatible, setIsCompatible] = useState<boolean | null>(null);
@@ -144,6 +156,9 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
             style: 'destructive',
             onPress: async () => {
               setBiometricEnabled(false);
+              // App Lock has no other way past the lock screen, so it can't outlive
+              // biometrics — leaving it on would lock the user out of their own app.
+              setAppLockEnabled(false);
               await SecureStore.deleteItemAsync(BIOMETRIC_USER_KEY);
             }
           },
@@ -202,7 +217,7 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
           {getBiometricName()} is Active
         </Text>
         <Text style={[styles.statusDescription, { color: appTheme.colors.textLight }]}>
-          You can now use {getBiometricName()} to quickly and securely sign in to your NouPro account.
+          NouPro now opens locked. Use {getBiometricName()} to get back in without typing your password.
         </Text>
       </View>
 
@@ -225,7 +240,7 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
           Quick & Secure Access
         </Text>
         <Text style={[styles.featureDescription, { color: appTheme.colors.textLight }]}>
-          Use {getBiometricName()} to sign in instantly without typing your password.
+          Open NouPro with {getBiometricName()} instead of typing your password.
         </Text>
       </View>
 
@@ -249,7 +264,7 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
           Instant Authentication
         </Text>
         <Text style={[styles.featureDescription, { color: appTheme.colors.textLight }]}>
-          Skip the password entry and access your account in seconds.
+          Your session stays on this device, so unlocking works instantly — even offline.
         </Text>
       </View>
     </View>
@@ -282,7 +297,7 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           <Text style={[styles.description, { color: appTheme.colors.textLight }]}>
-            Use your device's biometric features for quick and secure sign-in.
+            Unlock NouPro with your device's biometrics instead of your password.
           </Text>
 
           {!isCompatible ? (
@@ -314,6 +329,62 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
                 />
               </View>
 
+              {/* App Lock — only meaningful once biometrics can actually unlock. */}
+              {biometricEnabled && (
+                <>
+                  <View style={[styles.toggleSection, { backgroundColor: appTheme.colors.cardBackground }]}>
+                    <View style={styles.toggleLeft}>
+                      <Icon name="lock-closed-outline" size={24} color={appTheme.colors.iconColor} />
+                      <View style={styles.toggleTextContainer}>
+                        <Text style={[styles.toggleTitle, { color: appTheme.colors.text }]}>
+                          App Lock
+                        </Text>
+                        <Text style={[styles.toggleDescription, { color: appTheme.colors.textLight }]}>
+                          Require {getBiometricName()} when you come back to NouPro
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={appLockEnabled}
+                      onValueChange={setAppLockEnabled}
+                      trackColor={{ false: appTheme.colors.switchTrackOff, true: appTheme.colors.success }}
+                      thumbColor="#FFFFFF"
+                      ios_backgroundColor={appTheme.colors.switchTrackOff}
+                    />
+                  </View>
+
+                  {appLockEnabled && (
+                    <View style={styles.timeoutRow}>
+                      {LOCK_TIMEOUTS.map((opt) => {
+                        const selected = appLockTimeoutMs === opt.ms;
+                        return (
+                          <TouchableOpacity
+                            key={opt.ms}
+                            onPress={() => setAppLockTimeout(opt.ms)}
+                            style={[
+                              styles.timeoutChip,
+                              {
+                                backgroundColor: selected ? appTheme.colors.primary : appTheme.colors.cardBackground,
+                                borderColor: selected ? appTheme.colors.primary : appTheme.colors.borderColor,
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.timeoutChipText,
+                                { color: selected ? appTheme.colors.textInverse : appTheme.colors.text },
+                              ]}
+                            >
+                              {opt.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </>
+              )}
+
               {/* State-specific content */}
               {biometricEnabled ? renderEnabledState() : renderDisabledState()}
             </>
@@ -325,6 +396,23 @@ export default function BiometricLoginScreen({ navigation }: BiometricLoginScree
 }
 
 const styles = StyleSheet.create({
+  timeoutRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  timeoutChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  timeoutChipText: {
+    fontSize: theme.fontSize.sm,
+    fontFamily: theme.fonts.primary.medium,
+  },
   container: {
     flex: 1,
   },
