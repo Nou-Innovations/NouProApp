@@ -183,7 +183,7 @@ const repos = getRepos();
 const { prisma } = require('./src/db/prisma');
 
 // Services
-const { orderStatus: orderStatusService, eventMessages, pushService, storageService, stockService, otpService } = require('./src/services');
+const { orderStatus: orderStatusService, eventMessages, pushService, storageService, stockService, otpService, sessionService } = require('./src/services');
 
 // Authentication middleware
 const { requireAuth, optionalAuth, generateToken, verifyToken } = require('./src/middleware/auth');
@@ -1139,6 +1139,37 @@ const createPriceListSchema = z.object({
   isDefault: z.boolean().optional(),
 });
 
+// Auth + payment request-body schemas (SEC-3): cap lengths/types on the sensitive
+// entry points. The routes keep their own presence/business checks — these schemas
+// just reject malformed or oversized input early. Non-strict, so any extra field the
+// client sends passes through untouched (the handlers still read from req.body).
+const loginSchema = z.object({
+  email: z.string().min(1).max(320),
+  password: z.string().min(1).max(200),
+});
+
+const registerSchema = z.object({
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  phone: z.string().min(1).max(30),
+  countryCode: z.string().max(10).optional().nullable(),
+  email: z.string().max(320).optional().nullable(),
+  password: z.string().min(1).max(200), // route enforces the real 128 limit + strength
+  profilePicture: z.string().optional().nullable(),
+  phoneVerificationToken: z.string().max(2000).optional().nullable(),
+  emailVerificationToken: z.string().max(2000).optional().nullable(),
+});
+
+const createCheckoutSchema = z.object({
+  businessId: z.string().min(1).max(100),
+  plan: z.string().min(1).max(50),
+  billingPeriod: z.string().min(1).max(50),
+});
+
+const invoiceCheckoutSchema = z.object({
+  invoiceId: z.string().min(1).max(100),
+});
+
 // Validates req.body against a zod schema, returns parsed data or sends 400
 function validateBody(schema, req, res) {
   const result = schema.safeParse(req.body);
@@ -1300,6 +1331,7 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 // Auth Routes
 app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
+    if (!validateBody(loginSchema, req, res)) return;
     const { email, password } = req.body;
     
     if (!email || !password) {
@@ -1614,6 +1646,7 @@ app.post('/api/auth/refresh', authLimiter, async (req, res) => {
 // Register new user
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   try {
+    if (!validateBody(registerSchema, req, res)) return;
     const { firstName, lastName, phone, countryCode, email, password, profilePicture,
             phoneVerificationToken, emailVerificationToken } = req.body;
     
@@ -16638,6 +16671,7 @@ app.get('/api/subscription-pricing', publicReadLimiter, (req, res) => {
 // Create checkout session for subscription payment
 app.post('/api/payments/create-checkout', requireAuth, async (req, res) => {
   try {
+    if (!validateBody(createCheckoutSchema, req, res)) return;
     const { businessId, plan, billingPeriod } = req.body;
     if (!businessId || !plan || !billingPeriod) {
       return res.status(400).json(errorResponse('businessId, plan, and billingPeriod are required'));
@@ -16890,6 +16924,7 @@ app.get('/api/businesses/:businessId/subscription-status', requireAuth, async (r
 // Create checkout for paying a NouPro invoice
 app.post('/api/payments/invoice-checkout', requireAuth, async (req, res) => {
   try {
+    if (!validateBody(invoiceCheckoutSchema, req, res)) return;
     const { invoiceId } = req.body;
     if (!invoiceId) {
       return res.status(400).json(errorResponse('invoiceId is required'));
