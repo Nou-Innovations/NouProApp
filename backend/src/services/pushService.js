@@ -23,10 +23,15 @@ async function sendToUsers({ userIds, title, body, category, data }, repos) {
     const tokensToSend = [];
 
     for (const userId of userIds) {
-      // Check if user has this category enabled
       const prefs = await repos.notificationPreferenceRepo.getByUserId(userId);
+      // Master switch first. Before this existed, "turn off notifications" lived only in
+      // client state and was silently reset to ON at the next login (N-6).
+      if (prefs && prefs.pushEnabled === false) {
+        continue;
+      }
+      // Then the per-category preference.
       if (prefs && category && prefs[category] === false) {
-        continue; // User has disabled this category
+        continue;
       }
 
       const userTokens = await repos.pushTokenRepo.getActiveByUserId(userId);

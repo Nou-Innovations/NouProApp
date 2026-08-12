@@ -205,7 +205,6 @@ export function normalizeUser(raw: any): User {
     description: raw.description || null,
     address: raw.address || null,
     language: raw.language || 'EN',
-    notifications_on: raw.notifications_on ?? true,
     privacy_settings: raw.privacy_settings || raw.privacySettings || null,
     profile_slug: raw.profile_slug || raw.profileSlug || undefined,
     connections_count: raw.connections_count ?? raw.connectionsCount ?? 0,

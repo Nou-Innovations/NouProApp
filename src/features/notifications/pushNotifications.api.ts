@@ -1,6 +1,8 @@
 import { get, patch } from '@/shared/services/api';
 
 export interface NotificationPreferences {
+  /** Master switch — gates every category below (N-6). */
+  pushEnabled: boolean;
   messages: boolean;
   deliveries: boolean;
   invoices: boolean;

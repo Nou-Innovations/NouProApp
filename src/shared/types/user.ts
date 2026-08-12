@@ -32,7 +32,6 @@ export interface User {
   description?: string;
   address?: string;
   language: Language;
-  notifications_on: boolean;
   privacy_settings?: UserPrivacySettings;
   connections_count?: number;
   // Professional profile fields
@@ -67,7 +66,6 @@ export interface UpdateUserPayload {
   job_title?: string;
   description?: string;
   language?: Language;
-  notifications_on?: boolean;
   // Professional profile fields
   headline?: string;
   bio?: string;

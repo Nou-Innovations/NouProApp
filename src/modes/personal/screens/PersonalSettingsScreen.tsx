@@ -5,9 +5,10 @@
  * Help Community grow, and Logout
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Animated, Modal, Dimensions } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
+import { getNotificationPreferences, updateNotificationPreferences } from '@/features/notifications/pushNotifications.api';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
@@ -29,7 +30,6 @@ export default function PersonalSettingsScreen() {
   // Profile store
   const currentUser = useProfileStore((state) => state.currentUser);
   const userBusinesses = useProfileStore((state) => state.userBusinesses);
-  const updateCurrentUser = useProfileStore((state) => state.updateCurrentUser);
   const switchToBusiness = useProfileStore((state) => state.switchToBusiness);
   const setLocation = useBusinessStore((state) => state.setLocation);
   const storeLocations = useBusinessStore((state) => state.locations);
@@ -37,9 +37,10 @@ export default function PersonalSettingsScreen() {
     storeLocations.filter(loc => (loc as any).companyId === businessId);
 
   // Local state
-  const [notificationsEnabled, setNotificationsEnabled] = useState(
-    currentUser?.notifications_on ?? true
-  );
+  // Server-backed. This used to read `currentUser.notifications_on`, which lived only in
+  // client state — PATCH /auth/me never persisted it and normalizeUser defaulted it back
+  // to true, so turning push off silently re-enabled itself on the next login (N-6).
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [isProfileSwitcherVisible, setIsProfileSwitcherVisible] = useState(false);
   const [isAddBusinessOptionsVisible, setIsAddBusinessOptionsVisible] = useState(false);
   const [expandedBusinessId, setExpandedBusinessId] = useState<string | null>(null);
@@ -54,6 +55,17 @@ export default function PersonalSettingsScreen() {
   const addOptionsOverlayOpacity = useRef(new Animated.Value(0)).current;
   const addOptionsModalTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
+  // Load the real preference on mount.
+  useEffect(() => {
+    let cancelled = false;
+    getNotificationPreferences()
+      .then((prefs) => {
+        if (!cancelled && prefs) setNotificationsEnabled(prefs.pushEnabled !== false);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const handleNotificationsToggle = async (value: boolean) => {
     if (value) {
       try {
@@ -62,7 +74,7 @@ export default function PersonalSettingsScreen() {
         if (token) {
           await registerTokenWithBackend(token);
           setNotificationsEnabled(true);
-          updateCurrentUser({ notifications_on: true });
+          await updateNotificationPreferences({ pushEnabled: true });
         } else {
           AppAlert.alert(
             'Notifications Disabled',
@@ -81,7 +93,8 @@ export default function PersonalSettingsScreen() {
         console.error('[Settings] Push unregister error:', err);
       }
       setNotificationsEnabled(false);
-      updateCurrentUser({ notifications_on: false });
+      // Persist it, so it survives the next login.
+      await updateNotificationPreferences({ pushEnabled: false }).catch(() => {});
     }
   };
 

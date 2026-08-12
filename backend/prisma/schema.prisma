@@ -1113,6 +1113,10 @@ model PushToken {
 model NotificationPreference {
   id         String   @id @default(uuid())
   userId     String   @unique
+  /// Master push switch. Replaces the phantom `notifications_on`, which lived only in
+  /// client state: PATCH /auth/me never persisted it and normalizeUser defaulted it back
+  /// to true, so turning push off silently re-enabled itself on the next login (N-6).
+  pushEnabled Boolean @default(true)
   messages   Boolean  @default(true)
   deliveries Boolean  @default(true)
   invoices   Boolean  @default(true)
@@ -1616,6 +1620,14 @@ model UserConnection {
   id         String           @id @default(uuid())
   senderId   String
   receiverId String
+  /// The two participants sorted lexicographically, so ONE relationship is ONE row.
+  ///
+  /// `@@unique([senderId, receiverId])` is directional: it happily allowed both A->B and
+  /// B->A, which double-counted connections and made getStatus() return an arbitrary one
+  /// of the two — so accept/reject could act on a row the UI wasn't showing (C-7).
+  /// senderId/receiverId are kept because who asked still matters for the UI.
+  pairAId    String?
+  pairBId    String?
   status     ConnectionStatus @default(pending)
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
@@ -1623,6 +1635,7 @@ model UserConnection {
   receiver   User             @relation("ConnectionReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@unique([senderId, receiverId])
+  @@unique([pairAId, pairBId])
   @@index([senderId])
   @@index([receiverId])
 }

@@ -415,6 +415,18 @@ const joinRequestLimiter = rateLimit({
 });
 
 // Rate limiter for auth endpoints (15 attempts / 15 minutes / IP)
+// Connection requests were completely unlimited, so one account could spam another
+// with requests (and pushes) indefinitely — see also the rejection cooldown below (C-5).
+const connectionRequestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
+  message: { success: false, message: 'Too many connection requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: limiterValidate,
+});
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,                    // 15 attempts per window
@@ -4258,7 +4270,7 @@ app.put('/api/companies/:id', requireAuth, async (req, res) => {
 // ============================================================================
 
 // Send a connection request
-app.post('/api/connections/request', requireAuth, async (req, res) => {
+app.post('/api/connections/request', requireAuth, connectionRequestLimiter, async (req, res) => {
   try {
     const { receiverId } = req.body;
     if (!receiverId) {
@@ -4288,8 +4300,27 @@ app.post('/api/connections/request', requireAuth, async (req, res) => {
       if (existing.status === 'pending') {
         return res.status(409).json(errorResponse('Connection request already pending'));
       }
-      // If rejected, allow re-request by removing old one
-      await repos.connectionRepo.removeConnection(existing.id);
+      // Rejected: enforce a cooldown instead of deleting the row.
+      //
+      // Deleting it made declining meaningless — the sender could immediately re-request
+      // and the receiver got another push, with no record that they'd already said no
+      // (C-5). Re-open the SAME row after the cooldown so one relationship stays one row.
+      const REREQUEST_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+      const rejectedAt = new Date(existing.updatedAt || existing.createdAt).getTime();
+      if (Date.now() - rejectedAt < REREQUEST_COOLDOWN_MS) {
+        return res.status(429).json(errorResponse(
+          'This person declined your request. You can try again in a few days.',
+          'REQUEST_COOLDOWN',
+        ));
+      }
+      const reopened = await repos.connectionRepo.reopenRequest(existing.id, req.user.id, receiverId);
+      pushToUsers([receiverId], {
+        title: 'New connection request',
+        body: `${req.user.name || 'Someone'} wants to connect with you.`,
+        category: 'system',
+        data: { type: 'connection_request', connectionId: reopened.id, userId: req.user.id },
+      });
+      return res.status(201).json(successResponse(reopened, 'Connection request sent'));
     }
 
     const connection = await repos.connectionRepo.sendRequest(req.user.id, receiverId);
@@ -16607,7 +16638,8 @@ app.get('/api/notification-preferences', requireAuth, async (req, res) => {
 // Update notification preferences
 app.patch('/api/notification-preferences', requireAuth, async (req, res) => {
   try {
-    const allowed = ['messages', 'deliveries', 'invoices', 'orders', 'team', 'system'];
+    // pushEnabled is the master switch (N-6) — it gates every category.
+    const allowed = ['pushEnabled', 'messages', 'deliveries', 'invoices', 'orders', 'team', 'system'];
     const updates = {};
     for (const key of allowed) {
       if (typeof req.body[key] === 'boolean') {

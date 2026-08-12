@@ -44,6 +44,7 @@ export default function NotificationPreferencesScreen() {
     } catch (err) {
       // Use defaults on error
       setPrefs({
+        pushEnabled: true,
         messages: true,
         deliveries: true,
         invoices: true,

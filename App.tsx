@@ -775,12 +775,21 @@ const AppWithTheme = () => {
     return () => subscription.remove();
   }, [appLockEnabled]);
 
-  // Push notification initialization: register token when user is signed in with notifications enabled
+  // Register the push token once signed in, unless the user turned push off.
+  //
+  // The gate used to read `currentUser.notifications_on`, which existed only in client
+  // state and was defaulted back to `true` on every login — so turning push off
+  // re-registered the token on the next sign-in with no dialog, silently undoing the
+  // user's choice (N-6). The preference is now server-backed.
   useEffect(() => {
-    if (!isSignedIn || !currentUser?.notifications_on) return;
+    if (!isSignedIn) return;
 
     const initPush = async () => {
       try {
+        const { getNotificationPreferences } = require('@/features/notifications/pushNotifications.api');
+        const prefs = await getNotificationPreferences().catch(() => null);
+        if (prefs && prefs.pushEnabled === false) return;
+
         const { registerForPushNotifications, registerTokenWithBackend } = require('@/shared/services/pushNotifications');
         const token = await registerForPushNotifications();
         if (token) {
@@ -792,7 +801,7 @@ const AppWithTheme = () => {
     };
 
     initPush();
-  }, [isSignedIn, currentUser?.notifications_on]);
+  }, [isSignedIn]);
 
   // Push TAPS. Registered regardless of auth state: a tap can arrive on a cold start or
   // while logged out, in which case the target is parked and replayed after sign-in.

@@ -8,9 +8,23 @@ const { prisma } = require('../../db/prisma');
 // USER CONNECTIONS
 // ============================================================================
 
+/**
+ * Sorted participant pair. One relationship is one row regardless of who asked, which is
+ * what the @@unique([pairAId, pairBId]) index enforces — the older
+ * @@unique([senderId, receiverId]) is directional and allowed both A->B and B->A (C-7).
+ */
+function connectionPair(a, b) {
+  return a < b ? { pairAId: a, pairBId: b } : { pairAId: b, pairBId: a };
+}
+
 async function sendRequest(senderId, receiverId) {
   return prisma.userConnection.create({
-    data: { senderId, receiverId, status: 'pending' },
+    data: {
+      senderId,
+      receiverId,
+      status: 'pending',
+      ...connectionPair(senderId, receiverId),
+    },
   });
 }
 
@@ -25,6 +39,25 @@ async function rejectRequest(connectionId) {
   return prisma.userConnection.update({
     where: { id: connectionId },
     data: { status: 'rejected' },
+  });
+}
+
+/**
+ * Re-open a previously rejected request as a new pending one from `senderId`.
+ *
+ * Reuses the existing row rather than delete-and-recreate: one relationship stays one
+ * row (so the canonical-pair index still holds), and `updatedAt` keeps recording when
+ * the last decision was made, which is what the re-request cooldown reads (C-5).
+ */
+async function reopenRequest(id, senderId, receiverId) {
+  return prisma.userConnection.update({
+    where: { id },
+    data: {
+      status: 'pending',
+      senderId,
+      receiverId,
+      ...connectionPair(senderId, receiverId),
+    },
   });
 }
 
@@ -229,6 +262,8 @@ async function findExistingBusinessConnection(bizA, bizB) {
 }
 
 module.exports = {
+  connectionPair,
+  reopenRequest,
   // User connections
   sendRequest,
   acceptRequest,
