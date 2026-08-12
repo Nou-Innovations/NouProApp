@@ -27,6 +27,12 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
+          <string>noupro</string>
+        </array>
+      </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
           <string>com.noupro.app</string>
         </array>
       </dict>
@@ -43,6 +49,8 @@
     <string>12.0</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <key>NSAppTransportSecurity</key>
     <dict>
       <key>NSAllowsArbitraryLoads</key>
@@ -59,23 +67,19 @@
       </dict>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Allow NouPro to access your camera.</string>
+    <string>NouPro uses the camera to photograph products for your catalog and to share photos in chat.</string>
     <key>NSContactsUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your contacts</string>
+    <string>NouPro accesses your contacts only when you choose to share a contact card in a chat.</string>
     <key>NSFaceIDUsageDescription</key>
     <string>Allow NouPro to use Face ID for quick login.</string>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Allow NouPro to use your location.</string>
-    <key>NSLocationAlwaysUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <string>NouPro uses your location to show nearby businesses, set your business address, and track deliveries you manage.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
+    <string>NouPro uses the microphone when you record videos to share in chat.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to save photos</string>
+    <string>NouPro saves images you choose to download, such as invoices and product photos.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Allow NouPro to access your photos.</string>
+    <string>NouPro accesses your photo library so you can add product images, business logos, and share photos in chat.</string>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>

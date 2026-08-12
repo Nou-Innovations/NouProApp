@@ -65,6 +65,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       },
       package: 'com.noupro.app',
       versionCode: 2,
+      // SECURITY (MOB-4): the persisted zustand store is plain AsyncStorage, so cloud/adb
+      // backups would carry it off the device. Inert today (the committed manifest is what
+      // ships and is already set to false) but it stops a future prebuild reverting it.
+      allowBackup: false,
       permissions: [
         'android.permission.ACCESS_COARSE_LOCATION',
         'android.permission.ACCESS_FINE_LOCATION',
@@ -83,8 +87,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         {
           locationWhenInUsePermission:
             'NouPro uses your location to show nearby businesses, set your business address, and track deliveries you manage.',
-          locationAlwaysAndWhenInUsePermission:
-            'NouPro uses your location to show nearby businesses, set your business address, and track deliveries you manage.',
+          // SECURITY (MOB-17): deliberately NO locationAlwaysAndWhenInUsePermission.
+          // Setting it makes the expo-location plugin emit both NSLocationAlways* keys,
+          // which ask for BACKGROUND location — a capability this app does not have and
+          // does not use (no UIBackgroundModes on iOS, no ACCESS_BACKGROUND_LOCATION on
+          // Android). It was pure App Review liability. The keys have been removed from
+          // Info.plist; leaving this line in would let any prebuild put them back.
         },
       ],
       [
@@ -163,7 +171,21 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     updates: {
       fallbackToCacheTimeout: 0,
       url: 'https://u.expo.dev/862199f7-e9f9-4a46-9b37-a90773d8a72f',
+      // SECURITY (MOB-3): OTA updates are signed. Without this, anyone who gets into the
+      // Expo account can push arbitrary JavaScript to every installed app — the worst
+      // single item in the mobile section.
+      //
+      // The build embeds the CONTENTS of this file, and `eas update` signs each publish
+      // with the matching private key in keys/ (gitignored, and NOT recoverable — lose it
+      // and no OTA can be published until a new store build ships a new certificate).
+      // An unsigned publish is rejected by the client; it fails safe, keeping the current
+      // bundle, but the OTA pipeline stops until publishes are signed.
+      codeSigningCertificate: './certs/certificate.pem',
+      codeSigningMetadata: { keyid: 'main', alg: 'rsa-v1_5-sha256' },
     },
-    runtimeVersion: '1.0.0',
+    // Bumped for Batch D: this build changes native surface (permissions, manifest,
+    // R8, code signing), so it must not receive updates built against the old native set.
+    // Existing 1.0.0 installs keep getting 1.0.0 updates until they take the store build.
+    runtimeVersion: '1.1.0',
   };
 };

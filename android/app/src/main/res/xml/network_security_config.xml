@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SECURITY (MOB-8): explicit network policy for the app.
+
+  targetSdk is 35, so Android already blocks cleartext by default — this states the
+  intent rather than changing today's behaviour, and it is the hook a certificate pin
+  would attach to later (MOB-7).
+
+  `cleartextTrafficPermitted="false"` is set on the base config, so it applies to every
+  domain. There is deliberately NO debug-overrides block here: the debug build variant
+  already opts into cleartext via android:usesCleartextTraffic in
+  app/src/debug/AndroidManifest.xml, which is where local http://<LAN-IP>:3000
+  development belongs. Keeping the two separate means a release build cannot silently
+  inherit a development exemption.
+
+  NOTE (OPS-7): Expo has no app.config.ts equivalent for networkSecurityConfig, so this
+  file and the android:networkSecurityConfig attribute on the application element are
+  hand-managed. A clean prebuild will drop both. If prebuild is ever adopted, this needs
+  a custom config plugin.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
