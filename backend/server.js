@@ -158,21 +158,33 @@ async function sendContactChangedNotice(toEmail, { newValue, what = 'email' }) {
   });
 }
 
+/**
+ * Whether it's acceptable for email to silently no-op.
+ *
+ * This used to be `NODE_ENV === 'production'`, which meant every non-production
+ * environment — staging included — told the user "check your email" and then sent
+ * nothing (A-12). Now it's an explicit opt-in: local development sets
+ * ALLOW_EMAIL_STUB=true and gets console output; everywhere else fails loudly.
+ */
+function emailStubAllowed() {
+  return process.env.ALLOW_EMAIL_STUB === 'true';
+}
+
 async function sendPasswordResetEmail(toEmail, resetToken) {
   const transporter = getEmailTransporter();
   const appUrl = process.env.APP_BASE_URL || 'https://nouproapp.onrender.com';
   const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
 
   if (!transporter) {
-    if (process.env.NODE_ENV === 'production') {
-      // Fail loudly: in production a missing transporter means real users who
-      // request a reset never receive an email. Surface it to logs + Sentry
-      // instead of silently returning "success".
-      logger.error('[Email] Password reset email NOT sent — email transporter is not configured. Set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD.');
-      Sentry.captureMessage('Password reset email could not be sent: email transporter not configured', 'error');
-    } else {
+    if (emailStubAllowed()) {
       logger.debug('[Email] Would send password reset email to:', toEmail);
       logger.debug('[Email] Reset link:', resetLink);
+    } else {
+      // Fail loudly: a missing transporter means real users who request a reset
+      // never receive an email. Surface it to logs + Sentry instead of silently
+      // returning "success".
+      logger.error('[Email] Password reset email NOT sent — email transporter is not configured. Set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD, or ALLOW_EMAIL_STUB=true for local dev.');
+      Sentry.captureMessage('Password reset email could not be sent: email transporter not configured', 'error');
     }
     return;
   }
@@ -1681,7 +1693,7 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
     // telling the user a reset link "has been sent". This check is
     // account-independent (it fires for every request regardless of whether
     // the account exists), so it leaks no information about account existence.
-    if (process.env.NODE_ENV === 'production' && !getEmailTransporter()) {
+    if (!emailStubAllowed() && !getEmailTransporter()) {
       logger.error('[ForgotPassword] Email transporter not configured — cannot send reset emails.');
       Sentry.captureMessage('forgot-password requested but email transporter is not configured', 'error');
       return res.status(503).json(errorResponse('Email service is temporarily unavailable. Please try again later.', 'EMAIL_UNAVAILABLE'));
@@ -2873,6 +2885,21 @@ app.post('/api/auth/2fa/verify', authLimiter, twoFactorVerifyLimiter, async (req
   }
 });
 
+/**
+ * Slugs nobody may claim. These are either live URL segments on the public site
+ * (`/join/:id`, `/p/:id`, `/legal/*`, `/reset-password`) or words that would let a
+ * profile impersonate the platform.
+ */
+const RESERVED_PROFILE_SLUGS = new Set([
+  'admin', 'administrator', 'root', 'superuser', 'support', 'help', 'contact',
+  'me', 'self', 'you', 'user', 'users', 'profile', 'profiles', 'account', 'accounts',
+  'search', 'explore', 'discover', 'home', 'app', 'api', 'www', 'mail', 'email',
+  'noupro', 'nou', 'official', 'staff', 'team', 'security', 'billing', 'payments',
+  'login', 'logout', 'signin', 'signup', 'register', 'auth', 'oauth', 'settings',
+  'legal', 'privacy', 'terms', 'about', 'blog', 'news', 'status',
+  'join', 'invite', 'reset-password', 'delete-account', 'new', 'edit', 'null', 'undefined',
+]);
+
 // Update current user profile (requires authentication)
 app.patch('/api/auth/me', requireAuth, async (req, res) => {
   try {
@@ -2881,7 +2908,18 @@ app.patch('/api/auth/me', requireAuth, async (req, res) => {
     // Build update payload with only allowed fields
     const updateData = {};
     if (avatar !== undefined) updateData.avatar = avatar;
-    if (name !== undefined) updateData.name = name;
+    if (name !== undefined) {
+      // Previously assigned straight through: "", "   ", a 10k-char string, or a
+      // number/object all reached Prisma. Your name is on every card, chat bubble and
+      // order in the app, so an empty one renders as a blank identity everywhere (P-17).
+      if (typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json(errorResponse('Name cannot be empty', 'INVALID_NAME'));
+      }
+      if (name.trim().length > 100) {
+        return res.status(400).json(errorResponse('Name must be 100 characters or fewer', 'INVALID_NAME'));
+      }
+      updateData.name = name.trim();
+    }
     if (jobTitle !== undefined) updateData.jobTitle = jobTitle;
     if (description !== undefined) updateData.description = description;
     if (address !== undefined) updateData.address = address;
@@ -2930,6 +2968,22 @@ app.patch('/api/auth/me', requireAuth, async (req, res) => {
         typeof profileSlug === 'string' && profileSlug.trim() ? profileSlug.trim() : null;
 
       if (normalizedSlug) {
+        // A slug is a public URL segment served by GET /api/profile/:slug, so it needs
+        // shape rules the client can't be trusted to apply — EditPersonalProfileScreen
+        // strips bad characters as you type, but a direct PATCH bypasses that entirely,
+        // and could claim `admin`, `me`, or a 5000-character slug (P-17).
+        if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(normalizedSlug)) {
+          return res.status(400).json(errorResponse(
+            'Profile URL can only use lowercase letters, numbers and hyphens, and cannot start or end with a hyphen.',
+            'INVALID_SLUG',
+          ));
+        }
+        if (normalizedSlug.length < 3 || normalizedSlug.length > 30) {
+          return res.status(400).json(errorResponse('Profile URL must be between 3 and 30 characters', 'INVALID_SLUG'));
+        }
+        if (RESERVED_PROFILE_SLUGS.has(normalizedSlug)) {
+          return res.status(409).json(errorResponse('This profile URL is reserved', 'RESERVED_SLUG'));
+        }
         const { prisma } = require('./src/db/prisma');
         const existing = await prisma.user.findFirst({
           where: { profileSlug: normalizedSlug, NOT: { id: req.user.id } },
@@ -16204,7 +16258,12 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
             for (const bizId of adminBusinessIds) {
               try {
                 const accepted = await repos.connectionRepo.listBusinessConnections(bizId, 'accepted');
-                conns.push(...accepted.filter(c => c.createdAt && new Date(c.createdAt) > THIRTY_DAYS_AGO).slice(0, 5).map(c => ({ ...c, _sourceBizId: bizId })));
+                // Window + ordering on updatedAt (acceptance time), not createdAt (C-9).
+            conns.push(...accepted
+              .filter(c => (c.updatedAt || c.createdAt) && new Date(c.updatedAt || c.createdAt) > THIRTY_DAYS_AGO)
+              .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+              .slice(0, 5)
+              .map(c => ({ ...c, _sourceBizId: bizId })));
               } catch {}
             }
             return conns;
@@ -16310,7 +16369,16 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
         description: `${requester?.name || 'A company'} wants to connect with your business`,
         time: formatRelativeTime(conn.createdAt), timestamp: conn.createdAt, read: false,
         avatar: requester?.logoUrl || null, status: 'pending',
-        requestData: { connectionId: conn.id, companyId: requester?.id, companyName: requester?.name, businessId: conn.targetBusinessId },
+        // connectionKind is the explicit discriminator (C-10). `company_request` covers
+        // BOTH a BusinessConnection and a UserConnection, which use different accept /
+        // decline endpoints — calling the user endpoints with a business connection id
+        // 404s. The client had to infer which was which from whether `companyId` happened
+        // to be present, the same shape-guessing that caused round-1's B-1.
+        //
+        // Deliberately an added FIELD rather than a new type string: the backend deploys
+        // on push while the app ships through EAS, so renaming the type would leave every
+        // already-installed build unable to recognise these at all.
+        requestData: { connectionKind: 'business', connectionId: conn.id, companyId: requester?.id, companyName: requester?.name, businessId: conn.targetBusinessId },
       });
     }
 
@@ -16321,7 +16389,12 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
         id: `biz-conn-accepted-${conn.id}`, type: 'connection_accepted',
         title: 'Connection accepted',
         description: `You are now connected with ${otherBiz?.name || 'a company'}`,
-        time: formatRelativeTime(conn.createdAt), timestamp: conn.createdAt, read: false,
+        // updatedAt, not createdAt: createdAt is when the request was SENT, so accepting
+        // a 31-day-old request produced NO notification at all (it fell outside the
+        // 30-day window), and a 20-day-old one read "20 days ago" on the day it was
+        // accepted. Prisma stamps updatedAt via @updatedAt on accept (C-9).
+        time: formatRelativeTime(conn.updatedAt || conn.createdAt),
+        timestamp: conn.updatedAt || conn.createdAt, read: false,
         avatar: otherBiz?.logoUrl || null,
         requestData: { connectionId: conn.id, companyId: otherBiz?.id, companyName: otherBiz?.name },
       });
@@ -16543,6 +16616,8 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
             avatar: sender?.avatar || null,
             status: 'pending',
             requestData: {
+              // See the business branch above for why this is a field, not a new type.
+              connectionKind: 'user',
               connectionId: conn.id,
               userId: sender?.id,
               userName: sender?.name,
@@ -16557,7 +16632,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
       try {
         const acceptedConns = await repos.connectionRepo.listByUserId(userId, 'accepted');
         const recentAccepted = acceptedConns
-          .filter(c => c.createdAt && new Date(c.createdAt) > THIRTY_DAYS_AGO)
+          .filter(c => (c.updatedAt || c.createdAt) && new Date(c.updatedAt || c.createdAt) > THIRTY_DAYS_AGO)
           .slice(0, 5);
         for (const conn of recentAccepted) {
           const otherUser = conn.senderId === userId ? conn.receiver : conn.sender;
@@ -16566,8 +16641,8 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
             type: 'connection_accepted',
             title: 'Connection accepted',
             description: `You are now connected with ${otherUser?.name || 'someone'}`,
-            time: formatRelativeTime(conn.createdAt),
-            timestamp: conn.createdAt,
+            time: formatRelativeTime(conn.updatedAt || conn.createdAt),
+            timestamp: conn.updatedAt || conn.createdAt,
             read: false,
             avatar: otherUser?.avatar || null,
             requestData: {

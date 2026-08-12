@@ -216,7 +216,7 @@ export default function TeamManagementScreen() {
           onPress: async () => {
             if (!activeBusiness?.id) return;
             try {
-              await updateTeamMemberRole(activeBusiness.id, staff.id, newRole, user?.locationId || user?.locationIds?.[0]);
+              await updateTeamMemberRole(activeBusiness.id, staff.id, newRole, user?.locationId || user?.locationIds?.[0], staff.role);
               setSuccessMessage(`${staff.name}'s role has been updated`);
               setShowSuccessDialog(true);
               fetchUsers();

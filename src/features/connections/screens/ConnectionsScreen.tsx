@@ -97,6 +97,7 @@ export default function ConnectionsScreen() {
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ownerName, setOwnerName] = useState<string | null>(null);
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
@@ -113,8 +114,11 @@ export default function ConnectionsScreen() {
   const isViewingOther = Boolean(paramId && paramMode === 'user' && paramId !== currentUserId);
   const ownerId = isViewingOther ? paramId! : currentUserId;
 
-  const fetchConnections = useCallback(async () => {
-    setLoading(true);
+  const fetchConnections = useCallback(async ({ isRefresh = false }: { isRefresh?: boolean } = {}) => {
+    // Refresh and first-load are different states. They used to share `loading`, which
+    // unmounts the list for a full-screen spinner — so RefreshControl was never on
+    // screen long enough to render, and pull-to-refresh looked like a hard reload (C-11).
+    if (isRefresh) setRefreshing(true); else setLoading(true);
     setError(null);
     try {
       // CO-14: business connections now come from the canonical Group-A route, which
@@ -179,6 +183,7 @@ export default function ConnectionsScreen() {
       setError('Failed to load connections');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [activeBusiness?.id, isViewingOther, ownerId]);
 
@@ -630,7 +635,12 @@ export default function ConnectionsScreen() {
     let emptyMessage = 'Build your professional network by connecting with others.';
     let emptyIcon = 'person-add-outline';
     let ctaLabel: string | undefined = 'Find people';
-    let ctaAction: (() => void) | undefined = () => navigation.navigate('ExploreOverlay' as never);
+    // UserSearch, not ExploreOverlay: Explore is the business/product directory — it
+    // lists no people and has no Connect action, so "Find people" landed somewhere you
+    // could not find a person (C-11).
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore -- untyped useNavigation(), same as handleConnectionPress above
+    let ctaAction: (() => void) | undefined = () => navigation.navigate('UserSearch', { query: '' });
     
     if (searchQuery) {
       emptyTitle = 'No results found';
@@ -647,6 +657,7 @@ export default function ConnectionsScreen() {
       emptyMessage = 'Connect with suppliers, retailers, and partners.';
       emptyIcon = 'business-outline';
       ctaLabel = 'Find businesses';
+      ctaAction = () => navigation.navigate('ExploreOverlay' as never);
     }
 
     return (
@@ -700,8 +711,8 @@ export default function ConnectionsScreen() {
           contentContainerStyle={filteredConnections.length === 0 ? styles.emptyContainer : undefined}
           ListEmptyComponent={renderEmptyState}
           showsVerticalScrollIndicator={false}
-          onRefresh={fetchConnections}
-          refreshing={loading}
+          onRefresh={() => fetchConnections({ isRefresh: true })}
+          refreshing={refreshing}
           removeClippedSubviews
           maxToRenderPerBatch={10}
           windowSize={5}

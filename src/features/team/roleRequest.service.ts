@@ -28,18 +28,6 @@ export async function createRoleRequest(
 }
 
 /**
- * Cancel own pending request
- */
-export async function cancelRoleRequest(
-  businessId: string,
-  requestId: string
-): Promise<void> {
-  return patch(`/companies/${businessId}/role-requests/${requestId}`, {
-    status: 'CANCELLED'
-  });
-}
-
-/**
  * Withdraw your own pending join/role request.
  *
  * Without this the CTA was a dead end: it kept offering "Request to Join" (it reads
@@ -100,7 +88,7 @@ export async function resolveRoleRequest(
 const roleRequestService = {
   // Staff actions
   createRoleRequest,
-  cancelRoleRequest,
+  withdrawRoleRequest,
   getMyRoleRequest,
   // Admin actions
   getRoleRequests,

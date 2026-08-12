@@ -123,7 +123,10 @@ async function listByUserId(userId, status = 'accepted') {
       OR: [{ senderId: userId }, { receiverId: userId }],
     },
     include: { sender: true, receiver: true },
-    orderBy: { createdAt: 'desc' },
+    // updatedAt, not createdAt. All three callers ask for 'accepted', where createdAt is
+    // when the request was SENT — so the list read "most recently requested" and the
+    // notification derivation sliced the wrong five rows (C-9).
+    orderBy: { updatedAt: 'desc' },
   });
 }
 

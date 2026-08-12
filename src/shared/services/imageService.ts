@@ -347,16 +347,25 @@ export const imageService = {
   },
 
   /**
-   * Show image picker options (Camera or Gallery)
+   * Show image picker options (Camera or Gallery, and optionally Remove).
+   *
+   * `onRemove` is optional so the five existing callers are unaffected: pass it only
+   * where there is actually a picture to remove. Before this there was no way to clear
+   * a photo at all — you could only replace it with another one (P-16).
    */
-  showImagePickerOptions(onCamera: () => void, onGallery: () => void): void {
+  showImagePickerOptions(
+    onCamera: () => void,
+    onGallery: () => void,
+    onRemove?: () => void,
+  ): void {
     AppAlert.alert(
       'Change Profile Picture',
       'Choose an option',
       [
         { text: 'Camera', onPress: onCamera },
         { text: 'Gallery', onPress: onGallery },
-        { text: 'Cancel', style: 'cancel' },
+        ...(onRemove ? [{ text: 'Remove photo', style: 'destructive' as const, onPress: onRemove }] : []),
+        { text: 'Cancel', style: 'cancel' as const },
       ],
       { cancelable: true }
     );

@@ -105,12 +105,19 @@ export async function updateTeamMemberRole(
   companyId: string,
   userId: string,
   role: TeamMemberRole,
-  locationId?: string
+  locationId?: string,
+  currentRole?: TeamMemberRole,
 ): Promise<void> {
   // super_admin is business-level only (the location endpoint rejects it), and members
   // with no location are managed at the business level. Anything else updates the
   // specific location assignment (which also aligns the business-level role).
-  if (locationId && role !== 'super_admin') {
+  //
+  // The guard has to consider the CURRENT role too, not just the new one: the backend
+  // rejects on `bm.role === 'super_admin' || role === 'super_admin'`, so DEMOTING an
+  // owner who still carries a location row 400s. That's survivable today only because
+  // promotion deletes those rows — a legacy row from before that cleanup still breaks
+  // it, and the client shouldn't depend on that invariant holding (M-11).
+  if (locationId && role !== 'super_admin' && currentRole !== 'super_admin') {
     await patch(`/companies/${companyId}/locations/${locationId}/staff/${userId}`, { role });
   } else {
     await patch(`/companies/${companyId}/users/${userId}`, { role });

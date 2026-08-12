@@ -484,6 +484,11 @@ export const useProfileStore = create<ProfileStore>()(
           isInitialized: true, // Keep initialized to prevent dev seed re-run
           // Survives the reset so the auth screen can explain an involuntary logout.
           logoutReason: reason ?? null,
+          // Also survives: it's a device preference, not session state. initialState
+          // defaults it back to true, so someone who deliberately turned "stay signed
+          // in" OFF had that choice silently undone on every logout — and the setting
+          // only matters on the sign-in they were about to do next (A-14).
+          staySignedIn: get().staySignedIn,
         });
       },
 

@@ -247,7 +247,7 @@ export function ProfileSwitcher({
   /**
    * Render avatar or fallback
    */
-  const renderAvatar = (avatar?: string, name?: string, isBusinessMode?: boolean) => {
+  const renderAvatar = (avatar?: string | null, name?: string, isBusinessMode?: boolean) => {
     if (avatar) {
       return (
         <Image
@@ -281,7 +281,7 @@ export function ProfileSwitcher({
     type: 'personal' | 'business',
     name: string,
     subtitle: string,
-    avatar?: string,
+    avatar?: string | null,
     businessId?: string,
     isActive?: boolean,
     userBusiness?: UserBusiness

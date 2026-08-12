@@ -416,8 +416,14 @@ export default function EditPersonalProfileScreen() {
         onChangeText={(text) => updateField('profile_slug', text.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
         placeholder="e.g., arnaud-labonne"
         autoCapitalize="none"
+        maxLength={30}
         containerStyle={styles.fieldSpacing}
       />
+      {/* Mirrors the server rule (P-17) so people learn the constraint here rather
+          than from a 400 after tapping Save. Charset is enforced by onChangeText. */}
+      <Text style={[styles.fieldHint, { color: appTheme.colors.textSecondary }]}>
+        3–30 characters. Lowercase letters, numbers and hyphens.
+      </Text>
     </View>
   );
 

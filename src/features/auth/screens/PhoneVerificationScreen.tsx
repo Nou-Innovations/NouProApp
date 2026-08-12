@@ -4,13 +4,14 @@
  */
 
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/shared/types/navigation';
 import theme from '@/shared/theme';
 import { useTheme } from '@/shared/theme/ThemeProvider';
+import { Icon } from '@/shared/utils/icons';
 import { Text } from '@/shared/components/ui/Typography';
 import { AppButton, TextButton } from '@/shared/components/ui';
 import CodeInput from '@/shared/components/ui/CodeInput';
@@ -111,10 +112,7 @@ export default function PhoneVerificationScreen({ navigation, route }: Props) {
 
     try {
       await authAPI.sendEmailOTP(userData.email);
-      navigation.replace('EmailVerification', {
-        userData,
-        verificationMethod: 'email',
-      });
+      navigation.replace('EmailVerification', { userData });
     } catch (err: any) {
       AppAlert.alert('Error', err?.message || 'Failed to send email code. Please try again.');
     }
@@ -123,6 +121,17 @@ export default function PhoneVerificationScreen({ navigation, route }: Props) {
   return (
     <View style={[styles.container, { backgroundColor: appTheme.colors.background }]}>
       <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
+        {/* Back Button — these two were the only signup screens without one, so a
+            mistyped phone or email was a dead end: no way back to correct it (A-15). */}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
+          <Icon name="arrow-back" size={24} color={appTheme.colors.text} />
+        </TouchableOpacity>
+
         {/* Header Section */}
         <View style={styles.headerSection}>
           <Text style={[styles.title, { color: appTheme.colors.text }]}>
@@ -192,6 +201,13 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   headerSection: {
     alignItems: 'flex-start',

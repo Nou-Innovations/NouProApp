@@ -454,7 +454,6 @@ export const authAPI = {
     countryCode?: string;
     email?: string;
     password: string;
-    profilePicture?: string | null;
     /** Proof from verify-phone / verify-email. Register records which contact details
      *  were actually verified, and can be configured to require one. */
     phoneVerificationToken?: string;

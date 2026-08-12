@@ -12,6 +12,9 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { Text } from '@/shared/components/ui/Typography';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { AppButton } from '@/shared/components/ui';
+import { AppAlert } from '@/shared/services/appAlert';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 import {
   getNotificationPreferences,
   updateNotificationPreferences,
@@ -32,26 +35,23 @@ export default function NotificationPreferencesScreen() {
   const { theme: appTheme } = useTheme();
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadPreferences();
   }, []);
 
   const loadPreferences = async () => {
+    setLoadError(null);
     try {
       const data = await getNotificationPreferences();
       setPrefs(data);
     } catch (err) {
-      // Use defaults on error
-      setPrefs({
-        pushEnabled: true,
-        messages: true,
-        deliveries: true,
-        invoices: true,
-        orders: true,
-        team: true,
-        system: true,
-      });
+      // Previously this substituted an all-`true` object, so a failed load showed every
+      // category switched ON and the user read it as their saved settings — the worse
+      // half of P-15, because it invents state rather than merely hiding a failure.
+      setPrefs(null);
+      setLoadError(getApiErrorMessage(err, "We couldn't load your notification settings."));
     } finally {
       setLoading(false);
     }
@@ -67,8 +67,13 @@ export default function NotificationPreferencesScreen() {
     try {
       await updateNotificationPreferences({ [key]: value });
     } catch (err) {
-      // Revert on error
+      // Revert AND say so. A silent revert is indistinguishable from a switch that
+      // just won't move, so people retry it instead of retrying later (P-15).
       setPrefs(prefs);
+      AppAlert.alert(
+        "Couldn't save",
+        getApiErrorMessage(err, `We couldn't change your ${key} notifications. Please try again.`),
+      );
     }
   };
 
@@ -79,6 +84,13 @@ export default function NotificationPreferencesScreen() {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={appTheme.colors.primary} />
+        </View>
+      ) : loadError ? (
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.errorText, { color: appTheme.colors.textSecondary }]}>
+            {loadError}
+          </Text>
+          <AppButton title="Try again" onPress={() => { setLoading(true); loadPreferences(); }} />
         </View>
       ) : (
         <ScrollView style={styles.content}>
@@ -120,6 +132,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 32,
+    gap: 16,
+  },
+  errorText: {
+    fontSize: 15,
+    fontFamily: theme.fonts.primary.regular,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   content: {
     flex: 1,

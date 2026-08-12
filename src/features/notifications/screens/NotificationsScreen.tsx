@@ -102,9 +102,11 @@ const TYPE_COLORS: Record<string, string> = {
   join_request_rejected: '#D6453E',
   status_change: '#8B5CF6',
   delivery_assigned: '#2ACF01',
-  // Shared
-  message: '#2A75E6',
-  system: '#57534E',
+  // Shared. `message` and `system` used to be typed, coloured, iconed and routed here
+  // while the backend emitted neither — the notification feed has no chat or system
+  // rows at all. Removed rather than left as forward-compat, since a handler nothing
+  // can reach reads as a working feature (N-14). Unrelated to the `system` PUSH
+  // preference column, which is live.
   onboarding_create_business: '#2A75E6',
   onboarding_join_company: '#FF7A00',
 };
@@ -137,8 +139,6 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       case 'join_request_accepted': return 'checkmark-circle-outline';
       case 'join_request_rejected': return 'close-circle-outline';
       case 'status_change': return 'shield-checkmark-outline';
-      case 'message': return 'mail';
-      case 'system': return 'settings';
       case 'onboarding_create_business': return 'business-outline';
       case 'onboarding_join_company': return 'people-outline';
       default: return 'notifications';
@@ -390,11 +390,13 @@ export default function NotificationsScreen() {
         }
       } else if (notification.type === 'company_request') {
         const connectionId = notification.requestData?.connectionId!;
-        // Two payload shapes share this type: business mode carries companyId
-        // (a BusinessConnection id), personal mode carries userId (a
-        // UserConnection id). They use different endpoints — calling the user
-        // endpoints with a business connection id 404s.
-        const isBusinessConnection = !!notification.requestData?.companyId;
+        // Two different relationships share this notification type and use different
+        // endpoints — calling the user endpoints with a business connection id 404s.
+        // The backend now says which it is outright; the companyId sniff is only a
+        // fallback for notifications served before that field existed (C-10).
+        const isBusinessConnection = notification.requestData?.connectionKind
+          ? notification.requestData.connectionKind === 'business'
+          : !!notification.requestData?.companyId;
         if (status === 'accepted') {
           if (isBusinessConnection) {
             await acceptBusinessConnectionRequest(connectionId);
@@ -512,8 +514,10 @@ export default function NotificationsScreen() {
         }
         break;
       case 'company_request':
-        // Business mode carries companyId; personal mode carries the requester's userId
-        if (notification.requestData?.companyId) {
+        // Prefer the explicit kind; fall back to the payload shape (C-10).
+        if (notification.requestData?.connectionKind === 'user' && notification.requestData?.userId) {
+          navigation.navigate('ViewUserProfile', { userId: notification.requestData.userId });
+        } else if (notification.requestData?.companyId) {
           navigation.navigate('ViewBusinessProfile', { businessId: notification.requestData.companyId });
         } else if (notification.requestData?.userId) {
           navigation.navigate('ViewUserProfile', { userId: notification.requestData.userId });
@@ -575,9 +579,6 @@ export default function NotificationsScreen() {
         if (notification.productData?.productId) {
           navigation.navigate('ProductDetail', { productId: notification.productData.productId });
         }
-        break;
-      case 'message':
-        navigation.navigate('InboxOverlay' as never);
         break;
       case 'subscription_due':
         navigation.navigate('SubscriptionPlans');

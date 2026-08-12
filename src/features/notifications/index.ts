@@ -1,4 +1,5 @@
 // Notifications feature module
 export * from './screens';
-export * from './components';
+// './components' held only NotificationBell, which had zero importers — both tab
+// navigators own the badge directly now (N-14).
 

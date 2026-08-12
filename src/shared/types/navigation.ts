@@ -452,11 +452,9 @@ export type AuthStackParamList = {
   CreateAccount: undefined;
   PhoneVerification: { 
     userData: RegistrationUserData;
-    verificationMethod: 'phone';
   };
   EmailVerification: { 
     userData: RegistrationUserData;
-    verificationMethod: 'email';
   };
   CreatePassword: { 
     userData: RegistrationUserData;

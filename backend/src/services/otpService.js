@@ -55,6 +55,17 @@ function normalizeDestination(to, channel) {
 }
 
 /**
+ * Whether it's acceptable to "deliver" a code to the server console.
+ *
+ * This used to be `NODE_ENV !== 'production'`, which meant staging happily reported a
+ * code had been sent and then only logged it — the signup half of A-12. Now it's an
+ * explicit opt-in that local dev sets; anywhere real fails loudly instead.
+ */
+function consoleDeliveryAllowed() {
+  return process.env.ALLOW_EMAIL_STUB === 'true';
+}
+
+/**
  * Which channels can actually reach a user right now.
  * The client calls this BEFORE collecting a code, so it can route to a channel that
  * works instead of dead-ending on a 503.
@@ -62,7 +73,7 @@ function normalizeDestination(to, channel) {
 function getVerificationCapabilities({ getTwilioClient, getEmailTransporter }) {
   const hasTwilio = !!getTwilioClient();
   const hasEmail = !!getEmailTransporter();
-  const devConsole = process.env.NODE_ENV !== 'production';
+  const devConsole = consoleDeliveryAllowed();
   return {
     // Only Twilio can send an SMS. Email/console cannot stand in for a phone number.
     sms: hasTwilio || devConsole,
@@ -195,7 +206,7 @@ async function sendOtp({ to, channel }, deps) {
     return { provider: 'email' };
   }
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (consoleDeliveryAllowed()) {
     await persistCode(destination, channel, code);
     // Development only. Deliberately logged rather than returned.
     logger.info(`[OTP] (dev) Verification code for ${destination}: ${code}`);

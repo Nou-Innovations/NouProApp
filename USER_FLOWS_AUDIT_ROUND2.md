@@ -49,11 +49,11 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | A-9 | P1 | **FIXED ✅** — **Twilio is a hard single point of failure for signup, with no dev fallback.** `server.js:1560-1564` (and `:1594,:1631,:1659`) return 503 when the Twilio vars are unset, and `CreateAccountScreen.tsx:82-88` only navigates on success — so the user never reaches the OTP screen where the `__DEV__` bypass code lives (`PhoneVerificationScreen.tsx:23`). **Registration is 100% unreachable without Twilio, even in dev.** Email OTP uses the same Verify service, so it isn't an independent fallback. |
 | A-10 | P1 | **FIXED ✅** — **Verification is decorative and unrecoverable** (extends round-1 A-8). No `emailVerified`/`phoneVerified` columns exist; the OTP endpoints persist nothing; `register` never checks them. Additionally there is **no post-signup resend path** — the OTP screens are only reachable *before* the account exists, so nothing can ever mark a user verified later. |
 | A-11 | P1 | **FIXED ✅** — **Biometric auto-login can never run.** `App.tsx:732` returns early in both possible states: `staySignedIn: true` → rehydration already set `isSignedIn` → return; `staySignedIn: false` → rehydration forces `biometricEnabled: false` (`profileStore.ts:714`) → return. Even if it ran, `refreshToken()` only restores tokens, never `currentUser`, so `isSignedIn` would stay false. `BiometricLoginScreen.tsx:106-109` lets users enable a feature that does nothing. |
-| A-12 | P2 | Forgot-password's "fail loud" guard is production-only (`server.js:1235`) — on staging with no SMTP it still lies "check your email". |
-| A-13 | P2 | `failedLoginAttempts` is an unbounded in-memory Map with no TTL sweep (`server.js:1063`); email enumeration grows it forever. |
-| A-14 | P2 | `logout()` resets `staySignedIn` to `true` via `set({ ...initialState })` (`profileStore.ts:359`) — an explicit opt-out is forgotten on every logout. |
-| A-15 | P2 | The two OTP screens are the only signup screens with no visible back button. 2FA `tempToken` expires in 5 min with no countdown, resend or "start over" (`server.js:1128`). |
-| A-16 | P2 | Dead code: `authService.ts` (0 importers), the auth `index.ts` barrels, the `verificationMethod` nav param (written 3×, read never), `authAPI.getCurrentUser` (0 callers), `authAPI.register`'s `profilePicture` param. |
+| A-12 | P2 | **FIXED ✅** — Forgot-password's "fail loud" guard is production-only (`server.js:1235`) — on staging with no SMTP it still lies "check your email". |
+| A-13 | P2 | **ALREADY FIXED ✅ (verified 2026-08-12: bounded map + on-write sweep, `server.js:1480-1511`)** — `failedLoginAttempts` is an unbounded in-memory Map with no TTL sweep (`server.js:1063`); email enumeration grows it forever. |
+| A-14 | P2 | **FIXED ✅** — `logout()` resets `staySignedIn` to `true` via `set({ ...initialState })` (`profileStore.ts:359`) — an explicit opt-out is forgotten on every logout. |
+| A-15 | P2 | **FIXED ✅ (resend already existed; back buttons added — countdown/"start over" is batch 2)** — The two OTP screens are the only signup screens with no visible back button. 2FA `tempToken` expires in 5 min with no countdown, resend or "start over" (`server.js:1128`). |
+| A-16 | P2 | **FIXED ✅ (`getCurrentUser` was already live — it gained a caller in phase 1)** — Dead code: `authService.ts` (0 importers), the auth `index.ts` barrels, the `verificationMethod` nav param (written 3×, read never), `authAPI.getCurrentUser` (0 callers), `authAPI.register`'s `profilePicture` param. |
 
 ---
 
@@ -75,9 +75,9 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | P-12 | P1 | **FIXED ✅** — **Blocking is a one-way trip.** After blocking, the ⋯ menu still says "Block" (never "Unblock"), the profile renders normally, and Message stays enabled (failing server-side with a generic message). `unblockUser` and `GET /api/blocks` have zero callers. And the blocked user is **unaffected**: `GET /api/users/:userId` and `/api/users/search` never consult `blockRepo`, so they still find you and open your profile (round-1 C-7, confirmed open). |
 | P-13 | P1 | **FIXED ✅** — **"Privacy Policy" is a placeholder alert** (`PersonalSettingsScreen.tsx:104-106`) though the backend already serves `/legal/*`. Store-review blocker. |
 | P-14 | P1 | **FIXED ✅** — **A Sentry test-error button ships in user settings** (`PersonalSettingsScreen.tsx:350-366`), labelled "temporary", tappable by any user. |
-| P-15 | P2 | Notification preferences fail silently in both directions — load errors substitute all-`true` defaults, save errors silently revert the switch (`NotificationPreferencesScreen.tsx:40-72`). |
-| P-16 | P2 | `language` and `coverPhoto` have schema columns and API support but no UI anywhere. "Show this workplace on profile" toggles are still local-only (round-1 PR-6). No "remove photo" option exists. |
-| P-17 | P2 | No server-side validation of `name` (empty accepted) or `profileSlug` (no length cap, charset check, or reserved words like `me`/`admin`/`search`). |
+| P-15 | P2 | **FIXED ✅** — Notification preferences fail silently in both directions — load errors substitute all-`true` defaults, save errors silently revert the switch (`NotificationPreferencesScreen.tsx:40-72`). |
+| P-16 | P2 | **PARTLY FIXED ✅ (remove-photo added; "show on profile" was ALREADY FIXED via `WorkExperience.isVisible`; coverPhoto = batch 2; `language` = the i18n workstream)** — `language` and `coverPhoto` have schema columns and API support but no UI anywhere. "Show this workplace on profile" toggles are still local-only (round-1 PR-6). No "remove photo" option exists. |
+| P-17 | P2 | **FIXED ✅** — No server-side validation of `name` (empty accepted) or `profileSlug` (no length cap, charset check, or reserved words like `me`/`admin`/`search`). |
 | P-18 | P2 | "Share Profile" shares plain text with no URL, even though `profileSlug` and a public `GET /api/profile/:slug` route exist — the whole slug feature has no consumer. |
 
 **Healthy, verified:** the Report flow (reason lists match exactly end-to-end, self-report guarded, persists correctly), block/unblock endpoints themselves, `UserProfileScreen`'s loading/error/empty states, and privacy stripping on `GET /users/:userId`.
@@ -96,9 +96,9 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | C-6 | P1 | **FIXED ✅** — **`ConnectionsScreen` ignores `route.params.userId`.** All four callers pass a real id (`UserProfileScreen.tsx:437`, `BusinessProfileScreen.tsx:1031`, and both own-profile screens) and every one lands on *your own* connections. Fixing it also needs a backend change — `GET /connections` is hard-scoped to `req.user.id`. |
 | C-7 | P1 | **FIXED ✅** (`498e8d47`) — **Two rows for one relationship are possible.** `@@unique([senderId, receiverId])` is direction-specific and the check-then-write isn't transactional, so simultaneous A→B and B→A both succeed. Afterwards status lookups use `findFirst` → nondeterministic, and `blockUser` removes only one row, leaving a live request from a blocked user. |
 | C-8 | P1 | **FIXED ✅** — **Soft-deleted users leak into connection lists** — `userRepo.getById` has no `deletedAt` filter, unlike search which explicitly excludes them. |
-| C-9 | P2 | "Connection accepted" notifications use `createdAt` (when the request was *sent*), so an acceptance of a 31-day-old request produces no notification at all, and a 20-day-old one reads "20 days ago". `acceptRequest` doesn't touch `updatedAt` either. |
-| C-10 | P2 | Pending user↔user requests are typed `company_request`, forcing the frontend to sniff payload shape to choose an endpoint — the exact fragility that caused round-1's B-1. There is also no "your request was declined" signal at all. |
-| C-11 | P2 | Pull-to-refresh spinner never appears (`refreshing={loading}` while `loading` also swaps in a full-screen spinner). The empty-state "Find people" CTA goes to the business/product Explore surface, which has no people and no Connect action. |
+| C-9 | P2 | **FIXED ✅ (the “acceptRequest doesn't touch updatedAt” sub-claim was wrong — `@updatedAt` stamps it automatically)** — "Connection accepted" notifications use `createdAt` (when the request was *sent*), so an acceptance of a 31-day-old request produces no notification at all, and a 20-day-old one reads "20 days ago". `acceptRequest` doesn't touch `updatedAt` either. |
+| C-10 | P2 | **PARTLY FIXED ✅ (shape-sniffing removed via an explicit `connectionKind`; the "declined" signal is batch 2)** — Pending user↔user requests are typed `company_request`, forcing the frontend to sniff payload shape to choose an endpoint — the exact fragility that caused round-1's B-1. There is also no "your request was declined" signal at all. |
+| C-11 | P2 | **FIXED ✅** — Pull-to-refresh spinner never appears (`refreshing={loading}` while `loading` also swaps in a full-screen spinner). The empty-state "Find people" CTA goes to the business/product Explore surface, which has no people and no Connect action. |
 
 ---
 
@@ -116,9 +116,9 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | M-8 | P1 | **FIXED ✅** (`6f1b7fe7`) — **The mode-scoped notification split hides half these flows.** `invite_received` / `join_request_accepted` / `join_request_rejected` render only in **personal** mode; `staff_request` / `join_accepted` / `invite_pending` only in **business** mode (`server.js:14441` vs `:14691`). An admin working in business mode never sees an invite addressed to them — and with the badge still cosmetic (N-5), it can sit unseen indefinitely. |
 | M-9 | P1 | **FIXED ✅** — **The requester gets no pending state and can't withdraw.** `BusinessProfileScreen.tsx:384-389` shows "Request to Join" whenever the user isn't an *accepted* member, so a pending request still shows the CTA; a second tap 400s and the message is swallowed by the wrong error path (`:411`). No cancel route exists for the requester. |
 | M-10 | P2 | Pending invites consume paid staff seats (`getStaffCount` counts everything not suspended). Invites never expire — there's no expiry column. `server.js:12691-12692` mints an `inviteToken`/`inviteLink` per request that is never persisted and never served. |
-| M-11 | P2 | Demoting a super_admin from Team Management always 400s — `TeamManagementScreen.tsx:213` routes through the location PATCH, which rejects super_admin targets by design. |
+| M-11 | P2 | **FIXED ✅ (largely fixed already by the co-owner work; the legacy edge case is now closed too)** — Demoting a super_admin from Team Management always 400s — `TeamManagementScreen.tsx:213` routes through the location PATCH, which rejects super_admin targets by design. |
 | M-12 | P2 | `switchToPersonal()` leaves `businessStore` populated, and a failed `fetchLocations` after a company switch leaves `currentLocation` pointing at the *previous* company's location — location-scoped queries then carry a foreign `locationId`. |
-| M-13 | P2 | `cancelRoleRequest` sends `status: 'CANCELLED'`, which the backend rejects (currently zero callers). Dead code: `InviteTeamModal.tsx`, `team/components/AssignStaffModal.tsx`. |
+| M-13 | P2 | **FIXED ✅** — `cancelRoleRequest` sends `status: 'CANCELLED'`, which the backend rejects (currently zero callers). Dead code: `InviteTeamModal.tsx`, `team/components/AssignStaffModal.tsx`. |
 
 ---
 
@@ -150,7 +150,7 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | N-11 | P2 | **No welcome notification and no seed content** — notifications are *derived* on read from other tables (`server.js:14423-14919`), so there is no table a welcome row could even be written to. No tooltip/coach-mark/checklist system exists anywhere in the app. |
 | N-12 | P2 | **No pagination** — the list has no `onEndReached` and the backend hard-caps each section (`take: 50/20/10`, `slice(0,5)`) with no cursor, so older notifications are simply unreachable. Search is client-side over the loaded page only. Every filter tap replaces the list with skeletons (full-screen flash). |
 | N-13 | P2 | `subscription_due` navigates to `SubscriptionPlans` discarding `requestData.businessId` — an admin of multiple businesses lands on the wrong one. Stock alerts hardcode `time: 'now'` so they always sort to the top and never age. |
-| N-14 | P2 | `NotificationBell` is dead code (zero importers), which also makes the `Notifications` RootStack route unreachable — both modes reach notifications via the tab. `message` and `system` types are handled/typed but never emitted by the backend. |
+| N-14 | P2 | **FIXED ✅ (the "Notifications route is unreachable" claim was WRONG — `pushRouting.ts` depends on it, so the route stays)** — `NotificationBell` is dead code (zero importers), which also makes the `Notifications` RootStack route unreachable — both modes reach notifications via the tab. `message` and `system` types are handled/typed but never emitted by the backend. |
 | N-15 | P2 | The Experience section vanishes entirely for users with no company (`PersonalProfileScreen.tsx:418`), and `ActivityScreen`'s error state is a dead end with no retry (it replaces the list, so pull-to-refresh is gone too). |
 
 **Healthy, verified:** all 16 in-app notification types have correct tap handlers (round-1's N-1 order fix holds), pull-to-refresh works, dead-token pruning works, and push-token upsert is idempotent per user.
@@ -530,6 +530,74 @@ change.
 3. Share a product — the link resolves instead of 404ing.
 4. Privacy and Terms open in-app in **both** modes, and match `<backend>/legal/privacy` word for word.
 5. Open an invoice and tap the client name — you reach their profile.
+
+---
+
+## Fix log — P2 sweep batch 1 (2026-08-12)
+
+All 22 P2s were re-verified against code first. **Four were already fixed or wrong as
+written**, and are marked as such rather than "fixed by this batch": A-13 (the lockout map
+is bounded with an on-write sweep), A-15's resend (both OTP screens already have it),
+A-16d (`getCurrentUser` gained a caller in phase 1), and P-16's "show on profile"
+(`WorkExperience.isVisible` is full-stack). Two audit claims were **wrong**: N-14's
+"the `Notifications` route is unreachable" — `pushRouting.ts:47,54,58` navigates to it, so
+deleting it would have broken push deep-links — and C-9's "`acceptRequest` doesn't touch
+`updatedAt`", which `@updatedAt` does automatically.
+
+**A-12 — staging lied about sending email.** The fail-loud guard was `NODE_ENV === 'production'`,
+so every other environment told the user "check your email" and sent nothing. Now an
+explicit `ALLOW_EMAIL_STUB` opt-in that only local dev sets. **The same defect existed in the
+signup path** (`otpService.js` gated console delivery on `NODE_ENV !== 'production'`), so
+staging reported an OTP sent and only logged it — fixed identically, with a regression test.
+
+**A-14** `logout()` reset `staySignedIn` to `true` through `set({ ...initialState })`, so an
+explicit opt-out was undone on every sign-out — on precisely the setting that governs the
+next sign-in. **A-15a** Added the back button the two OTP screens were the only signup
+screens to lack, so a mistyped number was a dead end. **A-16** Deleted `authService.ts`,
+three dead barrels, the `verificationMethod` param (written 4×, read 0×) and `register`'s
+`profilePicture` param.
+
+**P-15 — preferences failed silently in both directions.** A failed load substituted an
+all-`true` object, so you saw every category ON and read it as your saved settings; a
+failed save reverted the switch with no word. The invented-state half is the worse one.
+**P-16c** Added "Remove photo" — you could previously only replace a picture, never clear
+it. **P-17** `PATCH /auth/me` accepted any `name` (including `""` and non-strings, straight
+into Prisma) and any `profileSlug` — no length, charset or reserved words, so `admin`,
+`me` and `search` were claimable on a public URL.
+
+**C-9** Connection-accepted notifications were derived from `createdAt` — when the request
+was *sent* — so accepting a 31-day-old request produced **no notification at all**, and a
+20-day-old one read "20 days ago" on the day it was accepted. Now `updatedAt`, including
+the repo `orderBy` that was slicing the wrong five rows.
+
+**C-10a — the discriminator is a field, not a new type string.** `company_request` covers
+both a BusinessConnection and a UserConnection, which have different accept/decline
+endpoints, and the client inferred which from whether `companyId` happened to be present.
+The plan called for splitting the type; I added `requestData.connectionKind` instead,
+because **the backend deploys on push while the app ships through EAS** — renaming the type
+would leave every installed build unable to recognise these notifications at all. The
+shape-sniff remains only as a fallback for rows served before the field existed.
+
+**C-11** `refreshing={loading}` while `loading` unmounts the entire list, so the pull-to-refresh
+spinner could never render; and "Find people" opened Explore, which lists businesses and has
+no Connect action. **M-11** The client chose the location endpoint from the *new* role while
+the backend rejects on the *current* one, so demoting an owner who still carried a legacy
+location row 400s. **M-13 / N-14** Deleted `cancelRoleRequest` (sent a status the backend
+rejects; `withdrawRoleRequest` superseded it), two unimported modals, `NotificationBell`,
+and the `message`/`system` notification types the backend never emits. The `system` **push
+preference** column is untouched and still live.
+
+**Verified:** backend 128/128 (one new test for the staging case), ESLint 0 errors,
+`tsc` 133 = unchanged baseline. No schema change.
+
+### Smoke tests
+
+1. Turn "stay signed in" off, log out, come back — it's still off.
+2. On the signup code screen, tap back — you can correct a mistyped number.
+3. Try to claim `admin` as your profile URL, and try saving an empty name — both refused.
+4. Pull to refresh on Connections — the spinner appears instead of a full reload.
+5. Open Settings → Notifications with the backend unreachable — it says so instead of showing everything switched on.
+6. Tap your avatar → Remove photo.
 
 ---
 

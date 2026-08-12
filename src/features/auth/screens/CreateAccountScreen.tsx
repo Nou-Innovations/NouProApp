@@ -91,10 +91,10 @@ export default function CreateAccountScreen({ navigation }: Props) {
 
       if (caps.sms) {
         await authAPI.sendPhoneOTP(userData.phone, userData.countryCode);
-        navigation.navigate('PhoneVerification', { userData, verificationMethod: 'phone' });
+        navigation.navigate('PhoneVerification', { userData });
       } else if (caps.email && userData.email) {
         await authAPI.sendEmailOTP(userData.email);
-        navigation.navigate('EmailVerification', { userData, verificationMethod: 'email' });
+        navigation.navigate('EmailVerification', { userData });
       } else {
         setError(
           'We can\'t send verification codes right now. Please try again later or contact support.',

@@ -27,7 +27,9 @@ export interface User {
   name: string;
   email?: string; // Optional if phone-based login
   phone?: string; // Optional if email-based login
-  avatar_url?: string;
+  // Nullable, not just absent: normalizeUser writes `null` when there is no avatar,
+  // and clearing your photo sends `avatar: null` to the server (P-16).
+  avatar_url?: string | null;
   job_title?: string;
   description?: string;
   address?: string;

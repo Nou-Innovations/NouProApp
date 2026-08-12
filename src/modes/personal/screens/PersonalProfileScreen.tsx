@@ -149,7 +149,26 @@ export default function PersonalProfileScreen() {
       }
     };
 
-    imageService.showImagePickerOptions(handleCamera, handleGallery);
+    const handleRemove = async () => {
+      setIsUploadingAvatar(true);
+      try {
+        await apiPatch('/auth/me', { avatar: null });
+        updateCurrentUser({ avatar_url: null });
+        setSuccessMessage('Profile picture removed');
+        setShowSuccessDialog(true);
+      } catch (err) {
+        AppAlert.alert('Not removed', getApiErrorMessage(err, 'Could not remove your picture. Please try again.'));
+      } finally {
+        setIsUploadingAvatar(false);
+      }
+    };
+
+    // Only offer Remove when there is something to remove.
+    imageService.showImagePickerOptions(
+      handleCamera,
+      handleGallery,
+      currentUser?.avatar_url ? handleRemove : undefined,
+    );
   };
 
   const handleGoToBusiness = (businessId: string) => {

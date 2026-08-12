@@ -90,13 +90,13 @@ test('capabilities: twilio configured reports both channels', () => {
   assert.equal(caps.provider, 'twilio');
 });
 
-test('capabilities: production with email only offers email, never sms', () => {
-  const prev = process.env.NODE_ENV;
-  process.env.NODE_ENV = 'production';
+test('capabilities: email only offers email, never sms', () => {
+  const prev = process.env.ALLOW_EMAIL_STUB;
+  delete process.env.ALLOW_EMAIL_STUB;
   const caps = otpService.getVerificationCapabilities({
     getTwilioClient: noTwilio, getEmailTransporter: () => ({}),
   });
-  process.env.NODE_ENV = prev;
+  if (prev === undefined) delete process.env.ALLOW_EMAIL_STUB; else process.env.ALLOW_EMAIL_STUB = prev;
   // Nothing but Twilio can deliver an SMS — this is what stops the client from
   // dead-ending on the phone screen.
   assert.equal(caps.sms, false);
@@ -104,13 +104,13 @@ test('capabilities: production with email only offers email, never sms', () => {
   assert.equal(caps.provider, 'email');
 });
 
-test('capabilities: production with nothing configured offers neither', () => {
-  const prev = process.env.NODE_ENV;
-  process.env.NODE_ENV = 'production';
+test('capabilities: nothing configured and no stub opt-in offers neither', () => {
+  const prev = process.env.ALLOW_EMAIL_STUB;
+  delete process.env.ALLOW_EMAIL_STUB;
   const caps = otpService.getVerificationCapabilities({
     getTwilioClient: noTwilio, getEmailTransporter: noEmail,
   });
-  process.env.NODE_ENV = prev;
+  if (prev === undefined) delete process.env.ALLOW_EMAIL_STUB; else process.env.ALLOW_EMAIL_STUB = prev;
   assert.equal(caps.sms, false);
   assert.equal(caps.email, false);
   assert.equal(caps.provider, 'none');
@@ -136,9 +136,9 @@ test('sendOtp falls back to email when Twilio is absent', async () => {
   assert.match(sentCode, /^\d{6}$/, 'a 6-digit code is generated');
 });
 
-test('sendOtp throws OTP_UNAVAILABLE in production with no provider', async () => {
-  const prev = process.env.NODE_ENV;
-  process.env.NODE_ENV = 'production';
+test('sendOtp throws OTP_UNAVAILABLE with no provider and no stub opt-in', async () => {
+  const prev = process.env.ALLOW_EMAIL_STUB;
+  delete process.env.ALLOW_EMAIL_STUB;
   stubPrisma();
   await assert.rejects(
     () => otpService.sendOtp({ to: '+23057000000', channel: 'sms' }, {
@@ -147,18 +147,38 @@ test('sendOtp throws OTP_UNAVAILABLE in production with no provider', async () =
     (err) => err.code === 'OTP_UNAVAILABLE',
   );
   restorePrisma();
-  process.env.NODE_ENV = prev;
+  if (prev === undefined) delete process.env.ALLOW_EMAIL_STUB; else process.env.ALLOW_EMAIL_STUB = prev;
 });
 
-test('sendOtp uses the dev console when nothing is configured outside production', async () => {
-  const prev = process.env.NODE_ENV;
-  process.env.NODE_ENV = 'development';
+// The console fallback is now an explicit opt-in rather than "any non-production
+// NODE_ENV". Staging used to qualify, so it reported a code had been sent and only
+// logged it — the signup half of A-12.
+test('sendOtp refuses on staging (non-production, no stub opt-in, no provider)', async () => {
+  const prevEnv = process.env.NODE_ENV;
+  const prevStub = process.env.ALLOW_EMAIL_STUB;
+  process.env.NODE_ENV = 'staging';
+  delete process.env.ALLOW_EMAIL_STUB;
+  stubPrisma();
+  await assert.rejects(
+    () => otpService.sendOtp({ to: '+23057000000', channel: 'sms' }, {
+      getTwilioClient: noTwilio, getEmailTransporter: noEmail, sendOtpEmail: async () => {},
+    }),
+    (err) => err.code === 'OTP_UNAVAILABLE',
+  );
+  restorePrisma();
+  process.env.NODE_ENV = prevEnv;
+  if (prevStub === undefined) delete process.env.ALLOW_EMAIL_STUB; else process.env.ALLOW_EMAIL_STUB = prevStub;
+});
+
+test('sendOtp uses the dev console when ALLOW_EMAIL_STUB is opted in', async () => {
+  const prev = process.env.ALLOW_EMAIL_STUB;
+  process.env.ALLOW_EMAIL_STUB = 'true';
   stubPrisma();
   const res = await otpService.sendOtp({ to: '+23057000000', channel: 'sms' }, {
     getTwilioClient: noTwilio, getEmailTransporter: noEmail, sendOtpEmail: async () => {},
   });
   restorePrisma();
-  process.env.NODE_ENV = prev;
+  if (prev === undefined) delete process.env.ALLOW_EMAIL_STUB; else process.env.ALLOW_EMAIL_STUB = prev;
   assert.equal(res.provider, 'console');
 });
 

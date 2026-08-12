@@ -30,8 +30,6 @@ export interface Notification {
     | 'status_change'
     | 'delivery_assigned'
     // Shared
-    | 'message'
-    | 'system'
     // Onboarding (frontend-only)
     | 'onboarding_create_business'
     | 'onboarding_join_company';
@@ -47,6 +45,14 @@ export interface Notification {
     requestId?: string;
     inviteId?: string;
     connectionId?: string;
+    /**
+     * Which relationship a `company_request` refers to. The type string covers both a
+     * BusinessConnection and a UserConnection, which have different accept/decline
+     * endpoints; this says which outright instead of leaving the client to guess from
+     * whether `companyId` is present (C-10). Optional because notifications served by
+     * an older backend won't carry it.
+     */
+    connectionKind?: 'user' | 'business';
     orderId?: string;
     deliveryId?: string;
     userId?: string;

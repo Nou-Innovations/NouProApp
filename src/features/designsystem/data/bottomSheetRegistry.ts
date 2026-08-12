@@ -252,15 +252,6 @@ export const GALLERY_ENTRIES: GalleryEntry[] = [
     demo: { kind: 'demo-bottomsheet' },
   },
   {
-    id: 'legacy-team-invite',
-    name: 'Team · Invite',
-    source: 'features/team/components/InviteTeamModal.tsx:60',
-    category: 'Legacy bottom sheets',
-    attributes: SLIDE_R20,
-    recommendation: 'migrate-bottomsheet',
-    demo: { kind: 'demo-bottomsheet' },
-  },
-  {
     id: 'legacy-locations-manage',
     name: 'Locations · Manage',
     source: 'features/company/components/ManageLocationsModal.tsx:214',
