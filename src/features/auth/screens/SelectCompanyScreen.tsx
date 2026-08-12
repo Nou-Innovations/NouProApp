@@ -23,6 +23,7 @@ import AppButton from '@/shared/components/ui/AppButton';
 import AppSearchBar from '@/shared/components/ui/AppSearchBar';
 import AppModal from '@/shared/components/ui/AppModal';
 import { useProfileStore } from '@/shared/store/profileStore';
+import { maybePromptForPush } from '@/shared/services/pushNotifications';
 import { authAPI, get, post } from '@/shared/services/api';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'SelectCompany'>;
@@ -123,6 +124,9 @@ export default function SelectCompanyScreen({ navigation, route }: Props) {
     setIsSending(false);
 
     if (successCount > 0) {
+      // First time this obviously matters — ask for push permission if we never have.
+      // No-ops when already asked; never blocks or fails the action (N-10).
+      maybePromptForPush();
       setShowSuccessModal(true);
     } else {
       setErrorMessage(errors[0] || 'Failed to send requests. Please try again.');

@@ -67,6 +67,7 @@ import PhoneVerificationScreen from '@/features/auth/screens/PhoneVerificationSc
 import EmailVerificationScreen from '@/features/auth/screens/EmailVerificationScreen';
 import CreatePasswordScreen from '@/features/auth/screens/CreatePasswordScreen';
 import UploadProfilePictureScreen from '@/features/auth/screens/UploadProfilePictureScreen';
+import NotificationsPermissionScreen from '@/features/auth/screens/NotificationsPermissionScreen';
 import ChoosePathScreen from '@/features/auth/screens/ChoosePathScreen';
 import SelectCompanyScreen from '@/features/auth/screens/SelectCompanyScreen';
 import BusinessBasicInfoScreen from '@/features/auth/screens/BusinessBasicInfoScreen';
@@ -374,6 +375,7 @@ function AuthNavigator() {
       <AuthStack.Screen name="EmailVerification" component={EmailVerificationScreen} />
       <AuthStack.Screen name="CreatePassword" component={CreatePasswordScreen} />
       <AuthStack.Screen name="UploadProfilePicture" component={UploadProfilePictureScreen} />
+      <AuthStack.Screen name="NotificationsPermission" component={NotificationsPermissionScreen} />
       <AuthStack.Screen name="ChoosePath" component={ChoosePathScreen} />
       
       {/* Join Company Flow */}
@@ -790,8 +792,17 @@ const AppWithTheme = () => {
         const prefs = await getNotificationPreferences().catch(() => null);
         if (prefs && prefs.pushEnabled === false) return;
 
-        const { registerForPushNotifications, registerTokenWithBackend } = require('@/shared/services/pushNotifications');
-        const token = await registerForPushNotifications();
+        // Only refresh the token for people who have ALREADY granted permission.
+        // Prompting here spent iOS's single per-install prompt the moment someone signed
+        // in, before the app had shown any reason to say yes. The ask now lives in the
+        // signup wizard, and otherwise defers to a moment that earns it (N-10).
+        const {
+          getPushPermissionState,
+          registerForPushNotifications,
+          registerTokenWithBackend,
+        } = require('@/shared/services/pushNotifications');
+        if ((await getPushPermissionState()) !== 'granted') return;
+        const { token } = await registerForPushNotifications();
         if (token) {
           await registerTokenWithBackend(token);
         }

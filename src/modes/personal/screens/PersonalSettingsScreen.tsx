@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Animated, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Animated, Modal, Dimensions, Linking } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { getNotificationPreferences, updateNotificationPreferences } from '@/features/notifications/pushNotifications.api';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -70,16 +70,27 @@ export default function PersonalSettingsScreen() {
     if (value) {
       try {
         const { registerForPushNotifications, registerTokenWithBackend } = require('@/shared/services/pushNotifications');
-        const token = await registerForPushNotifications();
+        const { status, token } = await registerForPushNotifications();
         if (token) {
           await registerTokenWithBackend(token);
           setNotificationsEnabled(true);
           await updateNotificationPreferences({ pushEnabled: true });
+        } else if (status === 'unsupported') {
+          // Previously this told simulator users to enable notifications in device
+          // settings, where there is nothing to enable (N-10).
+          AppAlert.alert(
+            'Not available here',
+            'Push notifications need a physical device — they cannot be enabled in the simulator.',
+            [{ text: 'OK' }],
+          );
         } else {
           AppAlert.alert(
-            'Notifications Disabled',
-            'Please enable notifications in your device settings to receive push notifications.',
-            [{ text: 'OK' }],
+            'Notifications blocked',
+            'Notifications are turned off for NouPro. Open Settings to allow them.',
+            [
+              { text: 'Not now', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => { Linking.openSettings().catch(() => {}); } },
+            ],
           );
         }
       } catch (err) {

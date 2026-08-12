@@ -89,7 +89,10 @@ export default function UploadProfilePictureScreen({ navigation, route }: Props)
         }
       }
 
-      navigation.navigate('ChoosePath', { pendingAuth });
+      // Ask about notifications here rather than at first sign-in: the account now
+      // exists (so a token can be registered) and the explainer earns iOS's single
+      // per-install prompt instead of spending it cold (N-10).
+      navigation.navigate('NotificationsPermission', { pendingAuth });
       clearPassword();
     } catch (err: any) {
       if (__DEV__) {

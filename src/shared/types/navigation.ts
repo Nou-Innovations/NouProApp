@@ -464,6 +464,9 @@ export type AuthStackParamList = {
   UploadProfilePicture: {
     userData: RegistrationUserData;
   };
+  NotificationsPermission: {
+    pendingAuth: import('./navigation').PendingAuthData;
+  };
   ChoosePath: {
     pendingAuth: import('./navigation').PendingAuthData;
   };

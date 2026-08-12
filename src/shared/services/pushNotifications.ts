@@ -17,15 +17,47 @@ Notifications.setNotificationHandler({
   }),
 });
 
+export type PushPermissionStatus = 'granted' | 'denied' | 'unsupported';
+/** `undetermined` = the OS has never asked, so we still have our one shot. */
+export type PushPermissionState = PushPermissionStatus | 'undetermined';
+
+export interface PushRegistrationResult {
+  status: PushPermissionStatus;
+  token: string | null;
+}
+
+/**
+ * What the OS currently thinks, which is the only reliable "have we asked yet" signal.
+ *
+ * Deliberately not a local flag: a stored flag would be missing for every install that
+ * already granted permission before this shipped, and would silently stop their token
+ * from being refreshed.
+ */
+export async function getPushPermissionState(): Promise<PushPermissionState> {
+  if (!Device.isDevice) return 'unsupported';
+  try {
+    const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+    if (status === 'granted') return 'granted';
+    if (status === 'undetermined' && canAskAgain) return 'undetermined';
+    return 'denied';
+  } catch {
+    return 'denied';
+  }
+}
+
 /**
  * Request notification permissions and get the Expo push token.
- * Returns the token string or null if permissions denied.
+ *
+ * Returns a discriminated status rather than a bare token. It used to collapse three
+ * very different outcomes into `null` — "user said no", "no hardware (simulator)", and
+ * "something threw" — so Settings told simulator users to go and enable notifications in
+ * device settings, where there is nothing to enable (N-10).
  */
-export async function registerForPushNotifications(): Promise<string | null> {
+export async function registerForPushNotifications(): Promise<PushRegistrationResult> {
   // Push notifications only work on physical devices
   if (!Device.isDevice) {
     console.warn('[Push] Must use physical device for push notifications');
-    return null;
+    return { status: 'unsupported', token: null };
   }
 
   // Check existing permissions
@@ -39,7 +71,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 
   if (finalStatus !== 'granted') {
-    return null;
+    return { status: 'denied', token: null };
   }
 
   // Set up Android notification channel
@@ -53,22 +85,73 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 
   // Get Expo push token
-  const tokenData = await Notifications.getExpoPushTokenAsync({
-    projectId: '862199f7-e9f9-4a46-9b37-a90773d8a72f',
-  });
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: '862199f7-e9f9-4a46-9b37-a90773d8a72f',
+    });
+    return { status: 'granted', token: tokenData.data };
+  } catch (err) {
+    // Permission was granted but Expo couldn't mint a token (network, project config).
+    // Report it as granted-without-token rather than as a denial.
+    console.warn('[Push] Could not get Expo token:', err);
+    return { status: 'granted', token: null };
+  }
+}
 
-  return tokenData.data;
+/**
+ * Ask for push permission at a moment it obviously matters — sending a join request,
+ * placing an order, sending a first message — but only if we've never asked.
+ *
+ * The prompt used to fire the instant you first signed in, before the app had shown any
+ * reason to say yes. iOS only ever allows one prompt per install, so asking cold spends
+ * the single chance you get (N-10). Fire-and-forget: never block the action.
+ *
+ * No-ops unless the OS has genuinely never asked, so this is safe to call on every
+ * order, message and join request.
+ */
+export async function maybePromptForPush(): Promise<void> {
+  try {
+    if ((await getPushPermissionState()) !== 'undetermined') return;
+    const result = await registerForPushNotifications();
+    if (result.token) {
+      await registerTokenWithBackend(result.token);
+    }
+  } catch {
+    /* never let a permission prompt break the action that triggered it */
+  }
 }
 
 /**
  * Register the push token with the backend.
+ *
+ * `accessToken` is for the signup wizard, where the account exists but nobody has
+ * logged in yet, so the store holds no token for the interceptor to attach. Same
+ * shape as `unregisterPushTokenOnLogout` below.
  */
-export async function registerTokenWithBackend(token: string): Promise<void> {
+export async function registerTokenWithBackend(
+  token: string,
+  accessToken?: string | null,
+): Promise<void> {
   try {
-    await post('/push-tokens/register', {
-      token,
-      platform: Platform.OS,
-    });
+    if (accessToken) {
+      const response = await fetch(`${API_CONFIG.baseUrl}/push-tokens/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ token, platform: Platform.OS }),
+      });
+      if (!response.ok) {
+        console.warn('[Push] Register rejected:', response.status);
+        return;
+      }
+    } else {
+      await post('/push-tokens/register', {
+        token,
+        platform: Platform.OS,
+      });
+    }
     // Save locally for logout cleanup
     await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
   } catch (err) {

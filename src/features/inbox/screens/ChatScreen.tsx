@@ -53,6 +53,7 @@ import { getTeamMembers, type TeamMember } from '@/features/team/team.service';
 import { confirmOrder, declineOrder } from '@/shared/services/orders';
 import { useDeliveriesStore } from '@/features/deliveries/deliveries.store';
 import { convertEstimateToInvoice } from '@/features/invoices/invoices.service';
+import { maybePromptForPush } from '@/shared/services/pushNotifications';
 
 // Order status colors from design.json (supports both legacy and UPPERCASE)
 const ORDER_STATUS_COLORS: Record<string, string> = {
@@ -596,6 +597,12 @@ export default function ChatScreen() {
         );
         // Note: don't add to store here -- the socket subscription in
         // useChatMessages will pick up the server-echoed message, avoiding duplicates.
+
+        // First time this obviously matters — a conversation is the clearest reason
+        // to want notifications. Hooked here rather than in inbox.service on purpose,
+        // so the offline queue's background replay can't raise a prompt out of
+        // nowhere. No-ops when already asked (N-10).
+        maybePromptForPush();
       } catch (error) {
         console.error('Failed to send message:', error);
         // Update status to failed

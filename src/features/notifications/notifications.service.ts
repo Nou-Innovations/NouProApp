@@ -7,6 +7,7 @@
  */
 
 import api from '@/shared/services/api';
+import { maybePromptForPush } from '@/shared/services/pushNotifications';
 
 export interface Notification {
   id: string;
@@ -116,6 +117,9 @@ export async function requestToJoinCompany(
   message?: string,
 ): Promise<void> {
   await api.post(`/companies/${businessId}/request-membership`, { message });
+  // First time this obviously matters — ask for push permission if we never have.
+  // No-ops when already asked; never blocks or fails the action (N-10).
+  maybePromptForPush();
 }
 
 /**

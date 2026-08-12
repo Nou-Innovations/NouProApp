@@ -25,6 +25,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import MapView, { Marker } from 'react-native-maps';
 import { requestToJoinCompany } from '@/features/notifications/notifications.service';
+import { maybePromptForPush } from '@/shared/services/pushNotifications';
 import { getMyRoleRequest, withdrawRoleRequest } from '@/features/team/roleRequest.service';
 import { AppBottomSheet, type AppBottomSheetItem, BusinessHoursTable } from '@/shared/components/ui';
 import { reportEntity, REPORT_REASONS, type ReportReason } from '@/features/profile/profile.service';
@@ -838,6 +839,9 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
       legacyClearCart();
       clearOrderCart(business.id);
       setShowPublicCheckout(false);
+      // This path bypasses orderStore.placeOrder entirely, so it needs its own hook.
+      // First time it obviously matters — no-ops if we've already asked (N-10).
+      maybePromptForPush();
       AppAlert.alert('Order placed!', `Your order #${order.id} has been sent to ${business.name}.`);
     } catch (err: any) {
       AppAlert.alert('Error', getApiErrorMessage(err, 'Failed to place order. Please try again.'));

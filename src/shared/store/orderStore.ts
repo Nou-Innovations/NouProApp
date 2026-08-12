@@ -376,6 +376,12 @@ export const useOrderStore = create<OrderStore>()(
             };
           });
 
+          // First time this obviously matters — ask for push permission if we never
+          // have, so order updates can actually reach them. No-ops when already asked;
+          // never blocks or fails the order (N-10). Lazy require: the store is imported
+          // from everywhere and the push service pulls in expo-notifications.
+          require('@/shared/services/pushNotifications').maybePromptForPush();
+
           return created;
         } catch (err: any) {
           const message = err?.message || 'Failed to place order';
