@@ -16,9 +16,21 @@ async function getById(id) {
   });
 }
 
+/**
+ * SECURITY (AUTH-7): email lookup is case-insensitive.
+ *
+ * This was an exact match while several writers lowercased. The result: `Foo@Bar.com` and
+ * `foo@bar.com` behaved as two separate accounts, login and forgot-password silently
+ * failed on a case mismatch, and register's duplicate check could be bypassed by varying
+ * case — letting one address own two accounts.
+ *
+ * `mode: 'insensitive'` rather than lowercasing the argument, because rows written before
+ * this fix may already contain capitals and must still be found.
+ */
 async function getByEmail(email) {
+  if (!email) return null;
   return prisma.user.findFirst({
-    where: { email }
+    where: { email: { equals: String(email).trim(), mode: 'insensitive' } }
   });
 }
 

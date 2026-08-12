@@ -63,13 +63,22 @@ async function upsertItem({ id, priceListId, productId, fixedPrice, fixedPricePe
   });
 }
 
-async function removeItem(itemId) {
-  try {
-    await prisma.priceListItem.delete({ where: { id: itemId } });
-    return true;
-  } catch (e) {
-    return false;
-  }
+/**
+ * SECURITY (TEN-4): deletion is scoped to the parent list, not the item id alone.
+ *
+ * This used to be `delete({ where: { id: itemId } })`. The route verifies the LIST
+ * belongs to the caller's company but then passed a bare item id, so supplying another
+ * tenant's itemId deleted their pricing — the ownership check proved nothing about the
+ * row actually being removed.
+ *
+ * deleteMany with both ids makes the scope part of the query: a foreign item simply
+ * matches nothing and `count` is 0, which the caller surfaces as a 404.
+ */
+async function removeItem(priceListId, itemId) {
+  const { count } = await prisma.priceListItem.deleteMany({
+    where: { id: itemId, priceListId },
+  });
+  return count > 0;
 }
 
 // ── Assignments ───────────────────────────────────────────────────────────────

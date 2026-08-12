@@ -80,7 +80,11 @@ function verifyToken(authHeader) {
   }
 
   try {
-    const payload = jwt.verify(token, secret);
+    // SECURITY (AUTH-13): pin the algorithm. jsonwebtoken 9 already rejects `alg: none`
+    // when a key is supplied, so this is not exploitable today — it removes the whole
+    // algorithm-confusion class rather than relying on a library default staying put.
+    // generateToken() below signs with the HS256 default, so this matches.
+    const payload = jwt.verify(token, secret, { algorithms: ['HS256'] });
     
     // Support multiple claim formats for user ID
     const userId = payload.sub || payload.userId || payload.id;

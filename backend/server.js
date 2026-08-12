@@ -12,6 +12,7 @@ const { ipKeyGenerator } = rateLimit;
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const { Server: SocketIOServer } = require('socket.io');
 // (Expo push SDK is used inside src/services/pushService — server.js no longer sends directly.)
 const { z } = require('zod');
@@ -43,6 +44,39 @@ if (process.env.SENTRY_DSN) {
     dsn: process.env.SENTRY_DSN,
     environment: process.env.NODE_ENV || 'development',
     tracesSampleRate: 0.1,
+
+    // SECURITY (OPS-2): crash reports must not become a side channel for user data.
+    // Explicit rather than relying on the SDK default, so a version bump can't quietly
+    // start collecting IPs, headers and cookies.
+    sendDefaultPii: false,
+
+    beforeSend: (event) => {
+      // Request bodies here carry passwords (login, register, change-password), OTP codes
+      // and invoice line items. Never ship them.
+      if (event.request) {
+        delete event.request.data;
+        delete event.request.cookies;
+        if (event.request.headers) {
+          for (const h of ['authorization', 'Authorization', 'cookie', 'Cookie', 'x-automation-key']) {
+            delete event.request.headers[h];
+          }
+        }
+        // Query strings carry the automation key on the legacy ?key= path (ABUSE-6).
+        if (typeof event.request.query_string === 'string') {
+          event.request.query_string = '<redacted>';
+        }
+      }
+      // Prisma validation errors quote the offending row back verbatim, which is how
+      // customer records would otherwise end up in an issue title.
+      if (event.exception?.values) {
+        for (const ex of event.exception.values) {
+          if (typeof ex.value === 'string' && ex.value.length > 500) {
+            ex.value = ex.value.slice(0, 500) + '… <truncated>';
+          }
+        }
+      }
+      return event;
+    },
   });
   logger.debug('[Sentry] Error monitoring enabled');
 
@@ -668,6 +702,10 @@ const upload = multer({
     files: 5, // Max 5 files per request
   },
   fileFilter: (req, file, cb) => {
+    // First gate: the DECLARED type. This is the client's multipart header and is trivially
+    // forged, so it is only a cheap early reject — the real check is sniffMimeType() below,
+    // which runs once the bytes exist. multer calls fileFilter before any content arrives,
+    // so content inspection is not possible here.
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       // Reject file with error
       return cb(new Error('INVALID_FILE_TYPE: Only images (PNG, JPEG, GIF, WebP) and PDFs are allowed'));
@@ -675,6 +713,38 @@ const upload = multer({
     cb(null, true);
   },
 });
+
+/**
+ * SECURITY (INJ-8): identify a file from its leading bytes, not its declared type.
+ *
+ * The declared Content-Type was the only check, and it is attacker-chosen — worse, it is
+ * then STORED and re-served as the object's content type, so a file could be uploaded as
+ * `image/png` and served back as whatever the uploader wanted. Every allowed format has a
+ * fixed signature, so this is a handful of byte comparisons and needs no dependency.
+ *
+ * Returns the detected canonical type, or null when nothing matches.
+ */
+function sniffMimeType(buf) {
+  if (!buf || buf.length < 12) return null;
+  const b = buf;
+  const startsWith = (...bytes) => bytes.every((v, i) => b[i] === v);
+
+  if (startsWith(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return 'image/png';
+  if (startsWith(0xff, 0xd8, 0xff)) return 'image/jpeg';
+  if (startsWith(0x47, 0x49, 0x46, 0x38)) return 'image/gif';                 // GIF8
+  if (startsWith(0x25, 0x50, 0x44, 0x46)) return 'application/pdf';           // %PDF
+  // WebP is RIFF....WEBP — the size field sits between the two markers.
+  if (startsWith(0x52, 0x49, 0x46, 0x46) &&
+      b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
+  return null;
+}
+
+/** jpg/jpeg are the same bytes; everything else must match its declared type exactly. */
+function mimeMatchesDeclared(detected, declared) {
+  if (!detected) return false;
+  if (detected === 'image/jpeg') return declared === 'image/jpeg' || declared === 'image/jpg';
+  return detected === declared;
+}
 
 // ============================================================================
 // SUBSCRIPTION TIERS & CAPABILITY DERIVATION
@@ -1162,6 +1232,36 @@ async function requireLocationMembership(req, res, locationId) {
   }
   if (!(await isLocationMember(locationId, user.id))) {
     res.status(403).json(errorResponse('You do not have access to this location', 'ACCESS_DENIED'));
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Reject a locationId that doesn't belong to the company being addressed.
+ *
+ * Nothing checked this, and the client can hand over a stale one: businessStore keeps
+ * `currentLocationId` from the previous company when a switch's location refetch fails,
+ * and clears it only AFTER the refetch resolves on the happy path. On reads that meant a
+ * foreign location silently returned an EMPTY catalogue — indistinguishable from "this
+ * company has no products". On the stock write it was worse: that route derives the
+ * business FROM THE LOCATION, so an adjustment made while browsing company B landed
+ * against company A, ledgered as a manual_adjust on the wrong books (M-12).
+ *
+ * Returns true when the pairing is fine (including when no location is scoped at all).
+ * Sends the 403 and returns false otherwise, so callers use the requireX(...) style:
+ *   if (!(await requireLocationInCompany(res, companyId, locationId))) return;
+ */
+async function requireLocationInCompany(res, companyId, locationId) {
+  if (!locationId) return true;
+  const location = await repos.locationRepo.getById(locationId);
+  // Support both shapes: prisma uses businessId, the older memory rows used companyId.
+  const locationBusinessId = location && (location.businessId || location.companyId);
+  if (!location || locationBusinessId !== companyId) {
+    res.status(403).json(errorResponse(
+      'That location does not belong to this company',
+      'LOCATION_COMPANY_MISMATCH',
+    ));
     return false;
   }
   return true;
@@ -1918,12 +2018,15 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     // Check if user already exists (by phone or email) in the database
     const existingByPhone = await repos.userRepo.getByPhone(fullPhone);
     if (existingByPhone) {
-      return res.status(409).json(errorResponse('A user with this phone number already exists'));
+      // SECURITY (AUTH-6): uniform wording. Distinct 'email exists' vs 'phone exists'
+      // messages let anyone test whether an address or number has an account here.
+      // Same string the P2002 fallback below already uses.
+      return res.status(409).json(errorResponse('A user with these details already exists. Please try logging in.'));
     }
     if (email) {
       const existingByEmail = await repos.userRepo.getByEmail(email);
       if (existingByEmail) {
-        return res.status(409).json(errorResponse('A user with this email already exists'));
+        return res.status(409).json(errorResponse('A user with these details already exists. Please try logging in.'));
       }
     }
 
@@ -2818,7 +2921,17 @@ app.post('/api/auth/2fa/verify', authLimiter, twoFactorVerifyLimiter, async (req
     // Verify the temp token
     const result = verifyToken(`Bearer ${tempToken}`);
     if (result.error) {
-      return res.status(401).json(errorResponse('Invalid or expired session'));
+      // Distinguish expiry from a bad token. verifyToken already tells them apart
+      // ('TOKEN_EXPIRED' vs 'INVALID_TOKEN') and this collapsed both into one string, so
+      // the client could only say "Invalid code" when the real problem was that the
+      // 5-minute window had closed and the code could never work (A-15).
+      const expired = result.error === 'TOKEN_EXPIRED';
+      return res.status(401).json(errorResponse(
+        expired
+          ? 'This sign-in request expired. Please sign in again.'
+          : 'Invalid or expired session',
+        expired ? 'TEMP_TOKEN_EXPIRED' : 'INVALID_TEMP_TOKEN',
+      ));
     }
 
     if (result.user.claims.type !== '2fa_pending') {
@@ -3743,6 +3856,20 @@ app.get('/api/opportunities/:id', requireAuth, async (req, res) => {
   try {
     const opp = await repos.opportunityRepo.getById(req.params.id);
     if (!opp) return res.status(404).json(errorResponse('Opportunity not found'));
+
+    // SECURITY (EXP-6): the list route only ever surfaces `open` opportunities, but this
+    // detail route returned ANY record by id — so closed and fulfilled postings, which a
+    // business has deliberately taken down, stayed readable by anyone who kept the id.
+    // Mirror the list's rule for outsiders; the owning business still sees everything.
+    //
+    // NOTE: if a responder ever needs to reopen a closed posting they responded to, relax
+    // this by allowing businesses with a response row — do not simply drop the check.
+    const oppOwner = await isBusinessMember(opp.businessId, req.user?.id);
+    const oppExpired = opp.expiresAt && new Date(opp.expiresAt).getTime() < Date.now();
+    if (!oppOwner && (opp.status !== 'open' || oppExpired)) {
+      return res.status(404).json(errorResponse('Opportunity not found'));
+    }
+
     const { _count, ...rest } = opp;
     return res.json(successResponse({ ...rest, responseCount: _count?.responses ?? 0 }));
   } catch (err) {
@@ -3909,6 +4036,15 @@ app.get('/api/events/:id', requireAuth, async (req, res) => {
   try {
     const ev = await repos.eventRepo.getById(req.params.id);
     if (!ev) return res.status(404).json(errorResponse('Event not found'));
+
+    // SECURITY (EXP-6): same as opportunities. Deliberately NOT mirroring the list's
+    // `startAt >= now` clause — the list hides past events from discovery, but someone who
+    // attended should still be able to open one. Only `cancelled` is withheld, which is the
+    // state a business actively retracted.
+    if (ev.status === 'cancelled' && !(await isBusinessMember(ev.businessId, req.user?.id))) {
+      return res.status(404).json(errorResponse('Event not found'));
+    }
+
     const { _count, ...rest } = ev;
     return res.json(successResponse({ ...rest, rsvpCount: _count?.rsvps ?? 0 }));
   } catch (err) {
@@ -5335,6 +5471,11 @@ app.get('/api/companies/:companyId/products', requireAuth, async (req, res) => {
     const { companyId } = req.params;
     const { locationId, category, search, status, viewType } = req.query;
 
+    // Reject a locationId belonging to another company. Without this the catalogue was
+    // filtered to products with stock at a foreign location — i.e. none — and rendered
+    // as "this company has no products" rather than as an error (M-12).
+    if (!(await requireLocationInCompany(res, companyId, locationId))) return;
+
     // Repo returns products for this businessId (companyId maps to businessId)
     let companyProducts = await repos.productRepo.getByBusinessId(companyId);
 
@@ -6622,7 +6763,7 @@ app.get('/api/companies/:companyId/discounts', requireAuth, async (req, res) => 
 // Validate a coupon code (checkout preview). Body: { code }. Declared before /:id.
 // Any authenticated business can validate a seller's code (the code is the secret) —
 // this is buyer-facing, so it does NOT require membership of the seller company.
-app.post('/api/companies/:companyId/discounts/validate', requireAuth, async (req, res) => {
+app.post('/api/companies/:companyId/discounts/validate', requireAuth, publicReadLimiter, async (req, res) => {
   try {
     const { companyId } = req.params;
     const code = (req.body.code || '').trim().toUpperCase();
@@ -6634,7 +6775,19 @@ app.post('/api/companies/:companyId/discounts/validate', requireAuth, async (req
       && (!discount.endDate || new Date(discount.endDate).getTime() >= now)
       && (discount.maxUses == null || discount.usedCount < discount.maxUses);
     if (!usable) return res.status(404).json(errorResponse('That code isn’t valid right now.'));
-    res.json(successResponse(discount));
+
+    // SECURITY (EXP-5): return only what applying a code needs. This used to send the whole
+    // row — `maxUses`, `usedCount`, the internal name, `minOrderAmount` — to any
+    // authenticated caller, for ANY companyId, with no throttle. That is a redemption
+    // oracle: you could measure a competitor's campaign size and take-up by guessing codes.
+    // The limiter above bounds the guessing; this bounds what a hit is worth.
+    res.json(successResponse({
+      id: discount.id,
+      code: discount.code,
+      type: discount.type,
+      value: discount.value,
+      minOrderAmount: discount.minOrderAmount ?? null,
+    }));
   } catch (e) {
     logger.error('Error validating discount code:', e);
     res.status(500).json(errorResponse('Failed to validate code'));
@@ -6926,7 +7079,9 @@ app.delete('/api/companies/:companyId/price-lists/:listId/items/:itemId', requir
     if (!existing || existing.businessId !== companyId) {
       return res.status(404).json(errorResponse('Price list not found'));
     }
-    const ok = await repos.priceListRepo.removeItem(itemId);
+    // SECURITY (TEN-4): scope the delete to this list. The check above proves the LIST is
+    // ours; without passing listId the item id alone decided what got deleted.
+    const ok = await repos.priceListRepo.removeItem(listId, itemId);
     if (!ok) return res.status(404).json(errorResponse('Item not found'));
     res.json(successResponse(null, 'Item removed'));
   } catch (e) {
@@ -7288,6 +7443,13 @@ app.delete('/api/users/me/experiences/:id', requireAuth, async (req, res) => {
 // List user's education
 app.get('/api/users/:userId/education', requireAuth, async (req, res) => {
   try {
+    // SECURITY (EXP-3): blocks are bidirectional, and GET /users/:userId enforces them —
+    // these sibling routes did not, so a blocked user could still read this section of the
+    // profile. Matches the fix already applied to /experiences.
+    const isSelf = req.user.id === req.params.userId;
+    if (!isSelf && await repos.blockRepo.isBlocked(req.user.id, req.params.userId)) {
+      return res.status(404).json(errorResponse('User not found'));
+    }
     const education = await repos.educationRepo.getByUserId(req.params.userId);
     res.json(successResponse(education));
   } catch (e) {
@@ -7371,6 +7533,13 @@ app.delete('/api/users/me/education/:id', requireAuth, async (req, res) => {
 // List user's certifications
 app.get('/api/users/:userId/certifications', requireAuth, async (req, res) => {
   try {
+    // SECURITY (EXP-3): blocks are bidirectional, and GET /users/:userId enforces them —
+    // these sibling routes did not, so a blocked user could still read this section of the
+    // profile. Matches the fix already applied to /experiences.
+    const isSelf = req.user.id === req.params.userId;
+    if (!isSelf && await repos.blockRepo.isBlocked(req.user.id, req.params.userId)) {
+      return res.status(404).json(errorResponse('User not found'));
+    }
     const certifications = await repos.certificationRepo.getByUserId(req.params.userId);
     res.json(successResponse(certifications));
   } catch (e) {
@@ -7467,6 +7636,13 @@ app.get('/api/skills/search', requireAuth, async (req, res) => {
 // List user's skills
 app.get('/api/users/:userId/skills', requireAuth, async (req, res) => {
   try {
+    // SECURITY (EXP-3): blocks are bidirectional, and GET /users/:userId enforces them —
+    // these sibling routes did not, so a blocked user could still read this section of the
+    // profile. Matches the fix already applied to /experiences.
+    const isSelf = req.user.id === req.params.userId;
+    if (!isSelf && await repos.blockRepo.isBlocked(req.user.id, req.params.userId)) {
+      return res.status(404).json(errorResponse('User not found'));
+    }
     const userSkills = await repos.skillRepo.getUserSkills(req.params.userId);
     res.json(successResponse(userSkills));
   } catch (e) {
@@ -8760,7 +8936,14 @@ app.patch('/api/locations/:locationId/stock/:productId', requireAuth, async (req
 
     const locationId = req.params.locationId;
     const productId = req.params.productId;
+
+    // SECURITY (INJ-3): reject NaN and negatives explicitly. `Number("abc")` is NaN, which
+    // flowed all the way into an Int column; negatives were only incidentally clamped by a
+    // Math.max deeper in the service. Neither should reach the ledger.
     const qtyOnHand = Number(req.body.qtyOnHand ?? 0);
+    if (!Number.isInteger(qtyOnHand) || qtyOnHand < 0) {
+      return res.status(400).json(errorResponse('qtyOnHand must be a whole number of 0 or more'));
+    }
 
     const location = await repos.locationRepo.getById(locationId);
     if (!location) {
@@ -8768,6 +8951,16 @@ app.patch('/api/locations/:locationId/stock/:productId', requireAuth, async (req
     }
 
     const locationBusinessId = location.businessId || location.companyId;
+
+    // SECURITY (TEN-5): the productId comes from the path and nothing tied it to this
+    // location's business — neither this route nor stockService validated it. A member of
+    // company A could therefore create Stock and StockMovement rows against company B's
+    // product, under A's location, polluting B's ledger.
+    const product = await repos.productRepo.getById(productId);
+    const productBusinessId = product?.businessId || product?.companyId;
+    if (!product || productBusinessId !== locationBusinessId) {
+      return res.status(404).json(errorResponse('Product not found'));
+    }
 
     // Set absolute on-hand via stockService so the change is ledgered
     // (records the delta as a manual_adjust movement).
@@ -9778,6 +9971,7 @@ app.get('/api/companies/:companyId/deliveries', requireAuth, async (req, res) =>
   try {
     const { companyId } = req.params;
     const { locationId, status, assignedTo, direction, type, search } = req.query;
+    if (!(await requireLocationInCompany(res, req.params.companyId, locationId))) return;
 
     let items = await repos.deliveryRepo.getByBusinessId(companyId);
 
@@ -10010,6 +10204,7 @@ app.get('/api/companies/:companyId/deliveries/analytics', requireAuth, async (re
   try {
     const { companyId } = req.params;
     const { locationId, from, to } = req.query;
+    if (!(await requireLocationInCompany(res, req.params.companyId, locationId))) return;
 
     const now = new Date();
     const DAY_MS = 1000 * 60 * 60 * 24;
@@ -15311,6 +15506,28 @@ app.post('/api/upload', requireAuth, upload.single('file'), async (req, res) => 
       return res.status(400).json(errorResponse('No file uploaded'));
     }
 
+    // SECURITY (INJ-8): verify the CONTENT matches the declared type before storing it.
+    // With memoryStorage the bytes are in hand; with diskStorage they have just been
+    // written, so read the header back and delete the file if it lied.
+    let head = req.file.buffer;
+    if (!head && req.file.path) {
+      const fh = await fs.promises.open(req.file.path, 'r');
+      try {
+        const { buffer } = await fh.read(Buffer.alloc(12), 0, 12, 0);
+        head = buffer;
+      } finally {
+        await fh.close();
+      }
+    }
+    const detected = sniffMimeType(head);
+    if (!mimeMatchesDeclared(detected, req.file.mimetype)) {
+      if (req.file.path) await fs.promises.unlink(req.file.path).catch(() => {});
+      return res.status(400).json(errorResponse(
+        'That file does not look like the type it claims to be.',
+        'INVALID_FILE_TYPE',
+      ));
+    }
+
     if (useSupabaseStorage) {
       // Persist to Supabase Storage → returns a permanent public CDN URL that
       // survives deploys (req.file.buffer comes from multer.memoryStorage).
@@ -15330,8 +15547,12 @@ app.post('/api/upload', requireAuth, upload.single('file'), async (req, res) => 
     // Surface the underlying storage error so misconfig (wrong key, wrong bucket,
     // RLS denial, etc.) is diagnosable from the client instead of a generic message.
     logger.error('[Upload] Error:', err);
+    // SECURITY (EXP-7): the detail names buckets and quotes RLS policy text. It was
+    // deliberately surfaced so misconfiguration is diagnosable from the client — keep that
+    // affordance in dev, but don't hand storage internals to production users.
     const detail = (err && (err.message || err.error)) || 'Unknown storage error';
-    res.status(500).json(errorResponse(`File upload failed: ${detail}`));
+    const safeDetail = process.env.NODE_ENV === 'production' ? 'Please try again.' : detail;
+    res.status(500).json(errorResponse(`File upload failed: ${safeDetail}`));
   }
 });
 
@@ -15575,6 +15796,9 @@ app.get('/api/companies/:companyId/activity-feed', requireAuth, async (req, res)
     const { companyId } = req.params;
     const { locationId, limit = 50 } = req.query;
     const maxLimit = Math.min(parseInt(limit, 10), 100);
+    // Reject a locationId belonging to another company (M-12).
+    if (!(await requireLocationInCompany(res, companyId, locationId))) return;
+
 
     // Verify user has access to this business
     const userId = req.user?.id;
@@ -15602,6 +15826,8 @@ app.get('/api/companies/:companyId/dashboard', requireAuth, async (req, res) => 
     if (!userId || !(await isBusinessMember(companyId, userId))) {
       return res.status(403).json(errorResponse('ACCESS_DENIED', 'You do not have access to this business'));
     }
+    // Reject a locationId belonging to another company (M-12).
+    if (!(await requireLocationInCompany(res, companyId, locationId))) return;
 
     const now = new Date();
     const formatCurrency = (amount) => `Rs ${Number(amount || 0).toFixed(2)}`;
@@ -15807,6 +16033,8 @@ app.get('/api/companies/:companyId/dashboard/overview', requireAuth, async (req,
     if (!userId || !(await isBusinessMember(companyId, userId))) {
       return res.status(403).json(errorResponse('ACCESS_DENIED', 'You do not have access to this business'));
     }
+    // Reject a locationId belonging to another company (M-12).
+    if (!(await requireLocationInCompany(res, companyId, locationId))) return;
 
     // Entitlement: analytics is Business+ ; full (30d) history is Enterprise-only
     const business = await prisma.business.findUnique({
@@ -15968,6 +16196,8 @@ app.get('/api/companies/:companyId/analytics', requireAuth, async (req, res) => 
     const range = (req.query.range === '30d' && gate.tier === 'ENTERPRISE') ? '30d' : '7d';
     const days = range === '30d' ? 30 : 7;
     const { locationId } = req.query;
+    // Reject a locationId belonging to another company (M-12).
+    if (!(await requireLocationInCompany(res, companyId, locationId))) return;
 
     const now = new Date();
     const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
@@ -16062,6 +16292,8 @@ app.get('/api/companies/:companyId/variance', requireAuth, async (req, res) => {
     const gate = await analyticsGate(companyId, req.user?.id, res);
     if (!gate) return;
     const { locationId } = req.query;
+    // Reject a locationId belonging to another company (M-12).
+    if (!(await requireLocationInCompany(res, companyId, locationId))) return;
     const orderLoc = locationId ? { soldByLocationId: locationId } : {};
 
     const period = resolvePeriod(req.query.period);
@@ -16827,20 +17059,27 @@ app.patch('/api/notification-preferences', requireAuth, async (req, res) => {
 // Public product catalog (scope/visibility filter)
 // GET /api/products?scope=public&companyId=...&brand=...&category=...
 // GET /api/products?visibility=public (also supported for compatibility)
-app.get('/api/products', async (req, res) => {
+app.get('/api/products', publicReadLimiter, async (req, res) => {
   try {
     const { companyId, brand, category } = req.query;
     // SECURITY: Public endpoint — do not trust viewerBusinessId from query params
     const viewerBusinessId = null;
-    let catalog = await repos.productRepo.list();
 
     // SECURITY (CO-4): this is an unauthenticated, cross-tenant route. It ALWAYS returns
-    // only listed products (regardless of any ?scope param a caller does or doesn't pass) —
-    // previously the listed-only filter ran only when the caller volunteered scope=public,
-    // so a bare GET /api/products dumped every company's full catalogue incl. costs.
-    catalog = catalog.filter(p =>
-      p.isListed === true || p.is_listed === true || p.isDisplayable === true || p.isPublic === true
-    );
+    // only listed products — previously the listed-only filter ran only when the caller
+    // volunteered scope=public, so a bare GET dumped every company's catalogue incl. costs.
+    //
+    // ABUSE-7: the filters now run in the QUERY, not in JS afterwards. The previous shape
+    // (`list()` → take the newest 500 → filter in memory) meant `?companyId=` searched only
+    // within the newest 500 products globally, so once the table passed that, a company
+    // whose products were older silently returned nothing. Also rate-limited now: this is
+    // the only unauthenticated route that returns tenant business data.
+    let catalog = await repos.productRepo.listPublic({
+      businessId: companyId || undefined,
+      brand: brand || undefined,
+      category: category || undefined,
+      limit: req.query.limit,
+    });
 
     // ENTITLEMENT (P2 #10): publishing products on the public feed is a Business+ capability
     // (canPublishProductsOnFeed). Hide products owned by businesses without it so FREE/PRO
@@ -16861,22 +17100,8 @@ app.get('/api/products', async (req, res) => {
       );
     }
 
-    // Optional filters for product-details suggestions carousels
-    if (companyId) {
-      catalog = catalog.filter(p =>
-        (p.companyId || p.businessId || p.ownerBusinessId) === companyId
-      );
-    }
-    if (brand) {
-      catalog = catalog.filter(p =>
-        (p.brand || '').toLowerCase() === String(brand).toLowerCase()
-      );
-    }
-    if (category) {
-      catalog = catalog.filter(p =>
-        (p.category || '').toLowerCase() === String(category).toLowerCase()
-      );
-    }
+    // (companyId / brand / category filtering now happens in listPublic's WHERE clause —
+    // see ABUSE-7 above. Filtering here in JS is what made the row cap silently wrong.)
 
     // Apply price privacy: hide prices for businesses with pricePrivacyEnabled
     catalog = await applyPricePrivacyBatch(catalog, viewerBusinessId || null);
@@ -17508,6 +17733,15 @@ app.get('/api/payments/checkout-result/:checkoutId', requireAuth, async (req, re
       return res.status(404).json(errorResponse('Payment not found'));
     }
 
+    // SECURITY (TEN-6): the payment row was returned to any authenticated caller holding a
+    // checkoutId, leaking another tenant's payment status and internal paymentId — and
+    // letting them trigger finalization of someone else's pending payment. Finalization is
+    // idempotent and authoritative-from-Peach so the damage was bounded, but the read was
+    // unscoped. 404 rather than 403: a wrong guess should not confirm the id exists.
+    if (!(await isBusinessMember(payment.businessId, req.user?.id))) {
+      return res.status(404).json(errorResponse('Payment not found'));
+    }
+
     // If already processed, return stored status
     if (payment.status !== 'PENDING') {
       return res.json(successResponse({ status: payment.status, paymentId: payment.id }));
@@ -17765,6 +17999,27 @@ app.post('/api/payments/invoice-checkout', requireAuth, async (req, res) => {
 // errors to Sentry (if configured) and returns a safe 500.
 // ============================================================================
 app.use((err, req, res, next) => {
+  // SECURITY (INJ-9): upload failures are the CLIENT's fault and must say so. multer
+  // throws for oversized files, too many files and rejected types, and every one of them
+  // fell through to the generic 500 below — so a user picking a 20MB photo was told the
+  // server had broken. The INVALID_FILE_TYPE error raised in fileFilter was constructed
+  // but never matched anywhere either.
+  if (err instanceof multer.MulterError) {
+    const messages = {
+      LIMIT_FILE_SIZE: 'That file is too large. The maximum is 10MB.',
+      LIMIT_FILE_COUNT: 'Too many files. You can upload up to 5 at a time.',
+      LIMIT_UNEXPECTED_FILE: 'Unexpected file field.',
+    };
+    logger.warn('[Upload] rejected:', err.code);
+    return res.status(400).json(errorResponse(messages[err.code] || 'That file could not be accepted.', err.code));
+  }
+  if (typeof err?.message === 'string' && err.message.startsWith('INVALID_FILE_TYPE')) {
+    return res.status(400).json(errorResponse(
+      'Only images (PNG, JPEG, GIF, WebP) and PDFs are allowed.',
+      'INVALID_FILE_TYPE',
+    ));
+  }
+
   // CORS rejections are expected/benign — don't spam Sentry with them.
   const isCors = typeof err?.message === 'string' && err.message.startsWith('CORS_');
   if (process.env.SENTRY_DSN && !isCors) {
@@ -17805,6 +18060,28 @@ if (process.env.NODE_ENV !== 'test') {
       .processRenewals({ notify: true, repos })
       .catch((err) => logger.error('[subscriptionRenewal] scheduled run failed:', err.message));
   }, SUBSCRIPTION_RENEWAL_INTERVAL_MS);
+
+  // SECURITY (AUTH-11): expire-and-forget for the two credential tables.
+  //
+  // Both already refuse to honour stale rows, so this is not an access control — it stops
+  // tables that only ever grow from accumulating exactly what a database dump is worth:
+  // which accounts signed in, from which devices, and every reset link ever requested.
+  // Both tables carry an expiresAt index for this. Daily is ample; the rows are already
+  // inert by the time they qualify.
+  const CREDENTIAL_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000; // daily
+  const pruneCredentials = () => {
+    sessionService
+      .pruneExpired()
+      .then(({ count }) => count && logger.info(`[prune] removed ${count} expired sessions`))
+      .catch((err) => logger.error('[prune] session prune failed:', err.message));
+    passwordResetService
+      .pruneExpired()
+      .then(({ count }) => count && logger.info(`[prune] removed ${count} expired reset tokens`))
+      .catch((err) => logger.error('[prune] reset-token prune failed:', err.message));
+  };
+  setInterval(pruneCredentials, CREDENTIAL_PRUNE_INTERVAL_MS);
+  // Once at boot too, so a long-running deploy gap doesn't leave a backlog for a day.
+  pruneCredentials();
 }
 
 server.listen(PORT, HOST, () => {

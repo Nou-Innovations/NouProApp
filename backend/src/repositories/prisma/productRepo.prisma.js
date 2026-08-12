@@ -10,6 +10,32 @@ async function list(limit = 500) {
   });
 }
 
+/**
+ * SECURITY / CORRECTNESS (ABUSE-7): the public catalogue query, filtered in the DATABASE.
+ *
+ * `list()` takes the newest 500 rows and the caller then filters in JS. That is a silent
+ * correctness bug as soon as the table passes 500: `?companyId=X` searches only within the
+ * newest 500 products globally, so a company whose products are older returns nothing and
+ * the suggestions carousel goes blank. Raising the cap only moves the cliff; the filters
+ * have to run in the query.
+ *
+ * `isListed` is the authoritative column (mapped to `is_listed`). `isDisplayable` is
+ * accepted as a legacy alias because older rows were written with only that set.
+ */
+async function listPublic({ businessId, brand, category, limit = 100 } = {}) {
+  const where = {
+    OR: [{ isListed: true }, { isDisplayable: true }],
+    ...(businessId ? { businessId } : {}),
+    ...(category ? { category: { equals: category, mode: 'insensitive' } } : {}),
+    ...(brand ? { brand: { equals: brand, mode: 'insensitive' } } : {}),
+  };
+  return prisma.product.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: Math.min(Number(limit) || 100, 100),
+  });
+}
+
 async function getById(id) {
   return prisma.product.findUnique({
     where: { id }
@@ -59,6 +85,7 @@ async function remove(id) {
 
 module.exports = {
   list,
+  listPublic,
   getById,
   getByBusinessId,
   getCarriedCopy,

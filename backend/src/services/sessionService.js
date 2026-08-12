@@ -95,7 +95,23 @@ async function listForUser(userId) {
   });
 }
 
+/**
+ * SECURITY (AUTH-11): delete sessions that are past their expiry.
+ *
+ * `isUsable` already refuses to honour them, so this is hygiene rather than an access
+ * control — but a table that only ever grows is a slow leak of exactly the data an
+ * attacker would want from a database dump: which accounts signed in, from what devices,
+ * and when. The Session_expiresAt index exists specifically to support this.
+ *
+ * Revoked-but-unexpired rows are deliberately kept: they still expire on their own, and
+ * removing them early would lose the audit trail of a revocation.
+ */
+async function pruneExpired({ now = new Date() } = {}) {
+  return prisma.session.deleteMany({ where: { expiresAt: { lt: now } } });
+}
+
 module.exports = {
+  pruneExpired,
   SESSION_TTL_DAYS,
   createSession,
   isUsable,
