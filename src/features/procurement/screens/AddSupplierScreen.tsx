@@ -4,8 +4,8 @@
  * Form screen for creating a new supplier.
  */
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Modal, FlatList } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -13,6 +13,8 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useProfileStore } from '@/shared/store/profileStore';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { KeyboardAwareScreen } from '@/shared/components/layout';
+import { ListItemCard } from '@/shared/components/ui';
+import { getConnectedBusinesses, type ConnectedBusiness } from '@/features/pricing/priceLists.service';
 import * as procurementService from '../services/procurement.service';
 import { useProcurementStore } from '../store/procurement.store';
 import type { CreateSupplierData } from '@/shared/types/procurement';
@@ -39,6 +41,39 @@ export default function AddSupplierScreen() {
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingSupplier, setIsLoadingSupplier] = useState(isEditMode);
+
+  /**
+   * Link this supplier to a real company you're connected to.
+   *
+   * The schema, the backend and the `AddSupplier: { supplierBusinessId? }` nav param all
+   * existed — only the UI was missing, so nothing ever set it (B-3). Customers has had
+   * this picker all along; this mirrors it, including the "connected businesses only"
+   * gate, so you can't claim an arbitrary company as your supplier.
+   */
+  const [linkedBusinessId, setLinkedBusinessId] = useState<string | null>(
+    route.params?.supplierBusinessId ?? null,
+  );
+  const [linkedBusinessName, setLinkedBusinessName] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [connections, setConnections] = useState<ConnectedBusiness[]>([]);
+
+  const openLinkPicker = useCallback(async () => {
+    setPickerOpen(true);
+    if (connections.length === 0 && activeBusiness?.id) {
+      try {
+        setConnections(await getConnectedBusinesses(activeBusiness.id));
+      } catch {
+        /* no connections is fine */
+      }
+    }
+  }, [activeBusiness?.id, connections.length]);
+
+  const selectLinked = (cb: ConnectedBusiness) => {
+    setLinkedBusinessId(cb.business.id);
+    setLinkedBusinessName(cb.business.name);
+    if (!name.trim()) setName(cb.business.name);
+    setPickerOpen(false);
+  };
 
   // Fetch existing supplier data when in edit mode
   useEffect(() => {
@@ -85,6 +120,7 @@ export default function AddSupplierScreen() {
         address: address.trim() || undefined,
         paymentTerms: paymentTerms.trim() || undefined,
         notes: notes.trim() || undefined,
+        supplierBusinessId: linkedBusinessId || undefined,
       };
 
       if (isEditMode && editSupplierId) {
@@ -200,6 +236,28 @@ export default function AddSupplierScreen() {
             autoCapitalize: 'words',
           })}
 
+          {/* Optional link to a connected NouPro business */}
+          <Text style={[styles.fieldLabel, { color: appTheme.colors.textSecondary }]}>
+            Linked business (optional)
+          </Text>
+          <TouchableOpacity
+            style={[styles.textInput, { borderColor: appTheme.colors.borderColor, backgroundColor: appTheme.colors.cardBackground, justifyContent: 'center' }]}
+            onPress={openLinkPicker}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={{ color: linkedBusinessName || linkedBusinessId ? appTheme.colors.text : appTheme.colors.textMuted }}
+              numberOfLines={1}
+            >
+              {linkedBusinessName || (linkedBusinessId ? 'Linked' : 'Not linked — tap to choose a connection')}
+            </Text>
+          </TouchableOpacity>
+          {linkedBusinessId ? (
+            <TouchableOpacity onPress={() => { setLinkedBusinessId(null); setLinkedBusinessName(null); }}>
+              <Text style={{ color: appTheme.colors.error, marginBottom: 12 }}>Remove link</Text>
+            </TouchableOpacity>
+          ) : null}
+
           {renderField('Payment Terms', paymentTerms, setPaymentTerms, {
             placeholder: 'e.g., Net 30, COD',
           })}
@@ -209,6 +267,31 @@ export default function AddSupplierScreen() {
             multiline: true,
           })}
       </KeyboardAwareScreen>
+
+      <Modal visible={pickerOpen} animationType="slide" onRequestClose={() => setPickerOpen(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: appTheme.colors.background }} edges={['top']}>
+          <SecondaryHeader title="Link a connection" leftAction={{ icon: 'close', onPress: () => setPickerOpen(false) }} />
+          <FlatList
+            data={connections}
+            keyExtractor={(cb) => cb.connectionId}
+            contentContainerStyle={{ padding: 16 }}
+            ListEmptyComponent={
+              <Text style={{ color: appTheme.colors.textLight, textAlign: 'center', marginTop: 24 }}>
+                No connected businesses yet. Connect with a business first, or just save this as a standalone supplier.
+              </Text>
+            }
+            renderItem={({ item }) => (
+              <ListItemCard
+                avatar={item.business.logoUrl
+                  ? { type: 'image', imageUri: item.business.logoUrl, userName: item.business.name }
+                  : { type: 'initials', userName: item.business.name }}
+                title={item.business.name}
+                onPress={() => selectLinked(item)}
+              />
+            )}
+          />
+        </SafeAreaView>
+      </Modal>
 
       {/* Submit Button */}
       <View
