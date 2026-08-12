@@ -16,6 +16,12 @@ const fs = require('fs');
 const { Server: SocketIOServer } = require('socket.io');
 // (Expo push SDK is used inside src/services/pushService — server.js no longer sends directly.)
 const { z } = require('zod');
+// INJ-5 / INJ-6: money-total derivation lives in src/domain so it can be unit-tested.
+const {
+  computeInvoiceTotals,
+  reportInvoiceTotalMismatch,
+  resolveProcurementTotal,
+} = require('./src/domain/moneyTotals');
 
 // Load environment variables (create a .env file in backend/ if needed)
 require('dotenv').config();
@@ -894,9 +900,22 @@ async function findBusiness(companyId) {
 // email invites slipped under the cap and materialized past the limit at registration. A
 // pending invite reserves the seat now and converts 1:1 into an 'invited' member on signup
 // (the invite flips to ACCEPTED), so there is no double-count and no bypass.
+// The two invite paths expire asymmetrically. Inviting someone with NO account writes a
+// CompanyInvite, which carries expiresAt and stops counting after 30 days. Inviting
+// someone who already HAS an account writes BusinessMember{status:'invited'} instead —
+// a model with no expiry column at all — so that seat was held forever unless an admin
+// happened to cancel it by hand. Same 30-day window, measured on createdAt, which is the
+// only timestamp the model has (M-10).
+const INVITE_SEAT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 async function getStaffCount(companyId) {
   const members = await repos.memberRepo.listBusinessMembers(companyId);
-  const seatMembers = members.filter(m => m.status === 'accepted' || m.status === 'invited').length;
+  const inviteCutoff = new Date(Date.now() - INVITE_SEAT_TTL_MS);
+  const seatMembers = members.filter(m => {
+    if (m.status === 'accepted') return true;
+    if (m.status !== 'invited') return false;
+    return !m.createdAt || new Date(m.createdAt) > inviteCutoff;
+  }).length;
   const pendingInvites = await prisma.companyInvite.count({
     where: {
       businessId: companyId,
@@ -4575,6 +4594,17 @@ app.patch('/api/connections/:id/reject', requireAuth, async (req, res) => {
     }
 
     const updated = await repos.connectionRepo.rejectRequest(req.params.id);
+
+    // Tell the sender. Declining was completely silent — no push, no notification, no
+    // state change they could see — so a request just sat there looking unanswered
+    // forever, and they had no way to know to stop waiting (C-10).
+    pushToUsers([connection.senderId], {
+      title: 'Connection request declined',
+      body: `${req.user.name || 'Someone'} declined your connection request.`,
+      category: 'system',
+      data: { type: 'connection_declined', connectionId: connection.id, userId: req.user.id },
+    });
+
     res.json(successResponse(updated, 'Connection rejected'));
   } catch (err) {
     logger.error('[ConnectionReject] Error:', err);
@@ -4923,6 +4953,21 @@ app.patch('/api/business-connections/:id/reject', requireAuth, async (req, res) 
     }
 
     const updated = await repos.connectionRepo.rejectBusinessRequest(req.params.id);
+
+    // Tell the requesting company's admins — declining was silent on this side too (C-10).
+    const targetBiz = await repos.businessRepo.getById(connection.targetBusinessId);
+    const requesterAdmins = await getBusinessAdminUserIds(connection.requesterBusinessId);
+    pushToUsers(requesterAdmins, {
+      title: 'Partner request declined',
+      body: `${targetBiz?.name || 'A company'} declined your connection request.`,
+      category: 'team',
+      data: {
+        type: 'business_connection_declined',
+        connectionId: connection.id,
+        companyId: connection.targetBusinessId,
+      },
+    });
+
     res.json(successResponse(updated, 'Business connection rejected'));
   } catch (err) {
     logger.error('[BizConnectionReject] Error:', err);
@@ -9271,6 +9316,9 @@ app.delete('/api/companies/:companyId/suppliers/:supplierId/products/:spId', req
 // ── Purchase Requests ──
 
 // GET /api/companies/:companyId/purchase-requests
+
+
+
 app.get('/api/companies/:companyId/purchase-requests', requireAuth, async (req, res) => {
   if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
 
@@ -9324,7 +9372,8 @@ app.post('/api/companies/:companyId/purchase-requests', requireAuth, procurement
       priority: priority || 'NORMAL',
       status: 'DRAFT',
       items,
-      totalAmount: totalAmount ? parseFloat(totalAmount) : null,
+      // INJ-6: derived from items; `? :` also meant a genuine 0 was stored as null.
+      totalAmount: resolveProcurementTotal('procurement create', totalAmount, items, logger),
       notes: notes || null,
       requiredByDate: requiredByDate ? new Date(requiredByDate) : null,
     });
@@ -9383,7 +9432,10 @@ app.patch('/api/companies/:companyId/purchase-requests/:prId', requireAuth, proc
     for (const key of allowedFields) {
       if (req.body[key] !== undefined) patch[key] = req.body[key];
     }
-    if (patch.totalAmount) patch.totalAmount = parseFloat(patch.totalAmount);
+    // INJ-6: re-derive when items are being updated; otherwise sanitise the client value.
+    if (Array.isArray(patch.items) || patch.totalAmount !== undefined) {
+      patch.totalAmount = resolveProcurementTotal('procurement patch', patch.totalAmount, patch.items, logger);
+    }
     if (patch.requiredByDate) patch.requiredByDate = new Date(patch.requiredByDate);
 
     const updated = await repos.procurementRepo.updatePurchaseRequest(req.params.prId, patch);
@@ -9626,7 +9678,8 @@ app.post('/api/companies/:companyId/purchase-orders', requireAuth, procurementLi
       locationId: locationId || null,
       poNumber: poId,
       items,
-      totalAmount: totalAmount ? parseFloat(totalAmount) : null,
+      // INJ-6: derived from items; `? :` also meant a genuine 0 was stored as null.
+      totalAmount: resolveProcurementTotal('procurement create', totalAmount, items, logger),
       status: 'DRAFT',
       paymentStatus: 'UNPAID',
       paymentTerms: paymentTerms || null,
@@ -9676,7 +9729,10 @@ app.patch('/api/companies/:companyId/purchase-orders/:poId', requireAuth, procur
     for (const key of allowedFields) {
       if (req.body[key] !== undefined) patch[key] = req.body[key];
     }
-    if (patch.totalAmount) patch.totalAmount = parseFloat(patch.totalAmount);
+    // INJ-6: re-derive when items are being updated; otherwise sanitise the client value.
+    if (Array.isArray(patch.items) || patch.totalAmount !== undefined) {
+      patch.totalAmount = resolveProcurementTotal('procurement patch', patch.totalAmount, patch.items, logger);
+    }
     if (patch.expectedDeliveryDate) patch.expectedDeliveryDate = new Date(patch.expectedDeliveryDate);
 
     const updated = await repos.procurementRepo.updatePurchaseOrder(req.params.poId, patch);
@@ -11375,6 +11431,9 @@ function buildInvoiceCardDetails(inv, currency) {
 }
 
 // Create invoice at Parent level
+
+
+
 app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => {
   // PERMISSION: Require business membership
   if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
@@ -11464,20 +11523,26 @@ app.post('/api/companies/:companyId/invoices', requireAuth, async (req, res) => 
         req.body.items.some((it) => it && (it.productId || it.product_id));
       if (invList && hasProductLine) {
         const priced = await repriceLineItems(invList, req.body.items, req.params.companyId, { forceBase: false });
-        const newSubtotal = priced.totalAmount;
-        const tr = Number(req.body.taxRate) || 0;
-        const disc = Number(req.body.discountAmount) || 0;
-        const newTax = Math.round(newSubtotal * (tr / 100) * 100) / 100;
+        // Price-list pricing wins over whatever unit prices the client sent.
         req.body.items = priced.items;
-        req.body.subtotal = newSubtotal;
-        req.body.taxAmount = newTax;
-        req.body.totalAmount = Math.round((newSubtotal + newTax - disc) * 100) / 100;
         if (priced.changed) {
           logger.info(`[priceList] invoice repriced for seller ${req.params.companyId} via list ${invList.id}`);
         }
       }
     } catch (priceErr) {
-      logger.error('[priceList] invoice repricing failed (keeping client amounts):', priceErr.message);
+      logger.error('[priceList] invoice repricing failed (keeping client line items):', priceErr.message);
+    }
+
+    // SECURITY (INJ-5): totals are ALWAYS derived from the line items, whether or not a
+    // price list applied. Previously they were client-supplied and only recomputed inside
+    // the price-list branch above — so a free-text invoice, or any seller without a list,
+    // set its own total, and that stored figure is what invoice-checkout charges.
+    {
+      const computed = computeInvoiceTotals(req.body, req.body.items);
+      reportInvoiceTotalMismatch(`create seller=${req.params.companyId}`, req.body, computed, logger);
+      req.body.subtotal = computed.subtotal;
+      req.body.taxAmount = computed.taxAmount;
+      req.body.totalAmount = computed.totalAmount;
     }
 
     // Generate invoice number with retry to handle concurrent requests
@@ -11698,6 +11763,16 @@ app.post('/api/locations/:locationId/invoices', requireAuth, async (req, res) =>
       req.body.dueDate = new Date(req.body.dueDate);
     }
 
+    // SECURITY (INJ-5): same derivation as the company-scoped create. This route had NO
+    // repricing branch at all, so its totals were 100% client-controlled.
+    {
+      const computed = computeInvoiceTotals(req.body, req.body.items);
+      reportInvoiceTotalMismatch(`create location=${req.params.locationId}`, req.body, computed, logger);
+      req.body.subtotal = computed.subtotal;
+      req.body.taxAmount = computed.taxAmount;
+      req.body.totalAmount = computed.totalAmount;
+    }
+
     // Generate location-specific invoice number with retry for unique constraint
     const prefix = (location.name || 'LOC').substring(0, 3).toUpperCase();
     const MAX_RETRIES = 3;
@@ -11873,6 +11948,20 @@ app.patch('/api/invoices/:invoiceId', requireAuth, async (req, res) => {
                             totalAmount, subtotal, taxAmount, paidAmount, status: newStat, type,
                             discount, shipping };
     Object.keys(updatePayload).forEach(k => updatePayload[k] === undefined && delete updatePayload[k]);
+
+    // SECURITY (INJ-5): if this PATCH touches anything the total depends on, re-derive it
+    // rather than trusting the client's arithmetic. Only when `items` is present: a partial
+    // update that doesn't send items has nothing to compute from, and inventing a subtotal
+    // of 0 would wipe the invoice. Note PATCH does not validate item shapes the way create
+    // does, so the helper ignores non-numeric lines rather than producing NaN.
+    if (Array.isArray(items)) {
+      const merged = { taxRate, discountAmount, discount, shipping, totalAmount };
+      const computed = computeInvoiceTotals(merged, items);
+      reportInvoiceTotalMismatch(`patch invoice=${req.params.invoiceId}`, merged, computed, logger);
+      updatePayload.subtotal = computed.subtotal;
+      updatePayload.taxAmount = computed.taxAmount;
+      updatePayload.totalAmount = computed.totalAmount;
+    }
 
     // Parse date strings to Date objects for DateTime columns
     if (updatePayload.issueDate && typeof updatePayload.issueDate === 'string') {
@@ -14464,10 +14553,6 @@ app.post('/api/companies/:companyId/users/invite', requireAuth, async (req, res)
       }
     }
 
-    // Mock invite token/link (in production: email + JWT invite token)
-    const inviteToken = nextId('invite');
-    const inviteLink = `/invite?companyId=${companyId}&userId=${user.id}&token=${inviteToken}`;
-
     const invitingBiz = await repos.businessRepo.getById(companyId);
     if (status === 'invited') {
       pushToUsers([user.id], {
@@ -14478,11 +14563,15 @@ app.post('/api/companies/:companyId/users/invite', requireAuth, async (req, res)
       });
     }
 
+    // No invite token here. One used to be minted per request — an unsigned random
+    // string pointing at `/invite?...`, never written to any table, never served by any
+    // route, and read by no client. It looked like a working invite-link feature in the
+    // response payload while being pure theatre (M-10). The person is notified by push
+    // above and the membership row is the real artifact.
     return res.json(successResponse({
       user,
       businessMember: bm,
       locationMembers: createdLocationMembers,
-      invite: { token: inviteToken, link: inviteLink },
     }));
   } catch (err) {
     return sendError(res, err);
@@ -16491,11 +16580,11 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
               try {
                 const accepted = await repos.connectionRepo.listBusinessConnections(bizId, 'accepted');
                 // Window + ordering on updatedAt (acceptance time), not createdAt (C-9).
-            conns.push(...accepted
-              .filter(c => (c.updatedAt || c.createdAt) && new Date(c.updatedAt || c.createdAt) > THIRTY_DAYS_AGO)
-              .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
-              .slice(0, 5)
-              .map(c => ({ ...c, _sourceBizId: bizId })));
+                conns.push(...accepted
+                  .filter(c => (c.updatedAt || c.createdAt) && new Date(c.updatedAt || c.createdAt) > THIRTY_DAYS_AGO)
+                  .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+                  .slice(0, 5)
+                  .map(c => ({ ...c, _sourceBizId: bizId })));
               } catch {}
             }
             return conns;
@@ -16548,6 +16637,29 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
             where: { id: { in: adminBusinessIds }, subscriptionTier: { not: 'FREE' }, currentPeriodEnd: { not: null }, deletedAt: null },
             select: { id: true, name: true, subscriptionTier: true, currentPeriodEnd: true },
           })
+        : Promise.resolve([]),
+
+      // 11. Recently declined partner requests WE sent — connection_declined (admin only).
+      // Appended rather than slotted in, so no existing extract(n) index shifts.
+      adminBusinessIds.length > 0
+        ? (async () => {
+            const conns = [];
+            for (const bizId of adminBusinessIds) {
+              try {
+                const rejected = await repos.connectionRepo.listBusinessConnections(bizId, 'rejected');
+                conns.push(...rejected
+                  // Only the company that ASKED needs telling.
+                  .filter(c => c.requesterBusinessId === bizId)
+                  // listBusinessConnections orders by createdAt (send time), so window
+                  // and sort on updatedAt (decline time) here — same as the accepted block.
+                  .filter(c => (c.updatedAt || c.createdAt) && new Date(c.updatedAt || c.createdAt) > THIRTY_DAYS_AGO)
+                  .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+                  .slice(0, 5)
+                  .map(c => ({ ...c, _sourceBizId: bizId })));
+              } catch {}
+            }
+            return conns;
+          })()
         : Promise.resolve([]),
     ]);
 
@@ -16886,6 +16998,43 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
         }
       } catch (err) {
         logger.error('Error fetching accepted connections for personal notifications:', err);
+      }
+
+      // 6. Recently declined personal connections I sent — connection_declined
+      try {
+        const rejectedConns = await repos.connectionRepo.listByUserId(userId, 'rejected');
+        const recentRejected = rejectedConns
+          // Only the SENDER needs telling; the receiver is the one who declined.
+          .filter(c => c.senderId === userId)
+          .filter(c => (c.updatedAt || c.createdAt) && new Date(c.updatedAt || c.createdAt) > THIRTY_DAYS_AGO)
+          .slice(0, 5);
+        for (const conn of recentRejected) {
+          const otherUser = conn.receiver;
+          const declinedAt = conn.updatedAt || conn.createdAt;
+          notifications.push({
+            // Keyed on the rejection time as well as the row id, on purpose. A rejected
+            // request is RE-OPENED rather than re-created when the sender tries again
+            // after the cooldown (C-5), so the same row id can be declined more than
+            // once — and notificationReadRepo keys read-state on this string, so a plain
+            // `conn-declined-<id>` would make the second decline arrive already marked
+            // read and never be seen.
+            id: `conn-declined-${conn.id}-${new Date(declinedAt).getTime()}`,
+            type: 'connection_declined',
+            title: 'Connection request declined',
+            description: `${otherUser?.name || 'Someone'} declined your connection request`,
+            time: formatRelativeTime(declinedAt),
+            timestamp: declinedAt,
+            read: false,
+            avatar: otherUser?.avatar || null,
+            requestData: {
+              connectionId: conn.id,
+              userId: otherUser?.id,
+              userName: otherUser?.name,
+            },
+          });
+        }
+      } catch (err) {
+        logger.error('Error fetching declined connections for personal notifications:', err);
       }
     } // end personal mode
 
