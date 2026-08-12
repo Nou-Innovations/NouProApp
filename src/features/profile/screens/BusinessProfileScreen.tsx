@@ -25,6 +25,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import MapView, { Marker } from 'react-native-maps';
 import { requestToJoinCompany } from '@/features/notifications/notifications.service';
+import { getMyRoleRequest, withdrawRoleRequest } from '@/features/team/roleRequest.service';
 import { AppBottomSheet, type AppBottomSheetItem, BusinessHoursTable } from '@/shared/components/ui';
 import { reportEntity, REPORT_REASONS, type ReportReason } from '@/features/profile/profile.service';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
@@ -80,6 +81,26 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     () => userBusinesses.some((ub: any) => ub.business?.id === businessId),
     [userBusinesses, businessId],
   );
+
+  /**
+   * A pending join request lives in `roleRequest`, NOT in userBusinesses — so the CTA
+   * kept saying "Request to Join" after you'd already asked, and a second tap 400'd
+   * with "you already have a pending request" (M-9).
+   */
+  const [myJoinRequest, setMyJoinRequest] = useState<{ id: string; status: string } | null>(null);
+  const hasPendingJoinRequest = myJoinRequest?.status === 'PENDING';
+
+  const loadMyJoinRequest = useCallback(async () => {
+    if (!businessId || activeMode !== 'personal' || isAlreadyMember) return;
+    try {
+      const req = await getMyRoleRequest(businessId);
+      setMyJoinRequest(req || null);
+    } catch {
+      // Non-fatal — worst case the CTA stays as-is.
+    }
+  }, [businessId, activeMode, isAlreadyMember]);
+
+  useEffect(() => { void loadMyJoinRequest(); }, [loadMyJoinRequest]);
 
   // Fetch business and brands data from API
   const fetchBusinessData = useCallback(async () => {
@@ -383,7 +404,9 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
   // personal mode when not already a member.
   const moreOptionsItems: AppBottomSheetItem[] = [
     ...(activeMode === 'personal' && !isAlreadyMember
-      ? [{ id: 'request-join', title: 'Request to Join' }]
+      ? hasPendingJoinRequest
+        ? [{ id: 'withdraw-join', title: 'Withdraw join request' }]
+        : [{ id: 'request-join', title: 'Request to Join' }]
       : []),
     { id: 'share', title: 'Share' },
     { id: 'report', title: 'Report' },
@@ -407,6 +430,7 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
           onPress: async () => {
             try {
               await requestToJoinCompany(businessId);
+              await loadMyJoinRequest();
               AppAlert.alert('Request Sent', `Your request to join ${business?.name || 'the company'} has been sent.`);
             } catch (err: any) {
               AppAlert.alert('Error', getApiErrorMessage(err, 'Failed to send request. Please try again.'));
@@ -417,9 +441,33 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
     );
   };
 
+  const handleWithdrawJoinRequest = () => {
+    AppAlert.alert(
+      'Withdraw request',
+      `Withdraw your request to join ${business?.name || 'this company'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Withdraw',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await withdrawRoleRequest(businessId);
+              setMyJoinRequest(null);
+            } catch (err) {
+              AppAlert.alert('Error', getApiErrorMessage(err, 'Could not withdraw your request.'));
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handleMoreOptionSelect = (item: AppBottomSheetItem) => {
     setMoreOptionsVisible(false);
-    if (item.id === 'request-join') {
+    if (item.id === 'withdraw-join') {
+      handleWithdrawJoinRequest();
+    } else if (item.id === 'request-join') {
       handleRequestToJoin();
     } else if (item.id === 'share') {
       handleShareProfile();
@@ -1050,20 +1098,17 @@ export default function BusinessProfileScreen({ navigation, route }: { navigatio
 
           {/* Social Stats - Connections + Followers */}
           <View style={styles.socialStats}>
-            <TouchableOpacity
-              style={styles.socialStatItem}
-              onPress={() => {
-                // @ts-ignore
-                navigation.navigate('Connections', { userId: businessId });
-              }}
-            >
+            {/* Not tappable: this is ANOTHER company's partner list. It used to open your
+                own connections, which was simply wrong. Browsing a company's partners
+                needs its own areBusinessesConnected gate (C-6). */}
+            <View style={styles.socialStatItem}>
               <Text style={[styles.socialStatCount, { color: appTheme.colors.text }]}>
                 {business?.connectionsCount ?? 0}
               </Text>
               <Text style={[styles.socialStatLabel, { color: appTheme.colors.secondary }]}>
                 Connections
               </Text>
-            </TouchableOpacity>
+            </View>
             <View style={styles.socialStatItem}>
               <Text style={[styles.socialStatCount, { color: appTheme.colors.text }]}>
                 {business?.followersCount ?? 0}

@@ -525,7 +525,7 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
         <TouchableOpacity
           style={styles.socialStatItem}
           onPress={() => {
-            navigation.navigate('Connections', { userId });
+            navigation.navigate('Connections', { userId, mode: 'user' });
           }}
         >
           <Text style={[styles.socialStatCount, { color: appTheme.colors.text }]}>

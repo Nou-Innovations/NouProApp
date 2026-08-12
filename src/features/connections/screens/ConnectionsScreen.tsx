@@ -29,6 +29,7 @@ import { AppAlert } from '@/shared/services/appAlert';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
 import { unblockUser } from '@/features/profile/profile.service';
 import {
+  getUserConnections,
   getPendingConnectionRequests,
   acceptConnection,
   rejectConnection,
@@ -97,7 +98,20 @@ export default function ConnectionsScreen() {
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ownerName, setOwnerName] = useState<string | null>(null);
   const activeBusiness = useProfileStore((state) => state.activeBusiness);
+  const currentUserId = useProfileStore((state) => state.currentUser?.id);
+
+  /**
+   * Whose connections are we looking at? `route.params` was declared and never read, so
+   * every entry point — including tapping someone else's count — showed YOUR list (C-6).
+   * `mode` disambiguates the two business entry points, which pass a BUSINESS id through
+   * a param historically named `userId`.
+   */
+  const paramId = route.params?.userId;
+  const paramMode = (route.params as { mode?: 'user' | 'business' } | undefined)?.mode ?? 'user';
+  const isViewingOther = Boolean(paramId && paramMode === 'user' && paramId !== currentUserId);
+  const ownerId = isViewingOther ? paramId! : currentUserId;
 
   const fetchConnections = useCallback(async () => {
     setLoading(true);
@@ -108,8 +122,14 @@ export default function ConnectionsScreen() {
       // ({ connectionId, business }) — the old /companies/:id/connections call returned
       // raw rows that never populated industry/description.
       const [userList, bizList] = await Promise.all([
-        get<{ connectionId: string; user: any; connectedAt: string }[]>('/connections'),
-        activeBusiness?.id
+        isViewingOther
+          // Their connections. The API 404s unless you're one of them, so an empty list
+          // is the honest outcome rather than an error.
+          ? getUserConnections(ownerId!).catch(() => [])
+          : get<{ connectionId: string; user: any; connectedAt: string }[]>('/connections'),
+        // Business connections are always the VIEWER's own company — browsing another
+        // company's partners would need its own gate and isn't part of this change.
+        !isViewingOther && activeBusiness?.id
           ? getBusinessConnections(activeBusiness.id).catch(() => [])
           : Promise.resolve([]),
       ]);
@@ -136,28 +156,45 @@ export default function ConnectionsScreen() {
 
       setAllConnections([...userConns, ...bizConns]);
 
-      // Pending (user + company) + blocked are best-effort: a failure there must not blank
-      // the main connections list.
-      const [pending, bizPending, blocked] = await Promise.all([
-        getPendingConnectionRequests().catch(() => [] as PendingConnection[]),
-        activeBusiness?.id
-          ? getPendingBusinessConnections(activeBusiness.id).catch(() => [] as PendingBusinessConnection[])
-          : Promise.resolve([] as PendingBusinessConnection[]),
-        getBlockedUsers().catch(() => [] as BlockedUser[]),
-      ]);
-      setPendingRequests(pending || []);
-      setPendingBizRequests(bizPending || []);
-      setBlockedUsers(blocked || []);
+      // Requests and blocks are self-only concepts — skip them entirely when looking at
+      // someone else, rather than fetching data whose tabs are hidden anyway.
+      if (isViewingOther) {
+        setPendingRequests([]);
+        setPendingBizRequests([]);
+        setBlockedUsers([]);
+      } else {
+        // Best-effort: a failure here must not blank the main connections list.
+        const [pending, bizPending, blocked] = await Promise.all([
+          getPendingConnectionRequests().catch(() => [] as PendingConnection[]),
+          activeBusiness?.id
+            ? getPendingBusinessConnections(activeBusiness.id).catch(() => [] as PendingBusinessConnection[])
+            : Promise.resolve([] as PendingBusinessConnection[]),
+          getBlockedUsers().catch(() => [] as BlockedUser[]),
+        ]);
+        setPendingRequests(pending || []);
+        setPendingBizRequests(bizPending || []);
+        setBlockedUsers(blocked || []);
+      }
     } catch {
       setError('Failed to load connections');
     } finally {
       setLoading(false);
     }
-  }, [activeBusiness?.id]);
+  }, [activeBusiness?.id, isViewingOther, ownerId]);
 
   useEffect(() => {
     fetchConnections();
   }, [fetchConnections]);
+
+  // Name for the header, so the screen says whose list this is.
+  useEffect(() => {
+    if (!isViewingOther || !ownerId) return;
+    let cancelled = false;
+    get<{ name?: string }>(`/users/${ownerId}`)
+      .then((u) => { if (!cancelled) setOwnerName(u?.name || null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isViewingOther, ownerId]);
 
   const filteredConnections = useMemo(() => {
     let connections: Connection[] = [];
@@ -326,8 +363,8 @@ export default function ConnectionsScreen() {
       >
         <Icon name="chevron-back" size={32} color={appTheme.colors.text} />
       </TouchableOpacity>
-      <Text style={[styles.headerTitle, { color: appTheme.colors.text }]}>
-        Connections
+      <Text style={[styles.headerTitle, { color: appTheme.colors.text }]} numberOfLines={1}>
+        {isViewingOther ? `${ownerName || 'Their'} connections` : 'Connections'}
       </Text>
       <View style={styles.headerRightSpacer} />
     </View>
@@ -375,7 +412,9 @@ export default function ConnectionsScreen() {
   // Filter bar - design.json: components.filterBar (full-width indicator)
   const renderFilterBar = () => (
     <View style={[styles.filterBar, { borderBottomColor: appTheme.colors.borderColor }]}>
-      {FILTERS.map((filter) => {
+      {/* Requests and Blocked are self-only concepts — hide them when viewing
+          someone else's connections. */}
+      {FILTERS.filter((f) => !isViewingOther || (f.id !== 'requests' && f.id !== 'blocked')).map((filter) => {
         const isActive = activeFilter === filter.id;
         return (
           <TouchableOpacity
@@ -437,7 +476,7 @@ export default function ConnectionsScreen() {
     <TouchableOpacity
       style={[styles.connectionItem, { borderBottomColor: appTheme.colors.borderColor }]}
       onPress={() => handleConnectionPress(item)}
-      onLongPress={() => handleDisconnectCompany(item.connectionId, item.name)}
+      onLongPress={isViewingOther ? undefined : () => handleDisconnectCompany(item.connectionId, item.name)}
       activeOpacity={0.7}
     >
       <Avatar

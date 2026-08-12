@@ -5,7 +5,7 @@
  * Staff members can request admin access, which must be approved by super_admin.
  */
 
-import { get, post, patch } from '@/shared/services/api';
+import { get, post, patch, del } from '@/shared/services/api';
 import { 
   RoleRequest, 
   CreateRoleRequestPayload, 
@@ -37,6 +37,17 @@ export async function cancelRoleRequest(
   return patch(`/companies/${businessId}/role-requests/${requestId}`, {
     status: 'CANCELLED'
   });
+}
+
+/**
+ * Withdraw your own pending join/role request.
+ *
+ * Without this the CTA was a dead end: it kept offering "Request to Join" (it reads
+ * memberships, and a request isn't one), a second tap 400'd, and only an admin could
+ * clear it (M-9).
+ */
+export async function withdrawRoleRequest(businessId: string): Promise<void> {
+  await del(`/companies/${businessId}/role-requests/me`);
 }
 
 /**

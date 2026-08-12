@@ -73,6 +73,20 @@ async function update(id, patch) {
   });
 }
 
+/**
+ * Withdraw a request. Hard delete on purpose: an unsent request is not history, and
+ * leaving a CANCELLED row behind would keep tripping the "you already have a pending
+ * request" check that made the CTA a dead end in the first place (M-9).
+ */
+async function remove(id) {
+  try {
+    await prisma.roleRequest.delete({ where: { id } });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 module.exports = {
   create,
   getById,
@@ -80,4 +94,5 @@ module.exports = {
   getByBusinessAndUser,
   getByUserId,
   update,
+  delete: remove,
 };

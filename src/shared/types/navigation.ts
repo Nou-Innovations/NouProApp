@@ -371,7 +371,11 @@ export type RootStackParamList = {
   TaskDetail: { taskId: string; businessId: string };
   
   // Social screens (Connections)
-  Connections: { userId: string };
+  /**
+   * `userId` carries a BUSINESS id when mode is 'business' — historical naming.
+   * Defaults to 'user' so existing callers keep working.
+   */
+  Connections: { userId: string; mode?: 'user' | 'business' };
   
   // Business Activity
   AllActivity: undefined;

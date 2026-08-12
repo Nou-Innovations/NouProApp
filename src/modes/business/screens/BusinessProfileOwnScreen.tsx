@@ -387,7 +387,7 @@ export default function BusinessProfileOwnScreen() {
           style={styles.socialStatItem}
           onPress={() => {
             // @ts-ignore
-            navigation.navigate('Connections', { userId: activeBusiness?.id || '' });
+            navigation.navigate('Connections', { userId: activeBusiness?.id || '', mode: 'business' });
           }}
         >
           <Text style={[styles.socialStatCount, { color: appTheme.colors.text }]}>

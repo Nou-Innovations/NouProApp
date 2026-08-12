@@ -43,6 +43,16 @@ export async function removeConnection(connectionId: string): Promise<void> {
   await del(`/connections/${connectionId}`);
 }
 
+/**
+ * Another user's accepted connections. The API returns 404 unless you are one of them,
+ * so treat a failure as "not visible" rather than surfacing an error.
+ */
+export async function getUserConnections(userId: string): Promise<
+  { connectionId: string; user: { id: string; name?: string; avatar?: string; jobTitle?: string }; connectedAt: string }[]
+> {
+  return get(`/users/${userId}/connections`);
+}
+
 /** Users this account has blocked. */
 export async function getBlockedUsers(): Promise<BlockedUser[]> {
   return get<BlockedUser[]>('/blocks');

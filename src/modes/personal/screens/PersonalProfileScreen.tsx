@@ -405,7 +405,7 @@ export default function PersonalProfileScreen() {
           style={styles.socialStatItem}
           onPress={() => {
             // @ts-ignore
-            navigation.navigate('Connections', { userId: currentUser?.id || '1' });
+            navigation.navigate('Connections', { userId: currentUser?.id || '1', mode: 'user' });
           }}
         >
           <Text style={[styles.socialStatCount, { color: appTheme.colors.text }]}>

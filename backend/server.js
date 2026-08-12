@@ -4436,6 +4436,62 @@ app.get('/api/connections', requireAuth, async (req, res) => {
   }
 });
 
+// Another user's connections — visible only to their accepted connections.
+// GET /api/users/:userId/connections
+//
+// Tapping someone's connection count used to open YOUR OWN list, because the screen
+// never read the route param and no endpoint existed (C-6).
+app.get('/api/users/:userId/connections', requireAuth, async (req, res) => {
+  try {
+    const ownerId = req.params.userId;
+    const viewerId = req.user.id;
+    const isSelf = ownerId === viewerId;
+
+    if (!isSelf) {
+      // 404 rather than 403, mirroring GET /users/:userId: a 403 confirms this person
+      // has a connection list you are not allowed to see.
+      if (await repos.blockRepo.isBlocked(viewerId, ownerId)) {
+        return res.status(404).json(errorResponse('User not found'));
+      }
+      if (!(await repos.connectionRepo.areConnected(viewerId, ownerId))) {
+        return res.status(404).json(errorResponse('User not found'));
+      }
+    }
+
+    const connections = await repos.connectionRepo.listByUserId(ownerId, 'accepted');
+    // Blocks are filtered against the VIEWER, not the owner — this is the viewer's view.
+    const viewerBlocked = new Set(await repos.blockRepo.getBlockedIds(viewerId));
+
+    const rows = [];
+    for (const conn of connections) {
+      const otherId = conn.senderId === ownerId ? conn.receiverId : conn.senderId;
+      if (viewerBlocked.has(otherId)) continue;
+      const otherUser = conn.senderId === ownerId ? conn.receiver : conn.sender;
+
+      // SECURITY: `isConnected` is computed against the VIEWER, per row.
+      //
+      // The sibling /api/connections route passes { isConnected: true } — correct there,
+      // because every row IS the caller's own connection. Copying that here would hand
+      // the email, phone and address of EVERYONE in this person's network to any single
+      // one of their connections. Most of these people are strangers to the viewer.
+      const viewerKnowsThem = otherId === viewerId
+        ? true
+        : await repos.connectionRepo.areConnected(viewerId, otherId);
+
+      rows.push({
+        connectionId: conn.id,
+        user: stripSensitiveUserFields(otherUser, { isConnected: viewerKnowsThem }),
+        connectedAt: conn.updatedAt,
+      });
+    }
+
+    return res.json(successResponse(rows));
+  } catch (err) {
+    logger.error('[UserConnectionsList] Error:', err);
+    return res.status(500).json(errorResponse('Failed to list connections'));
+  }
+});
+
 // List pending connection requests (received)
 app.get('/api/connections/pending', requireAuth, async (req, res) => {
   try {
@@ -14517,6 +14573,37 @@ app.get('/api/companies/:companyId/role-requests/me', requireAuth, async (req, r
     );
 
     return res.json(successResponse(request || null));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+// Withdraw your own pending join/role request.
+// DELETE /api/companies/:companyId/role-requests/me
+//
+// Without this there was no way out: the CTA still read "Request to Join" (it checks
+// memberships, and a request isn't one), a second tap 400'd with "you already have a
+// pending request", and only an admin could resolve it (M-9).
+app.delete('/api/companies/:companyId/role-requests/me', requireAuth, async (req, res) => {
+  try {
+    const businessId = req.params.companyId;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json(errorResponse('Authentication required'));
+    }
+
+    const request = await repos.roleRequestRepo.getByBusinessAndUser(businessId, userId, ['PENDING']);
+    if (!request) {
+      return res.status(404).json(errorResponse('No pending request to withdraw'));
+    }
+    // Belt and braces: getByBusinessAndUser is already scoped to this user, but this row
+    // is the only thing standing between someone and another person's request.
+    if (request.userId !== userId) {
+      return res.status(403).json(errorResponse('You can only withdraw your own request', 'FORBIDDEN'));
+    }
+
+    await repos.roleRequestRepo.delete(request.id);
+    return res.json(successResponse(null, 'Request withdrawn'));
   } catch (err) {
     return sendError(res, err);
   }
