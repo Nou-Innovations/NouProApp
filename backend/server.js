@@ -16744,6 +16744,24 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
       });
     }
 
+    // 5b. Declined partner requests we sent
+    for (const conn of extract(10)) {
+      const otherBiz = conn.targetBusiness;
+      const declinedAt = conn.updatedAt || conn.createdAt;
+      notifications.push({
+        // Same rejection-time key as the personal side, for the same reason: a rejected
+        // row can be reused, and read-state is keyed on this string (C-10).
+        id: `biz-conn-declined-${conn.id}-${new Date(declinedAt).getTime()}`,
+        type: 'connection_declined',
+        title: 'Partner request declined',
+        description: `${otherBiz?.name || 'A company'} declined your connection request`,
+        time: formatRelativeTime(declinedAt),
+        timestamp: declinedAt, read: false,
+        avatar: otherBiz?.logoUrl || null,
+        requestData: { connectionId: conn.id, companyId: otherBiz?.id, companyName: otherBiz?.name },
+      });
+    }
+
     // 6. Paid invoices
     for (const inv of extract(5)) {
       notifications.push({
@@ -17090,7 +17108,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
       );
     } else if (filter === 'connections') {
       notifications = notifications.filter(n =>
-        n.type === 'company_request' || n.type === 'connection_accepted'
+        n.type === 'company_request' || n.type === 'connection_accepted' || n.type === 'connection_declined'
       );
     } else if (filter === 'jobs') {
       notifications = notifications.filter(n =>
@@ -18233,6 +18251,10 @@ if (process.env.NODE_ENV !== 'test') {
   pruneCredentials();
 }
 
+// Only start listening when run directly. Requiring this file (the integration tests do)
+// must give you a configured-but-idle app — otherwise the test process binds the real port
+// and never exits. `module.exports` below is what makes those tests possible at all.
+if (require.main === module) {
 server.listen(PORT, HOST, () => {
   const lanIP = getNetworkIP();
   logger.debug('');
@@ -18313,4 +18335,9 @@ server.listen(PORT, HOST, () => {
   logger.debug('    GET  /api/feed');
   logger.debug('    POST /api/upload');
   logger.debug('    GET  /api/health');
-}); 
+});
+}
+
+// Exported for the integration tests (Batch F). `app` is the Express instance with every
+// route registered; `server` is the HTTP server Socket.IO is attached to.
+module.exports = { app, server };
