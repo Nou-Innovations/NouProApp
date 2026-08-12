@@ -52,7 +52,7 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | A-12 | P2 | **FIXED ✅** — Forgot-password's "fail loud" guard is production-only (`server.js:1235`) — on staging with no SMTP it still lies "check your email". |
 | A-13 | P2 | **ALREADY FIXED ✅ (verified 2026-08-12: bounded map + on-write sweep, `server.js:1480-1511`)** — `failedLoginAttempts` is an unbounded in-memory Map with no TTL sweep (`server.js:1063`); email enumeration grows it forever. |
 | A-14 | P2 | **FIXED ✅** — `logout()` resets `staySignedIn` to `true` via `set({ ...initialState })` (`profileStore.ts:359`) — an explicit opt-out is forgotten on every logout. |
-| A-15 | P2 | **FIXED ✅ (resend already existed; back buttons added — countdown/"start over" is batch 2)** — The two OTP screens are the only signup screens with no visible back button. 2FA `tempToken` expires in 5 min with no countdown, resend or "start over" (`server.js:1128`). |
+| A-15 | P2 | **FIXED ✅ (resend already existed; back buttons, countdown, expiry-aware error and "start over" all added)** — The two OTP screens are the only signup screens with no visible back button. 2FA `tempToken` expires in 5 min with no countdown, resend or "start over" (`server.js:1128`). |
 | A-16 | P2 | **FIXED ✅ (`getCurrentUser` was already live — it gained a caller in phase 1)** — Dead code: `authService.ts` (0 importers), the auth `index.ts` barrels, the `verificationMethod` nav param (written 3×, read never), `authAPI.getCurrentUser` (0 callers), `authAPI.register`'s `profilePicture` param. |
 
 ---
@@ -76,9 +76,9 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | P-13 | P1 | **FIXED ✅** — **"Privacy Policy" is a placeholder alert** (`PersonalSettingsScreen.tsx:104-106`) though the backend already serves `/legal/*`. Store-review blocker. |
 | P-14 | P1 | **FIXED ✅** — **A Sentry test-error button ships in user settings** (`PersonalSettingsScreen.tsx:350-366`), labelled "temporary", tappable by any user. |
 | P-15 | P2 | **FIXED ✅** — Notification preferences fail silently in both directions — load errors substitute all-`true` defaults, save errors silently revert the switch (`NotificationPreferencesScreen.tsx:40-72`). |
-| P-16 | P2 | **PARTLY FIXED ✅ (remove-photo added; "show on profile" was ALREADY FIXED via `WorkExperience.isVisible`; coverPhoto = batch 2; `language` = the i18n workstream)** — `language` and `coverPhoto` have schema columns and API support but no UI anywhere. "Show this workplace on profile" toggles are still local-only (round-1 PR-6). No "remove photo" option exists. |
+| P-16 | P2 | **PARTLY FIXED ✅ (remove-photo + coverPhoto built; "show on profile" was ALREADY FIXED via `WorkExperience.isVisible`; only `language` remains, deferred to the i18n workstream)** — `language` and `coverPhoto` have schema columns and API support but no UI anywhere. "Show this workplace on profile" toggles are still local-only (round-1 PR-6). No "remove photo" option exists. |
 | P-17 | P2 | **FIXED ✅** — No server-side validation of `name` (empty accepted) or `profileSlug` (no length cap, charset check, or reserved words like `me`/`admin`/`search`). |
-| P-18 | P2 | "Share Profile" shares plain text with no URL, even though `profileSlug` and a public `GET /api/profile/:slug` route exist — the whole slug feature has no consumer. |
+| P-18 | P2 | **FIXED ✅** — "Share Profile" shares plain text with no URL, even though `profileSlug` and a public `GET /api/profile/:slug` route exist — the whole slug feature has no consumer. |
 
 **Healthy, verified:** the Report flow (reason lists match exactly end-to-end, self-report guarded, persists correctly), block/unblock endpoints themselves, `UserProfileScreen`'s loading/error/empty states, and privacy stripping on `GET /users/:userId`.
 
@@ -97,7 +97,7 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | C-7 | P1 | **FIXED ✅** (`498e8d47`) — **Two rows for one relationship are possible.** `@@unique([senderId, receiverId])` is direction-specific and the check-then-write isn't transactional, so simultaneous A→B and B→A both succeed. Afterwards status lookups use `findFirst` → nondeterministic, and `blockUser` removes only one row, leaving a live request from a blocked user. |
 | C-8 | P1 | **FIXED ✅** — **Soft-deleted users leak into connection lists** — `userRepo.getById` has no `deletedAt` filter, unlike search which explicitly excludes them. |
 | C-9 | P2 | **FIXED ✅ (the “acceptRequest doesn't touch updatedAt” sub-claim was wrong — `@updatedAt` stamps it automatically)** — "Connection accepted" notifications use `createdAt` (when the request was *sent*), so an acceptance of a 31-day-old request produces no notification at all, and a 20-day-old one reads "20 days ago". `acceptRequest` doesn't touch `updatedAt` either. |
-| C-10 | P2 | **PARTLY FIXED ✅ (shape-sniffing removed via an explicit `connectionKind`; the "declined" signal is batch 2)** — Pending user↔user requests are typed `company_request`, forcing the frontend to sniff payload shape to choose an endpoint — the exact fragility that caused round-1's B-1. There is also no "your request was declined" signal at all. |
+| C-10 | P2 | **FIXED ✅ (shape-sniffing removed via an explicit `connectionKind`; declined requests now notify and push on both the personal and business sides)** — Pending user↔user requests are typed `company_request`, forcing the frontend to sniff payload shape to choose an endpoint — the exact fragility that caused round-1's B-1. There is also no "your request was declined" signal at all. |
 | C-11 | P2 | **FIXED ✅** — Pull-to-refresh spinner never appears (`refreshing={loading}` while `loading` also swaps in a full-screen spinner). The empty-state "Find people" CTA goes to the business/product Explore surface, which has no people and no Connect action. |
 
 ---
@@ -115,9 +115,9 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | M-7 | P1 | **FIXED ✅** (`6f1b7fe7`) — **Adding a member directly is silent and consent-free** — `server.js:12330-12337` creates the `BusinessMember` outright with `status='accepted'` by default, no invite, no consent, no notification. Only `invited` rows generate a notification. |
 | M-8 | P1 | **FIXED ✅** (`6f1b7fe7`) — **The mode-scoped notification split hides half these flows.** `invite_received` / `join_request_accepted` / `join_request_rejected` render only in **personal** mode; `staff_request` / `join_accepted` / `invite_pending` only in **business** mode (`server.js:14441` vs `:14691`). An admin working in business mode never sees an invite addressed to them — and with the badge still cosmetic (N-5), it can sit unseen indefinitely. |
 | M-9 | P1 | **FIXED ✅** — **The requester gets no pending state and can't withdraw.** `BusinessProfileScreen.tsx:384-389` shows "Request to Join" whenever the user isn't an *accepted* member, so a pending request still shows the CTA; a second tap 400s and the message is swallowed by the wrong error path (`:411`). No cancel route exists for the requester. |
-| M-10 | P2 | Pending invites consume paid staff seats (`getStaffCount` counts everything not suspended). Invites never expire — there's no expiry column. `server.js:12691-12692` mints an `inviteToken`/`inviteLink` per request that is never persisted and never served. |
+| M-10 | P2 | **FIXED ✅ (the seat/expiry parts were ALREADY FIXED under CO-18 and seat-reservation is deliberate; this closes the real hole — an "invited" member row that never expired — and deletes the phantom token)** — Pending invites consume paid staff seats (`getStaffCount` counts everything not suspended). Invites never expire — there's no expiry column. `server.js:12691-12692` mints an `inviteToken`/`inviteLink` per request that is never persisted and never served. |
 | M-11 | P2 | **FIXED ✅ (largely fixed already by the co-owner work; the legacy edge case is now closed too)** — Demoting a super_admin from Team Management always 400s — `TeamManagementScreen.tsx:213` routes through the location PATCH, which rejects super_admin targets by design. |
-| M-12 | P2 | `switchToPersonal()` leaves `businessStore` populated, and a failed `fetchLocations` after a company switch leaves `currentLocation` pointing at the *previous* company's location — location-scoped queries then carry a foreign `locationId`. |
+| M-12 | P2 | **FIXED ✅ (worse than described: reads returned an empty catalogue that read as "no products". Now guarded server-side on 8 routes, not just in the store)** — `switchToPersonal()` leaves `businessStore` populated, and a failed `fetchLocations` after a company switch leaves `currentLocation` pointing at the *previous* company's location — location-scoped queries then carry a foreign `locationId`. |
 | M-13 | P2 | **FIXED ✅** — `cancelRoleRequest` sends `status: 'CANCELLED'`, which the backend rejects (currently zero callers). Dead code: `InviteTeamModal.tsx`, `team/components/AssignStaffModal.tsx`. |
 
 ---
@@ -151,7 +151,7 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | N-12 | P2 | **No pagination** — the list has no `onEndReached` and the backend hard-caps each section (`take: 50/20/10`, `slice(0,5)`) with no cursor, so older notifications are simply unreachable. Search is client-side over the loaded page only. Every filter tap replaces the list with skeletons (full-screen flash). |
 | N-13 | P2 | `subscription_due` navigates to `SubscriptionPlans` discarding `requestData.businessId` — an admin of multiple businesses lands on the wrong one. Stock alerts hardcode `time: 'now'` so they always sort to the top and never age. |
 | N-14 | P2 | **FIXED ✅ (the "Notifications route is unreachable" claim was WRONG — `pushRouting.ts` depends on it, so the route stays)** — `NotificationBell` is dead code (zero importers), which also makes the `Notifications` RootStack route unreachable — both modes reach notifications via the tab. `message` and `system` types are handled/typed but never emitted by the backend. |
-| N-15 | P2 | The Experience section vanishes entirely for users with no company (`PersonalProfileScreen.tsx:418`), and `ActivityScreen`'s error state is a dead end with no retry (it replaces the list, so pull-to-refresh is gone too). |
+| N-15 | P2 | **FIXED ✅ (also fixed the unreported half: every row read "Present - Present")** — The Experience section vanishes entirely for users with no company (`PersonalProfileScreen.tsx:418`), and `ActivityScreen`'s error state is a dead end with no retry (it replaces the list, so pull-to-refresh is gone too). |
 
 **Healthy, verified:** all 16 in-app notification types have correct tap handlers (round-1's N-1 order fix holds), pull-to-refresh works, dead-token pruning works, and push-token upsert is idempotent per user.
 
@@ -598,6 +598,99 @@ preference** column is untouched and still live.
 4. Pull to refresh on Connections — the spinner appears instead of a full reload.
 5. Open Settings → Notifications with the backend unreachable — it says so instead of showing everything switched on.
 6. Tap your avatar → Remove photo.
+
+---
+
+## Fix log — P2 sweep batch 2 (2026-08-12)
+
+Seven items. Two were worse than the audit described, and **one severity call in my own
+plan was wrong** — recorded here because the plan was approved on it.
+
+**M-12 — I overstated it, then found the real problem was broader.** I claimed the stale
+`locationId` let a stock adjustment land in the wrong company. It doesn't: the TEN-5
+product check immediately below (`server.js`, stock PATCH) rejects a product whose
+business doesn't match the location's, so the cross-company write already 404'd. **Not a
+data-corruption bug.** What *is* real is the read side, on eight routes: a foreign
+`locationId` was applied as a filter with nothing checking it belonged to the company, so
+the catalogue came back **empty and rendered as "this company has no products"**, and the
+dashboard, analytics, deliveries and variance numbers were silently wrong. Now there's one
+`requireLocationInCompany` guard applied across all eight. Client side: `fetchLocations`
+cleared the selection only *after* the round trip and **never** in its catch, so a failed
+refetch left the previous company's location live; `switchToPersonal` never cleared it at
+all, so it survived into personal mode and into whatever company you opened next; and
+`updateLocation`/`deleteLocation` wrote `currentLocation` without `currentLocationId`,
+leaving the id pointing at a **deleted row** — read by different consumers than the object,
+so two halves of the app disagreed about the selection.
+
+**A-15b — the 5-minute 2FA window logged you out.** `/auth/2fa/verify` wasn't in
+`isAuthEndpoint`, so a 401 from an expired temp token fell through to the refresh path,
+found no refresh token, read that as revoked, and called `logout('session_expired')` — you
+got thrown out of the sign-in you were in the middle of, blamed for a session you never
+had. The backend collapsed expiry and a wrong code into one message, so the screen could
+only say "Invalid code" when the real problem was the clock. Now: distinct error codes, a
+countdown recomputed from the token's own `exp` each tick (so backgrounding the app doesn't
+desync it), Verify disabled at zero, and "Start over" back to sign-in — there is no
+endpoint to refresh a temp token, so re-login is the only recovery.
+
+**N-15 — the Experience section had a second, unreported bug.** It rendered *memberships*
+and formatted `start_date`/`end_date`, which `GET /auth/me` never populates — so **every
+row read "Present - Present"**. It also returned `null` for anyone with no company, hiding
+roles they had added by hand and could see on their own public profile but not here. Now
+real `WorkExperience` rows: real dates, `isVisible` finally applies to your own profile,
+and hand-typed rows aren't tappable (nor are archived companies). `ActivityScreen`'s error
+state replaced the list and took pull-to-refresh with it, leaving no way to retry at all.
+
+**P-16b** Built cover photos end to end. The pickers cropped square-only with no override —
+the *company* cover already cropped square and rendered into a non-square frame — so
+`openCamera`/`openGallery` gained an optional aspect. **`normalizeUser` had no
+`coverPhoto → cover_photo` line**, so a field the backend has always returned and the type
+has always declared was invisible to every consumer. No stock-photo fallback: the business
+screens hardcode an Unsplash URL, which `CompanyEditScreen` documents as the CO-27
+anti-pattern. This also ends the 5% profile-completeness penalty everyone carried for a
+field they had no way to fill.
+
+**P-18 — "Share Profile" shared no link at all**; the own-profile one interpolated your
+*name* where a URL should be. Now `/u/:idOrSlug`, keyed on id-or-slug because `profileSlug`
+is opt-in and almost nobody has set one — slug-only would be dead for most users. Per
+Arnaud's call the page is a hand-off: name, photo and headline, then a "Sign in to see
+more" sheet on scroll. It's fed by a **purpose-built minimal endpoint**, not
+`GET /api/profile/:slug`, which returns the whole user plus work history, education,
+certifications and skills — the exposure now matches what the page renders. `u` and `p`
+were added to the reserved slugs (neither was there, so a user could have claimed `u` and
+shadowed the route), and `/api/profile/:slug` now 404s deleted accounts, which it never
+checked.
+
+**The route-inventory test caught both new public routes** — Batch F's guard, working
+exactly as intended. Both are now registered with a written justification, and the profile
+card sits behind `publicReadLimiter`: it accepts a *guessable* key, so without a limit it
+would have been an account-enumeration oracle.
+
+**C-10b** Declining a connection was completely silent — no push, no notification, no
+visible state change — so a request sat looking unanswered forever. Both reject routes now
+push, and declines are derived for personal and business. **The keys carry the rejection
+time**: a rejected row is re-opened rather than re-created when the sender retries after
+the cooldown, and read-state is keyed on the notification id — so a plain
+`conn-declined-<id>` would make the second decline arrive already marked read.
+
+**M-10 residual** Inviting someone who *already has an account* writes
+`BusinessMember{status:'invited'}`, a model with no expiry column at all, so that seat was
+held forever unless an admin cancelled it by hand — while the no-account path expires after
+30 days. Same window now, measured on `createdAt`. Also deleted the invite token minted on
+every request: an unsigned random string, never stored, never served, with no route to
+redeem it and no client reading it.
+
+**Verified:** backend 154/154, ESLint 0 errors, `tsc` 133 = unchanged baseline. No schema
+change. Note the backend baseline moved from 128 to 154 mid-batch — a separate session
+landed security Batch E and F while this was in progress.
+
+### Smoke tests
+
+1. With two companies, open one, switch to the other with the network off, then look at Products — you get an error rather than an empty catalogue.
+2. Set a cover photo; check it on your own profile and from another account. Remove it.
+3. Share your profile — the link opens a page with your name and photo, and scrolling raises "Sign in to see more".
+4. Sign in with 2FA and let it sit 5 minutes — a countdown runs, the message says it expired, and "Start over" returns you to sign-in instead of logging you out.
+5. Have someone decline your connection request — you get told.
+6. Open your profile with no company — Experience shows your added roles, and no row says "Present - Present".
 
 ---
 

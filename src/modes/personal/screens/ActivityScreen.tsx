@@ -81,6 +81,9 @@ export default function ActivityScreen() {
       return;
     }
 
+    // Show the spinner on entry, so a retry from the error state gives feedback instead
+    // of looking like the button did nothing (N-15).
+    setIsLoading(true);
     try {
       const response = await get<{ activities: DeliveryActivity[] }>(`/users/${currentUser.id}/activities`);
       setActivities(response.activities || []);
@@ -245,15 +248,15 @@ export default function ActivityScreen() {
         edges={['top']}
       >
         <PrimaryHeader title="Activities" />
-        <View style={[styles.errorContainer, { backgroundColor: appTheme.colors.surface }]}>
-          <Icon name="alert-circle-outline" size={32} color={appTheme.colors.error} />
-          <Text style={[styles.errorTitle, { color: appTheme.colors.error }]}>
-            Unable to load activities
-          </Text>
-          <Text style={[styles.errorSubtitle, { color: appTheme.colors.textSecondary }]}>
-            Please check your connection and try again
-          </Text>
-        </View>
+        {/* This branch replaces the whole list, which takes RefreshControl with it — so
+            without a button there was no way to try again at all (N-15). */}
+        <EmptyState
+          iconName="alert-circle-outline"
+          title="Unable to load activities"
+          subtitle="Please check your connection and try again"
+          ctaLabel="Retry"
+          onCtaPress={loadActivities}
+        />
       </SafeAreaView>
     );
   }

@@ -18,6 +18,7 @@ export interface Notification {
     | 'invite_pending'
     | 'company_request'
     | 'connection_accepted'
+    | 'connection_declined'
     | 'invoice'
     | 'delivery'
     | 'stock_alert'

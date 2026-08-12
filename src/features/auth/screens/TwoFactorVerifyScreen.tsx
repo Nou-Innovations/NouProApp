@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -19,6 +19,28 @@ import { KeyboardAwareScreen } from '@/shared/components/layout';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'TwoFactorVerify'>;
 
+/**
+ * Seconds left on the temp token, read from its own `exp` claim.
+ *
+ * The token lives 5 minutes and nothing told the user that, so letting it lapse produced
+ * "Invalid code" for a code that was perfectly correct (A-15). Same base64url decode the
+ * API layer already does for the access token; unverified on purpose — this only drives
+ * a label, the server is still the authority.
+ */
+function secondsLeft(token: string): number | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '=='.slice(0, (4 - (base64.length % 4)) % 4);
+    const { exp } = JSON.parse(atob(padded));
+    if (!exp) return null;
+    return Math.max(0, exp - Math.floor(Date.now() / 1000));
+  } catch {
+    return null;
+  }
+}
+
 export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -28,10 +50,26 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isBackupMode, setIsBackupMode] = useState(false);
+  const [remaining, setRemaining] = useState<number | null>(() => secondsLeft(tempToken));
+  const expired = remaining !== null && remaining <= 0;
 
   const login = useProfileStore((state) => state.login);
   const setTwoFactorEnabled = useProfileStore((state) => state.setTwoFactorEnabled);
   const inputRef = useRef<TextInput>(null);
+
+  // Tick the countdown. Recomputed from `exp` each second rather than decremented, so a
+  // backgrounded app doesn't come back with a timer that's minutes behind reality.
+  useEffect(() => {
+    if (secondsLeft(tempToken) === null) return;
+    const id = setInterval(() => setRemaining(secondsLeft(tempToken)), 1000);
+    return () => clearInterval(id);
+  }, [tempToken]);
+
+  // There is no endpoint to refresh a temp token — re-entering the password is the only
+  // way to get a new one, so "start over" means going back to sign-in.
+  const handleStartOver = () => {
+    navigation.navigate('Login');
+  };
 
   const handleVerify = async () => {
     const trimmedCode = code.trim();
@@ -42,6 +80,11 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
 
     if (!isBackupMode && trimmedCode.length !== 6) {
       setError('Please enter a 6-digit code');
+      return;
+    }
+
+    if (expired) {
+      setError('This sign-in request expired. Please start over.');
       return;
     }
 
@@ -58,6 +101,11 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
     } catch (err: any) {
       if (err.status === 0 || err.code === 'ERR_NETWORK') {
         setError('No internet connection. Please check your network and try again.');
+      } else if (err.response?.error?.code === 'TEMP_TOKEN_EXPIRED') {
+        // Say what actually happened. This used to read "Invalid code", sending people
+        // to re-check an authenticator app that was showing the right code (A-15).
+        setRemaining(0);
+        setError('This sign-in request expired. Please start over.');
       } else {
         setError(err.response?.message || err.message || 'Invalid code. Please try again.');
       }
@@ -99,6 +147,18 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
                 ? 'Enter one of your backup codes'
                 : 'Enter the 6-digit code from your authenticator app'}
             </Text>
+            {remaining !== null ? (
+              <Text
+                style={[
+                  styles.countdown,
+                  { color: expired ? appTheme.colors.error : appTheme.colors.textSecondary },
+                ]}
+              >
+                {expired
+                  ? 'This request has expired'
+                  : `Expires in ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`}
+              </Text>
+            ) : null}
           </View>
 
           {/* Error */}
@@ -137,16 +197,25 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
               title="Verify"
               onPress={handleVerify}
               loading={loading}
-              disabled={loading || !code.trim()}
-              variant={code.trim() && !loading ? 'primary' : 'disabled'}
+              disabled={loading || !code.trim() || expired}
+              variant={code.trim() && !loading && !expired ? 'primary' : 'disabled'}
             />
 
-            <TextButton
-              title={isBackupMode ? 'Use authenticator app instead' : 'Use a backup code instead'}
-              onPress={toggleBackupMode}
-              style={styles.switchModeButton}
-              textStyle={styles.switchModeText}
-            />
+            {expired ? (
+              <TextButton
+                title="Start over"
+                onPress={handleStartOver}
+                style={styles.switchModeButton}
+                textStyle={styles.switchModeText}
+              />
+            ) : (
+              <TextButton
+                title={isBackupMode ? 'Use authenticator app instead' : 'Use a backup code instead'}
+                onPress={toggleBackupMode}
+                style={styles.switchModeButton}
+                textStyle={styles.switchModeText}
+              />
+            )}
           </View>
       </KeyboardAwareScreen>
     </View>
@@ -180,6 +249,12 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.primary.bold,
     lineHeight: 36,
     marginBottom: 8,
+  },
+  countdown: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.regular,
+    lineHeight: 20,
+    marginTop: 8,
   },
   subtitle: {
     fontSize: 16,

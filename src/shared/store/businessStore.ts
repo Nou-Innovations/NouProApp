@@ -178,7 +178,14 @@ export const useBusinessStore = create<BusinessStoreState>()(
   },
 
   fetchLocations: async (businessId: string) => {
-    set({ isLoading: true, error: null });
+    // Clear the selection UP FRONT, not just on success. Two holes otherwise: the catch
+    // path never cleared at all, so a failed refetch after a company switch left the
+    // PREVIOUS company's location selected; and even on the happy path the clear only
+    // landed after the round trip, so every consumer re-rendered with the new companyId
+    // and the old locationId in between. Location-scoped reads then came back filtered to
+    // a location the company doesn't own — an empty catalogue that reads as "no products"
+    // rather than as an error (M-12).
+    set({ isLoading: true, error: null, currentLocation: null, currentLocationId: null });
     try {
       const raw = await apiGet<Record<string, any>[]>(`/companies/${businessId}/locations`);
       // Map backend camelCase response to store's field names
@@ -211,12 +218,18 @@ export const useBusinessStore = create<BusinessStoreState>()(
         });
       }
 
-      // Default to "All Locations" on app startup
-      // Users can manually select a specific location if needed
-      set({ currentLocation: null, currentLocationId: null });
+      // Selection was already cleared at the top; nothing to reset here. Default is
+      // "All Locations" — users can pick a specific one.
     } catch (error) {
       if (__DEV__) console.log('Failed to fetch locations:', error);
-      set({ locations: [], isLoading: false, error: 'Failed to load locations' });
+      set({
+        locations: [],
+        isLoading: false,
+        error: 'Failed to load locations',
+        // Stay cleared: holding a location we can no longer verify is worse than none.
+        currentLocation: null,
+        currentLocationId: null,
+      });
     }
   },
 
@@ -359,6 +372,11 @@ export const useBusinessStore = create<BusinessStoreState>()(
         currentBusiness: updatedCurrentBusiness,
         currentCompany: updatedCurrentBusiness,
         currentLocation: updatedCurrentLocation,
+        // Keep the id in step with the object. These are read by DIFFERENT consumers —
+        // useProducts/useDeliveries read currentLocation.id while the dashboard hooks read
+        // currentLocationId — so letting them drift makes two halves of the app disagree
+        // about which location is selected (M-12).
+        currentLocationId: updatedCurrentLocation?.id ?? null,
         isLoading: false 
       });
 
@@ -398,6 +416,9 @@ export const useBusinessStore = create<BusinessStoreState>()(
         currentBusiness: updatedCurrentBusiness,
         currentCompany: updatedCurrentBusiness,
         currentLocation: updatedCurrentLocation,
+        // Without this, deleting the selected location left currentLocationId pointing at
+        // the DELETED row while currentLocation moved to locations[0] (M-12).
+        currentLocationId: updatedCurrentLocation?.id ?? null,
         isLoading: false 
       });
 

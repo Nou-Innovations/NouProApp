@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NouPro — Profile</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #1A1714; color: #EDE7DF; font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 64px 20px 0; }
+  h1 { font-size: 28px; margin: 0 0 4px; color: #FFFFFF; }
+  h2 { font-size: 19px; margin: 32px 0 8px; color: #FF7A00; }
+  p, li { color: #CFC7BC; }
+  ol { padding-left: 20px; }
+  a { color: #FF7A00; }
+  .card { display: flex; align-items: center; gap: 16px; }
+  .avatar { width: 72px; height: 72px; border-radius: 36px; object-fit: cover; background: #241F1A; flex: none; }
+  .avatar-fallback { width: 72px; height: 72px; border-radius: 36px; background: #241F1A; flex: none; display: flex; align-items: center; justify-content: center; font-size: 28px; color: #A89F93; }
+  .headline { color: #A89F93; margin: 0; }
+  .cta { display: inline-block; background: #FF7A00; color: #1A1714; font-weight: 600; text-decoration: none; padding: 14px 24px; border-radius: 12px; margin-top: 24px; }
+  /* Enough page to scroll, so the gate has something to trigger on. */
+  .teaser { margin-top: 40px; padding-bottom: 60vh; }
+  .blurred { filter: blur(6px); opacity: 0.5; user-select: none; pointer-events: none; }
+  .bar { height: 14px; border-radius: 7px; background: #241F1A; margin: 12px 0; }
+  .bar.short { width: 45%; }
+  .bar.mid { width: 70%; }
+  footer { margin-top: 48px; color: #A89F93; font-size: 13px; border-top: 1px solid #332E28; padding-top: 16px; padding-bottom: 40px; }
+  .sheet { position: fixed; inset: 0; background: rgba(10,8,6,0.75); display: none; align-items: flex-end; justify-content: center; }
+  .sheet.open { display: flex; }
+  .sheet-inner { background: #241F1A; border-radius: 20px 20px 0 0; padding: 28px 24px 36px; width: 100%; max-width: 640px; text-align: center; }
+  .sheet h2 { margin-top: 0; color: #FFFFFF; }
+  .sheet .cta { display: block; margin: 20px auto 0; max-width: 320px; }
+  .dismiss { background: none; border: 0; color: #A89F93; font-size: 15px; margin-top: 16px; cursor: pointer; font-family: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <div class="avatar-fallback" id="avatar-fallback">?</div>
+    <div>
+      <h1 id="name">On NouPro</h1>
+      <p class="headline" id="headline"></p>
+    </div>
+  </div>
+
+  <a class="cta" id="open-app" href="#">Open in NouPro</a>
+
+  <div class="teaser">
+    <h2>Experience, connections and more</h2>
+    <div class="blurred" aria-hidden="true">
+      <div class="bar mid"></div>
+      <div class="bar"></div>
+      <div class="bar short"></div>
+      <div class="bar mid"></div>
+      <div class="bar"></div>
+    </div>
+  </div>
+
+  <footer>
+    NouPro — B2B commerce, connected. ·
+    <a href="/legal/privacy">Privacy Policy</a> · <a href="/legal/terms">Terms of Service</a>
+  </footer>
+</main>
+
+<div class="sheet" id="gate" role="dialog" aria-modal="true" aria-labelledby="gate-title">
+  <div class="sheet-inner">
+    <h2 id="gate-title">Sign in to see more</h2>
+    <p>Work history, connections and the rest of this profile are on NouPro.</p>
+    <a class="cta" id="gate-open" href="#">Open in NouPro</a>
+    <button class="dismiss" id="gate-dismiss" type="button">Not now</button>
+  </div>
+</div>
+
+<script>
+  // The id or slug is the last path segment (/u/:idOrSlug). Read client-side so the page
+  // stays a plain static file, like the other hosted pages. Validated before use so a
+  // hostile path can't break out of the URL or the fetch.
+  var key = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
+  var valid = /^[A-Za-z0-9_-]{1,64}$/.test(key);
+
+  var openLinks = [document.getElementById('open-app'), document.getElementById('gate-open')];
+  if (valid) {
+    openLinks.forEach(function (a) { a.href = 'noupro://u/' + encodeURIComponent(key); });
+  } else {
+    openLinks.forEach(function (a) { a.remove(); });
+  }
+
+  if (valid) {
+    fetch('/api/public/profile-card/' + encodeURIComponent(key))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (body) {
+        var u = body && body.data;
+        if (!u) return;
+        // textContent, never innerHTML — the name is user-controlled.
+        document.getElementById('name').textContent = u.name || 'On NouPro';
+        document.getElementById('headline').textContent = u.headline || u.jobTitle || '';
+        var fallback = document.getElementById('avatar-fallback');
+        if (u.avatar) {
+          var img = document.createElement('img');
+          img.className = 'avatar';
+          img.alt = '';
+          img.src = u.avatar;
+          fallback.replaceWith(img);
+        } else if (u.name) {
+          fallback.textContent = u.name.trim().charAt(0).toUpperCase();
+        }
+        document.title = (u.name ? u.name + ' — ' : '') + 'NouPro';
+      })
+      .catch(function () { /* the page still works as a plain hand-off */ });
+  }
+
+  // Raise the gate once, when the visitor scrolls past the header. Dismissible on
+  // purpose: a modal you can't close is a worse first impression than one you can.
+  var gate = document.getElementById('gate');
+  var shown = false;
+  function maybeShowGate() {
+    if (shown || window.scrollY < 120) return;
+    shown = true;
+    gate.classList.add('open');
+    window.removeEventListener('scroll', maybeShowGate);
+  }
+  window.addEventListener('scroll', maybeShowGate, { passive: true });
+  document.getElementById('gate-dismiss').addEventListener('click', function () {
+    gate.classList.remove('open');
+  });
+</script>
+</body>
+</html>

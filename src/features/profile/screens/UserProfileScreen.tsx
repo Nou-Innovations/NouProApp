@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Share } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, Linking, Share } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
 import { Skeleton, SkeletonCircle, SkeletonRow, SkeletonColumn } from '@/shared/components/ui/Skeleton';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +22,7 @@ import { removeConnection } from '@/features/connections/connections.service';
 import { getUserChats, createUserChat } from '@/features/inbox/inbox.service';
 import theme from '@/shared/theme';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
+import { profileShareUrl } from '@/shared/config/urls';
 
 interface UserProfileScreenProps {
   navigation: any;
@@ -38,6 +39,10 @@ interface UserProfileData {
   email?: string;
   phone?: string;
   avatar?: string;
+  // The backend has always sent this (stripSensitiveUserFields doesn't remove it); the
+  // interface just never declared it, so it was invisible here (P-16).
+  coverPhoto?: string;
+  profileSlug?: string;
   jobTitle?: string;
   description?: string;
   address?: string;
@@ -180,8 +185,12 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
   const handleSecondaryAction = async () => {
     if (viewType === ProfileViewType.SELF_PROFILE) {
       try {
+        // Was message-only, with no link at all (P-18). Slug when they have one,
+        // id otherwise — profileSlug is opt-in and rarely set.
+        const shareUrl = profileShareUrl(user?.profileSlug || userId);
         await Share.share({
-          message: `Check out ${user?.name || 'this user'}'s profile on NouPro!`,
+          message: `Check out ${user?.name || 'this user'}'s profile on NouPro! ${shareUrl}`,
+          url: shareUrl,
           title: 'Share Profile',
         });
       } catch (error) {
@@ -367,8 +376,10 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
     } else if (title === 'Report') {
       setReportSheetVisible(true);
     } else if (title === 'Share') {
+      const shareUrl = profileShareUrl(user?.profileSlug || userId);
       Share.share({
-        message: `Check out ${user?.name || 'this user'}'s profile on NouPro!`,
+        message: `Check out ${user?.name || 'this user'}'s profile on NouPro! ${shareUrl}`,
+        url: shareUrl,
         title: 'Share Profile',
       }).catch(console.error);
     }
@@ -672,6 +683,11 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
       {renderHeader(showMoreMenu)}
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {user?.coverPhoto ? (
+          <View style={[styles.coverContainer, { backgroundColor: appTheme.colors.surface }]}>
+            <Image source={{ uri: user.coverPhoto }} style={styles.coverImage} resizeMode="cover" />
+          </View>
+        ) : null}
         {renderProfileSection()}
         {renderExperienceSection()}
         {renderAboutSection()}
@@ -751,9 +767,18 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xl,
   },
   // Profile Section - matching PersonalProfileScreen
+  coverContainer: {
+    width: '100%',
+    aspectRatio: 3 / 4,
+  },
+  coverImage: {
+    width: '100%',
+    height: '100%',
+  },
   profileSection: {
     paddingHorizontal: 12,
-    paddingTop: 0,
+    // Matches PersonalProfileScreen: 16px between the cover and the avatar.
+    paddingTop: 16,
     paddingBottom: theme.spacing.md,
   },
   profileTopRow: {

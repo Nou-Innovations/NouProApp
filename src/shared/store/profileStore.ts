@@ -275,6 +275,10 @@ export function normalizeUser(raw: any): User {
   return {
     ...raw,
     avatar_url: raw.avatar_url || raw.avatar || raw.profilePicture || null,
+    // Was missing entirely: the backend has always returned coverPhoto and the
+    // User type has always declared cover_photo, but nothing bridged the two, so the
+    // field was invisible to every consumer (P-16).
+    cover_photo: raw.cover_photo || raw.coverPhoto || null,
     job_title: raw.job_title || raw.jobTitle || null,
     description: raw.description || null,
     address: raw.address || null,
@@ -526,6 +530,16 @@ export const useProfileStore = create<ProfileStore>()(
           currentStaffEntry: null,
           currentStaffRoleType: null,
         });
+
+        // Drop the company's location state too. Setting activeBusiness to null makes
+        // App.tsx's `if (activeBusiness?.id)` guard false, so fetchLocations never runs
+        // and never clears it — the last company's locations, currentLocation and
+        // currentLocationId simply lived on through personal mode and into whatever
+        // company you opened next (M-12). Lazy require: same circular-import reason as
+        // logout() above.
+        try {
+          require('@/shared/store/businessStore').useBusinessStore.getState().reset();
+        } catch {}
       },
 
       /**

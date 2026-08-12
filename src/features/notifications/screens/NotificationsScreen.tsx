@@ -100,6 +100,7 @@ const TYPE_COLORS: Record<string, string> = {
   invite_received: '#2A75E6',
   join_request_accepted: '#2ACF01',
   join_request_rejected: '#D6453E',
+  connection_declined: '#D6453E',
   status_change: '#8B5CF6',
   delivery_assigned: '#2ACF01',
   // Shared. `message` and `system` used to be typed, coloured, iconed and routed here
@@ -137,6 +138,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       case 'order_update': return 'receipt-outline';
       case 'subscription_due': return 'card-outline';
       case 'join_request_accepted': return 'checkmark-circle-outline';
+      case 'connection_declined': return 'close-circle-outline';
       case 'join_request_rejected': return 'close-circle-outline';
       case 'status_change': return 'shield-checkmark-outline';
       case 'onboarding_create_business': return 'business-outline';
@@ -530,6 +532,10 @@ export default function NotificationsScreen() {
         } else if (notification.requestData?.userId) {
           navigation.navigate('ViewUserProfile', { userId: notification.requestData.userId });
         }
+        break;
+      case 'connection_declined':
+        // Informational only — same treatment as join_request_rejected. Opening the
+        // profile of someone who just declined you would be a strange place to land.
         break;
       case 'invite_received':
         if (notification.requestData?.businessId) {

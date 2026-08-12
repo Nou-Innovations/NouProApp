@@ -179,6 +179,16 @@ export async function clearProfilePictureCache(): Promise<void> {
   } catch { /* best-effort */ }
 }
 
+/**
+ * Crop shape for the pickers. Both used to hardcode a square, which is right for an
+ * avatar and wrong for anything wide — the company cover already cropped to a square and
+ * then rendered the result into a non-square frame. Optional so the existing callers
+ * keep today's behaviour untouched (P-16).
+ */
+export interface PickerOptions {
+  aspect?: [number, number];
+}
+
 export const imageService = {
   /**
    * Request CAMERA permission only — used when taking a new photo.
@@ -229,7 +239,7 @@ export const imageService = {
   /**
    * Open camera to take a new photo
    */
-  async openCamera(): Promise<ImageUploadResponse> {
+  async openCamera(opts?: PickerOptions): Promise<ImageUploadResponse> {
     try {
       const hasPermission = await this.requestCameraPermission();
       if (!hasPermission) {
@@ -239,7 +249,7 @@ export const imageService = {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [1, 1], // Square aspect ratio for profile pictures
+        aspect: opts?.aspect ?? [1, 1], // Square by default (profile pictures)
         quality: 0.8,
         base64: false,
       });
@@ -260,7 +270,7 @@ export const imageService = {
   /**
    * Open gallery to select an existing photo
    */
-  async openGallery(): Promise<ImageUploadResponse> {
+  async openGallery(opts?: PickerOptions): Promise<ImageUploadResponse> {
     try {
       const hasPermission = await this.requestMediaLibraryPermission();
       if (!hasPermission) {
@@ -270,7 +280,7 @@ export const imageService = {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [1, 1], // Square aspect ratio for profile pictures
+        aspect: opts?.aspect ?? [1, 1], // Square by default (profile pictures)
         quality: 0.8,
         base64: false,
       });
@@ -357,9 +367,10 @@ export const imageService = {
     onCamera: () => void,
     onGallery: () => void,
     onRemove?: () => void,
+    title = 'Change Profile Picture',
   ): void {
     AppAlert.alert(
-      'Change Profile Picture',
+      title,
       'Choose an option',
       [
         { text: 'Camera', onPress: onCamera },

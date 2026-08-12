@@ -4,13 +4,14 @@
  * Based on app-logic.json screens.personalMode.profile
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Image,
   Share,
   ActivityIndicator,
   Animated,
@@ -19,7 +20,7 @@ import {
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Icon } from '@/shared/utils/icons';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
@@ -28,10 +29,13 @@ import { useBusinessStore } from '@/shared/store/businessStore';
 import Avatar from '@/shared/components/ui/Avatar';
 import { AppModal, SectionTitle } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
-import { imageService } from '@/shared/services/imageService';
+import { imageService, uploadImage } from '@/shared/services/imageService';
 import { patch as apiPatch } from '@/shared/services/api';
 import { AppAlert } from '@/shared/services/appAlert';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
+import { profileShareUrl } from '@/shared/config/urls';
+import { getExperiences } from '@/features/profile/services/profile.service';
+import type { WorkExperience } from '@/shared/types/profile';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -51,6 +55,31 @@ export default function PersonalProfileScreen() {
 
   // Local state
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+
+  // Real WorkExperience rows, not memberships. This section used to render
+  // `userBusinesses`, whose start_date/end_date GET /auth/me never populates — so every
+  // row read "Present - Present" — and it returned null entirely for anyone without a
+  // company, hiding roles they had added by hand and could see on their own public
+  // profile but not here (N-15).
+  const [experiences, setExperiences] = useState<WorkExperience[]>([]);
+
+  const loadExperiences = useCallback(async () => {
+    if (!currentUser?.id) return;
+    try {
+      const rows = await getExperiences(currentUser.id);
+      setExperiences(rows || []);
+    } catch {
+      // Non-fatal: the rest of the profile still renders.
+    }
+  }, [currentUser?.id]);
+
+  // Refetch on focus so adding or editing an entry shows on return.
+  useFocusEffect(
+    useCallback(() => {
+      void loadExperiences();
+    }, [loadExperiences]),
+  );
   const [isProfileSwitcherVisible, setIsProfileSwitcherVisible] = useState(false);
   const [isAddBusinessOptionsVisible, setIsAddBusinessOptionsVisible] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -75,8 +104,13 @@ export default function PersonalProfileScreen() {
 
   const handleShareProfile = async () => {
     try {
+      // Was message-only, with the NAME interpolated where a link should be — the
+      // recipient got "Check out my profile on NouPro: Jane Doe" and nothing to tap,
+      // even though a public profile route already existed (P-18).
+      const url = profileShareUrl(currentUser?.profile_slug || currentUser?.id || '');
       await Share.share({
-        message: `Check out my profile on NouPro: ${currentUser?.name}`,
+        message: `Check out my profile on NouPro: ${url}`,
+        url,
         title: 'Share Profile',
       });
     } catch (error) {
@@ -170,6 +204,88 @@ export default function PersonalProfileScreen() {
       currentUser?.avatar_url ? handleRemove : undefined,
     );
   };
+
+  const handleChangeCover = async () => {
+    const uploadAndPersistCover = async (localUri: string) => {
+      try {
+        // uploadImage directly, not uploadProfilePicture: the latter also writes an
+        // avatar-specific local cache under profile_pictures/, which a cover has no use for.
+        const url = await uploadImage(localUri);
+        await apiPatch('/auth/me', { coverPhoto: url });
+        updateCurrentUser({ cover_photo: url });
+        setSuccessMessage('Cover photo updated!');
+        setShowSuccessDialog(true);
+      } catch (err) {
+        AppAlert.alert('Not saved', getApiErrorMessage(err, 'Could not update your cover photo.'));
+      }
+    };
+
+    // 4:3 to match the business profile cover, so personal and company profiles read as
+    // the same app. The pickers cropped square-only until now (P-16).
+    const pickerOpts = { aspect: [3, 4] as [number, number] };
+
+    const runPick = async (pick: () => Promise<{ success: boolean; imageUri?: string }>) => {
+      setIsUploadingCover(true);
+      try {
+        const result = await pick();
+        if (result.success && result.imageUri) {
+          await uploadAndPersistCover(result.imageUri);
+        }
+      } catch (error) {
+        AppAlert.alert('Error', getApiErrorMessage(error, 'Something went wrong. Please try again.'));
+      } finally {
+        setIsUploadingCover(false);
+      }
+    };
+
+    const handleRemoveCover = async () => {
+      setIsUploadingCover(true);
+      try {
+        await apiPatch('/auth/me', { coverPhoto: null });
+        updateCurrentUser({ cover_photo: null });
+      } catch (err) {
+        AppAlert.alert('Not removed', getApiErrorMessage(err, 'Could not remove your cover photo.'));
+      } finally {
+        setIsUploadingCover(false);
+      }
+    };
+
+    imageService.showImagePickerOptions(
+      () => runPick(() => imageService.openCamera(pickerOpts)),
+      () => runPick(() => imageService.openGallery(pickerOpts)),
+      currentUser?.cover_photo ? handleRemoveCover : undefined,
+      'Change Cover Photo',
+    );
+  };
+
+  const renderCoverPhoto = () => (
+    <TouchableOpacity
+      style={[styles.coverContainer, { backgroundColor: appTheme.colors.surface }]}
+      onPress={handleChangeCover}
+      activeOpacity={0.85}
+      accessibilityLabel="Change cover photo"
+      accessibilityRole="button"
+    >
+      {currentUser?.cover_photo ? (
+        <Image source={{ uri: currentUser.cover_photo }} style={styles.coverImage} resizeMode="cover" />
+      ) : (
+        // Deliberately no stock-photo fallback. The business screens hardcode an Unsplash
+        // URL here, which CompanyEditScreen documents as the CO-27 anti-pattern — an
+        // empty cover should look empty, not like someone else's photograph.
+        <View style={styles.coverEmpty}>
+          <Icon name="image-outline" size={28} color={appTheme.colors.iconMuted} />
+          <Text style={[styles.coverEmptyText, { color: appTheme.colors.textMuted }]}>
+            Add a cover photo
+          </Text>
+        </View>
+      )}
+      {isUploadingCover ? (
+        <View style={styles.coverUploadOverlay}>
+          <ActivityIndicator color="#FFFFFF" />
+        </View>
+      ) : null}
+    </TouchableOpacity>
+  );
 
   const handleGoToBusiness = (businessId: string) => {
     // @ts-ignore
@@ -455,7 +571,7 @@ export default function PersonalProfileScreen() {
   );
 
   const renderExperienceSection = () => {
-    if (userBusinesses.length === 0) return null;
+    if (experiences.length === 0) return null;
 
     return (
       <View style={[styles.section, { backgroundColor: appTheme.colors.cardBackground }]}>
@@ -463,36 +579,48 @@ export default function PersonalProfileScreen() {
           Experience
         </SectionTitle>
 
-        {userBusinesses.map((ub, index) => (
-          <TouchableOpacity
-            key={ub.business.id}
-            style={[
-              styles.experienceCard,
-              index !== userBusinesses.length - 1 && { borderBottomWidth: 1, borderBottomColor: appTheme.colors.borderColor }
-            ]}
-            onPress={() => handleGoToBusiness(ub.business.id)}
-          >
-            <Avatar
-              userId={ub.business.id}
-              userName={ub.business.name}
-              imageUri={ub.business.logo_url}
-              size={48}
-            />
-            <View style={styles.experienceInfo}>
-              <Text style={[styles.experienceName, { color: appTheme.colors.text }]}>
-                {ub.business.name}
-              </Text>
-              <Text style={[styles.experienceRole, { color: appTheme.colors.textLight }]}>
-                {getRoleDisplayName(ub.role)}
-              </Text>
-              {/* Date range - Start date to End date (like LinkedIn) */}
-              <Text style={[styles.experienceDate, { color: appTheme.colors.textMuted }]}>
-                {formatExperienceDate(ub.start_date)} - {formatExperienceDate(ub.end_date)}
-              </Text>
-            </View>
-            <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
-          </TouchableOpacity>
-        ))}
+        {experiences.map((exp, index) => {
+          // Only company-backed rows lead anywhere. A hand-typed role has no
+          // linkedBusinessId, and an archived company keeps its name on the timeline but
+          // stops being tappable.
+          const targetBusinessId =
+            exp.linkedBusiness?.deletedAt ? undefined : exp.linkedBusinessId;
+          const isTappable = Boolean(targetBusinessId);
+
+          return (
+            <TouchableOpacity
+              key={exp.id}
+              style={[
+                styles.experienceCard,
+                index !== experiences.length - 1 && { borderBottomWidth: 1, borderBottomColor: appTheme.colors.borderColor }
+              ]}
+              onPress={isTappable ? () => handleGoToBusiness(targetBusinessId!) : undefined}
+              disabled={!isTappable}
+              activeOpacity={isTappable ? 0.7 : 1}
+            >
+              <Avatar
+                userId={exp.linkedBusinessId || exp.id}
+                userName={exp.linkedBusiness?.name || exp.companyName}
+                imageUri={exp.linkedBusiness?.logoUrl || exp.companyLogo}
+                size={48}
+              />
+              <View style={styles.experienceInfo}>
+                <Text style={[styles.experienceName, { color: appTheme.colors.text }]}>
+                  {exp.linkedBusiness?.name || exp.companyName}
+                </Text>
+                <Text style={[styles.experienceRole, { color: appTheme.colors.textLight }]}>
+                  {exp.position}
+                </Text>
+                <Text style={[styles.experienceDate, { color: appTheme.colors.textMuted }]}>
+                  {formatExperienceDate(exp.startDate)} - {exp.isCurrent ? 'Present' : formatExperienceDate(exp.endDate)}
+                </Text>
+              </View>
+              {isTappable ? (
+                <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+              ) : null}
+            </TouchableOpacity>
+          );
+        })}
       </View>
     );
   };
@@ -840,6 +968,7 @@ export default function PersonalProfileScreen() {
     >
       {renderHeader()}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {renderCoverPhoto()}
         {renderProfileSection()}
         {renderExperienceSection()}
         {renderAboutSection()}
@@ -883,9 +1012,35 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: theme.spacing.xl,
   },
+  coverContainer: {
+    width: '100%',
+    aspectRatio: 3 / 4,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  coverImage: {
+    width: '100%',
+    height: '100%',
+  },
+  coverEmpty: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  coverEmptyText: {
+    fontSize: 14,
+    fontFamily: theme.fonts.primary.regular,
+  },
+  coverUploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   profileSection: {
     paddingHorizontal: 12, // 12px horizontal margin
-    paddingTop: 0,
+    // 16px gap between the cover and the profile picture, matching the business screens.
+    paddingTop: 16,
     paddingBottom: theme.spacing.md,
   },
   profileTopRow: {

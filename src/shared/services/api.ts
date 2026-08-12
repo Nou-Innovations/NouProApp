@@ -167,7 +167,12 @@ const createApiClient = (): AxiosInstance => {
       if (status === 401) {
         const url = error.config?.url || '';
         const method = (error.config?.method || '').toLowerCase();
-        const isAuthEndpoint = ['/auth/login', '/auth/register', '/auth/refresh'].some(
+        // '/auth/2fa/verify' belongs here: the caller isn't signed in yet, so a 401 from an
+        // expired tempToken has nothing to refresh. It fell through to the refresh path,
+        // found no refreshToken, read that as "revoked" and called logout('session_expired')
+        // — so letting the 5-minute window lapse threw you out of the login you were in the
+        // middle of, with a message about a session you never had (A-15).
+        const isAuthEndpoint = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/2fa/verify'].some(
           (p) => url.includes(p)
         );
 

@@ -426,6 +426,7 @@ app.get('/legal/delete-account', sendLegalPage('delete-account.html'));
 // hand-off; the id is read client-side, so these stay plain static files.
 app.get('/join/:companyId', sendPublicPage('join.html'));
 app.get('/p/:productId', sendPublicPage('product.html'));
+app.get('/u/:idOrSlug', sendPublicPage('profile.html'));
 
 // Password-reset landing page. Reset emails link to
 // `${APP_BASE_URL}/reset-password?token=...` — this used to 404 (no page
@@ -3030,6 +3031,8 @@ const RESERVED_PROFILE_SLUGS = new Set([
   'login', 'logout', 'signin', 'signup', 'register', 'auth', 'oauth', 'settings',
   'legal', 'privacy', 'terms', 'about', 'blog', 'news', 'status',
   'join', 'invite', 'reset-password', 'delete-account', 'new', 'edit', 'null', 'undefined',
+  // Live path segments on the public site — claiming these as a slug would shadow the route.
+  'u', 'p',
 ]);
 
 // Update current user profile (requires authentication)
@@ -7786,7 +7789,10 @@ app.get('/api/profile/:slug', optionalAuth, async (req, res) => {
       },
     });
 
-    if (!profile) {
+    // Deleted accounts: 404 rather than serving the whole profile. GET /users/:userId
+    // returns a tombstone for these; this route checked nothing, so a deleted user's
+    // slug still served their full work history to anyone who had the link.
+    if (!profile || profile.deletedAt) {
       return res.status(404).json(errorResponse('Profile not found'));
     }
 
@@ -7795,6 +7801,52 @@ app.get('/api/profile/:slug', optionalAuth, async (req, res) => {
     res.json(successResponse(stripSensitiveUserFields(profile)));
   } catch (e) {
     logger.error('Error fetching public profile:', e);
+    res.status(500).json(errorResponse('Failed to fetch profile'));
+  }
+});
+
+/**
+ * Minimal public card for the share landing page (/u/:idOrSlug).
+ *
+ * Deliberately NOT `GET /api/profile/:slug`, which returns the whole user row plus work
+ * history, education, certifications and skills. The landing page shows a name, a photo
+ * and a headline, so that is all this returns — the exposure matches what is rendered
+ * rather than what a profile happens to contain (P-18).
+ *
+ * Accepts an id OR a slug, because profileSlug is opt-in and almost nobody has set one;
+ * keying the share URL on the slug alone would produce a dead link for most users.
+ *
+ * Unauthenticated by design — a share link has to work for someone who doesn't have an
+ * account yet, which is the whole point. Behind publicReadLimiter because accepting a
+ * guessable key (a slug) makes it an enumeration oracle otherwise. It returns only what
+ * the landing page renders, never email/phone/address, and 404s deleted accounts.
+ */
+app.get('/api/public/profile-card/:idOrSlug', publicReadLimiter, async (req, res) => {
+  try {
+    const { prisma } = require('./src/db/prisma');
+    const key = String(req.params.idOrSlug || '');
+    const user = await prisma.user.findFirst({
+      where: { OR: [{ id: key }, { profileSlug: key }] },
+      select: {
+        id: true, name: true, avatar: true, headline: true,
+        jobTitle: true, profileSlug: true, deletedAt: true,
+      },
+    });
+
+    if (!user || user.deletedAt) {
+      return res.status(404).json(errorResponse('Profile not found'));
+    }
+
+    res.json(successResponse({
+      id: user.id,
+      name: user.name,
+      avatar: user.avatar,
+      headline: user.headline,
+      jobTitle: user.jobTitle,
+      profileSlug: user.profileSlug,
+    }));
+  } catch (e) {
+    logger.error('Error fetching public profile card:', e);
     res.status(500).json(errorResponse('Failed to fetch profile'));
   }
 });

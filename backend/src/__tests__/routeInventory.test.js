@@ -37,6 +37,7 @@ const ALLOWED_UNAUTHENTICATED = new Map([
   ['GET /reset-password', 'static page; the token is consumed by the POST, not this'],
   ['GET /join/:companyId', 'static invite landing page'],
   ['GET /p/:productId', 'static product share page'],
+  ['GET /u/:idOrSlug', 'static profile share page; renders nothing server-side'],
 
   // Authentication itself — cannot require a token to obtain a token. All rate-limited.
   ['POST /api/auth/login', 'authLimiter + per-account lockout'],
@@ -56,6 +57,7 @@ const ALLOWED_UNAUTHENTICATED = new Map([
   ['GET /api/public/locations/:locationId/products', 'publicReadLimiter; listed products only'],
   ['POST /api/public/locations/:locationId/orders', 'publicOrderLimiter; prices are server-side'],
   ['GET /api/products', 'publicReadLimiter; listed-only, filtered in-query (ABUSE-7)'],
+  ['GET /api/public/profile-card/:idOrSlug', 'publicReadLimiter; name/avatar/headline only, no contact fields, 404s deleted accounts (P-18)'],
 
   // Static metadata and infrastructure.
   ['GET /api/order-status-meta', 'static enum metadata, no tenant data'],

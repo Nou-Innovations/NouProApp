@@ -430,6 +430,7 @@ function AppNavigator() {
         InvoiceDetails: 'invoices/:invoiceId',
         ViewBusinessProfile: 'join/:businessId',
         ProductDetail: 'products/:productId',
+        ViewUserProfile: 'u/:userId',
       },
     },
   };

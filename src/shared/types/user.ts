@@ -40,7 +40,9 @@ export interface User {
   headline?: string;
   bio?: string;
   industry?: string;
-  cover_photo?: string;
+  // Nullable for the same reason as avatar_url: normalizeUser writes `null` when
+  // there's no cover, and clearing it sends `coverPhoto: null` to the server (P-16).
+  cover_photo?: string | null;
   profile_slug?: string;
   created_at: string; // ISO timestamp
   updated_at?: string;

@@ -31,6 +31,14 @@ export const inviteUrl = (companyId: string) => `${PUBLIC_WEB_URL}/join/${compan
 /** Public product share link. */
 export const productShareUrl = (productId: string) => `${PUBLIC_WEB_URL}/p/${productId}`;
 
+/**
+ * Public profile share link. Takes a slug when the user has set one, otherwise their id —
+ * profileSlug is opt-in and almost nobody has set one, so a slug-only URL would be a dead
+ * link for most people (P-18). The page it opens shows a name and photo, then asks the
+ * visitor to sign in for the rest.
+ */
+export const profileShareUrl = (idOrSlug: string) => `${PUBLIC_WEB_URL}/u/${idOrSlug}`;
+
 /** The hosted legal pages — the same copy as the in-app screens. */
 export const legalUrl = (page: 'privacy' | 'terms' | 'delete-account') =>
   `${PUBLIC_WEB_URL}/legal/${page}`;
