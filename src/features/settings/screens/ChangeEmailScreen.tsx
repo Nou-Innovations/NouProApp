@@ -33,6 +33,7 @@ export default function ChangeEmailScreen({ navigation, route }: ChangeEmailScre
 
   const [value, setValue] = useState('');
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
 
@@ -70,8 +71,24 @@ export default function ChangeEmailScreen({ navigation, route }: ChangeEmailScre
     }
     setIsBusy(true);
     try {
-      if (isEmail) await authAPI.confirmEmailChange(trimmed, code.trim());
-      else await authAPI.confirmPhoneChange(trimmed, code.trim());
+      // The password is sent but NOT required client-side. Accounts created by invite have
+      // no password and the server exempts them, so a hard requirement here would lock
+      // exactly those users out of ever changing their contact details. If the server does
+      // need one it answers PASSWORD_REQUIRED, which surfaces in the catch below.
+      const pw = password.trim() || undefined;
+      const result = isEmail
+        ? await authAPI.confirmEmailChange(trimmed, code.trim(), pw)
+        : await authAPI.confirmPhoneChange(trimmed, code.trim(), pw);
+
+      // Adopt the returned pair. The server bumped tokenVersion and revoked every other
+      // session, so the refresh token this device is holding is now stale — without this
+      // the user is signed out at the next rotation, roughly half an hour later.
+      // These go through post<T>, which already unwraps, so it's result.tokens — not
+      // result.data.tokens as in the changePassword path.
+      if (result?.tokens?.token) {
+        useProfileStore.getState().setTokens(result.tokens.token, result.tokens.refreshToken);
+      }
+
       updateCurrentUser(isEmail ? { email: trimmed } : { phone: trimmed });
       AppAlert.alert(
         'Updated',
@@ -121,6 +138,18 @@ export default function ChangeEmailScreen({ navigation, route }: ChangeEmailScre
                 placeholder="6-digit code"
                 keyboardType="number-pad"
                 maxLength={6}
+                containerStyle={styles.field}
+              />
+
+              <AppTextField
+                label="Current password"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter your password"
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                leftIcon="lock-closed-outline"
                 containerStyle={styles.field}
               />
               <Text style={[styles.hint, { color: appTheme.colors.textMuted }]}>

@@ -35,23 +35,45 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
   const [showBackupCodesModal, setShowBackupCodesModal] = useState(false);
   const [disablePassword, setDisablePassword] = useState('');
   const [showDisablePrompt, setShowDisablePrompt] = useState(false);
+  // Held between the two setup steps: the server guards /2fa/setup and /2fa/verify-setup
+  // independently (audit AUTH-5), so the password is needed twice and we only ask once.
+  const [setupPassword, setSetupPassword] = useState('');
+
+  const beginSetup = async (currentPassword?: string) => {
+    setIsLoading(true);
+    try {
+      const response = await authAPI.setup2FA(currentPassword);
+      const data = response.data || response;
+      setSecretKey(data.secret);
+      setOtpauthUrl(data.otpauthUrl);
+      setSetupPassword(currentPassword || '');
+      setIsSettingUp(true);
+    } catch (error: any) {
+      const message = getApiErrorMessage(error, 'Failed to set up 2FA. Please try again.');
+      AppAlert.alert('Error', message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleToggle = async (value: boolean) => {
     if (value) {
-      // Starting setup - call backend to generate secret
-      setIsLoading(true);
-      try {
-        const response = await authAPI.setup2FA();
-        const data = response.data || response;
-        setSecretKey(data.secret);
-        setOtpauthUrl(data.otpauthUrl);
-        setIsSettingUp(true);
-      } catch (error: any) {
-        const message = getApiErrorMessage(error, 'Failed to set up 2FA. Please try again.');
-        AppAlert.alert('Error', message);
-      } finally {
-        setIsLoading(false);
-      }
+      // Enabling 2FA now requires the current password, so an attacker holding a stolen
+      // token can't enrol their own authenticator and lock the real owner out (AUTH-5).
+      // Not required client-side: invite-created accounts have no password and the server
+      // exempts them, so an empty entry is passed through and the server decides.
+      AppAlert.prompt(
+        'Confirm your password',
+        'Enter your current password to turn on two-factor authentication.',
+        [
+          // Explicit buttons rather than the callback form, which renders OK only — the
+          // user needs a way out, and the Switch is state-driven so it snaps back.
+          { text: 'Cancel', style: 'cancel' },
+          // beginSetup owns its own try/catch/finally, so nothing needs to await it here.
+          { text: 'Continue', onPress: (input) => { beginSetup(input?.trim() || undefined); } },
+        ],
+        'secure-text',
+      );
     } else {
       // Disabling 2FA - prompt for password
       setShowDisablePrompt(true);
@@ -89,11 +111,12 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
 
     setIsLoading(true);
     try {
-      const response = await authAPI.verifySetup2FA(verificationCode);
+      const response = await authAPI.verifySetup2FA(verificationCode, setupPassword || undefined);
       const data = response.data || response;
       setTwoFactorEnabled(true);
       setIsSettingUp(false);
       setVerificationCode('');
+      setSetupPassword('');
       setBackupCodes(data.backupCodes || []);
       setShowBackupCodesModal(true);
     } catch (error: any) {

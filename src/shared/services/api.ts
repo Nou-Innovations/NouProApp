@@ -166,12 +166,29 @@ const createApiClient = (): AxiosInstance => {
       // Handle 401 errors with token refresh
       if (status === 401) {
         const url = error.config?.url || '';
+        const method = (error.config?.method || '').toLowerCase();
         const isAuthEndpoint = ['/auth/login', '/auth/register', '/auth/refresh'].some(
           (p) => url.includes(p)
         );
 
+        // A 401 from these means "wrong password", NOT "expired token". Refreshing does
+        // nothing (the session is fine) and retrying replays the same wrong password, so
+        // the request loops. Treat them as terminal and surface the error to the screen.
+        const isPasswordCheck =
+          [
+            '/auth/change-email/confirm',
+            '/auth/change-phone/confirm',
+            '/auth/change-password',
+            '/auth/2fa/setup',
+            '/auth/2fa/verify-setup',
+            '/auth/2fa/disable',
+          ].some((p) => url.includes(p)) ||
+          // DELETE /users/me verifies a password; GET /users/me is an ordinary read whose
+          // 401 SHOULD still trigger a refresh, so this one is matched on method too.
+          (method === 'delete' && url.includes('/users/me'));
+
         // Don't attempt refresh for auth endpoints -- just throw
-        if (isAuthEndpoint) {
+        if (isAuthEndpoint || isPasswordCheck) {
           throw new ApiError(message, status, code, error.response?.data);
         }
 
@@ -215,9 +232,20 @@ const createApiClient = (): AxiosInstance => {
           : { ok: false, reason: 'transient' };
 
         if (outcome.ok && error.config) {
-          // Retry the original request with the new token
-          error.config.headers.Authorization = `Bearer ${outcome.token}`;
-          return client.request(error.config);
+          // Retry the original request with the new token — ONCE.
+          //
+          // Without this flag the replay re-enters this interceptor, and any request that
+          // 401s for a reason a refresh cannot fix loops forever: 401 → refresh (succeeds,
+          // the session is fine) → replay → 401 → … The existing _retryCount guard covers
+          // only network/timeout errors, not this path. Bounding it here fixes the whole
+          // class, not just the endpoints enumerated above.
+          const cfg = error.config as typeof error.config & { _refreshRetried?: boolean };
+          if (cfg._refreshRetried) {
+            throw new ApiError(message, status, code, error.response?.data);
+          }
+          cfg._refreshRetried = true;
+          cfg.headers.Authorization = `Bearer ${outcome.token}`;
+          return client.request(cfg);
         }
 
         if (outcome.ok === false && outcome.reason === 'revoked') {
@@ -349,6 +377,26 @@ interface AuthResponseData {
   token: string;
   refreshToken: string;
   businesses: Record<string, unknown>[];
+}
+
+/**
+ * Response of POST /auth/change-email|phone/confirm.
+ *
+ * The updated user fields, PLUS a fresh token pair. The server bumps `tokenVersion` and
+ * revokes every other session on a verified contact change (audit AUTH-2), which would
+ * otherwise invalidate the caller's OWN refresh token too — so it hands back a new pair
+ * and the client MUST adopt it. Discarding this is a silent sign-out ~30 minutes later.
+ *
+ * NOTE the nesting: these endpoints go through the `post<T>` helper, which already unwraps
+ * `.data.data`, so the tokens are at `result.tokens.token` — NOT `result.data.token` like
+ * the `changePassword` path, which calls apiClient directly. Easy and silent to get wrong.
+ */
+export interface ContactChangeResult {
+  id?: string;
+  email?: string;
+  phone?: string;
+  tokens?: { token: string; refreshToken: string };
+  [key: string]: unknown;
 }
 
 /** Shape of the GDPR account-data export (backend: GET /users/me/export). */
@@ -517,16 +565,24 @@ export const authAPI = {
     await post<void>('/auth/change-email/request', { newEmail });
   },
 
-  confirmEmailChange: async (newEmail: string, code: string): Promise<void> => {
-    await post<void>('/auth/change-email/confirm', { newEmail, code });
+  confirmEmailChange: async (
+    newEmail: string,
+    code: string,
+    currentPassword?: string,
+  ): Promise<ContactChangeResult> => {
+    return post<ContactChangeResult>('/auth/change-email/confirm', { newEmail, code, currentPassword });
   },
 
   requestPhoneChange: async (newPhone: string): Promise<void> => {
     await post<void>('/auth/change-phone/request', { newPhone });
   },
 
-  confirmPhoneChange: async (newPhone: string, code: string): Promise<void> => {
-    await post<void>('/auth/change-phone/confirm', { newPhone, code });
+  confirmPhoneChange: async (
+    newPhone: string,
+    code: string,
+    currentPassword?: string,
+  ): Promise<ContactChangeResult> => {
+    return post<ContactChangeResult>('/auth/change-phone/confirm', { newPhone, code, currentPassword });
   },
 
   changePassword: async (currentPassword: string, newPassword: string): Promise<ApiResponse<{ message: string }>> => {
@@ -543,13 +599,21 @@ export const authAPI = {
   },
 
   // Two-Factor Authentication
-  setup2FA: async (): Promise<ApiResponse<{ secret: string; otpauthUrl: string }>> => {
-    const response = await apiClient.post('/auth/2fa/setup');
+  //
+  // Both setup steps require the current password (audit AUTH-5): without it, a stolen
+  // access token let an attacker enrol THEIR authenticator and lock the owner out. The
+  // server guards each step independently, so the password goes to both — sending it only
+  // to /setup would leave /verify-setup callable on its own.
+  setup2FA: async (currentPassword?: string): Promise<ApiResponse<{ secret: string; otpauthUrl: string }>> => {
+    const response = await apiClient.post('/auth/2fa/setup', { currentPassword });
     return response.data;
   },
 
-  verifySetup2FA: async (code: string): Promise<ApiResponse<{ backupCodes: string[]; message: string }>> => {
-    const response = await apiClient.post('/auth/2fa/verify-setup', { code });
+  verifySetup2FA: async (
+    code: string,
+    currentPassword?: string,
+  ): Promise<ApiResponse<{ backupCodes: string[]; message: string }>> => {
+    const response = await apiClient.post('/auth/2fa/verify-setup', { code, currentPassword });
     return response.data;
   },
 
