@@ -295,14 +295,15 @@ One row each, deliberately. Prose for 40 P2s is what makes an audit go unread.
 |---|---|---|---|
 | `AUTH-6` | Register leaks account existence with distinct per-identifier messages | `server.js:1737`-`1746` | Uniform 409 |
 | `AUTH-7` | Email lookup is case-sensitive while writers lowercase → duplicate accounts, silent login failures | `userRepo.prisma.js:19`-`23` | Normalize on write and lookup; add a functional unique index |
-| `AUTH-8` | No rate limit on `change-password` or `DELETE /users/me`, each doing bcrypt cost 12 | `server.js:1865`, `:2832` | Per-user limiter (brute-force + CPU DoS) |
+| `AUTH-8` | ✅ **FIXED 2026-08-10 (B2).** No rate limit on `change-password` or `DELETE /users/me`, each doing bcrypt cost 12 | `server.js:2008`, `:3130` | Done: `sensitiveAccountLimiter`, 10/15min per user |
 | `AUTH-9` | ✅ **FIXED 2026-08-10 (B1).** `2fa/disable` relied on bcryptjs returning false for a null digest rather than guarding it | `server.js:2625` | Done: explicit null guard, matching change-password |
 | `AUTH-10` | Refresh tokens not hashed at rest, no reuse detection, and `touch` slides expiry forever (no absolute lifetime) | `sessionService.js:59`-`65` | Store a digest, add `absoluteExpiresAt`; deliberate trade-off — see the file's own comment |
 | `AUTH-11` | No session-pruning job despite an index built for it | `sessionService.js` | Add to the automation cron |
 | `AUTH-12` | `requireAuth` never revalidates the session/`tokenVersion` — up to 30 min revocation lag even after `AUTH-1` | `auth.js:82`-`96` | Cached `sid` liveness check |
 | `AUTH-13` | `jwt.verify` doesn't pin `algorithms` | `auth.js:42` | `{ algorithms: ['HS256'] }`, plus `issuer`/`audience` |
-| `ABUSE-2` | Automation API key compared with `!==` (not constant-time), accepted via `?key=` query string (lands in logs), and none of its 3 routes are rate-limited | `middleware/automationAuth.js:28`-`32` | `crypto.timingSafeEqual`, header only, add a limiter. **Fails closed correctly otherwise** |
-| `ABUSE-3` | OTP resend resets the 5-attempt lockout (new row, `attempts: 0`); no per-destination send throttle → SMS bombing and Twilio cost burn on an unauthenticated route | `otpService.js:75`-`88`, `:162`; `server.js:2123` | Per-destination cooldown + daily cap; count attempts per destination |
+| `ABUSE-2` | ✅ **FIXED 2026-08-10 (B2).** Automation API key compared with `!==` (not constant-time), and none of its 3 routes were rate-limited | `middleware/automationAuth.js:20`, `server.js:17117` | Done: `crypto.timingSafeEqual` over hashed operands + `automationLimiter` (30/15min). Query-string key intentionally retained — see `ABUSE-6` |
+| `ABUSE-3` | ✅ **FIXED 2026-08-10 (B2).** OTP resend reset the 5-attempt lockout (new row, `attempts: 0`); no per-destination send throttle → SMS bombing and Twilio cost burn on an unauthenticated route | `otpService.js:74`, `:253` | Done: attempts now summed across a 15-min window (DB-backed, survives restarts); 60s cooldown + 10/hour per destination, placed **above** the Twilio branch |
+| `ABUSE-6` | Automation key is still accepted via `?key=` in the URL, where it lands in access logs. Kept deliberately: the renewal cron may rely on it and that job charges cards. Every use now logs `[SECURITY] automation key supplied via query string` | `middleware/automationAuth.js:47` | Watch the logs; once the line stops appearing, delete the `queryKey` fallback (one line) |
 | `ABUSE-4` | `authLimiter` is one shared 15/15min IP bucket across 13 routes → self-DoS behind CGNAT, generous for distributed attacks | `server.js:387`-`395` | Split per route, key on identifier + IP |
 | `ABUSE-5` | Rate limiters use the default in-memory store → limits multiply per Render instance and reset on deploy | all limiters | Shared Redis/Postgres store before scaling past one instance |
 | `ABUSE-6` | No per-socket rate limiting; `join_chat` does 2-3 DB reads per emit, unthrottled | `server.js:1276` | Per-socket token bucket in `io.use` |
@@ -447,6 +448,7 @@ Append one row per batch as it lands. **Update the §4 index status in the same 
 | Date | Batch | IDs closed | Commit | Notes |
 |---|---|---|---|---|
 | 2026-08-10 | A (partial) | `AUTH-1` phase 1, `EXP-1`, `OPS-1` (code) | `2cc8d42f` | All three P0s. 14-test token-type matrix added at `src/middleware/auth.test.js`; suite 95/95 green. **The sweep found a 13th leaky `include` the audit's count of 12 missed** (`memberRepo.prisma.js` `getByUserId`) — fixed too. |
+| 2026-08-10 | B2 | `ABUSE-2`, `ABUSE-3`, `AUTH-8` | see `git log` | Abuse/cost controls. Suite 124/124 (+15). The OTP throttle sits **above** the Twilio branch on purpose — a DB-backed guard would silently miss the paid channel. Attempt counting is DB-backed (must survive restarts); the send cooldown is in-memory (cost guard, short window). Query-string automation key kept on purpose → new `ABUSE-6`. |
 | 2026-08-10 | B1 | `AUTH-2`, `AUTH-3`, `AUTH-4`, `AUTH-5`, `AUTH-9`, `AUTH-15` | see `git log` | Auth correctness. **First migration of the audit**: `20260810200000_add_password_reset_token` (additive). Suite 109/109 (+8). Found and fixed `AUTH-15` — backup codes were accepted-but-not-consumed by account deletion. `AUTH-14` accepted as a known residual. |
 | 2026-08-10 | A (rest) | `TEN-1`, `TEN-2`, `TEN-3`, `INJ-1`, `INJ-4` | `b2ad7a5e` | Batch A complete. Suite 101/101 green (+6 checkout-id cases). **Two fix designs in this doc were wrong and were corrected during implementation** — see below. New follow-up logged as `EXP-8`. |
 
@@ -468,7 +470,7 @@ Three one-line changes, each marked with a `PHASE 2` comment:
 
 Then update the last test in `backend/src/middleware/auth.test.js` (`PHASE 1: a legacy untyped access token is still accepted`) to assert the opposite.
 
-**Batch A is complete. Batch B1 (auth correctness) is complete.** Remaining: **B2** — `ABUSE-2` (automation key), `ABUSE-3` (OTP throttle), `AUTH-8` (bcrypt-route limiters), and `ABUSE-1` once the Cloudflare-ingress question in §3 is answered.
+**Batches A, B1 and B2 are complete.** The only Batch B item still open is **`ABUSE-1`**, which is blocked on the Cloudflare-ingress question in §3 — it cannot be answered from a sandbox, and guessing either leaves every IP-keyed limit defeatable or collapses all users into one bucket. Next up after that: Batch C (client, OTA-shippable).
 
 ### B1 corrections to this document
 

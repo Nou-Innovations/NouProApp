@@ -494,6 +494,36 @@ const twoFactorLimiter = rateLimit({
 // enum, so adding one later needs no migration.
 const FEEDBACK_CATEGORY_IDS = ['interface', 'add', 'modify', 'ideas', 'other'];
 
+// SECURITY (AUTH-8): change-password and account deletion had NO limiter at all, while
+// each runs bcrypt at cost 12 — and deletion additionally compares the supplied code
+// against every stored backup code. That is two problems at once: an unbounded online
+// guessing oracle against the current password for anyone holding a stolen access token,
+// and a cheap way to peg the single-threaded Node process from one session.
+// Applied AFTER requireAuth, so req.user.id is available.
+const sensitiveAccountLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.user?.id ?? clientIpKey(req),
+  message: { success: false, message: 'Too many attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: limiterValidate,
+});
+
+// SECURITY (ABUSE-2): the automation endpoints had no limiter, so the shared API key was
+// brute-forceable at full speed — and one of the three charges stored cards. Deliberately
+// generous: the real caller is a cron hitting this about once a day from a single address,
+// so 30/15min is invisible to it. An attacker exhausts their OWN ip bucket, not the cron's.
+const automationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  keyGenerator: clientIpKey,
+  message: { success: false, message: 'Too many requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: limiterValidate,
+});
+
 // Rate limiter for suggestion creation (anti-spam): 5 per 10 minutes per user.
 // Applied AFTER requireAuth, so req.user.id is available.
 const suggestionLimiter = rateLimit({
@@ -1975,7 +2005,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
 });
 
 // Change password (requires authentication)
-app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+app.post('/api/auth/change-password', requireAuth, sensitiveAccountLimiter, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     
@@ -2095,6 +2125,11 @@ function sendOtpError(res, err, fallbackMessage) {
   }
   if (err?.code === 'OTP_LOCKED') {
     return res.status(429).json(errorResponse(err.message, 'OTP_LOCKED'));
+  }
+  // ABUSE-3: per-destination send throttle. The message carries the wait time, so it is
+  // safe to surface verbatim — it says nothing about whether the destination has an account.
+  if (err?.code === 'OTP_THROTTLED') {
+    return res.status(429).json(errorResponse(err.message, 'OTP_THROTTLED'));
   }
   return res.status(500).json(errorResponse(fallbackMessage));
 }
@@ -3092,7 +3127,7 @@ app.get('/api/users/me/export', requireAuth, dataExportLimiter, async (req, res)
  * (orders/invoices/deliveries/messages) are RETAINED — they are other parties'
  * legal records (GDPR Art. 17(3)(b)); the sender simply renders as "Deleted user".
  */
-app.delete('/api/users/me', requireAuth, async (req, res) => {
+app.delete('/api/users/me', requireAuth, sensitiveAccountLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
     const { password, twoFactorCode } = req.body || {};
@@ -17079,7 +17114,7 @@ app.post('/api/public/locations/:locationId/orders', publicOrderLimiter, async (
 
 // Run order automation (auto-cancel stale orders, report stuck pending)
 // Can be called via: curl -H "x-automation-key: your-key" http://localhost:3000/api/automation/orders
-app.post('/api/automation/orders', async (req, res) => {
+app.post('/api/automation/orders', automationLimiter, async (req, res) => {
   if (!requireAutomationAuth(req, res)) return;
 
   try {
@@ -17095,7 +17130,7 @@ app.post('/api/automation/orders', async (req, res) => {
 });
 
 // Get automation status/preview (dry run)
-app.get('/api/automation/orders/preview', async (req, res) => {
+app.get('/api/automation/orders/preview', automationLimiter, async (req, res) => {
   if (!requireAutomationAuth(req, res)) return;
 
   try {
@@ -17112,7 +17147,7 @@ app.get('/api/automation/orders/preview', async (req, res) => {
 // with a 7-day grace-then-downgrade dunning cycle. Point a daily external cron at this
 // (a fallback in-process timer also runs it). Add ?dryRun=true to preview without charging.
 // Idempotent, so overlapping runs (cron + timer) cannot double-charge.
-app.post('/api/automation/subscriptions/renew', async (req, res) => {
+app.post('/api/automation/subscriptions/renew', automationLimiter, async (req, res) => {
   if (!requireAutomationAuth(req, res)) return;
 
   try {

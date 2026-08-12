@@ -29,6 +29,8 @@ const CODE_TTL_MS = 10 * 60 * 1000;
  *  a carrier's CGNAT shares one bucket, while a distributed attacker gets the full
  *  allowance per IP against a 6-digit code. */
 const MAX_ATTEMPTS = 5;
+/** Window over which failed attempts are summed for a destination (see ABUSE-3). */
+const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 
 class OtpUnavailableError extends Error {
   constructor(channel) {
@@ -70,6 +72,79 @@ function getVerificationCapabilities({ getTwilioClient, getEmailTransporter }) {
   };
 }
 
+/**
+ * SECURITY (ABUSE-3): per-destination send throttle.
+ *
+ * `POST /api/auth/send-phone-otp` needs no login, and nothing here limited how often a
+ * given number could be targeted — so anyone could SMS-bomb an arbitrary phone and burn
+ * Twilio credit. The IP-keyed route limiter does not help: the cost is per DESTINATION,
+ * and a distributed sender gets the full IP allowance from every address it controls.
+ *
+ * In-memory on purpose. This is a cost guard over a short window, so a process restart
+ * costs at most one extra message — whereas the brute-force guard (attempt counting) is
+ * DB-backed precisely because it must survive restarts. Not shared across Render
+ * instances; same known gap as the login lockout, tracked as ABUSE-5.
+ *
+ * Bounded like recordFailedLogin: the keys are attacker-supplied, so the map needs a
+ * ceiling or it becomes a memory-growth vector.
+ */
+const SEND_COOLDOWN_MS = 60 * 1000;
+const SEND_MAX_PER_HOUR = 10;
+const SEND_WINDOW_MS = 60 * 60 * 1000;
+const MAX_THROTTLE_ENTRIES = 10000;
+/** destination -> { last: epochMs, times: epochMs[] } */
+const sendHistory = new Map();
+
+class OtpThrottledError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'OtpThrottledError';
+    this.code = 'OTP_THROTTLED';
+  }
+}
+
+function pruneSendHistory(now) {
+  if (sendHistory.size < MAX_THROTTLE_ENTRIES) return;
+  for (const [key, entry] of sendHistory) {
+    if (now - entry.last >= SEND_WINDOW_MS) sendHistory.delete(key);
+  }
+  // Map preserves insertion order, so the first key is the least recently added.
+  while (sendHistory.size >= MAX_THROTTLE_ENTRIES) {
+    const oldest = sendHistory.keys().next().value;
+    if (oldest === undefined) break;
+    sendHistory.delete(oldest);
+  }
+}
+
+/**
+ * Throws OtpThrottledError if this destination has been messaged too recently or too
+ * often. Records the send otherwise. Must be called ABOVE the provider branch — the
+ * Twilio path returns early without touching the database, so a DB-backed counter would
+ * silently not cover the expensive channel.
+ */
+function assertSendAllowed(destination, now = Date.now()) {
+  pruneSendHistory(now);
+  const entry = sendHistory.get(destination) || { last: 0, times: [] };
+
+  if (entry.last && now - entry.last < SEND_COOLDOWN_MS) {
+    const wait = Math.ceil((SEND_COOLDOWN_MS - (now - entry.last)) / 1000);
+    throw new OtpThrottledError(`Please wait ${wait}s before requesting another code.`);
+  }
+
+  const recent = entry.times.filter((t) => now - t < SEND_WINDOW_MS);
+  if (recent.length >= SEND_MAX_PER_HOUR) {
+    throw new OtpThrottledError('Too many codes requested for this destination. Try again later.');
+  }
+
+  recent.push(now);
+  sendHistory.set(destination, { last: now, times: recent });
+}
+
+/** Test seam: drop all throttle state. */
+function _resetSendHistory() {
+  sendHistory.clear();
+}
+
 /** Store a freshly generated code, superseding any previous live code for the same destination. */
 async function persistCode(destination, channel, code) {
   await prisma.otpCode.updateMany({
@@ -95,6 +170,10 @@ async function persistCode(destination, channel, code) {
 async function sendOtp({ to, channel }, deps) {
   const destination = normalizeDestination(to, channel);
   if (!destination) throw new Error('A destination is required');
+
+  // SECURITY (ABUSE-3): ABOVE the provider branch on purpose — Twilio returns early
+  // without persisting anything, so a DB-backed guard would miss the paid channel.
+  assertSendAllowed(destination);
 
   const client = deps.getTwilioClient();
   if (client) {
@@ -159,7 +238,28 @@ async function verifyOtp({ to, code }, deps) {
     return false;
   }
 
-  if (record.attempts >= MAX_ATTEMPTS) {
+  // SECURITY (ABUSE-3): count attempts across the whole window, not just this row.
+  //
+  // persistCode supersedes the previous live code and inserts a fresh row with
+  // attempts = 0, and this function only ever read the newest row — so MAX_ATTEMPTS
+  // really meant "5 guesses per send, unlimited sends". Requesting a new code reset the
+  // lockout, which is precisely what an attacker grinding a 6-digit code would do.
+  //
+  // Superseded rows keep their `attempts`, so the history is already in the table; this
+  // sums it. DB-backed rather than in-memory because a brute-force guard must survive a
+  // restart. Same dual normalization as the lookup above, or varying an email's case
+  // would sidestep the counter.
+  const windowStart = new Date(Date.now() - ATTEMPT_WINDOW_MS);
+  const recentRows = await prisma.otpCode.findMany({
+    where: {
+      destination: { in: [destinationRaw, destinationEmail] },
+      createdAt: { gt: windowStart },
+    },
+    select: { attempts: true },
+  });
+  const attemptsInWindow = recentRows.reduce((sum, r) => sum + (r.attempts || 0), 0);
+
+  if (attemptsInWindow >= MAX_ATTEMPTS) {
     const err = new Error('Too many incorrect attempts. Request a new code.');
     err.code = 'OTP_LOCKED';
     throw err;
@@ -179,6 +279,18 @@ async function verifyOtp({ to, code }, deps) {
     where: { id: record.id },
     data: { consumedAt: new Date() },
   });
+
+  // Clear the attempt window on success. Without this, someone who fumbled a code, then
+  // succeeded, then legitimately needed another one (changing their email twice, say)
+  // would carry the earlier misses into the next flow and lock themselves out.
+  await prisma.otpCode.updateMany({
+    where: {
+      destination: { in: [destinationRaw, destinationEmail] },
+      createdAt: { gt: new Date(Date.now() - ATTEMPT_WINDOW_MS) },
+      attempts: { gt: 0 },
+    },
+    data: { attempts: 0 },
+  });
   return true;
 }
 
@@ -187,9 +299,15 @@ module.exports = {
   verifyOtp,
   getVerificationCapabilities,
   OtpUnavailableError,
+  OtpThrottledError,
   MAX_ATTEMPTS,
   CODE_TTL_MS,
+  ATTEMPT_WINDOW_MS,
+  SEND_COOLDOWN_MS,
+  SEND_MAX_PER_HOUR,
   // exported for tests
   generateCode,
   normalizeDestination,
+  assertSendAllowed,
+  _resetSendHistory,
 };
