@@ -259,14 +259,21 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
 
   const currentUser = useProfileStore((state) => state.currentUser);
-  const isNewUser = useProfileStore((state) => state.isNewUser);
   const userBusinesses = useProfileStore((state) => state.userBusinesses);
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
   const activeMode = useProfileStore((state) => state.activeMode);
   const refreshBusinesses = useProfileStore((state) => state.refreshBusinesses);
 
   const isPersonalMode = activeMode === 'personal';
-  const isOnboardingUser = isNewUser && userBusinesses.length === 0;
+  /**
+   * Show the getting-started cards to anyone in personal mode with no company — not
+   * only to `isNewUser`, which HomeScreen clears on a 5-second timer and which isn't
+   * persisted, so the cards were effectively unreachable. They are now MERGED with
+   * real notifications rather than replacing them: the old code returned the static
+   * array before the API call, so someone who signed up via an invite and opened this
+   * screen within those 5 seconds saw two tips instead of their actual invite (N-4).
+   */
+  const showOnboardingCards = isPersonalMode && userBusinesses.length === 0;
 
   // Reset filter to 'all' when mode changes
   useEffect(() => {
@@ -274,13 +281,6 @@ export default function NotificationsScreen() {
   }, [activeMode]);
 
   const fetchNotifications = useCallback(async () => {
-    // Personal mode onboarding — show static notifications
-    if (isPersonalMode && isOnboardingUser) {
-      setNotifications(ONBOARDING_NOTIFICATIONS);
-      setLoading(false);
-      return;
-    }
-
     if (!currentUser?.id) {
       setLoading(false);
       return;
@@ -293,14 +293,15 @@ export default function NotificationsScreen() {
         selectedFilter === 'all' ? undefined : (selectedFilter as any),
         isPersonalMode ? 'personal' : 'business',
       );
-      setNotifications(data);
+      // Prepend the getting-started cards rather than substituting for the feed.
+      setNotifications(showOnboardingCards ? [...ONBOARDING_NOTIFICATIONS, ...data] : data);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
-      setNotifications([]);
+      setNotifications(showOnboardingCards ? ONBOARDING_NOTIFICATIONS : []);
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.id, selectedFilter, isPersonalMode, isOnboardingUser]);
+  }, [currentUser?.id, selectedFilter, isPersonalMode, showOnboardingCards]);
 
   useEffect(() => {
     fetchNotifications();

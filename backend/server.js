@@ -592,11 +592,21 @@ const webhookLimiter = rateLimit({
 // Render's filesystem is ephemeral, so disk storage MUST NOT be relied on in prod.
 const useSupabaseStorage = storageService.isConfigured();
 if (!useSupabaseStorage) {
-  logger.warn(
+  const storageMessage =
     '[Storage] SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — file uploads fall back to ' +
     'LOCAL DISK (./uploads). This is fine for local dev but EPHEMERAL on Render: uploaded ' +
-    'images will be wiped on every redeploy. Set the Supabase Storage env vars in production.'
-  );
+    'images will be wiped on every redeploy. Set the Supabase Storage env vars in production.';
+
+  if (process.env.NODE_ENV === 'production') {
+    // Fail loudly, mirroring the forgot-password transporter guard. A warn is not enough
+    // here: uploads appear to succeed and the URLs work right up until the next deploy,
+    // at which point every avatar and product photo 404s with nothing in the logs to
+    // connect the two events (P-8).
+    logger.error(storageMessage);
+    Sentry.captureMessage('Uploads are using ephemeral local disk in production', 'error');
+  } else {
+    logger.warn(storageMessage);
+  }
 }
 
 const storage = useSupabaseStorage
@@ -7753,113 +7763,13 @@ app.post('/api/suggestions/:id/vote', requireAuth, async (req, res) => {
 // ============================================================================
 // BUSINESS CONNECTION ROUTES
 // ============================================================================
-
-// Send a connection request
-app.post('/api/companies/:companyId/connections', requireAuth, async (req, res) => {
-  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
-  try {
-    const { targetBusinessId } = req.body;
-    if (!targetBusinessId) {
-      return res.status(400).json(errorResponse('targetBusinessId is required'));
-    }
-    if (targetBusinessId === req.params.companyId) {
-      return res.status(400).json(errorResponse('Cannot connect to your own business'));
-    }
-    const targetBusiness = await repos.businessRepo.getActiveById(targetBusinessId);
-    if (!targetBusiness) {
-      return res.status(404).json(errorResponse('Target business not found'));
-    }
-    const connection = await prisma.businessConnection.create({
-      data: {
-        requesterBusinessId: req.params.companyId,
-        targetBusinessId,
-      },
-    });
-    res.status(201).json(successResponse(connection));
-  } catch (e) {
-    if (e.code === 'P2002') {
-      return res.status(409).json(errorResponse('Connection request already exists'));
-    }
-    logger.error('Error creating connection:', e);
-    res.status(500).json(errorResponse('Failed to create connection'));
-  }
-});
-
-// List connections for a business
-app.get('/api/companies/:companyId/connections', requireAuth, async (req, res) => {
-  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
-  try {
-    const { status } = req.query;
-    const where = {
-      OR: [
-        { requesterBusinessId: req.params.companyId },
-        { targetBusinessId: req.params.companyId },
-      ],
-    };
-    if (status) where.status = status;
-
-    const connections = await prisma.businessConnection.findMany({
-      where,
-      include: {
-        requesterBusiness: { select: { id: true, name: true, logoUrl: true } },
-        targetBusiness: { select: { id: true, name: true, logoUrl: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    res.json(successResponse(connections));
-  } catch (e) {
-    logger.error('Error fetching connections:', e);
-    res.status(500).json(errorResponse('Failed to fetch connections'));
-  }
-});
-
-// Accept or reject a connection request
-app.patch('/api/companies/:companyId/connections/:connectionId', requireAuth, async (req, res) => {
-  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
-  try {
-    const { status } = req.body;
-    if (!['accepted', 'rejected'].includes(status)) {
-      return res.status(400).json(errorResponse('Status must be "accepted" or "rejected"'));
-    }
-    const connection = await prisma.businessConnection.findUnique({
-      where: { id: req.params.connectionId },
-    });
-    if (!connection || connection.targetBusinessId !== req.params.companyId) {
-      return res.status(404).json(errorResponse('Connection request not found'));
-    }
-    if (connection.status !== 'pending') {
-      return res.status(400).json(errorResponse('Connection request already responded to'));
-    }
-    const updated = await prisma.businessConnection.update({
-      where: { id: req.params.connectionId },
-      data: { status },
-    });
-    res.json(successResponse(updated));
-  } catch (e) {
-    logger.error('Error updating connection:', e);
-    res.status(500).json(errorResponse('Failed to update connection'));
-  }
-});
-
-// Remove a connection
-app.delete('/api/companies/:companyId/connections/:connectionId', requireAuth, async (req, res) => {
-  if (!(await requireBusinessMembership(req, res, req.params.companyId))) return;
-  try {
-    const connection = await prisma.businessConnection.findUnique({
-      where: { id: req.params.connectionId },
-    });
-    if (!connection ||
-      (connection.requesterBusinessId !== req.params.companyId &&
-       connection.targetBusinessId !== req.params.companyId)) {
-      return res.status(404).json(errorResponse('Connection not found'));
-    }
-    await prisma.businessConnection.delete({ where: { id: req.params.connectionId } });
-    res.json(successResponse(null, 'Connection removed'));
-  } catch (e) {
-    logger.error('Error deleting connection:', e);
-    res.status(500).json(errorResponse('Failed to delete connection'));
-  }
-});
+//
+// The legacy /api/companies/:companyId/connections* routes were removed (audit B-2).
+// They duplicated /api/business-connections/* but skipped three things the canonical
+// routes do: the reverse-direction duplicate check (the unique index is directional,
+// so with A->B pending they happily created B->A), the block check, and the
+// notification. No frontend code referenced them — the client moved to
+// /business-connections/* — so they were an unguarded second door into the same data.
 
 // ============================================================================
 // ORDER ROUTES (with scope: PARENT vs LOCATION)
@@ -13687,7 +13597,11 @@ app.post('/api/companies/:companyId/locations/:locationId/staff', requireAuth, a
   try {
     const { companyId, locationId } = req.params;
     if (!(await requireBusinessAdmin(req, res, companyId))) return;
-    const { userId, role, status = 'accepted' } = req.body || {};
+    // Default to 'invited', not 'accepted': this route used to add someone to a company
+    // outright — no invite, no consent, no notification — so a person could find
+    // themselves a member of a company they never agreed to join (M-7). Callers that
+    // genuinely need immediate membership must now say so explicitly.
+    const { userId, role, status = 'invited' } = req.body || {};
 
     if (!userId) return res.status(400).json(errorResponse('userId is required'));
     ensureRole(role);
@@ -13767,6 +13681,18 @@ app.post('/api/companies/:companyId/locations/:locationId/staff', requireAuth, a
       });
     } else {
       lm = await repos.memberRepo.updateLocationMember(lm.id, { role, status });
+    }
+
+    // Tell them. Adding someone to a company with no notification at all is how a
+    // person ends up a member of somewhere they never agreed to join (M-7).
+    if (bm?.status === 'invited') {
+      const invitingBiz = await repos.businessRepo.getById(companyId);
+      pushToUsers([userId], {
+        title: 'Company invitation',
+        body: `You have been invited to join ${invitingBiz?.name || 'a company'}.`,
+        category: 'team',
+        data: { type: 'invite_received', companyId },
+      });
     }
 
     return res.json(successResponse({
@@ -16355,9 +16281,14 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
     } // end business mode
 
     // =========================================================================
-    // PERSONAL MODE
+    // PERSONALLY ADDRESSED — shown in BOTH modes.
+    //
+    // These are addressed to the PERSON, not to a company they manage. They used to sit
+    // inside `if (mode === 'personal')`, so an admin working in business mode never saw
+    // an invitation addressed to them — and with the badge counting only the current
+    // mode, it could sit unseen indefinitely (M-8).
     // =========================================================================
-    if (mode === 'personal') {
+    {
       // 1. Company invites received by this user — invite_received
       try {
         const allMemberships = await repos.memberRepo.getByUserId(userId);
@@ -16438,6 +16369,12 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
         logger.error('Error fetching user role requests for personal notifications:', err);
       }
 
+    } // end personally-addressed
+
+    // =========================================================================
+    // PERSONAL MODE ONLY
+    // =========================================================================
+    if (mode === 'personal') {
       // 3. Deliveries assigned to this user — delivery_assigned
       try {
         const myAssignments = await repos.deliveryStaffRepo.getByUserId(userId);
@@ -16554,7 +16491,10 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
       notifications = notifications.filter(n =>
         mode === 'personal'
           ? ['invite_received', 'company_request', 'join_request_accepted', 'join_request_rejected'].includes(n.type)
-          : ['staff_request', 'join_accepted', 'company_request', 'invite_pending'].includes(n.type)
+          // Personally-addressed types are included here too: they render in both modes
+          // now, so the business-mode "requests" filter must not hide them (M-8).
+          : ['staff_request', 'join_accepted', 'company_request', 'invite_pending',
+             'invite_received', 'join_request_accepted', 'join_request_rejected'].includes(n.type)
       );
     } else if (filter === 'deliveries') {
       notifications = notifications.filter(n =>

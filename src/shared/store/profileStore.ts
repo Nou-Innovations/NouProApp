@@ -567,6 +567,16 @@ export const useProfileStore = create<ProfileStore>()(
             business: normalizeBusiness(ub.business),
           }));
           get().setUserBusinesses(normalized);
+
+          // Consume response.user too. It was fetched and thrown away, which made this
+          // the only /auth/me GET in the app and left currentUser written solely by
+          // login() — so a profile edited on another device, or a connections count that
+          // moved, never appeared until the next sign-in (P-9). normalizeUser handles the
+          // Prisma-vs-store casing (avatar -> avatar_url, jobTitle -> job_title).
+          if (response?.user) {
+            const current = get().currentUser;
+            get().setCurrentUser(normalizeUser({ ...(current || {}), ...response.user }));
+          }
         } catch {
           // Silently ignore refresh errors — user can try again later
         }

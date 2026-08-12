@@ -30,6 +30,8 @@ import { AppModal, SectionTitle } from '@/shared/components/ui';
 import AppButton from '@/shared/components/ui/AppButton';
 import { imageService } from '@/shared/services/imageService';
 import { patch as apiPatch } from '@/shared/services/api';
+import { AppAlert } from '@/shared/services/appAlert';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -92,12 +94,29 @@ export default function PersonalProfileScreen() {
         imageUri: localUri,
         imageType: 'profile',
       });
-      if (uploadResult.success && uploadResult.imageUri) {
-        await apiPatch('/auth/me', { avatar: uploadResult.imageUri });
-        updateCurrentUser({ avatar_url: uploadResult.imageUri });
-        setSuccessMessage('Profile picture updated!');
-        setShowSuccessDialog(true);
+      if (!uploadResult.success || !uploadResult.imageUri) {
+        // There was no else here at all: a failed upload ran the spinner, stopped, and
+        // changed nothing, with no message. Silent failure is the worst outcome for an
+        // action the user just took (P-7).
+        AppAlert.alert('Upload failed', 'Could not upload your profile picture. Please try again.');
+        return;
       }
+
+      try {
+        await apiPatch('/auth/me', { avatar: uploadResult.imageUri });
+      } catch (err) {
+        // The image uploaded but the profile didn't save — say so rather than letting
+        // the outer catch swallow it, or the avatar silently reverts on next login.
+        AppAlert.alert(
+          'Not saved',
+          getApiErrorMessage(err, 'Your picture uploaded but could not be saved to your profile.'),
+        );
+        return;
+      }
+
+      updateCurrentUser({ avatar_url: uploadResult.imageUri });
+      setSuccessMessage('Profile picture updated!');
+      setShowSuccessDialog(true);
     };
 
     const handleCamera = async () => {
@@ -109,6 +128,7 @@ export default function PersonalProfileScreen() {
         }
       } catch (error) {
         console.error('Camera error:', error);
+        AppAlert.alert('Error', getApiErrorMessage(error, 'Something went wrong. Please try again.'));
       } finally {
         setIsUploadingAvatar(false);
       }
@@ -123,6 +143,7 @@ export default function PersonalProfileScreen() {
         }
       } catch (error) {
         console.error('Gallery error:', error);
+        AppAlert.alert('Error', getApiErrorMessage(error, 'Something went wrong. Please try again.'));
       } finally {
         setIsUploadingAvatar(false);
       }

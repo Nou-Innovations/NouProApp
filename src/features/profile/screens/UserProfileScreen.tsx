@@ -42,6 +42,9 @@ interface UserProfileData {
   description?: string;
   address?: string;
   connectionsCount?: number;
+  headline?: string;
+  bio?: string;
+  industry?: string;
   connectionStatus?: { id: string; status: string; direction: string } | null;
   isBlockedByMe?: boolean;
   isDeleted?: boolean;
@@ -480,6 +483,20 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
         </Text>
       ) : null}
 
+      {/* Headline — editable in Edit Profile and scored by profile completion, but
+          rendered on no screen at all until now (P-10). */}
+      {user.headline ? (
+        <Text style={[styles.jobStatus, { color: appTheme.colors.secondary }]}>
+          {user.headline}
+        </Text>
+      ) : null}
+
+      {user.industry ? (
+        <Text style={[styles.jobStatus, { color: appTheme.colors.textMuted }]}>
+          {user.industry}
+        </Text>
+      ) : null}
+
       {/* Description - expandable */}
       {user.description ? (
         <TouchableOpacity
@@ -493,6 +510,14 @@ export default function UserProfileScreen({ navigation, route }: UserProfileScre
             {user.description}
           </Text>
         </TouchableOpacity>
+      ) : null}
+
+      {/* Bio — a user could write 2000 characters that nobody, including themselves,
+          could ever read. */}
+      {user.bio ? (
+        <Text style={[styles.description, { color: appTheme.colors.secondary }]}>
+          {user.bio}
+        </Text>
       ) : null}
 
       {/* Connections Stats */}

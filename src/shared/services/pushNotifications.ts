@@ -103,22 +103,38 @@ export async function unregisterTokenFromBackend(): Promise<void> {
 export async function unregisterPushTokenOnLogout(accessToken: string | null): Promise<void> {
   try {
     const pushToken = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
-    if (pushToken && accessToken) {
-      await fetch(`${API_CONFIG.baseUrl}/push-tokens/unregister`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ token: pushToken }),
-      });
+    if (!pushToken) return;
+    if (!accessToken) {
+      // Nothing we can do server-side without a token; keep the key so a later
+      // sign-in can retry rather than orphaning the row.
+      return;
+    }
+
+    const response = await fetch(`${API_CONFIG.baseUrl}/push-tokens/unregister`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ token: pushToken }),
+    });
+
+    // Only drop the local key once the server actually deactivated the row.
+    //
+    // This used to clear in a `finally` with no status check, so an offline logout —
+    // the common case — left the row isActive:true for the OLD account while the local
+    // key vanished. The previous user's notifications then kept arriving on this device
+    // with no way left to clean up, and it does not self-heal: PushToken is unique on
+    // (userId, token), so the next account simply creates a second row (N-7).
+    if (response.ok) {
+      await AsyncStorage.removeItem(PUSH_TOKEN_KEY);
+    } else {
+      console.warn('[Push] Unregister rejected, keeping token for retry:', response.status);
     }
   } catch (err) {
+    // Offline or server unreachable: keep the token so the next successful
+    // registration/unregistration can clean it up.
     console.warn('[Push] Failed to unregister token on logout:', err);
-  } finally {
-    // Always clear the cached token so the next account on this device
-    // doesn't inherit it.
-    AsyncStorage.removeItem(PUSH_TOKEN_KEY).catch(() => {});
   }
 }
 
