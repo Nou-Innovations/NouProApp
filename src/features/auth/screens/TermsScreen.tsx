@@ -1,15 +1,18 @@
 /**
  * TermsScreen — Terms of Service.
  *
- * Operational copy as of July 2026. Two items need Arnaud + counsel before
- * public launch: (1) confirm the governing-law jurisdiction in the "Governing
- * Law" section, (2) confirm the legal entity name in "Contact". Keep in sync
- * with the hosted copy at backend/public/legal/terms.html.
+ * Keep in sync with the hosted copy at backend/public/legal/terms.html.
+ *
+ * STILL NEEDS ARNAUD + COUNSEL before public launch: the governing-law
+ * jurisdiction, and the registered legal entity name. "Governing Law" below is
+ * deliberately written to work in any jurisdiction until that is settled — it is
+ * a placeholder in substance even though it reads as finished prose.
  */
 import React from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/shared/types/navigation';
 import LegalScreen, { LegalSection } from '../components/LegalScreen';
+import { SUPPORT_EMAIL } from '@/shared/config/urls';
 
 const LAST_UPDATED = 'July 2, 2026';
 
@@ -64,7 +67,7 @@ const SECTIONS: LegalSection[] = [
   },
   {
     heading: 'Contact',
-    body: 'Questions about these Terms of Service: support@nou.pro.',
+    body: `Questions about these Terms of Service: ${SUPPORT_EMAIL}.`,
   },
 ];
 

@@ -67,6 +67,13 @@ export interface Invoice {
   issuedByScope?: 'PARENT' | 'LOCATION';
   issuedByLocationId?: string;
   orderId?: string;
+  // Who the invoice was billed to. A real NouPro company sets clientBusinessId; a CRM
+  // customer record sets customerId; a walk-in or one-off client has neither and lives
+  // entirely in the clientName/clientEmail fields below. Prisma returns all three (the
+  // repo does no `select`), they were just never declared here — so nothing could link
+  // an invoice back to the party it was billed to.
+  clientBusinessId?: string;
+  customerId?: string;
   clientName: string;
   clientEmail: string;
   clientPhone?: string;

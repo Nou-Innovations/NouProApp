@@ -7,7 +7,7 @@
 
 **Severity:** **P0** = broken or user-visibly wrong for everyone who tries it · **P1** = real bug or missing piece users will hit · **P2** = polish / integrity.
 
-**Status:** Batches 1–4 are **FIXED** — every P0 in this document, plus P-6, P-12, C-4, C-8, M-4 and M-5. See the fix logs at the bottom. What remains is P1/P2 polish, listed in "Still open" below.
+**Status: every P0 and every P1 in this document is now fixed.** Batches 1–4 closed the P0s; the P1 sweep (phases 1–3) plus the individual A-*/P-*/N-* batches closed the rest. What remains is **22 P2 rows** — the authoritative list is the per-section tables above (rows not marked FIXED), never this line.
 
 ---
 
@@ -67,10 +67,10 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | **P-4** | **P0** | **FIXED ✅** — **"Leave workplace" and "Delete company" are fake.** `ProfileSettingsScreen.tsx:102-106` shows *"You have left the workplace."* and navigates back — with no API call. `:97-100` does the same for *"Company deletion process started…"*. A real `leaveCompany` exists (`profileStore.ts:531-534`) and a real `DELETE /companies/:id/members/me` exists (`server.js:12800`). |
 | **P-5** | **P0** | **FIXED ✅** — **The sidebar's "Settings" leads to a stub with a fake "Delete account".** `SidebarContent.tsx:392` routes personal mode to `PersonalProfileSettings` — a two-row screen whose `confirmDeleteAccount` (`PersonalProfileSettingsScreen.tsx:87-90`) just alerts *"Account deletion process started…"*. This is a **second** copy of the round-1 PR-5 stub, and it sits behind the app's most discoverable Settings entry point, while the real settings hub is reachable only from the gear icon on the profile screen and the working `DeleteAccountScreen` is buried under Security. **App Store 5.1.1(v) risk** — account deletion must actually delete. |
 | P-6 | P1 | **FIXED ✅** — **Email/phone are freely editable, unverified, and can lock you out.** `PATCH /auth/me` assigns them blind (`server.js:1918-1919`). Clearing the email field sets `email = null`, and login is email-only → the account becomes unreachable. No OTP, no password re-auth, and a uniqueness collision throws P2002 → generic 500 instead of a usable 409. No dedicated change-email/phone screen exists. |
-| P-7 | P1 | **Avatar upload failure is completely silent on the profile screen.** `PersonalProfileScreen.tsx:89-101` has **no `else`** for `uploadResult.success === false`, and the catch blocks only `console.error`. With the Supabase bucket still unprovisioned, the spinner runs, stops, and nothing changes — zero feedback. (The Edit-Profile copy of the same flow *does* alert — inconsistent.) |
-| P-8 | P1 | **Avatars die on the next deploy.** With Supabase unset, uploads fall back to local disk served from `/uploads` (`server.js:13566`, `:278`). Other users *can* see them — until Render's ephemeral disk is wiped on redeploy, after which every avatar 404s and silently falls back to initials. |
-| P-9 | P1 | **`currentUser` is never re-synced from the server.** `authAPI.getCurrentUser()` has zero callers; `refreshBusinesses()` fetches `/auth/me` but discards `response.user` (`profileStore.ts:519-524`). So `connections_count` is frozen at login value, edits made on another device never appear, and `twoFactorEnabled` can desync. |
-| P-10 | P1 | **`headline`, `bio` and `industry` are editable but rendered nowhere** — not on your own profile, not on anyone else's (`UserProfileData` doesn't even declare them). A user can write a 2000-character bio that no one, including themselves, can ever read. |
+| P-7 | P1 | **FIXED ✅** (`6f1b7fe7`) — **Avatar upload failure is completely silent on the profile screen.** `PersonalProfileScreen.tsx:89-101` has **no `else`** for `uploadResult.success === false`, and the catch blocks only `console.error`. With the Supabase bucket still unprovisioned, the spinner runs, stops, and nothing changes — zero feedback. (The Edit-Profile copy of the same flow *does* alert — inconsistent.) |
+| P-8 | P1 | **FIXED ✅** (`6f1b7fe7`) — **Avatars die on the next deploy.** With Supabase unset, uploads fall back to local disk served from `/uploads` (`server.js:13566`, `:278`). Other users *can* see them — until Render's ephemeral disk is wiped on redeploy, after which every avatar 404s and silently falls back to initials. |
+| P-9 | P1 | **FIXED ✅** (`6f1b7fe7`) — **`currentUser` is never re-synced from the server.** `authAPI.getCurrentUser()` has zero callers; `refreshBusinesses()` fetches `/auth/me` but discards `response.user` (`profileStore.ts:519-524`). So `connections_count` is frozen at login value, edits made on another device never appear, and `twoFactorEnabled` can desync. |
+| P-10 | P1 | **FIXED ✅** (`6f1b7fe7`) — **`headline`, `bio` and `industry` are editable but rendered nowhere** — not on your own profile, not on anyone else's (`UserProfileData` doesn't even declare them). A user can write a 2000-character bio that no one, including themselves, can ever read. |
 | P-11 | P1 | **FIXED ✅** — **Work experiences added via `AddWorkExperience` are invisible.** The POST is real (`server.js:5759`) but nothing renders `WorkExperience` rows — every list iterates `userBusinesses` or server-derived `BusinessMember` rows instead. Data is written and never shown (except in the GDPR export). |
 | P-12 | P1 | **FIXED ✅** — **Blocking is a one-way trip.** After blocking, the ⋯ menu still says "Block" (never "Unblock"), the profile renders normally, and Message stays enabled (failing server-side with a generic message). `unblockUser` and `GET /api/blocks` have zero callers. And the blocked user is **unaffected**: `GET /api/users/:userId` and `/api/users/search` never consult `blockRepo`, so they still find you and open your profile (round-1 C-7, confirmed open). |
 | P-13 | P1 | **FIXED ✅** — **"Privacy Policy" is a placeholder alert** (`PersonalSettingsScreen.tsx:104-106`) though the backend already serves `/legal/*`. Store-review blocker. |
@@ -92,9 +92,9 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | **C-2** | **P0** | **FIXED ✅** — **Any backend error on "Connect" crashes the dialog.** `UserProfileScreen.tsx:228` reads `err?.response?.error` — and since `ApiError.response` is the body, `.error` is the **object** `{ code, message }` (`backend/src/utils/response.js:17-21`). That object is passed into `AppModal`'s `<Text>{message}</Text>` → *"Objects are not valid as a React child."* Triggered by every 409 (already pending / already connected) and 403 (blocked) — i.e. any time the profile data is stale. Correct read is `err.message`. |
 | C-3 | P1 | **FIXED ✅** — **Still zero connection-management UI** (round-1 C-3/C-4/C-5 confirmed unchanged). No pending-requests tab, no cancel-sent, no disconnect, no unblock, no blocked list. `GET /connections/pending`, `DELETE /connections/:id`, `DELETE /users/:id/block` and `GET /blocks` all have **zero** callers. The "Pending" and "Connected" buttons are alert dead-ends. |
 | C-4 | P1 | **FIXED ✅** — **`GET /connections/pending` leaks a stranger's full user record.** `server.js:3257-3264` strips only `passwordHash`, `twoFactorSecret` and `twoFactorBackupCodes` from an `include: { sender: true }`, so before you accept, you receive the requester's `email`, `phone`, `address`, `privacySettings`, `tokenVersion`, `lastLoginAt` and `deletedAt` — bypassing the privacy gate `GET /users/:userId` applies. Same over-sharing in `GET /connections`. |
-| C-5 | P1 | **Unlimited request spam; declining achieves nothing.** No rate limiter on `POST /connections/request`, and a `rejected` row is deleted and re-created on re-request (`server.js:3149-3151`) — the sender's button even reverts to "Connect". Mirror the 7-day cooldown that role requests already have. |
+| C-5 | P1 | **FIXED ✅** (`498e8d47`) — **Unlimited request spam; declining achieves nothing.** No rate limiter on `POST /connections/request`, and a `rejected` row is deleted and re-created on re-request (`server.js:3149-3151`) — the sender's button even reverts to "Connect". Mirror the 7-day cooldown that role requests already have. |
 | C-6 | P1 | **FIXED ✅** — **`ConnectionsScreen` ignores `route.params.userId`.** All four callers pass a real id (`UserProfileScreen.tsx:437`, `BusinessProfileScreen.tsx:1031`, and both own-profile screens) and every one lands on *your own* connections. Fixing it also needs a backend change — `GET /connections` is hard-scoped to `req.user.id`. |
-| C-7 | P1 | **Two rows for one relationship are possible.** `@@unique([senderId, receiverId])` is direction-specific and the check-then-write isn't transactional, so simultaneous A→B and B→A both succeed. Afterwards status lookups use `findFirst` → nondeterministic, and `blockUser` removes only one row, leaving a live request from a blocked user. |
+| C-7 | P1 | **FIXED ✅** (`498e8d47`) — **Two rows for one relationship are possible.** `@@unique([senderId, receiverId])` is direction-specific and the check-then-write isn't transactional, so simultaneous A→B and B→A both succeed. Afterwards status lookups use `findFirst` → nondeterministic, and `blockUser` removes only one row, leaving a live request from a blocked user. |
 | C-8 | P1 | **FIXED ✅** — **Soft-deleted users leak into connection lists** — `userRepo.getById` has no `deletedAt` filter, unlike search which explicitly excludes them. |
 | C-9 | P2 | "Connection accepted" notifications use `createdAt` (when the request was *sent*), so an acceptance of a 31-day-old request produces no notification at all, and a 20-day-old one reads "20 days ago". `acceptRequest` doesn't touch `updatedAt` either. |
 | C-10 | P2 | Pending user↔user requests are typed `company_request`, forcing the frontend to sniff payload shape to choose an endpoint — the exact fragility that caused round-1's B-1. There is also no "your request was declined" signal at all. |
@@ -111,9 +111,9 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | M-3 | P1 | **RESOLVED BY DESIGN ✅** — co-owners replace transfer; see the Batch 4 log. — **Admin can remove the owner, and no ownership-transfer endpoint exists.** `DELETE /companies/:id/users/:userId/invite` (`server.js:12735`) only checks that ≥1 admin-or-super_admin remains, so an admin can delete the owner's membership. The error text says *"Transfer ownership first"* — grep finds no such endpoint anywhere. |
 | M-4 | P1 | **FIXED ✅** — **The owner can leave and permanently orphan the company.** `server.js:12816-12827` counts `admin \|\| super_admin` as "remaining admins", so a super_admin can leave with only a plain admin left — and `server.js:12482-12487` then forbids anyone from ever granting `super_admin` again. Unrecoverable without direct DB access. |
 | M-5 | P1 | **FIXED ✅** — **Email invites create a shadow account that blocks the invitee from ever signing up.** `server.js:12645-12653` creates a `User` with the email and no `passwordHash`; `POST /auth/register` then rejects that email with 409 (`server.js:1410-1414`). The invitee can never register. It's also an account-squatting primitive — any admin can burn arbitrary email addresses. **This is the endpoint the missing invite UI (round-1 M-3) would expose**, so it must be fixed before that UI ships. |
-| M-6 | P1 | **Staff can never leave a company.** The only Leave UI is inside `CompanySettingsScreen`, wrapped in `BusinessAdminGuard` and reachable only in business mode — which staff are hard-blocked from entering. The backend route works and is unreachable. |
-| M-7 | P1 | **Adding a member directly is silent and consent-free** — `server.js:12330-12337` creates the `BusinessMember` outright with `status='accepted'` by default, no invite, no consent, no notification. Only `invited` rows generate a notification. |
-| M-8 | P1 | **The mode-scoped notification split hides half these flows.** `invite_received` / `join_request_accepted` / `join_request_rejected` render only in **personal** mode; `staff_request` / `join_accepted` / `invite_pending` only in **business** mode (`server.js:14441` vs `:14691`). An admin working in business mode never sees an invite addressed to them — and with the badge still cosmetic (N-5), it can sit unseen indefinitely. |
+| M-6 | P1 | **FIXED ✅** (already fixed, confirmed in phase 1) — **Staff can never leave a company.** The only Leave UI is inside `CompanySettingsScreen`, wrapped in `BusinessAdminGuard` and reachable only in business mode — which staff are hard-blocked from entering. The backend route works and is unreachable. |
+| M-7 | P1 | **FIXED ✅** (`6f1b7fe7`) — **Adding a member directly is silent and consent-free** — `server.js:12330-12337` creates the `BusinessMember` outright with `status='accepted'` by default, no invite, no consent, no notification. Only `invited` rows generate a notification. |
+| M-8 | P1 | **FIXED ✅** (`6f1b7fe7`) — **The mode-scoped notification split hides half these flows.** `invite_received` / `join_request_accepted` / `join_request_rejected` render only in **personal** mode; `staff_request` / `join_accepted` / `invite_pending` only in **business** mode (`server.js:14441` vs `:14691`). An admin working in business mode never sees an invite addressed to them — and with the badge still cosmetic (N-5), it can sit unseen indefinitely. |
 | M-9 | P1 | **FIXED ✅** — **The requester gets no pending state and can't withdraw.** `BusinessProfileScreen.tsx:384-389` shows "Request to Join" whenever the user isn't an *accepted* member, so a pending request still shows the CTA; a second tap 400s and the message is swallowed by the wrong error path (`:411`). No cancel route exists for the requester. |
 | M-10 | P2 | Pending invites consume paid staff seats (`getStaffCount` counts everything not suspended). Invites never expire — there's no expiry column. `server.js:12691-12692` mints an `inviteToken`/`inviteLink` per request that is never persisted and never served. |
 | M-11 | P2 | Demoting a super_admin from Team Management always 400s — `TeamManagementScreen.tsx:213` routes through the location PATCH, which rejects super_admin targets by design. |
@@ -126,8 +126,8 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 
 | ID | Sev | Finding |
 |---|---|---|
-| B-1 | P1 | **No screen for incoming partner requests.** `GET /business-connections/:businessId/pending` (`server.js:3517`) has zero frontend callers; the only surface is the notification feed, and `ConnectionsScreen` filters to accepted only. No disconnect UI either (round-1 B-3 confirmed open). |
-| B-2 | P1 | **Two parallel implementations still coexist** (round-1 B-2 confirmed open). The legacy `POST /api/companies/:companyId/connections` (`server.js:6468`) writes with no reverse-direction check, while the canonical `/business-connections/request` checks both — and `ConnectionsScreen.tsx:85` still reads from the legacy one. |
+| B-1 | P1 | **FIXED ✅** (already fixed, confirmed in phase 1) — **No screen for incoming partner requests.** `GET /business-connections/:businessId/pending` (`server.js:3517`) has zero frontend callers; the only surface is the notification feed, and `ConnectionsScreen` filters to accepted only. No disconnect UI either (round-1 B-3 confirmed open). |
+| B-2 | P1 | **FIXED ✅** (`6f1b7fe7`) — **Two parallel implementations still coexist** (round-1 B-2 confirmed open). The legacy `POST /api/companies/:companyId/connections` (`server.js:6468`) writes with no reverse-direction check, while the canonical `/business-connections/request` checks both — and `ConnectionsScreen.tsx:85` still reads from the legacy one. |
 | B-3 | P1 | **FIXED ✅** — **Supplier↔business linking has schema, backend and a nav type but no UI.** `navigation.ts:385` declares `AddSupplier: { supplierBusinessId?: string }`; `AddSupplierScreen` never reads it and no caller passes it. Customers have the equivalent UI (gated on accepted connections) — suppliers are the asymmetric gap. |
 | B-4 | P2 | **CRM links are unilateral, unvalidated and unnotified.** `customerBusinessId`/`supplierBusinessId` are written (`server.js:5026,5062,7540`) with no existence check, no connection check and no notification — company A can silently list company B as its customer. The only *consented* company↔company relationship is `BusinessConnection`. |
 
@@ -140,11 +140,11 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | **N-1** | **P0** | **FIXED ✅** — **The new user's only CTA leads to a dead button.** The empty feed's "Explore NouPro" (`HomeScreen.tsx:273`) opens `ExploreOverlay`, whose every "Connect" calls `toggleConnect` → `if (!myId) return` (`useExploreDiscovery.ts:85`), where `myId = activeBusiness?.id`. A personal user with no company has no `activeBusiness`, so **every Connect tap silently does nothing** — no error, no state change. The "recommended" and "nearby" sections are empty for them too (both gated on `activeBusiness`), leaving a bare directory of dead buttons. |
 | **N-2** | **P0** | **FIXED ✅** — **No push notification exists for any social or team event.** There are only five `sendToUsers` call sites in the whole backend — delivery status (`server.js:8910`), issue assigned (`:9258`), chat messages (`:15533`), stuck orders (`orderAutomation.js:344`) and subscription renewals. **Nothing pushes on** join request created/approved/rejected, company invite, user or business connection request/accept, role change, low stock, or invoice paid. The product's core loop is poll-only. |
 | **N-3** | **P0** | **FIXED ✅** — **Every push tap is dead — warm and cold** (round-1 N-5, now traced fully). `addNotificationResponseListener` (`pushNotifications.ts:129`) and `addNotificationReceivedListener` (`:139`) both have **zero call sites**, and there's no `getLastNotificationResponseAsync`. Three compounding reasons it isn't a one-line fix: (a) `linking` maps only `OrderDetails` and `InvoiceDetails`, which no push payload matches; (b) `linking` is attached only to the signed-in container (`App.tsx:415`) — the auth container has none, so a push arriving pre-login is dropped with no replay; (c) the two containers are separate trees, so any handler must queue the target until the app is signed in. |
-| N-4 | P1 | **Onboarding cards are unreachable *and* they suppress real notifications.** `NotificationsScreen.tsx:274-279` returns `ONBOARDING_NOTIFICATIONS` **before the API call**, gated on `isNewUser` — which `HomeScreen.tsx:56-63` clears on a 5-second timer. So a user who signs up via an invite and opens Notifications within 5 seconds sees two static cards *instead of* their real pending invite; after 5 seconds, the only onboarding guidance in the product is gone forever. |
+| N-4 | P1 | **FIXED ✅** (`6f1b7fe7`) — **Onboarding cards are unreachable *and* they suppress real notifications.** `NotificationsScreen.tsx:274-279` returns `ONBOARDING_NOTIFICATIONS` **before the API call**, gated on `isNewUser` — which `HomeScreen.tsx:56-63` clears on a 5-second timer. So a user who signs up via an invite and opens Notifications within 5 seconds sees two static cards *instead of* their real pending invite; after 5 seconds, the only onboarding guidance in the product is gone forever. |
 | N-5 | P1 | **FIXED ✅** — **The unread badge is cosmetic and the app-icon badge is never touched** (round-1 N-4, mechanism now pinned). The only writer is the Notifications screen itself (`:307-309`), which is a lazy tab — so **at launch the badge is always 0** regardless of pending invites. `useFocusEffect(markAllAsRead)` (`:572-576`) then zeroes the context without marking anything read server-side, and since the effect only refires on *change*, it stays stuck at 0 forever after. No `setBadgeCountAsync` call exists anywhere, and no push payload carries a `badge`. |
-| N-6 | P1 | **`notifications_on` is a phantom field that re-enables push on every login** (round-1 N-8, consequence now traced). It isn't in the schema and `PATCH /auth/me` never persists it; `normalizeUser` defaults it to `true`. So: user turns push off → token deactivated → next login normalizes it back to `true` → `App.tsx:764-767` re-registers the token → push silently returns, with no dialog since permission is still granted. |
-| N-7 | P1 | **Logout discards the push token even when unregistration fails.** `pushNotifications.ts:118-122` clears the local key in a `finally` with no status check and no retry — so if the device is offline at logout (the common case), the row stays `isActive: true` and **the previous user's pushes keep landing on that device**, with the local key gone and no way to clean up. |
-| N-8 | P1 | **Order pushes are filed under the wrong preference.** `eventMessages.js:111` routes order events through the chat push helper, which sends `category: 'messages'` (`server.js:15537`) — so turning off "Messages" kills order pushes, and turning off "Orders" doesn't. |
+| N-6 | P1 | **FIXED ✅** (`498e8d47`) — **`notifications_on` is a phantom field that re-enables push on every login** (round-1 N-8, consequence now traced). It isn't in the schema and `PATCH /auth/me` never persists it; `normalizeUser` defaults it to `true`. So: user turns push off → token deactivated → next login normalizes it back to `true` → `App.tsx:764-767` re-registers the token → push silently returns, with no dialog since permission is still granted. |
+| N-7 | P1 | **FIXED ✅** (`6f1b7fe7`) — **Logout discards the push token even when unregistration fails.** `pushNotifications.ts:118-122` clears the local key in a `finally` with no status check and no retry — so if the device is offline at logout (the common case), the row stays `isActive: true` and **the previous user's pushes keep landing on that device**, with the local key gone and no way to clean up. |
+| N-8 | P1 | **FIXED ✅** (this batch) — **Order pushes are filed under the wrong preference.** `eventMessages.js:111` routes order events through the chat push helper, which sends `category: 'messages'` (`server.js:15537`) — so turning off "Messages" kills order pushes, and turning off "Orders" doesn't. |
 | N-9 | P1 | **FIXED ✅** — **Tapping a notification never marks it read visually** — fire-and-forget with no local state update (`:461-465`), so the row stays highlighted until a manual refresh. And **"mark all as read" is client-only**: `markAllAsRead` is `setUnreadCount(0)` with no network call, no bulk endpoint exists, and there is no UI button. Server-side rows stay unread forever. |
 | N-10 | P1 | **FIXED ✅** — **Permission is requested the instant the user first signs in**, with no priming screen, and a decline is silent (round-1 N-13/N-14). The settings recovery message can't distinguish "denied" from "simulator". |
 | N-11 | P2 | **No welcome notification and no seed content** — notifications are *derived* on read from other tables (`server.js:14423-14919`), so there is no table a welcome row could even be written to. No tooltip/coach-mark/checklist system exists anywhere in the app. |
@@ -313,7 +313,11 @@ Invites for people without an account went into a new `CompanyInvite` table inst
 
 ## Still open (P1/P2 polish)
 
-**Every P0 is now fixed, and the P1 sweep (phases 1–3) closed 15 of them.** What remains is ~22 P2s plus the P1s the sweep did not reach — the authoritative list is the per-section tables above (rows NOT marked FIXED), not this paragraph. A previous version of this summary went stale and led me to report the audit as complete when it wasn't; trust the table rows.
+**Every P0 and every P1 is fixed.** What remains is **22 P2 rows** — the authoritative list is the per-section tables above (rows not marked FIXED), not this paragraph.
+
+**Why this section keeps going stale, and the rule that fixes it.** Phases 1 and 2 of the P1 sweep shipped 12 fixes and no doc commit followed, so 14 rows read as open for a day and I reported P-13 as broken when it had been fixed since `8d66cf5d`. An earlier version of this same paragraph went the other way and claimed the audit was complete when it wasn't. **Mark the rows in the same commit as the code** — every doc-only follow-up commit in the log below is one that nearly got skipped. And when answering "what's left", read the table rows against the code, not the summary.
+
+**Not code, needs Arnaud:** the Supabase Storage bucket/key/Render env (P-8, code ready since `6f1b7fe7`); DNS for `nou.pro`, which nothing currently serves; counsel sign-off on the registered entity name and governing-law jurisdiction; and whether to move the mail sending domain to `nou.pro` (SPF/DKIM).
 
 ---
 
@@ -422,6 +426,36 @@ The projection lives in `memberRepo`'s add/update/remove, not at the ~5 route ca
 
 ---
 
+## Fix log — P1 sweep phases 1 & 2 (2026-08-11/12)
+
+*Backfilled 2026-08-12. These two commits shipped and the rows were never marked, which
+is how the "still open" list came to be mostly wrong — see the note under "Still open".*
+
+### Phase 1 — `6f1b7fe7` (9 items, no schema change)
+
+All ~18 P1s were re-verified against code first. **Two turned out already fixed:** M-6 (the
+work-experience merge gave staff a Leave button on a personal-mode surface, so the
+business-mode guard no longer traps them) and B-1 (business partner requests were already
+in the Requests tab).
+
+- **P-7** A failed avatar upload gave zero feedback: no `else` for `success: false`, and a failed PATCH was only `console.error`'d — the spinner ran, stopped, and nothing changed.
+- **P-9** `refreshBusinesses()` fetched `/auth/me` and threw away `response.user`, and `authAPI.getCurrentUser` had zero callers — so `currentUser` was written **only** at login. A profile edited on another device, or a connections count that moved, never appeared until the next sign-in.
+- **P-10** `headline`, `bio` and `industry` were editable *and scored by profile completion*, but rendered on no screen — you could be nudged to write a 2000-character bio nobody, including you, could ever read.
+- **N-7** Logout cleared the local push token in a `finally` with no `res.ok` check, so an offline logout — the common case — left the row `isActive: true` for the OLD account while the local key vanished. The previous user's notifications kept arriving with no way left to clean up, and it does **not** self-heal: `PushToken` is unique on `(userId, token)`, so the next account just creates a second row.
+- **N-4** The onboarding cards returned *before* the API call, so someone who signed up via an invite and opened Notifications inside the 5-second `isNewUser` window saw two tips instead of their actual invite. Now merged rather than substituted, and keyed on "no company" rather than a flag that is unpersisted and expires in 5s.
+- **M-8** Invitations addressed to a *person* only rendered in personal mode, so an admin working in business mode never saw them.
+- **M-7** `POST /companies/:id/locations/:locationId/staff` defaulted to `status: 'accepted'` — no invite, no consent, no notification — so you could find yourself a member of a company you never agreed to join. Defaults to `'invited'` and notifies.
+- **B-2** Deleted the four legacy `/api/companies/:companyId/connections*` routes. No frontend callers, and they skipped the reverse-direction duplicate check (the unique index was directional, so with A→B pending they created B→A), the block check, and the notification — an unguarded second door into the same data.
+- **P-8** Uploads silently fall back to local disk, which Render wipes on redeploy: images work right up until the next deploy, then every one 404s with nothing connecting the two events. Production now logs an error and reports to Sentry. **The Supabase bucket, key and Render env are still Arnaud's to set.**
+
+### Phase 2 — `498e8d47` (3 items, one migration)
+
+- **N-6** "Turn off notifications" lived only in client state: `PATCH /auth/me` never persisted it and `normalizeUser` defaulted it back to `true`, so it silently re-enabled itself on the next login and `App.tsx` re-registered the token — with no dialog, because permission was still granted. The master switch now lives in `NotificationPreference` beside the per-category ones; the phantom `notifications_on` is gone.
+- **C-7** `@@unique([senderId, receiverId])` is **directional**, so A→B and B→A could both exist. That double-counted connections and made `getStatus()` return whichever row it found first — so accept/reject could act on a row the UI wasn't showing. Added a canonical sorted pair with its own unique index, letting the database refuse the duplicate instead of relying on a check-then-write that was never transactional. The migration de-duplicates existing reciprocal rows **before** adding the constraint: accepted beats pending (dropping an accepted connection would be visible data loss), otherwise oldest wins so the original requester stays the sender.
+- **C-5** Connection requests had no rate limit at all, and declining one achieved nothing: the rejected row was **deleted**, so the sender could immediately re-request and the receiver got another push, with no record they'd already said no. Added a per-user limiter and a 7-day cooldown; the rejected row is re-opened rather than deleted.
+
+---
+
 ## Fix log — P1 sweep phase 3 (2026-08-12)
 
 Four items that needed something built rather than repaired.
@@ -444,6 +478,58 @@ Four items that needed something built rather than repaired.
 4. **The leak check:** in a connection's list, a stranger's row must not expose their email or phone.
 5. Sign up → the notifications explainer appears before iOS asks. Tap "Not now", then send a join request → it asks then. Skip that too and place an order → it asks. Never twice.
 6. On a simulator, Settings says notifications need a physical device rather than telling you to enable them in settings.
+
+---
+
+## Fix log — N-8 + the domain story (2026-08-12)
+
+**N-8 — the notification preferences lied in both directions.** Order, invoice and
+procurement state changes are posted into a chat and pushed through
+`sendPushToOfflineParticipants`, which hardcoded `category: 'messages'`. `pushService`
+gates on that category, so turning **Messages** off silently killed order updates, and
+turning **Orders** off didn't stop them. All three producers funnel through one
+`broadcastEventMessage`, so the category is now threaded through from there — defaulting
+to `'messages'` keeps the four plain-chat call sites byte-identical.
+
+**P-13 was already fixed** (`8d66cf5d`); this batch closed what its own fix log flagged as
+left over.
+
+**Five domains, no single source of truth.** `nou.pro` in the legal copy, `noupro.app`
+sending the mail and generating invite links, `noupro.com` on product shares, and
+`nouproapp.onrender.com` quietly being the only thing that serves anything — including
+the `/legal/*` pages the store listings point at, a URL the legal copy never mentions.
+Changing the public domain meant editing nine call sites plus three HTML files, which is
+why it had never been changed consistently.
+
+- New `src/shared/config/urls.ts`. **Two constants on purpose:** `BRAND_DOMAIN` is `nou.pro` *now* (Arnaud's call), but `PUBLIC_WEB_URL` points at what actually answers HTTP — a link is only worth sharing if something responds to it. One line converges them once DNS points at the backend.
+- **Both shared links were dead ends.** `InviteStaffScreen` handed `https://noupro.app/join/:id` to real people via `Share.share()`: nothing served the domain, it wasn't in `linking.prefixes`, and no `/join` route existed. Repointing it alone would only have made it *differently* dead, so the backend now serves `/join/:companyId` and `/p/:productId` landing pages (same pattern as `reset-password.html`) that hand off via `noupro://`, and the linking config maps `join/:businessId` → the company profile, landing on the Request-to-Join CTA.
+- `support@noupro.app` in Team Management **contradicted** `support@nou.pro` in the legal copy. Both now read one constant.
+- Only the `EMAIL_FROM` **fallback** moved to `noreply@nou.pro`. **`backend/.env` was deliberately left alone** — if SPF/DKIM is set up for `noupro.app`, changing the live sender domain would send transactional mail to spam. That's a DNS decision, not a code one.
+
+**Legal copy — only what was factually wrong:**
+
+- The privacy copy named the **CNIL (France)** as your supervisory authority while every other signal in the repo says Mauritius. Now jurisdiction-neutral pending counsel.
+- Both the app and `delete-account.html` said deletion **"erases"** your data. The backend *anonymises and soft-deletes* (`server.js` rewrites the address to `deleted-<id>@deleted.nou.pro` and sets `deletedAt`). Defensible under GDPR Art. 17(3)(b), but overstated on a page the Play Console links to. Reworded accurately on all three surfaces.
+- The policy claimed it was available "on our website". **There is no website.**
+- `delete-account.html` had no last-updated date; the other two did.
+- The in-app and hosted privacy copies now match word for word again.
+
+**One stray placeholder, the same bug as P-13:** `InvoiceDetailsScreen` made the client
+name tappable and answered with *"functionality would be implemented here"*. It now opens
+the company or the CRM customer. `clientBusinessId`/`customerId` were on the Prisma model
+and in the API response all along — just never declared on the frontend `Invoice` type,
+so nothing could link an invoice back to who it was billed to.
+
+**Verified:** backend 127/127, ESLint 0 errors, `tsc` 133 = unchanged baseline. No schema
+change.
+
+### Smoke tests
+
+1. Turn **Messages** off and leave **Orders** on, then have a partner advance an order — the push still arrives. Reverse it and it doesn't.
+2. Invite a staff member and tap Share — the link opens a real page; with the app installed it opens the company profile with Request to Join.
+3. Share a product — the link resolves instead of 404ing.
+4. Privacy and Terms open in-app in **both** modes, and match `<backend>/legal/privacy` word for word.
+5. Open an invoice and tap the client name — you reach their profile.
 
 ---
 

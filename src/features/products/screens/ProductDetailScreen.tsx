@@ -67,6 +67,7 @@ import ClientStoreCard from '../components/productDetail/ClientStoreCard';
 import RelatedRow from '../components/productDetail/RelatedRow';
 import { HeroHeader } from '@/shared/components/layout/headers';
 import ProductDetailSkeleton, { RelatedRowSkeleton } from '../components/productDetail/ProductDetailSkeleton';
+import { productShareUrl } from '@/shared/config/urls';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Image must be 3:4 ratio (width:height = 3:4)
@@ -428,7 +429,7 @@ const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       const priceText = dto.pricing.priceHidden ? '' : ` - ${formatPrice(dto.pricing.basePrice, dto.pricing.currency)}`;
       await Share.share({
         message: `Check out ${dto.product.name}${priceText}`,
-        url: `https://noupro.com/products/${productId}`,
+        url: productShareUrl(productId),
       });
     } catch {
       // Share cancelled or failed

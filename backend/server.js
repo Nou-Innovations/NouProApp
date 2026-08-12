@@ -109,7 +109,7 @@ async function sendOtpEmail(toEmail, code) {
   }
 
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM || 'NouPro <noreply@noupro.app>',
+    from: process.env.EMAIL_FROM || 'NouPro <noreply@nou.pro>',
     to: toEmail,
     subject: `${code} is your NouPro verification code`,
     text: `Your NouPro verification code is ${code}. It expires in 10 minutes.\n\nIf you didn't request this, you can ignore this email.`,
@@ -141,7 +141,7 @@ async function sendContactChangedNotice(toEmail, { newValue, what = 'email' }) {
     return;
   }
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM || 'NouPro <noreply@noupro.app>',
+    from: process.env.EMAIL_FROM || 'NouPro <noreply@nou.pro>',
     to: toEmail,
     subject: `Your NouPro ${what} was changed`,
     html: `
@@ -178,7 +178,7 @@ async function sendPasswordResetEmail(toEmail, resetToken) {
   }
 
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM || 'NouPro <noreply@noupro.app>',
+    from: process.env.EMAIL_FROM || 'NouPro <noreply@nou.pro>',
     to: toEmail,
     subject: 'Reset your NouPro password',
     html: `
@@ -348,33 +348,38 @@ app.use('/uploads', express.static('uploads'));
 // Public, no auth. Served as static HTML from backend/public/legal/. The HTML
 // files are maintained separately; if one is missing we 404 gracefully rather
 // than crash. Registered early so they never fall through to an authed handler.
-const LEGAL_DIR = path.join(__dirname, 'public', 'legal');
-const sendLegalPage = (fileName) => (req, res) => {
-  const filePath = path.join(LEGAL_DIR, fileName);
+const PUBLIC_DIR = path.join(__dirname, 'public');
+// `relPath` is always a hardcoded literal below — never anything from the request — so
+// there is no traversal surface here. Explicit routes rather than express.static, so no
+// other file under public/ becomes reachable.
+const sendPublicPage = (relPath) => (req, res) => {
+  const filePath = path.join(PUBLIC_DIR, relPath);
   res.sendFile(filePath, (err) => {
     if (err && !res.headersSent) {
       res.status(404).type('text/plain').send('Not found');
     }
   });
 };
+const sendLegalPage = (fileName) => sendPublicPage(path.join('legal', fileName));
 app.get('/legal/privacy', sendLegalPage('privacy.html'));
 app.get('/legal/terms', sendLegalPage('terms.html'));
 // Google Play's Data Safety form requires a public web page describing account
 // deletion; Apple reviewers also check it. Steps live in the HTML, not here.
 app.get('/legal/delete-account', sendLegalPage('delete-account.html'));
 
+// Landing pages for the two links the app hands to people OUTSIDE it: the staff-invite
+// link and the product share link. Both used to point at domains this repo doesn't serve
+// (noupro.app, noupro.com), weren't in the app's deep-link prefixes, and had no route —
+// so every shared link was a dead end. The pages explain the link and offer a `noupro://`
+// hand-off; the id is read client-side, so these stay plain static files.
+app.get('/join/:companyId', sendPublicPage('join.html'));
+app.get('/p/:productId', sendPublicPage('product.html'));
+
 // Password-reset landing page. Reset emails link to
 // `${APP_BASE_URL}/reset-password?token=...` — this used to 404 (no page
 // existed), which made the emailed link a dead end and left
 // POST /api/auth/reset-password unreachable. The page posts to that endpoint.
-app.get('/reset-password', (req, res) => {
-  const filePath = path.join(__dirname, 'public', 'reset-password.html');
-  res.sendFile(filePath, (err) => {
-    if (err && !res.headersSent) {
-      res.status(404).type('text/plain').send('Not found');
-    }
-  });
-});
+app.get('/reset-password', sendPublicPage('reset-password.html'));
 
 // Shared client-IP key for all rate limiters. Behind Cloudflare (Render fronts every
 // *.onrender.com with CF), `CF-Connecting-IP` is the true client IP and cannot be spoofed —
@@ -17249,7 +17254,7 @@ const getNetworkIP = () => {
  * Send push notifications to chat participants who are NOT currently connected via socket.
  * Called after a new message is emitted via socket.
  */
-async function sendPushToOfflineParticipants(chatId, senderName, messagePreview, excludeSenderId) {
+async function sendPushToOfflineParticipants(chatId, senderName, messagePreview, excludeSenderId, category = 'messages') {
   try {
     const chat = await repos.chatRepo.getById(chatId);
     if (!chat) return;
@@ -17267,15 +17272,19 @@ async function sendPushToOfflineParticipants(chatId, senderName, messagePreview,
     }
 
     // Notify offline participants only, via pushService (PushToken table; also respects
-    // each user's 'messages' notification preference and prunes dead tokens).
+    // the user's notification preference for `category` and prunes dead tokens).
     const offlineParticipantIds = participantIds.filter(pid => !connectedUserIds.has(pid));
     if (offlineParticipantIds.length === 0) return;
 
+    // `category` used to be hardcoded to 'messages'. Order/invoice/procurement events are
+    // posted into a chat too, so they were gated on the Messages preference: turning
+    // Messages off silently killed order updates, and turning Orders off didn't stop
+    // them (N-8). Callers now pass the category the event actually belongs to.
     await pushService.sendToUsers({
       userIds: offlineParticipantIds,
       title: senderName || 'New message',
       body: messagePreview || 'You have a new message',
-      category: 'messages',
+      category,
       data: { chatId, chatName: chat.name || senderName },
     }, repos);
   } catch (err) {

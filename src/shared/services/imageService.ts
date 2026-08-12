@@ -160,6 +160,25 @@ export async function uploadImage(localUri: string): Promise<string> {
   return json.data?.url || json.url;
 }
 
+/**
+ * SECURITY (MOB-13): wipe the cached profile pictures on logout.
+ *
+ * Both halves matter. The AsyncStorage map keys user ids to local file paths, and the
+ * files themselves are copied into the app's document directory — so without this, the
+ * next person to sign in on a shared device inherits the previous account's cached faces.
+ * Best-effort: a failure here must never block signing out.
+ */
+export async function clearProfilePictureCache(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.PROFILE_PICTURES);
+  } catch { /* best-effort */ }
+  try {
+    const dir = `${FileSystem.documentDirectory}profile_pictures/`;
+    const info = await FileSystem.getInfoAsync(dir);
+    if (info.exists) await FileSystem.deleteAsync(dir, { idempotent: true });
+  } catch { /* best-effort */ }
+}
+
 export const imageService = {
   /**
    * Request CAMERA permission only — used when taking a new photo.

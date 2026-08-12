@@ -87,8 +87,22 @@ async function resolveBusinessPairChat({ sellerBiz, otherBiz = null, extraUserId
 /**
  * Broadcast a just-persisted event message live + push offline participants.
  * Mirrors the normal send route; never throws (realtime failure must not break the op).
+ *
+ * `category` decides which NotificationPreference column gates the push. It used to be
+ * hardcoded to 'messages' inside the chat helper, so the preferences lied in BOTH
+ * directions: turning Messages off silently killed order updates, and turning Orders off
+ * didn't stop them (N-8). Must be one of the NotificationPreference columns:
+ * messages | deliveries | invoices | orders | team | system.
  */
-function broadcastEventMessage({ chatId, created, participantCounts, humanText, actorId, actorName }) {
+function broadcastEventMessage({
+  chatId,
+  created,
+  participantCounts,
+  humanText,
+  actorId,
+  actorName,
+  category = 'messages',
+}) {
   try {
     if (deps.io) {
       deps.io.to(`chat:${chatId}`).emit('message', created);
@@ -109,7 +123,7 @@ function broadcastEventMessage({ chatId, created, participantCounts, humanText, 
       }
     }
     if (deps.sendPushToOfflineParticipants) {
-      deps.sendPushToOfflineParticipants(chatId, actorName || 'NouPro', humanText, actorId);
+      deps.sendPushToOfflineParticipants(chatId, actorName || 'NouPro', humanText, actorId, category);
     }
   } catch (emitErr) {
     // realtime/push failure must not fail the underlying operation
@@ -220,7 +234,7 @@ async function postOrderEvent({ order, actorId, actorName, previousStatus = null
     meta: { isSystem: true, payload, entityId: order.id, entityType: 'order' },
   }, { incrementUnread: true });
 
-  broadcastEventMessage({ chatId, created, participantCounts, humanText, actorId, actorName });
+  broadcastEventMessage({ chatId, created, participantCounts, humanText, actorId, actorName, category: 'orders' });
   return created;
 }
 
@@ -299,7 +313,7 @@ async function postInvoiceEvent({ invoice, actorId, actorName, kind, details = n
     meta,
   }, { incrementUnread: true });
 
-  broadcastEventMessage({ chatId, created, participantCounts, humanText, actorId, actorName });
+  broadcastEventMessage({ chatId, created, participantCounts, humanText, actorId, actorName, category: 'invoices' });
   return created;
 }
 
@@ -358,7 +372,7 @@ async function postProcurementEvent({ businessId, type, entityId, actorId, actor
     meta: { isSystem: true, event: humanText, entityId, entityType: 'procurement', procurementType: type },
   }, { incrementUnread: true });
 
-  broadcastEventMessage({ chatId, created, participantCounts, humanText, actorId, actorName });
+  broadcastEventMessage({ chatId, created, participantCounts, humanText, actorId, actorName, category: 'orders' });
   return created;
 }
 

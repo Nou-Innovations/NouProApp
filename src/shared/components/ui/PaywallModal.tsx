@@ -22,6 +22,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import theme from '@/shared/theme';
 import { SubscriptionPlan, PLAN_INFO, PLAN_PRICES_MONTHLY, CURRENCY } from '@/shared/types/subscription';
 import { PaywallModalType } from '@/shared/utils/permissions';
+import { SALES_EMAIL } from '@/shared/config/urls';
 
 interface PaywallModalProps {
   visible: boolean;
@@ -118,7 +119,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
       onContactSales();
     } else {
       // Default: open email
-      Linking.openURL('mailto:sales@noupro.app?subject=Enterprise%20Inquiry');
+      Linking.openURL(`mailto:${SALES_EMAIL}?subject=Enterprise%20Inquiry`);
     }
     onClose();
   };

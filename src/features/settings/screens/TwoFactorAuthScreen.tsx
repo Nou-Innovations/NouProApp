@@ -18,6 +18,9 @@ interface TwoFactorAuthScreenProps {
   navigation: any;
 }
 
+/** How long a copied 2FA secret may sit on the clipboard before it is wiped (MOB-11). */
+const CLIPBOARD_CLEAR_MS = 90 * 1000;
+
 export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenProps) {
   const { theme: appTheme } = useTheme();
 
@@ -134,14 +137,38 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
     setOtpauthUrl('');
   };
 
+  /**
+   * SECURITY (MOB-11): wipe a copied secret from the clipboard after a grace period.
+   *
+   * The clipboard is shared with every other app on the device and persists indefinitely,
+   * so a 2FA secret or a set of backup codes left there is a long-lived credential sitting
+   * in the clear. expo-clipboard 7.x exposes no clear API, so "clearing" means writing an
+   * empty string.
+   *
+   * It reads first and only clears if the clipboard still holds what we put there —
+   * otherwise we would silently destroy whatever the user copied in the meantime.
+   */
+  const scheduleClipboardClear = (copied: string) => {
+    setTimeout(async () => {
+      try {
+        const current = await Clipboard.getStringAsync();
+        if (current === copied) await Clipboard.setStringAsync('');
+      } catch { /* best-effort */ }
+    }, CLIPBOARD_CLEAR_MS);
+  };
+
   const handleCopySecret = async () => {
-    await Clipboard.setStringAsync(secretKey.replace(/-/g, ''));
-    AppAlert.alert('Copied', 'Secret key copied to clipboard');
+    const value = secretKey.replace(/-/g, '');
+    await Clipboard.setStringAsync(value);
+    scheduleClipboardClear(value);
+    AppAlert.alert('Copied', 'Secret key copied. It will be cleared from your clipboard in 90 seconds.');
   };
 
   const handleCopyBackupCodes = async () => {
-    await Clipboard.setStringAsync(backupCodes.join('\n'));
-    AppAlert.alert('Copied', 'Backup codes copied to clipboard');
+    const value = backupCodes.join('\n');
+    await Clipboard.setStringAsync(value);
+    scheduleClipboardClear(value);
+    AppAlert.alert('Copied', 'Backup codes copied. They will be cleared from your clipboard in 90 seconds.');
   };
 
   const renderSetupFlow = () => (
@@ -333,11 +360,16 @@ export default function TwoFactorAuthScreen({ navigation }: TwoFactorAuthScreenP
         variant="success"
         title="Save Your Backup Codes"
         message={`Two-factor authentication is now enabled!\n\nSave these backup codes in a safe place. Each code can only be used once:\n\n${backupCodes.join('\n')}`}
-        primaryButtonText="Copy & Close"
+        // SECURITY (MOB-11): copying is now a choice. This used to be a single
+        // "Copy & Close" button, so the only way to dismiss the dialog was to put eight
+        // backup codes on the system clipboard — readable by any other app.
+        primaryButtonText="Copy"
         onPrimaryAction={() => {
           handleCopyBackupCodes();
           setShowBackupCodesModal(false);
         }}
+        secondaryButtonText="Close"
+        onSecondaryAction={() => setShowBackupCodesModal(false)}
       />
 
       {/* Disable 2FA Password Prompt */}

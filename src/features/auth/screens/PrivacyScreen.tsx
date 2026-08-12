@@ -2,22 +2,30 @@
  * PrivacyScreen — Privacy Policy.
  *
  * This copy reflects NouPro's actual data practices (processors, retention,
- * in-app export/deletion) as of July 2026. Have legal counsel review it before
- * public launch, and set the governing jurisdiction in TermsScreen. Keep this
- * file in sync with the hosted copy at backend/public/legal/privacy.html —
- * that URL is what App Store Connect links to.
+ * in-app export/deletion). Keep this file in sync with the hosted copy at
+ * backend/public/legal/privacy.html — that URL is what App Store Connect links to.
+ *
+ * STILL NEEDS ARNAUD + COUNSEL before public launch:
+ *   1. The registered entity name, legal form and postal address for "Contact" —
+ *      it currently says only "Data controller: NouPro", and there is no postal
+ *      address anywhere, which most privacy regimes require of a controller.
+ *   2. The governing-law jurisdiction, in TermsScreen.
+ * The supervisory-authority wording below is deliberately jurisdiction-neutral
+ * until (2) is settled — it used to name the CNIL (France) while every other
+ * signal in this repo points to Mauritius.
  */
 import React from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/shared/types/navigation';
 import LegalScreen, { LegalSection } from '../components/LegalScreen';
+import { BRAND_DOMAIN, SUPPORT_EMAIL } from '@/shared/config/urls';
 
-const LAST_UPDATED = 'July 2, 2026';
+const LAST_UPDATED = 'August 12, 2026';
 
 const SECTIONS: LegalSection[] = [
   {
     heading: 'Overview',
-    body: 'NouPro is a business-to-business platform that connects distributors, wholesalers, and retailers. This Privacy Policy explains what information we collect, why, who processes it on our behalf, and the rights you can exercise directly inside the app. It applies to the NouPro mobile app and related services operated under the nou.pro domain.',
+    body: `NouPro is a business-to-business platform that connects distributors, wholesalers, and retailers. This Privacy Policy explains what information we collect, why, who processes it on our behalf, and the rights you can exercise directly inside the app. It applies to the NouPro mobile app and related services operated under the ${BRAND_DOMAIN} domain.`,
   },
   {
     heading: 'Information We Collect',
@@ -41,11 +49,11 @@ const SECTIONS: LegalSection[] = [
   },
   {
     heading: 'Data Retention',
-    body: 'We keep your data while your account is active. If you delete your account, your personal profile is erased immediately (see Your Rights). Invoices, orders, and delivery records are retained for as long as commercial and tax law requires, because they are also the legal records of the other businesses involved. Crash diagnostics are retained by Sentry on a rolling basis.',
+    body: 'We keep your data while your account is active. If you delete your account, your personal profile is removed and your remaining details are anonymised immediately (see Your Rights). Invoices, orders, and delivery records are retained for as long as commercial and tax law requires, because they are also the legal records of the other businesses involved. Crash diagnostics are retained by Sentry on a rolling basis.',
   },
   {
     heading: 'Your Rights & In-App Tools',
-    body: 'You can exercise your key rights directly in the app, without contacting us:\n\n• Export your data: Settings → Security → Export My Data gives you a machine-readable copy of your personal data (right of access and portability).\n\n• Delete your account: Settings → Security → Delete Account permanently erases your profile, connections, and personal data after you confirm with your password (right to erasure). Records other businesses are legally required to keep (their invoices and orders) are retained but no longer linked to an active profile — your name is replaced with “Deleted user”.\n\nYou also have rights to correction, restriction, and objection, and the right to lodge a complaint with your data-protection authority (in France, the CNIL). For anything not covered in-app, contact us at the address below.',
+    body: 'You can exercise your key rights directly in the app, without contacting us:\n\n• Export your data: Settings → Security → Export My Data gives you a machine-readable copy of your personal data (right of access and portability).\n\n• Delete your account: Settings → Security → Delete Account removes your profile and anonymises your personal data after you confirm with your password (right to erasure). Your name, photo, contact details, profile content, and connections are deleted, and every device is signed out. Records other businesses are legally required to keep — their invoices, orders, and deliveries — are retained but no longer linked to you: your name shows as “Deleted user”.\n\nYou also have rights to correction, restriction, and objection, and the right to lodge a complaint with the data-protection authority in your country. For anything not covered in-app, contact us by email.',
   },
   {
     heading: 'Security',
@@ -61,7 +69,7 @@ const SECTIONS: LegalSection[] = [
   },
   {
     heading: 'Contact',
-    body: 'Data controller: NouPro. Questions about this policy or your data: support@nou.pro. The current version of this policy is always available in the app and on our website.',
+    body: `Data controller: NouPro. Questions about this policy or your data: ${SUPPORT_EMAIL}.`,
   },
 ];
 

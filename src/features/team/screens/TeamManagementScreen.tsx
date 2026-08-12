@@ -13,6 +13,7 @@ import { reportEntity, REPORT_REASONS, type ReportReason } from '@/features/prof
 import LocationDropdown from '@/shared/components/ui/LocationDropdown';
 import theme from '@/shared/theme';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
+import { SUPPORT_EMAIL } from '@/shared/config/urls';
 import {
   cancelInvite,
   getTeamMembers,
@@ -686,7 +687,7 @@ export default function TeamManagementScreen() {
           }}
           title="Report User"
           onPress={() => {
-            AppAlert.alert('Report User', 'To report this user, please contact support at support@noupro.app');
+            AppAlert.alert('Report User', `To report this user, please contact support at ${SUPPORT_EMAIL}`);
             setShowJoinRequestOptions(false);
             setSelectedJoinRequest(null);
           }}

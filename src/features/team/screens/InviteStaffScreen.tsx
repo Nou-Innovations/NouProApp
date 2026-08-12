@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Share, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { AppAlert } from '@/shared/services/appAlert';
+import { inviteUrl } from '@/shared/config/urls';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/shared/theme/ThemeProvider';
@@ -37,7 +38,7 @@ export default function InviteStaffScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const inviteLink = `https://noupro.app/join/${companyId || 'company'}`;
+  const inviteLink = inviteUrl(companyId || 'company');
 
   const loadData = useCallback(async () => {
     if (!companyId) {

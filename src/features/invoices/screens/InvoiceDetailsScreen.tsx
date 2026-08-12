@@ -414,9 +414,28 @@ export default function InvoiceDetailsScreen({ route, navigation }: Props) {
     navigation.goBack();
   };
 
+  /**
+   * Open whoever the invoice was billed to. This used to be a placeholder alert saying
+   * the functionality "would be implemented here", so the client name looked tappable
+   * and did nothing.
+   *
+   * An invoice can be billed to a real company (`clientBusinessId`) or to a CRM customer
+   * record (`customerId`) — walk-in and one-off clients only ever have the latter. Both
+   * targets exist; there is simply no profile to open when neither id is set.
+   */
   const navigateToClientProfile = () => {
-    // Navigate to client profile - will implement based on available navigation
-    AppAlert.alert('Client Profile', 'Navigate to client profile functionality would be implemented here');
+    if (invoice?.clientBusinessId) {
+      navigation.navigate('ViewBusinessProfile', { businessId: invoice.clientBusinessId });
+      return;
+    }
+    if (invoice?.customerId) {
+      navigation.navigate('CustomerDetail', { customerId: invoice.customerId });
+      return;
+    }
+    AppAlert.alert(
+      clientName,
+      'This client was entered manually on the invoice, so there is no profile to open.',
+    );
   };
 
   // Check if current user is the invoice creator (can modify payment status)

@@ -16,37 +16,111 @@ import { Business, BusinessStaff, StaffRole, StaffRoleType, UserBusiness } from 
 import { ProfileMode } from '@/shared/types/roles';
 import { SubscriptionPlan, PLAN_FEATURES } from '@/shared/types/subscription';
 import { chatService } from '@/shared/services/chat';
-// Graceful fallback: use SecureStore when native module is available, otherwise AsyncStorage
-let SecureStoreAvailable = false;
+/**
+ * SECURITY (MOB-1): auth tokens live in SecureStore (Keychain / Android Keystore) and
+ * NOWHERE ELSE. There is deliberately no AsyncStorage fallback.
+ *
+ * There used to be one, guarded by `!!SecureStore?.getItemAsync`. That probe never did
+ * anything: `getItemAsync` is a plain JS export that exists whether or not the native
+ * module is linked, so the flag was always true and the fallback was unreachable. What
+ * actually happened without the native module was a THROW — and every call site swallowed
+ * it with `.catch(() => {})`, so a failed token write looked exactly like a successful one.
+ *
+ * Both halves are fixed here. The probe is now `isAvailableAsync()` (the real check), and
+ * failures are reported instead of silently dropped. When secure storage is unavailable we
+ * fail CLOSED: the session simply isn't persisted. Writing a credential in the clear so the
+ * user stays logged in is not a trade worth making.
+ */
 let SecureStore: typeof import('expo-secure-store') | null = null;
 try {
   SecureStore = require('expo-secure-store');
-  // Test if the native module is actually available (not just the JS package)
-  SecureStoreAvailable = !!SecureStore?.getItemAsync;
 } catch {
-  SecureStoreAvailable = false;
+  SecureStore = null;
 }
 
-const secureGet = async (key: string): Promise<string | null> => {
-  if (SecureStoreAvailable && SecureStore) {
-    return SecureStore.getItemAsync(key);
+/** Resolved once. `isAvailableAsync` is the only probe that actually tests the native module. */
+let secureStoreProbe: Promise<boolean> | null = null;
+const isSecureStoreAvailable = (): Promise<boolean> => {
+  if (!SecureStore) return Promise.resolve(false);
+  if (!secureStoreProbe) {
+    secureStoreProbe = SecureStore.isAvailableAsync().catch(() => false);
   }
-  return AsyncStorage.getItem(key);
+  return secureStoreProbe;
 };
 
-const secureSet = async (key: string, value: string): Promise<void> => {
-  if (SecureStoreAvailable && SecureStore) {
-    return SecureStore.setItemAsync(key, value);
+/** One place to notice that secure storage failed, instead of ten silent catches. */
+const reportSecureStoreFailure = (op: string, key: string, err: unknown) => {
+  const message = `[SecureStore] ${op} failed for ${key} — the session will not persist`;
+  console.warn(message, err);
+  try {
+    // Lazy require: Sentry may not be initialised in dev or in tests.
+    const Sentry = require('@sentry/react-native');
+    Sentry?.captureMessage?.(message, 'warning');
+  } catch { /* reporting is best-effort */ }
+};
+
+const secureGet = async (key: string): Promise<string | null> => {
+  if (!(await isSecureStoreAvailable()) || !SecureStore) return null;
+  try {
+    return await SecureStore.getItemAsync(key);
+  } catch (err) {
+    reportSecureStoreFailure('read', key, err);
+    return null;
   }
-  return AsyncStorage.setItem(key, value);
+};
+
+const secureSet = async (key: string, value: string): Promise<boolean> => {
+  if (!(await isSecureStoreAvailable()) || !SecureStore) {
+    reportSecureStoreFailure('write', key, new Error('SecureStore unavailable'));
+    return false;
+  }
+  try {
+    await SecureStore.setItemAsync(key, value);
+    return true;
+  } catch (err) {
+    reportSecureStoreFailure('write', key, err);
+    return false;
+  }
 };
 
 const secureDelete = async (key: string): Promise<void> => {
-  if (SecureStoreAvailable && SecureStore) {
-    return SecureStore.deleteItemAsync(key);
+  if (SecureStore && (await isSecureStoreAvailable())) {
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch (err) {
+      reportSecureStoreFailure('delete', key, err);
+    }
   }
-  return AsyncStorage.removeItem(key);
+  // Always sweep AsyncStorage too: users who ran a build with the old fallback may still
+  // have a plaintext token sitting there, and the fix alone would orphan rather than
+  // remove it. Harmless when the key was never written.
+  await AsyncStorage.removeItem(key).catch(() => {});
 };
+
+/**
+ * SECURITY (MOB-14): the subset of the profile that may be written to disk.
+ *
+ * The persisted store is plain AsyncStorage — unencrypted, and swept up by device backups
+ * (`android:allowBackup="true"`, tracked as MOB-4). Personal data must not live there.
+ *
+ * Kept: the identity fields the signed-in shell renders before any network call —
+ * `id` (read ~115 times across the app), `name`, `avatar_url`, plus `language` and
+ * `created_at` because `User` requires them.
+ *
+ * Deliberately dropped: email, phone, address, privacy_settings, job_title, description,
+ * headline, bio, industry, cover_photo, profile_slug, connections_count. All of those are
+ * re-fetched from /auth/me on launch by ProfileStoreInitializer.
+ */
+function redactUserForStorage(user: User | null): User | null {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    avatar_url: user.avatar_url,
+    language: user.language,
+    created_at: user.created_at,
+  } as User;
+}
 
 /**
  * Profile Store State
@@ -385,6 +459,17 @@ export const useProfileStore = create<ProfileStore>()(
 
         // Clear offline message queue from AsyncStorage
         AsyncStorage.removeItem('@offline_message_queue').catch(() => {});
+
+        // SECURITY (MOB-13): per-account caches that used to survive a sign-out, so the
+        // next person on a shared device inherited them. The push token is removed here
+        // unconditionally — unregisterPushTokenOnLogout above only deletes it locally when
+        // its API call succeeds, so an offline logout previously left it behind, pointing
+        // this device at the account that just signed out.
+        AsyncStorage.removeItem('noupro_push_token').catch(() => {});
+        // Avatar colours/initials for every user this account ever saw. clearAllAvatarData
+        // already existed for exactly this and had no callers.
+        try { require('@/shared/services/userAvatarService').userAvatarService.clearAllAvatarData(); } catch {}
+        try { require('@/shared/services/imageService').clearProfilePictureCache(); } catch {}
 
         // Reset other stores (lazy require to avoid circular dependencies at module load time)
         try { require('@/shared/store/businessStore').useBusinessStore.getState().reset(); } catch {}
@@ -753,7 +838,17 @@ export const useProfileStore = create<ProfileStore>()(
         appLockTimeoutMs: state.appLockTimeoutMs,
         activeMode: state.activeMode,
         activeBusinessId: state.activeBusinessId,
-        currentUser: state.currentUser,
+        // SECURITY (MOB-14): only the fields the app shell needs to render a signed-in
+        // session. Email, phone, address, privacy settings, bio and the rest of the
+        // profile are NOT written to disk — this store is plain AsyncStorage, which is
+        // unencrypted and is included in device backups.
+        //
+        // Why redact instead of dropping currentUser entirely: `isSignedIn` is
+        // `Boolean(accessToken && currentUser)`, so persisting nothing would sign every
+        // user out on the next launch and leave the app unusable offline. Keeping the
+        // identity fields preserves both; ProfileStoreInitializer refills the rest from
+        // /auth/me on launch.
+        currentUser: redactUserForStorage(state.currentUser),
         userBusinesses: state.userBusinesses,
         activeBusiness: state.activeBusiness,
         currentUserRole: state.currentUserRole,

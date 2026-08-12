@@ -55,9 +55,11 @@ import SidebarContent from '@/navigation/SidebarContent';
 
 // Services
 import { userAvatarService } from '@/shared/services/userAvatarService';
+import { authAPI } from '@/shared/services/api';
 import { offlineQueue } from '@/features/inbox/services/offlineQueue';
 import { syncOrderStatusMeta } from '@/shared/services/orderStatusSync';
 import { syncSubscriptionPricing } from '@/shared/services/subscriptionPricingSync';
+import { PUBLIC_WEB_URL } from '@/shared/config/urls';
 import * as Sentry from '@sentry/react-native';
 
 // Screens - Auth
@@ -411,12 +413,23 @@ function AppNavigator() {
 
   // Deep-linking: resolves noupro:// links (and the production https base) to
   // the relevant in-app screens. Matches the "scheme" declared in app.json.
+  //
+  // `join` and `p` are the two links the app shares OUTSIDE itself (staff invites,
+  // product shares). They previously pointed at domains nothing served and weren't
+  // listed here, so a shared link was a dead end even for someone who had the app.
+  // `join` lands on the company profile, which already has the Request to Join CTA.
+  //
+  // NOTE: no universal links are configured (no associatedDomains / AASA /
+  // assetlinks.json), so the https prefix can't open the app from a cold tap — the
+  // backend landing pages hand off via noupro:// instead. Setting those up needs DNS.
   const linking = {
-    prefixes: ['noupro://', 'https://nouproapp.onrender.com'],
+    prefixes: ['noupro://', PUBLIC_WEB_URL],
     config: {
       screens: {
         OrderDetails: 'orders/:orderId',
         InvoiceDetails: 'invoices/:invoiceId',
+        ViewBusinessProfile: 'join/:businessId',
+        ProductDetail: 'products/:productId',
       },
     },
   };
@@ -698,6 +711,35 @@ function ProfileStoreInitializer({ children }: { children: React.ReactNode }) {
     //   console.log('[Dev] Loading mock seed data...');
         // }
   }, [isInitialized, setCurrentUser, setUserBusinesses]);
+
+  // SECURITY (MOB-14): refill the profile fields that are deliberately NOT persisted.
+  //
+  // Only identity fields (id/name/avatar) survive a restart — email, phone, address and
+  // privacy settings are dropped by `redactUserForStorage` so they never sit unencrypted
+  // on disk. This restores them from the server once per launch.
+  //
+  // The failure handling IS the design. A network error must leave the user signed in with
+  // the redacted copy: this runs on every cold start, including offline ones, and treating
+  // "couldn't reach the server" as "signed out" would lock people out of their own app the
+  // moment their connection dropped. Only a 401 means the session is genuinely gone, and
+  // the api interceptor already owns that path (audit A-5, same transient-vs-revoked rule).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { accessToken, currentUser } = useProfileStore.getState();
+      if (!accessToken || !currentUser) return;
+      try {
+        const response = await authAPI.getCurrentUser();
+        const fresh = (response as any)?.data?.user ?? (response as any)?.data ?? null;
+        if (!cancelled && fresh?.id) {
+          useProfileStore.getState().updateCurrentUser(fresh);
+        }
+      } catch {
+        // Intentionally swallowed — see above. The redacted profile stays in place.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Restore active business if we were in business mode
   useEffect(() => {
@@ -1010,6 +1052,44 @@ if (SENTRY_DSN) {
     dsn: SENTRY_DSN,
     environment: process.env.EXPO_PUBLIC_APP_ENV || 'dev',
     tracesSampleRate: 0.1,
+
+    // SECURITY (OPS-2): crash reports must not become a side channel for user data.
+    //
+    // Explicit rather than relying on the SDK default, so a future version bump can't
+    // quietly turn IP/header/cookie collection on.
+    sendDefaultPii: false,
+
+    beforeSend: (event) => {
+      // Request bodies can carry anything the screen was submitting — including a
+      // password on the auth screens. Never ship them.
+      if (event.request) {
+        delete event.request.data;
+        delete event.request.cookies;
+        if (event.request.headers) {
+          delete event.request.headers.Authorization;
+          delete event.request.headers.authorization;
+          delete event.request.headers.Cookie;
+        }
+      }
+      return event;
+    },
+
+    beforeBreadcrumb: (breadcrumb) => {
+      // babel keeps console.error/warn in release builds, so console breadcrumbs ship —
+      // and they carry whatever was logged, e.g. raw WebView messages and API errors.
+      if (breadcrumb.category === 'console') return null;
+
+      // HTTP breadcrumbs record the full URL, so identifiers land in Sentry just by
+      // browsing (/payments/checkout-result/<id>, /companies/<id>/users, …).
+      // Keep the shape of the request, drop the values.
+      if (breadcrumb.data?.url && typeof breadcrumb.data.url === 'string') {
+        breadcrumb.data.url = breadcrumb.data.url
+          .replace(/\/[0-9a-fA-F-]{16,}/g, '/<id>')
+          .replace(/\/\d+/g, '/<id>')
+          .replace(/\?.*$/, '?<query>');
+      }
+      return breadcrumb;
+    },
   });
 }
 
