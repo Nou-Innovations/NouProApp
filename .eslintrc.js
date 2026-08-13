@@ -43,6 +43,14 @@ module.exports = {
   },
   overrides: [
     {
+      // Build/CI helpers are plain Node CommonJS, not React Native — they legitimately
+      // use __dirname, module, process. Declaring the environment keeps `no-undef` at
+      // ERROR everywhere (it is the net that caught three production crashes) instead
+      // of weakening the rule to accommodate a handful of scripts.
+      files: ['scripts/**/*.js'],
+      env: { node: true },
+    },
+    {
       // @typescript-eslint rules are only loaded for TS files by universe/native,
       // so our TS-specific overrides must live here (not at top level).
       files: ['*.ts', '*.tsx'],

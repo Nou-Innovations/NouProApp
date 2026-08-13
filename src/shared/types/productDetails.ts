@@ -5,6 +5,7 @@
  */
 
 import { UIProductStatus } from './product';
+import { formatCurrency as sharedFormatCurrency } from '@/shared/utils/format';
 
 // ============================================================================
 // Capabilities
@@ -333,9 +334,8 @@ export const DEFAULT_CURRENCY = 'Rs';
  * Format price with currency
  */
 export function formatPrice(price: number, currency: string = DEFAULT_CURRENCY): string {
-  return `${currency} ${price.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  // Delegates to the app-wide formatter. This used to pin the locale to 'en-US', so
+  // grouping and the decimal mark could never follow the user's language.
+  return sharedFormatCurrency(price, currency === DEFAULT_CURRENCY ? undefined : currency);
 }
 

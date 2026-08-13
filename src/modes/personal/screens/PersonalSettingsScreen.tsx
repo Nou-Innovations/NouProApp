@@ -20,8 +20,15 @@ import { authAPI } from '@/shared/services/api';
 import Avatar from '@/shared/components/ui/Avatar';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { DemoModeBadge } from '@/shared/components/ui/DemoModeBadge';
+import type { Language } from '@/shared/types/user';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+/** Each language named in itself, the way language pickers should read. */
+const LANGUAGE_NAMES: Record<Language, string> = {
+  EN: 'English',
+  FR: 'Français',
+};
 
 export default function PersonalSettingsScreen() {
   const navigation = useNavigation();
@@ -40,6 +47,8 @@ export default function PersonalSettingsScreen() {
   // Server-backed. This used to read `currentUser.notifications_on`, which lived only in
   // client state — PATCH /auth/me never persisted it and normalizeUser defaulted it back
   // to true, so turning push off silently re-enabled itself on the next login (N-6).
+  const language = useProfileStore((state) => state.language);
+  const setLanguage = useProfileStore((state) => state.setLanguage);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [isProfileSwitcherVisible, setIsProfileSwitcherVisible] = useState(false);
   const [isAddBusinessOptionsVisible, setIsAddBusinessOptionsVisible] = useState(false);
@@ -122,6 +131,20 @@ export default function PersonalSettingsScreen() {
   const handleSecurity = () => {
     // @ts-ignore
     navigation.navigate('SecuritySettings');
+  };
+
+  const handleChangeLanguage = () => {
+    AppAlert.actionSheet({
+      title: 'Language',
+      message: 'Choose the language for the app.',
+      options: [
+        ...(Object.keys(LANGUAGE_NAMES) as Language[]).map((code) => ({
+          label: LANGUAGE_NAMES[code] + (code === language ? '  ✓' : ''),
+          onPress: () => setLanguage(code),
+        })),
+        { label: 'Cancel', cancel: true },
+      ],
+    });
   };
 
   const handlePrivacyPolicy = () => {
@@ -363,6 +386,25 @@ export default function PersonalSettingsScreen() {
           ios_backgroundColor={appTheme.colors.switchTrackOff}
         />
       </View>
+
+      {/* Language — the moment `user.language` stops being a decorative column. It has
+          existed in the schema, the types and the store defaults since the beginning,
+          and nothing has ever read it or offered a way to set it. */}
+      <TouchableOpacity
+        style={[styles.settingRow, { borderBottomColor: appTheme.colors.borderColor }]}
+        onPress={handleChangeLanguage}
+      >
+        <View style={styles.settingLeft}>
+          <Icon name="language-outline" size={24} color={appTheme.colors.iconColor} />
+          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Language</Text>
+        </View>
+        <View style={styles.settingRight}>
+          <Text style={[styles.settingValue, { color: appTheme.colors.textSecondary }]}>
+            {LANGUAGE_NAMES[language]}
+          </Text>
+          <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
+        </View>
+      </TouchableOpacity>
 
       {/* Privacy Policy */}
       <TouchableOpacity
@@ -732,6 +774,15 @@ const styles = StyleSheet.create({
   },
   settingsSection: {
     marginTop: theme.spacing.sm,
+  },
+  settingRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  settingValue: {
+    fontSize: 15,
+    fontFamily: theme.fonts.primary.regular,
   },
   settingRow: {
     flexDirection: 'row',

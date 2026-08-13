@@ -8,6 +8,8 @@
  */
 
 import { theme } from '@/shared/theme';
+import { formatCurrency as sharedFormatCurrency, currencySymbol as sharedCurrencySymbol } from '@/shared/utils/format';
+import { CURRENCY } from '@/shared/types/subscription';
 
 // ============================================================================
 // Status Types
@@ -245,31 +247,18 @@ export function getDaysUntilDue(dueDate: string): number {
  * Uses Intl.NumberFormat for locale-aware formatting.
  * Defaults to EUR if no currency code is provided.
  */
+/**
+ * Invoice money. Delegates to the app-wide formatter.
+ *
+ * This used to be a separate `Intl` call defaulting to **EUR** — in an app that trades
+ * in rupees, an invoice with no explicit currency rendered "€1,500.00". It also pinned
+ * the locale to 'en-US', so it could never follow the user's language.
+ */
 export function formatInvoiceCurrency(amount: number, currency?: string): string {
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'EUR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount || 0);
-  } catch {
-    // Fallback if currency code is invalid
-    return `${currency || 'EUR'} ${(amount || 0).toFixed(2)}`;
-  }
+  return sharedFormatCurrency(amount, currency || CURRENCY.code);
 }
 
-/**
- * Get the currency symbol for a currency code (e.g. "EUR" -> "€", "USD" -> "$").
- */
+/** The symbol for an invoice's currency. */
 export function getCurrencySymbol(currency?: string): string {
-  try {
-    const parts = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'EUR',
-    }).formatToParts(0);
-    return parts.find((p) => p.type === 'currency')?.value || currency || '€';
-  } catch {
-    return currency || '€';
-  }
+  return sharedCurrencySymbol(currency || CURRENCY.code);
 }

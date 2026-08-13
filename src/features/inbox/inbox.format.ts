@@ -5,6 +5,8 @@
  * Extracted from ChatScreen.tsx for reusability and testability.
  */
 
+import { formatCurrency as sharedFormatCurrency } from '@/shared/utils/format';
+
 /**
  * Format timestamp for message bubbles (HH:MM only)
  * No date shown in message bubbles - date separators handle that.
@@ -93,8 +95,9 @@ export function getDateKey(timestamp: string): string {
 /**
  * Format currency amount
  */
-export function formatCurrency(amount: number, currency = '$'): string {
-  return `${currency}${amount.toFixed(2)}`;
+export function formatCurrency(amount: number, currency?: string): string {
+  // Defaulted to '$' — a dollar sign in a rupee app. Delegates now.
+  return sharedFormatCurrency(amount, currency);
 }
 
 /**

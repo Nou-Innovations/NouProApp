@@ -11,7 +11,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User } from '@/shared/types/user';
+import { User, Language } from '@/shared/types/user';
 import { Business, BusinessStaff, StaffRole, StaffRoleType, UserBusiness } from '@/shared/types/business';
 import { ProfileMode } from '@/shared/types/roles';
 import { SubscriptionPlan, PLAN_FEATURES } from '@/shared/types/subscription';
@@ -136,6 +136,16 @@ interface ProfileState {
   
   // Stay signed in preference (ON by default = users stay logged in across app restarts)
   staySignedIn: boolean;
+
+  /**
+   * UI language. Deliberately TOP-LEVEL, not on `currentUser`.
+   *
+   * `currentUser` is nulled by `logout()` and by the `!staySignedIn` rehydrate branch,
+   * so a language kept there would be silently reset every sign-out — exactly the bug
+   * `staySignedIn` itself had (A-14). It also has to be readable on the auth screens,
+   * where there is no user at all.
+   */
+  language: Language;
   
   // Security settings (Personal mode only)
   twoFactorEnabled: boolean;
@@ -239,6 +249,8 @@ interface ProfileActions {
   
   // Stay signed in preference
   setStaySignedIn: (value: boolean) => void;
+  /** Change the UI language. Persists locally and, when signed in, to the server. */
+  setLanguage: (value: Language) => void;
   
   // Security settings (Personal mode only)
   setTwoFactorEnabled: (value: boolean) => void;
@@ -326,6 +338,7 @@ const initialState: ProfileState = {
   accessToken: null,
   refreshToken: null,
   staySignedIn: true, // ON by default = users stay logged in across app restarts
+  language: 'EN',
   // Security settings
   twoFactorEnabled: false,
   biometricEnabled: false,
@@ -424,6 +437,10 @@ export const useProfileStore = create<ProfileStore>()(
           userBusinesses: normalizedBusinesses,
           isInitialized: true,
           error: null,
+          // The account's language wins over whatever this device had. It's the
+          // considered preference and it follows you between devices; a choice made on
+          // the sign-in screen becomes the account's as soon as setLanguage runs.
+          language: normalizedUser.language || get().language,
           logoutReason: null, // a successful sign-in clears any "session expired" notice
           isNewUser: isNewUser ?? false,
           twoFactorEnabled: !!(user as any).twoFactorEnabled,
@@ -493,6 +510,9 @@ export const useProfileStore = create<ProfileStore>()(
           // in" OFF had that choice silently undone on every logout — and the setting
           // only matters on the sign-in they were about to do next (A-14).
           staySignedIn: get().staySignedIn,
+          // Same reasoning: the sign-in screen you land on should be in the language
+          // you chose, not reset to English because you signed out.
+          language: get().language,
         });
       },
 
@@ -752,6 +772,21 @@ export const useProfileStore = create<ProfileStore>()(
        */
       setStaySignedIn: (value: boolean) => set({ staySignedIn: value }),
 
+      setLanguage: (value: Language) => {
+        set({ language: value });
+        // Mirror onto currentUser so anything reading the server shape agrees, and
+        // persist to the account. Fire-and-forget: the local change must apply
+        // instantly even offline, and a failed sync self-heals on the next /auth/me.
+        const user = get().currentUser;
+        if (user) set({ currentUser: { ...user, language: value } });
+        if (get().accessToken) {
+          try {
+            const { patch } = require('@/shared/services/api') as typeof import('@/shared/services/api');
+            patch('/auth/me', { language: value }).catch(() => {});
+          } catch { /* offline or module not ready */ }
+        }
+      },
+
       /**
        * Set two-factor authentication enabled
        */
@@ -849,6 +884,7 @@ export const useProfileStore = create<ProfileStore>()(
       // Tokens are stored separately in SecureStore
       partialize: (state: ProfileStore) => ({
         staySignedIn: state.staySignedIn,
+        language: state.language,
         twoFactorEnabled: state.twoFactorEnabled,
         biometricEnabled: state.biometricEnabled,
         // The two settings persist; isLocked/lastBackgroundedAt deliberately do NOT,

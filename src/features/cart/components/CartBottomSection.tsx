@@ -4,6 +4,7 @@ import { AppAlert } from '@/shared/services/appAlert';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useOrderStore } from '@/shared/store/orderStore';
 import { AppButton, TextButton } from '@/shared/components/ui';
+import { formatCurrency } from '@/shared/utils/format';
 
 interface CartBottomSectionProps {
   businessId: string;
@@ -25,9 +26,8 @@ const CartBottomSection: React.FC<CartBottomSectionProps> = ({ businessId, onPla
     return { totalItems: items, totalAmount: amount };
   }, [cart]);
   
-  const formatCurrency = (amount: number): string => {
-    return `Rs ${amount.toLocaleString()}`;
-  };
+
+
 
   const handleClearCart = () => {
     AppAlert.alert(

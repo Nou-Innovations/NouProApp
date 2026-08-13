@@ -4,6 +4,7 @@ import { AppAlert } from '@/shared/services/appAlert';
 import { useTheme } from '@/shared/theme/ThemeProvider';
 import { useOrderStore, useCarts } from '@/shared/store/orderStore';
 import { AppButton, TextButton } from '@/shared/components/ui';
+import { formatCurrency } from '@/shared/utils/format';
 
 interface CartPopupProps {
   isVisible: boolean;
@@ -39,9 +40,8 @@ const CartPopup: React.FC<CartPopupProps> = ({
 
   const hasItems = totalItems > 0;
   
-  const formatCurrency = (amount: number): string => {
-    return `Rs ${amount.toLocaleString()}`;
-  };
+
+
 
   const handleCancel = () => {
     AppAlert.alert(

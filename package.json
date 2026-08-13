@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "preflight": "node scripts/preflight.js",
+    "i18n:check": "node scripts/i18n-check.js",
     "postinstall": "npx patch-package"
   },
   "dependencies": {

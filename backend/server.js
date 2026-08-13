@@ -16050,14 +16050,14 @@ app.get('/api/companies/:companyId/activity-feed', requireAuth, async (req, res)
     // Verify user has access to this business
     const userId = req.user?.id;
     if (!userId || !(await isBusinessMember(companyId, userId))) {
-      return res.status(403).json(errorResponse('ACCESS_DENIED', 'You do not have access to this business'));
+      return res.status(403).json(errorResponse('You do not have access to this business', 'ACCESS_DENIED'));
     }
 
     const activities = await buildActivityFeed(companyId, locationId, maxLimit);
     return res.json(successResponse({ activities }));
   } catch (err) {
     logger.error('Error fetching activity feed:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch activity feed'));
+    return res.status(500).json(errorResponse(err.message || 'Failed to fetch activity feed', 'SERVER_ERROR'));
   }
 });
 
@@ -16071,7 +16071,7 @@ app.get('/api/companies/:companyId/dashboard', requireAuth, async (req, res) => 
     // Verify user has access to this business
     const userId = req.user?.id;
     if (!userId || !(await isBusinessMember(companyId, userId))) {
-      return res.status(403).json(errorResponse('ACCESS_DENIED', 'You do not have access to this business'));
+      return res.status(403).json(errorResponse('You do not have access to this business', 'ACCESS_DENIED'));
     }
     // Reject a locationId belonging to another company (M-12).
     if (!(await requireLocationInCompany(res, companyId, locationId))) return;
@@ -16264,7 +16264,7 @@ app.get('/api/companies/:companyId/dashboard', requireAuth, async (req, res) => 
     }));
   } catch (err) {
     logger.error('Error fetching business dashboard:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch dashboard'));
+    return res.status(500).json(errorResponse(err.message || 'Failed to fetch dashboard', 'SERVER_ERROR'));
   }
 });
 
@@ -16278,7 +16278,7 @@ app.get('/api/companies/:companyId/dashboard/overview', requireAuth, async (req,
 
     const userId = req.user?.id;
     if (!userId || !(await isBusinessMember(companyId, userId))) {
-      return res.status(403).json(errorResponse('ACCESS_DENIED', 'You do not have access to this business'));
+      return res.status(403).json(errorResponse('You do not have access to this business', 'ACCESS_DENIED'));
     }
     // Reject a locationId belonging to another company (M-12).
     if (!(await requireLocationInCompany(res, companyId, locationId))) return;
@@ -16291,7 +16291,7 @@ app.get('/api/companies/:companyId/dashboard/overview', requireAuth, async (req,
     const tier = business?.subscriptionTier || 'FREE';
     const hasAnalytics = tier === 'BUSINESS' || tier === 'ENTERPRISE';
     if (!hasAnalytics) {
-      return res.status(403).json(errorResponse('UPGRADE_REQUIRED', 'Analytics is available on the Business plan and above'));
+      return res.status(403).json(errorResponse('Analytics is available on the Business plan and above', 'UPGRADE_REQUIRED'));
     }
     const allow30d = tier === 'ENTERPRISE';
     const range = (req.query.range === '30d' && allow30d) ? '30d' : '7d';
@@ -16380,7 +16380,7 @@ app.get('/api/companies/:companyId/dashboard/overview', requireAuth, async (req,
     }));
   } catch (err) {
     logger.error('Error fetching dashboard overview:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch overview'));
+    return res.status(500).json(errorResponse(err.message || 'Failed to fetch overview', 'SERVER_ERROR'));
   }
 });
 
@@ -16392,13 +16392,13 @@ app.get('/api/companies/:companyId/dashboard/overview', requireAuth, async (req,
 // Shared gate: Business+ only. Returns { tier } or sends 403 and returns null.
 async function analyticsGate(companyId, userId, res) {
   if (!userId || !(await isBusinessMember(companyId, userId))) {
-    res.status(403).json(errorResponse('ACCESS_DENIED', 'You do not have access to this business'));
+    res.status(403).json(errorResponse('You do not have access to this business', 'ACCESS_DENIED'));
     return null;
   }
   const business = await prisma.business.findUnique({ where: { id: companyId }, select: { subscriptionTier: true } });
   const tier = business?.subscriptionTier || 'FREE';
   if (tier !== 'BUSINESS' && tier !== 'ENTERPRISE') {
-    res.status(403).json(errorResponse('UPGRADE_REQUIRED', 'Analytics is available on the Business plan and above'));
+    res.status(403).json(errorResponse('Analytics is available on the Business plan and above', 'UPGRADE_REQUIRED'));
     return null;
   }
   return { tier };
@@ -16528,7 +16528,7 @@ app.get('/api/companies/:companyId/analytics', requireAuth, async (req, res) => 
     }));
   } catch (err) {
     logger.error('Error fetching analytics:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch analytics'));
+    return res.status(500).json(errorResponse(err.message || 'Failed to fetch analytics', 'SERVER_ERROR'));
   }
 });
 
@@ -16623,7 +16623,7 @@ app.get('/api/companies/:companyId/variance', requireAuth, async (req, res) => {
     return res.json(successResponse({ period, budget, periodOverPeriod, margin }));
   } catch (err) {
     logger.error('Error fetching variance:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch variance'));
+    return res.status(500).json(errorResponse(err.message || 'Failed to fetch variance', 'SERVER_ERROR'));
   }
 });
 
@@ -16638,7 +16638,7 @@ app.get('/api/companies/:companyId/targets', requireAuth, async (req, res) => {
     return res.json(successResponse(target || { period, revenueTarget: null, ordersTarget: null }));
   } catch (err) {
     logger.error('Error fetching targets:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to fetch targets'));
+    return res.status(500).json(errorResponse('Failed to fetch targets', 'SERVER_ERROR'));
   }
 });
 
@@ -16655,7 +16655,7 @@ app.put('/api/companies/:companyId/targets', requireAuth, async (req, res) => {
     return res.json(successResponse(saved));
   } catch (err) {
     logger.error('Error saving targets:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to save targets'));
+    return res.status(500).json(errorResponse('Failed to save targets', 'SERVER_ERROR'));
   }
 });
 
@@ -16675,7 +16675,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
     // Verify user is requesting their own notifications
     const requestUserId = req.user?.id;
     if (requestUserId !== userId) {
-      return res.status(403).json(errorResponse('ACCESS_DENIED', 'You can only access your own notifications'));
+      return res.status(403).json(errorResponse('You can only access your own notifications', 'ACCESS_DENIED'));
     }
 
     const formatCurrency = (amount) => `Rs ${Number(amount || 0).toFixed(2)}`;
@@ -17385,7 +17385,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
     }));
   } catch (err) {
     logger.error('Error fetching notifications:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch notifications'));
+    return res.status(500).json(errorResponse(err.message || 'Failed to fetch notifications', 'SERVER_ERROR'));
   }
 });
 
@@ -17398,7 +17398,7 @@ app.post('/api/users/:userId/notifications/:notificationId/read', requireAuth, a
     // Verify user is updating their own notification
     const requestUserId = req.user?.id;
     if (requestUserId !== userId) {
-      return res.status(403).json(errorResponse('ACCESS_DENIED', 'You can only update your own notifications'));
+      return res.status(403).json(errorResponse('You can only update your own notifications', 'ACCESS_DENIED'));
     }
     
     // Persist read state using notificationReadRepo
@@ -17415,7 +17415,7 @@ app.post('/api/users/:userId/notifications/:notificationId/read', requireAuth, a
     }));
   } catch (err) {
     logger.error('Error marking notification as read:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to mark notification as read'));
+    return res.status(500).json(errorResponse(err.message || 'Failed to mark notification as read', 'SERVER_ERROR'));
   }
 });
 
@@ -17426,13 +17426,13 @@ app.post('/api/push-tokens/register', requireAuth, async (req, res) => {
   try {
     const { token, platform, deviceId } = req.body;
     if (!token || !platform) {
-      return res.status(400).json(errorResponse('VALIDATION', 'token and platform are required'));
+      return res.status(400).json(errorResponse('token and platform are required', 'VALIDATION'));
     }
     const record = await repos.pushTokenRepo.upsert(req.user.id, token, platform, deviceId || null);
     return res.json(successResponse(record, 'Push token registered'));
   } catch (err) {
     logger.error('[PushToken] Register error:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to register push token'));
+    return res.status(500).json(errorResponse('Failed to register push token', 'SERVER_ERROR'));
   }
 });
 
@@ -17441,13 +17441,13 @@ app.delete('/api/push-tokens/unregister', requireAuth, async (req, res) => {
   try {
     const { token } = req.body;
     if (!token) {
-      return res.status(400).json(errorResponse('VALIDATION', 'token is required'));
+      return res.status(400).json(errorResponse('token is required', 'VALIDATION'));
     }
     await repos.pushTokenRepo.deactivate(req.user.id, token);
     return res.json(successResponse(null, 'Push token unregistered'));
   } catch (err) {
     logger.error('[PushToken] Unregister error:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to unregister push token'));
+    return res.status(500).json(errorResponse('Failed to unregister push token', 'SERVER_ERROR'));
   }
 });
 
@@ -17462,7 +17462,7 @@ app.get('/api/notification-preferences', requireAuth, async (req, res) => {
     return res.json(successResponse(prefs));
   } catch (err) {
     logger.error('[NotifPrefs] Get error:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to get notification preferences'));
+    return res.status(500).json(errorResponse('Failed to get notification preferences', 'SERVER_ERROR'));
   }
 });
 
@@ -17478,13 +17478,13 @@ app.patch('/api/notification-preferences', requireAuth, async (req, res) => {
       }
     }
     if (Object.keys(updates).length === 0) {
-      return res.status(400).json(errorResponse('VALIDATION', 'No valid preferences to update'));
+      return res.status(400).json(errorResponse('No valid preferences to update', 'VALIDATION'));
     }
     const prefs = await repos.notificationPreferenceRepo.upsert(req.user.id, updates);
     return res.json(successResponse(prefs, 'Preferences updated'));
   } catch (err) {
     logger.error('[NotifPrefs] Update error:', err);
-    return res.status(500).json(errorResponse('SERVER_ERROR', 'Failed to update notification preferences'));
+    return res.status(500).json(errorResponse('Failed to update notification preferences', 'SERVER_ERROR'));
   }
 });
 

@@ -11,6 +11,7 @@ import {
   STATUS_TO_TIMELINE_STEP,
   type StatusBadgeConfig,
 } from '@/shared/ui/tokens/orderEventCard';
+import { formatCurrency as sharedFormatCurrency } from '@/shared/utils/format';
 
 // ============================================================================
 // Action Types
@@ -141,8 +142,10 @@ export function getSellerActions(status: OrderEventStatus): OrderEventAction[] {
 /**
  * Format currency amount
  */
-export function formatCurrency(amount: number, currency: string = 'MUR'): string {
-  return `${currency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export function formatCurrency(amount: number, currency?: string): string {
+  // Rendered the literal code — "MUR 1,500.00" — instead of the symbol, and pinned the
+  // locale to en-US. Delegates now.
+  return sharedFormatCurrency(amount, currency);
 }
 
 /**
