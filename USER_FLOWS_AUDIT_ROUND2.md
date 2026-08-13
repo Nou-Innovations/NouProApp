@@ -7,7 +7,7 @@
 
 **Severity:** **P0** = broken or user-visibly wrong for everyone who tries it · **P1** = real bug or missing piece users will hit · **P2** = polish / integrity.
 
-**Status: every P0 and every P1 in this document is now fixed.** Batches 1–4 closed the P0s; the P1 sweep (phases 1–3) plus the individual A-*/P-*/N-* batches closed the rest. What remains is **22 P2 rows** — the authoritative list is the per-section tables above (rows not marked FIXED), never this line.
+**Status: every row in this document is closed** — all P0s, all P1s, all 22 P2s. The audit is complete as of 2026-08-12. The authoritative record is the per-section tables above, never this line; anything reopened should be marked there first.
 
 ---
 
@@ -129,7 +129,7 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | B-1 | P1 | **FIXED ✅** (already fixed, confirmed in phase 1) — **No screen for incoming partner requests.** `GET /business-connections/:businessId/pending` (`server.js:3517`) has zero frontend callers; the only surface is the notification feed, and `ConnectionsScreen` filters to accepted only. No disconnect UI either (round-1 B-3 confirmed open). |
 | B-2 | P1 | **FIXED ✅** (`6f1b7fe7`) — **Two parallel implementations still coexist** (round-1 B-2 confirmed open). The legacy `POST /api/companies/:companyId/connections` (`server.js:6468`) writes with no reverse-direction check, while the canonical `/business-connections/request` checks both — and `ConnectionsScreen.tsx:85` still reads from the legacy one. |
 | B-3 | P1 | **FIXED ✅** — **Supplier↔business linking has schema, backend and a nav type but no UI.** `navigation.ts:385` declares `AddSupplier: { supplierBusinessId?: string }`; `AddSupplierScreen` never reads it and no caller passes it. Customers have the equivalent UI (gated on accepted connections) — suppliers are the asymmetric gap. |
-| B-4 | P2 | **CRM links are unilateral, unvalidated and unnotified.** `customerBusinessId`/`supplierBusinessId` are written (`server.js:5026,5062,7540`) with no existence check, no connection check and no notification — company A can silently list company B as its customer. The only *consented* company↔company relationship is `BusinessConnection`. |
+| B-4 | P2 | **FIXED ✅ (also closed a bypass the audit missed: `linkInvoiceCustomer` copied an unvalidated `clientBusinessId` straight into the CRM link)** — **CRM links are unilateral, unvalidated and unnotified.** `customerBusinessId`/`supplierBusinessId` are written (`server.js:5026,5062,7540`) with no existence check, no connection check and no notification — company A can silently list company B as its customer. The only *consented* company↔company relationship is `BusinessConnection`. |
 
 ---
 
@@ -147,9 +147,9 @@ A recurring root cause runs through a third of these: **`ApiError.response` is t
 | N-8 | P1 | **FIXED ✅** (this batch) — **Order pushes are filed under the wrong preference.** `eventMessages.js:111` routes order events through the chat push helper, which sends `category: 'messages'` (`server.js:15537`) — so turning off "Messages" kills order pushes, and turning off "Orders" doesn't. |
 | N-9 | P1 | **FIXED ✅** — **Tapping a notification never marks it read visually** — fire-and-forget with no local state update (`:461-465`), so the row stays highlighted until a manual refresh. And **"mark all as read" is client-only**: `markAllAsRead` is `setUnreadCount(0)` with no network call, no bulk endpoint exists, and there is no UI button. Server-side rows stay unread forever. |
 | N-10 | P1 | **FIXED ✅** — **Permission is requested the instant the user first signs in**, with no priming screen, and a decline is silent (round-1 N-13/N-14). The settings recovery message can't distinguish "denied" from "simulator". |
-| N-11 | P2 | **No welcome notification and no seed content** — notifications are *derived* on read from other tables (`server.js:14423-14919`), so there is no table a welcome row could even be written to. No tooltip/coach-mark/checklist system exists anywhere in the app. |
-| N-12 | P2 | **No pagination** — the list has no `onEndReached` and the backend hard-caps each section (`take: 50/20/10`, `slice(0,5)`) with no cursor, so older notifications are simply unreachable. Search is client-side over the loaded page only. Every filter tap replaces the list with skeletons (full-screen flash). |
-| N-13 | P2 | `subscription_due` navigates to `SubscriptionPlans` discarding `requestData.businessId` — an admin of multiple businesses lands on the wrong one. Stock alerts hardcode `time: 'now'` so they always sort to the top and never age. |
+| N-11 | P2 | **FIXED ✅ (also fixed the unreported half: the onboarding cards were hardcoded `read: false`, so new users had an unread badge of 2 that nothing could clear)** — **No welcome notification and no seed content** — notifications are *derived* on read from other tables (`server.js:14423-14919`), so there is no table a welcome row could even be written to. No tooltip/coach-mark/checklist system exists anywhere in the app. |
+| N-12 | P2 | **FIXED ✅ (opt-in pagination; the per-source caps, not `limit`, were the real depth limit)** — **No pagination** — the list has no `onEndReached` and the backend hard-caps each section (`take: 50/20/10`, `slice(0,5)`) with no cursor, so older notifications are simply unreachable. Search is client-side over the loaded page only. Every filter tap replaces the list with skeletons (full-screen flash). |
+| N-13 | P2 | **FIXED ✅ (worse than described: the plans screen acts on the ACTIVE business, so a multi-company admin could pay for the wrong one)** — `subscription_due` navigates to `SubscriptionPlans` discarding `requestData.businessId` — an admin of multiple businesses lands on the wrong one. Stock alerts hardcode `time: 'now'` so they always sort to the top and never age. |
 | N-14 | P2 | **FIXED ✅ (the "Notifications route is unreachable" claim was WRONG — `pushRouting.ts` depends on it, so the route stays)** — `NotificationBell` is dead code (zero importers), which also makes the `Notifications` RootStack route unreachable — both modes reach notifications via the tab. `message` and `system` types are handled/typed but never emitted by the backend. |
 | N-15 | P2 | **FIXED ✅ (also fixed the unreported half: every row read "Present - Present")** — The Experience section vanishes entirely for users with no company (`PersonalProfileScreen.tsx:418`), and `ActivityScreen`'s error state is a dead end with no retry (it replaces the list, so pull-to-refresh is gone too). |
 
@@ -311,13 +311,19 @@ Invites for people without an account went into a new `CompanyInvite` table inst
 
 ---
 
-## Still open (P1/P2 polish)
+## Still open
 
-**Every P0 and every P1 is fixed.** What remains is **22 P2 rows** — the authoritative list is the per-section tables above (rows not marked FIXED), not this paragraph.
+**Nothing.** Every P0, P1 and P2 row in this document is marked FIXED or RESOLVED BY DESIGN. Verify against the tables above rather than trusting this line.
 
-**Why this section keeps going stale, and the rule that fixes it.** Phases 1 and 2 of the P1 sweep shipped 12 fixes and no doc commit followed, so 14 rows read as open for a day and I reported P-13 as broken when it had been fixed since `8d66cf5d`. An earlier version of this same paragraph went the other way and claimed the audit was complete when it wasn't. **Mark the rows in the same commit as the code** — every doc-only follow-up commit in the log below is one that nearly got skipped. And when answering "what's left", read the table rows against the code, not the summary.
+**Why this section kept going stale, and the rule that fixed it.** Phases 1 and 2 of the P1 sweep shipped 12 fixes with no doc commit, so 14 rows read as open for a day and I reported P-13 as broken when it had been fixed since `8d66cf5d`. An earlier version of this paragraph went the other way and claimed the audit was complete when it wasn't. **Mark the rows in the same commit as the code.** And when answering "what's left", read the rows against the code — over the three P2 batches, **ten of the 22 rows turned out to be already fixed, wrong as written, or materially worse than described**.
+
+**Deferred deliberately, with a reason:**
+
+- **`language`** (part of P-16) — the column exists and the API accepts it, but the app has no i18n system at all: no library, no translation files, and nothing reads the value. A picker would change a database column and do nothing visible, which is the same class of bug this audit spent three batches removing. Arnaud chose to build real i18n as its own scoped workstream rather than fold a stub into a P2 sweep.
+- **Payments pagination** — found while doing N-12, unrelated to this audit. `usePayments` sends `page`, the backend reads only `offset`, and the declared `totalPages` never exists, so `loadMore` never fires and Payment History shows only the first 20 rows. Filed separately rather than widening the batch.
 
 **Not code, needs Arnaud:** the Supabase Storage bucket/key/Render env (P-8, code ready since `6f1b7fe7`); DNS for `nou.pro`, which nothing currently serves; counsel sign-off on the registered entity name and governing-law jurisdiction; and whether to move the mail sending domain to `nou.pro` (SPF/DKIM).
+
 
 ---
 
@@ -691,6 +697,76 @@ landed security Batch E and F while this was in progress.
 4. Sign in with 2FA and let it sit 5 minutes — a countdown runs, the message says it expired, and "Start over" returns you to sign-in instead of logging you out.
 5. Have someone decline your connection request — you get told.
 6. Open your profile with no company — Experience shows your added roles, and no row says "Present - Present".
+
+---
+
+## Fix log — P2 sweep batch 3 (2026-08-12) — audit complete
+
+The last four rows, and the sweep's only migration. Two were worse than described.
+
+**B-4 — the rule had a bypass the audit never mentions.** `customerBusinessId` /
+`supplierBusinessId` were written with no existence check, no relationship check and no
+notification, so company A could silently list company B as its customer. Per Arnaud's
+call the link now requires an **accepted connection**, enforced with the existing
+`areBusinessesConnected` and `getActiveById` (the latter covers existence *and*
+soft-deletion, which matters because company deletes are soft — an archived company was
+otherwise still claimable). Three things that would each have broken something:
+
+- **`linkInvoiceCustomer` was the way around it.** It copies an invoice's `clientBusinessId` straight into the CRM link, and `clientBusinessId` is never validated on invoice create — so raising a bogus invoice minted a linked Customer claiming any company you liked. It is deliberately **not** a rejection: the function is wrapped in a catch that only logs, so a thrown error would vanish silently, and failing the invoice would be a far worse trade than an unlinked CRM row. The customer is still created, just without the claim.
+- **The PATCH validates only when the link CHANGES.** `AddCustomerScreen` always resends `customerBusinessId`, so an unconditional check would have rejected an unrelated edit — changing a phone number on a row linked before this rule would start failing.
+- **The seed route is exempt.** It backfills historical rows from past invoices and orders; applying the rule there would break the migration path.
+
+Existing links are untouched — no reader re-validates, so create-time enforcement is safe.
+`AddSupplierScreen` also showed a generic message and would have swallowed the new error.
+
+**N-11 — a badge nobody could clear.** The two getting-started cards were a client-side
+`const` prepended after the server's sort with **`read: false` hardcoded**. Tapping one
+marked it read optimistically and POSTed the key, which the server dutifully stored — but
+the next fetch re-created the constant, so it returned unread. **New users had a permanent
+unread badge of 2**, and the module-level `new Date()` meant "Just now" drifted the longer
+the app stayed open. Both cards are derived server-side now, alongside a welcome row keyed
+on `User.createdAt` (the handler previously loaded no user row at all), so read-state
+applies for free and they sort by time like everything else.
+
+**N-12 — the caps were the real limit, not the page size.** The list is assembled, sorted,
+read-stamped and filtered server-side, so the page slice goes **after the filter chain** —
+`filter=unread` depends on read-state, and slicing earlier would return short pages. Two
+traps: the per-source caps are applied *before* the merge, so raising `limit` alone would
+have changed nothing past roughly 100 rows; and **two places derive the app-icon badge by
+counting unread items in the returned array** (`NotificationContext` and the screen, which
+overwrites it), so paginating naively would have made the badge silently report only page
+one — the server now returns `unreadCount` over the whole filtered set. **Pagination is
+opt-in**: no `limit` param and the response is byte-identical to before, because the
+backend deploys on push while the app ships via EAS and installed builds must keep working.
+This is a deeper window, not infinite history — the feed is derived, not stored.
+
+**N-13 — it could charge the wrong company.** `subscription_due` navigated to the plans
+screen and dropped the `businessId` the backend already sends. That screen reads
+`activeBusiness` for the plan it shows, the upgrade/downgrade branch **and the checkout
+call** — so an admin of several companies tapping "your Acme subscription is due" could
+land on, and pay for, whichever company happened to be active. Per Arnaud's call the app
+now switches to that company first, and **refuses to navigate if the switch fails** (left
+the company, suspended, staff-only) rather than falling back to someone else's billing.
+Same for the push route.
+
+**The migration** (`20260812120000_add_stock_updated_at`): `Stock` had no timestamps, so
+the derivation invented `new Date()` per request and every low-stock alert pinned itself
+above genuinely recent activity, permanently, with a label that never aged. Purely
+additive. Existing rows are stamped with the deploy time — a backfill, not real history —
+so **on the first day every alert still sorts together**, and it self-corrects as stock
+moves.
+
+**Verified:** backend 154/154, ESLint 0 errors, `tsc` 133 = unchanged baseline. The
+migration was validated locally (`prisma validate`) and applies on deploy; it was not run
+from the dev machine.
+
+### Smoke tests
+
+1. As an admin of two companies, tap a subscription notice for the *other* one — the app switches to that company before the plans screen opens. **This is the money path.**
+2. Add a company you're not connected to as a customer — refused. One you are — works, and they're told.
+3. Invoice a company you're not connected to — the invoice still works and the customer still appears, just unlinked.
+4. As a new user, open Notifications — there's a welcome. Tap it; it stays read and the badge clears.
+5. Scroll notifications past the first page.
 
 ---
 

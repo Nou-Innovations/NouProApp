@@ -19,6 +19,7 @@ export interface Notification {
     | 'company_request'
     | 'connection_accepted'
     | 'connection_declined'
+    | 'welcome'
     | 'invoice'
     | 'delivery'
     | 'stock_alert'
@@ -90,20 +91,61 @@ export type NotificationMode = 'business' | 'personal';
 /**
  * Get notifications for a user, filtered by mode
  */
-export async function getNotifications(
+export interface NotificationPage {
+  notifications: Notification[];
+  /** Unread across the WHOLE filtered set, not just this page — the badge reads this. */
+  unreadCount: number;
+  total: number;
+  hasMore: boolean;
+}
+
+/**
+ * Get notifications for a user, filtered by mode.
+ *
+ * Pagination is opt-in: pass `limit` and the server slices, omit it and you get the
+ * full (capped) list exactly as before. Older app builds send neither, which is why
+ * the server keeps that path — the backend deploys on push while the app ships via
+ * EAS, so installed builds must keep working unchanged (N-12).
+ */
+export async function getNotificationPage(
   userId: string,
-  filter?: NotificationFilter,
-  mode?: NotificationMode,
-): Promise<Notification[]> {
+  opts: {
+    filter?: NotificationFilter;
+    mode?: NotificationMode;
+    limit?: number;
+    offset?: number;
+  } = {},
+): Promise<NotificationPage> {
   const params = new URLSearchParams();
-  if (filter && filter !== 'all') params.append('filter', filter);
-  if (mode) params.append('mode', mode);
+  if (opts.filter && opts.filter !== 'all') params.append('filter', opts.filter);
+  if (opts.mode) params.append('mode', opts.mode);
+  if (opts.limit !== undefined) params.append('limit', String(opts.limit));
+  if (opts.offset !== undefined) params.append('offset', String(opts.offset));
 
   const query = params.toString();
   const response = await api.get(
     `/users/${userId}/notifications${query ? `?${query}` : ''}`,
   );
-  return response.data.data.notifications;
+  const body = response.data.data;
+  const notifications: Notification[] = body?.notifications ?? [];
+  return {
+    notifications,
+    // Fall back to counting when the server predates the field, so the badge is never
+    // worse than it was.
+    unreadCount: body?.unreadCount ?? notifications.filter((n) => !n.read).length,
+    total: body?.total ?? notifications.length,
+    hasMore: Boolean(body?.hasMore),
+  };
+}
+
+/** Unpaginated convenience wrapper, unchanged for existing callers. */
+export async function getNotifications(
+  userId: string,
+  filter?: NotificationFilter,
+  mode?: NotificationMode,
+): Promise<Notification[]> {
+  const { notifications } = await getNotificationPage(userId, { filter, mode });
+  return notifications;
 }
 
 /**

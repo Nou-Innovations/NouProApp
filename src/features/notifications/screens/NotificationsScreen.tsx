@@ -23,7 +23,7 @@ import FilterBar from '@/shared/components/ui/FilterBar';
 import { AppModal, ListItemCard, EmptyState, SkeletonListItem } from '@/shared/components/ui';
 import theme from '@/shared/theme';
 import {
-  getNotifications,
+  getNotificationPage,
   markNotificationRead,
   acceptConnectionRequest,
   declineConnectionRequest,
@@ -60,29 +60,12 @@ const BUSINESS_FILTERS = ['all', 'requests', 'deliveries', 'invoices', 'orders']
 // Personal mode filters
 const PERSONAL_FILTERS = ['all', 'requests', 'connections', 'jobs'];
 
-// Onboarding notifications shown in personal mode for new users
-const ONBOARDING_NOTIFICATIONS: Notification[] = [
-  {
-    id: 'onboarding-create-business',
-    type: 'onboarding_create_business',
-    title: 'Create your Business profile',
-    description: 'Set up your own business and start managing your operations',
-    time: 'Just now',
-    timestamp: new Date().toISOString(),
-    read: false,
-    avatar: null,
-  },
-  {
-    id: 'onboarding-join-company',
-    type: 'onboarding_join_company',
-    title: 'Join an existing Company',
-    description: 'Request to join a company and collaborate with your team',
-    time: 'Just now',
-    timestamp: new Date().toISOString(),
-    read: false,
-    avatar: null,
-  },
-];
+/**
+ * Rows per page. The feed is derived on read, not stored, and the per-source caps in the
+ * handler bound how deep it goes — this is a deeper window, not infinite history.
+ */
+const PAGE_SIZE = 20;
+
 
 const TYPE_COLORS: Record<string, string> = {
   // Business mode
@@ -108,6 +91,7 @@ const TYPE_COLORS: Record<string, string> = {
   // rows at all. Removed rather than left as forward-compat, since a handler nothing
   // can reach reads as a working feature (N-14). Unrelated to the `system` PUSH
   // preference column, which is live.
+  welcome: '#FF7A00',
   onboarding_create_business: '#2A75E6',
   onboarding_join_company: '#FF7A00',
 };
@@ -141,6 +125,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       case 'connection_declined': return 'close-circle-outline';
       case 'join_request_rejected': return 'close-circle-outline';
       case 'status_change': return 'shield-checkmark-outline';
+      case 'welcome': return 'sparkles-outline';
       case 'onboarding_create_business': return 'business-outline';
       case 'onboarding_join_company': return 'people-outline';
       default: return 'notifications';
@@ -254,6 +239,10 @@ export default function NotificationsScreen() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  /** Unread across the whole filtered set, from the server. Null until the first fetch. */
+  const [serverUnread, setServerUnread] = useState<number | null>(null);
 
   const navigation = useNavigation<any>();
   const { theme: appTheme } = useTheme();
@@ -265,17 +254,16 @@ export default function NotificationsScreen() {
   const currentUserRole = useProfileStore((state) => state.currentUserRole);
   const activeMode = useProfileStore((state) => state.activeMode);
   const refreshBusinesses = useProfileStore((state) => state.refreshBusinesses);
+  const switchToBusiness = useProfileStore((state) => state.switchToBusiness);
+  const activeBusinessId = useProfileStore((state) => state.activeBusinessId);
 
   const isPersonalMode = activeMode === 'personal';
-  /**
-   * Show the getting-started cards to anyone in personal mode with no company — not
-   * only to `isNewUser`, which HomeScreen clears on a 5-second timer and which isn't
-   * persisted, so the cards were effectively unreachable. They are now MERGED with
-   * real notifications rather than replacing them: the old code returned the static
-   * array before the API call, so someone who signed up via an invite and opened this
-   * screen within those 5 seconds saw two tips instead of their actual invite (N-4).
+  /*
+   * The getting-started cards moved server-side (N-11). They keep the N-4 rule that
+   * earned them — shown to anyone in personal mode with no company, rather than to
+   * `isNewUser`, which HomeScreen clears on a 5-second timer and never persists — but
+   * the condition now lives in the notifications handler, where read-state applies.
    */
-  const showOnboardingCards = isPersonalMode && userBusinesses.length === 0;
 
   // Reset filter to 'all' when mode changes
   useEffect(() => {
@@ -290,26 +278,60 @@ export default function NotificationsScreen() {
 
     try {
       setLoading(true);
-      const data = await getNotifications(
-        currentUser.id,
-        selectedFilter === 'all' ? undefined : (selectedFilter as any),
-        isPersonalMode ? 'personal' : 'business',
-      );
-      // Prepend the getting-started cards rather than substituting for the feed.
-      setNotifications(showOnboardingCards ? [...ONBOARDING_NOTIFICATIONS, ...data] : data);
+      const page = await getNotificationPage(currentUser.id, {
+        filter: selectedFilter === 'all' ? undefined : (selectedFilter as any),
+        mode: isPersonalMode ? 'personal' : 'business',
+        limit: PAGE_SIZE,
+        offset: 0,
+      });
+      // The getting-started cards are derived server-side now, so they arrive with real
+      // read-state. They used to be a client-side const with `read: false` hardcoded,
+      // which meant they could never be dismissed and the unread badge was permanently
+      // stuck at 2 for new users (N-11).
+      setNotifications(page.notifications);
+      setHasMore(page.hasMore);
+      setServerUnread(page.unreadCount);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
-      setNotifications(showOnboardingCards ? ONBOARDING_NOTIFICATIONS : []);
+      setNotifications([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.id, selectedFilter, isPersonalMode, showOnboardingCards]);
+  }, [currentUser?.id, selectedFilter, isPersonalMode]);
+
+  /**
+   * Append the next page. Uses its own flag rather than `loading`, which swaps the whole
+   * list out for skeletons — reusing it would blank the feed mid-scroll (N-12).
+   */
+  const loadMore = useCallback(async () => {
+    if (!currentUser?.id || loadingMore || loading || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await getNotificationPage(currentUser.id, {
+        filter: selectedFilter === 'all' ? undefined : (selectedFilter as any),
+        mode: isPersonalMode ? 'personal' : 'business',
+        limit: PAGE_SIZE,
+        offset: notifications.length,
+      });
+      setNotifications((prev) => [...prev, ...page.notifications]);
+      setHasMore(page.hasMore);
+      setServerUnread(page.unreadCount);
+    } catch (error) {
+      console.error('Failed to load more notifications:', error);
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [currentUser?.id, loadingMore, loading, hasMore, notifications.length, selectedFilter, isPersonalMode]);
 
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  // Server-computed, covering the whole filtered set. Counting the loaded rows would
+  // report only what has been scrolled to (N-12).
+  const unreadCount = serverUnread ?? notifications.filter((n) => !n.read).length;
   useEffect(() => {
     setUnreadCount(unreadCount);
   }, [unreadCount, setUnreadCount]);
@@ -586,8 +608,34 @@ export default function NotificationsScreen() {
           navigation.navigate('ProductDetail', { productId: notification.productData.productId });
         }
         break;
-      case 'subscription_due':
+      case 'subscription_due': {
+        // Switch to the company the notice is ABOUT before opening plans. The screen
+        // reads activeBusiness for the current plan, the upgrade/downgrade branch AND
+        // the checkout call — so an admin of several companies tapping "your Acme
+        // subscription is due" could land on, and pay for, whichever company happened
+        // to be active (N-13). switchToBusiness validates membership and accepted
+        // status, so a notice for a company you've since left fails safely.
+        const targetBusinessId = notification.requestData?.businessId;
+        if (targetBusinessId && targetBusinessId !== activeBusinessId) {
+          // Await the result and DON'T navigate if it fails. switchToBusiness returns
+          // false for a company you've left, been suspended from, or only have staff
+          // access to — opening the plans screen anyway would land you on whichever
+          // company was already active, which is the exact bug being fixed.
+          const switched = await switchToBusiness(targetBusinessId);
+          if (!switched) {
+            AppAlert.alert(
+              'Not available',
+              'You no longer have access to that company\'s billing.',
+            );
+            break;
+          }
+        }
         navigation.navigate('SubscriptionPlans');
+        break;
+      }
+      case 'welcome':
+        // Straight to the thing the copy asks for — a photo and a headline.
+        navigation.navigate('EditPersonalProfile');
         break;
       case 'onboarding_create_business':
         navigation.navigate('BusinessBasicInfo', { fromProfileSwitcher: true });
@@ -690,6 +738,15 @@ export default function NotificationsScreen() {
           contentContainerStyle={styles.listContent}
           style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
+          onEndReached={hasMore ? loadMore : undefined}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={styles.footerLoading}>
+                <ActivityIndicator color={appTheme.colors.primary} />
+              </View>
+            ) : null
+          }
           removeClippedSubviews
           maxToRenderPerBatch={10}
           windowSize={5}
@@ -776,6 +833,10 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+  },
+  footerLoading: {
+    paddingVertical: 20,
+    alignItems: 'center',
   },
   listContent: {
     paddingBottom: theme.spacing.lg,

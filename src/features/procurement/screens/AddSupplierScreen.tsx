@@ -18,6 +18,7 @@ import { getConnectedBusinesses, type ConnectedBusiness } from '@/features/prici
 import * as procurementService from '../services/procurement.service';
 import { useProcurementStore } from '../store/procurement.store';
 import type { CreateSupplierData } from '@/shared/types/procurement';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 
 export default function AddSupplierScreen() {
   const navigation = useNavigation();
@@ -138,7 +139,13 @@ export default function AddSupplierScreen() {
       }
     } catch (error) {
       console.error('Error saving supplier:', error);
-      AppAlert.alert('Error', `Failed to ${isEditMode ? 'update' : 'add'} supplier. Please try again.`);
+      // Surface what the server actually said. The generic message swallowed real
+      // reasons — a plan limit, a duplicate link, or (now) "you can only link a company
+      // you are connected with", which is actionable and was invisible here (B-4).
+      AppAlert.alert(
+        'Error',
+        getApiErrorMessage(error, `Failed to ${isEditMode ? 'update' : 'add'} supplier. Please try again.`),
+      );
     } finally {
       setIsSubmitting(false);
     }

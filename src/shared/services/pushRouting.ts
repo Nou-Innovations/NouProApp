@@ -23,6 +23,12 @@ export const navigationRef = createNavigationContainerRef();
 export interface PushTarget {
   screen: string;
   params?: Record<string, unknown>;
+  /**
+   * Make this company active before navigating. Only for screens whose meaning depends
+   * on the active business — the subscription plans screen reads it for the plan shown
+   * AND the checkout it starts (N-13). Navigation is abandoned if the switch is refused.
+   */
+  switchToBusinessId?: string;
 }
 
 /**
@@ -71,9 +77,16 @@ export function resolvePushTarget(data: unknown): PushTarget | null {
       break;
   }
 
-  // Subscription pushes share a prefix.
+  // Subscription pushes share a prefix. Carry the company id through: the plans screen
+  // acts on whichever business is ACTIVE, so without this a multi-company admin tapping
+  // a subscription push could pay for the wrong one (N-13).
   if (typeof d.type === 'string' && d.type.startsWith('subscription_')) {
-    return { screen: 'SubscriptionPlans' };
+    return {
+      screen: 'SubscriptionPlans',
+      ...(d.companyId || d.businessId
+        ? { switchToBusinessId: String(d.companyId || d.businessId) }
+        : {}),
+    };
   }
   return null;
 }
@@ -104,6 +117,24 @@ export function navigateToPushTarget(target: PushTarget | null): void {
   if (!navigationRef.isReady()) {
     setPendingPushTarget(target);
     return;
+  }
+
+  // Some targets are only correct in the context of a particular company — the plans
+  // screen reads the ACTIVE business for the plan it shows and the checkout it starts.
+  // Switch first, and drop the navigation entirely if the switch is refused (left the
+  // company, suspended, staff-only), rather than landing on someone else's billing.
+  if (target.switchToBusinessId) {
+    const { useProfileStore } = require('@/shared/store/profileStore');
+    const state = useProfileStore.getState();
+    if (state.activeBusinessId !== target.switchToBusinessId) {
+      void state
+        .switchToBusiness(target.switchToBusinessId)
+        .then((ok: boolean) => {
+          if (ok) navigateToPushTarget({ ...target, switchToBusinessId: undefined });
+        })
+        .catch(() => {});
+      return;
+    }
   }
   // The ref is untyped here (the RootStack param list lives in App.tsx), so widen it
   // rather than fight the overloads with `as never`.

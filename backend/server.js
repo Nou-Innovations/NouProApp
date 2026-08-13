@@ -6552,15 +6552,33 @@ async function linkInvoiceCustomer(invoice) {
   try {
     if (!invoice || invoice.customerId) return invoice;
     if (!invoice.clientName && !invoice.clientBusinessId) return invoice;
+
+    // This path was the way around B-4's rule: it copies the invoice's clientBusinessId
+    // straight into customerBusinessId, and clientBusinessId is never validated on
+    // invoice create — so raising a bogus invoice minted a linked Customer claiming any
+    // company you liked.
+    //
+    // Deliberately NOT a rejection. Failing here would fail the invoice, which is a far
+    // worse trade than an unlinked CRM row — and this whole function is wrapped in a
+    // catch that only logs, so a thrown error would vanish silently anyway. Instead the
+    // customer is still created, just WITHOUT the claim on the other company.
+    let linkedBusinessId = invoice.clientBusinessId || null;
+    if (linkedBusinessId) {
+      const connected = await repos.connectionRepo
+        .areBusinessesConnected(invoice.businessId, linkedBusinessId)
+        .catch(() => false);
+      if (!connected) linkedBusinessId = null;
+    }
+
     const existing = await repos.customerRepo.findByIdentity(invoice.businessId, {
-      customerBusinessId: invoice.clientBusinessId,
+      customerBusinessId: linkedBusinessId,
       name: invoice.clientName,
       email: invoice.clientEmail,
     });
     const customer = existing || (await repos.customerRepo.create({
       id: 'cus-' + uuidv4().slice(0, 8),
       businessId: invoice.businessId,
-      customerBusinessId: invoice.clientBusinessId || null,
+      customerBusinessId: linkedBusinessId,
       name: (invoice.clientName || '').trim() || 'Unnamed customer',
       email: invoice.clientEmail || null,
       phone: invoice.clientPhone || null,
@@ -6617,6 +6635,68 @@ app.get('/api/companies/:companyId/customers/:customerId', requireAuth, async (r
 });
 
 // Create a customer
+/**
+ * A CRM row may only CLAIM another company when the two are actually connected.
+ *
+ * `customerBusinessId` / `supplierBusinessId` were written with no existence check, no
+ * relationship check and no notification, so company A could silently list company B as
+ * its customer or supplier — B never learned of it and had no say. Both Add screens
+ * already offer only accepted connections in their picker, so this makes the server
+ * enforce the contract the UI already implies (B-4).
+ *
+ * `getActiveById` covers existence AND soft-deletion in one call (business deletes are
+ * soft, so an archived company would otherwise stay claimable).
+ *
+ * Returns true when the link is allowed, INCLUDING when there is no link at all —
+ * unlinked CRM rows are the normal case for walk-in and one-off customers. Sends the
+ * error and returns false otherwise.
+ */
+async function requireLinkableBusiness(res, ownCompanyId, linkedBusinessId, kind) {
+  if (!linkedBusinessId) return true;
+
+  if (linkedBusinessId === ownCompanyId) {
+    res.status(400).json(errorResponse(
+      `A company cannot be its own ${kind}.`, 'SELF_LINK',
+    ));
+    return false;
+  }
+
+  const linked = await repos.businessRepo.getActiveById(linkedBusinessId);
+  if (!linked) {
+    res.status(404).json(errorResponse('That company was not found', 'BUSINESS_NOT_FOUND'));
+    return false;
+  }
+
+  const connected = await repos.connectionRepo.areBusinessesConnected(ownCompanyId, linkedBusinessId);
+  if (!connected) {
+    res.status(403).json(errorResponse(
+      `You can only link a company you are connected with. Send ${linked.name} a connection request first, or save this as a standalone ${kind}.`,
+      'NOT_CONNECTED',
+    ));
+    return false;
+  }
+  return true;
+}
+
+/** Tell the linked company's admins they've been listed. Fire-and-forget. */
+async function notifyLinkedBusiness(ownCompanyId, linkedBusinessId, kind) {
+  try {
+    const [own, admins] = await Promise.all([
+      repos.businessRepo.getById(ownCompanyId),
+      getBusinessAdminUserIds(linkedBusinessId),
+    ]);
+    if (!admins.length) return;
+    pushToUsers(admins, {
+      title: `Listed as a ${kind}`,
+      body: `${own?.name || 'A company'} added your business as a ${kind}.`,
+      category: 'system',
+      data: { type: 'crm_link_created', companyId: ownCompanyId, kind },
+    });
+  } catch (err) {
+    logger.error('[CRM] Could not notify linked business:', err);
+  }
+}
+
 app.post('/api/companies/:companyId/customers', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
@@ -6626,6 +6706,7 @@ app.post('/api/companies/:companyId/customers', requireAuth, async (req, res) =>
     if (!name || !name.trim()) {
       return res.status(400).json(errorResponse('Customer name is required'));
     }
+    if (!(await requireLinkableBusiness(res, companyId, customerBusinessId, 'customer'))) return;
 
     const newCustomer = await repos.customerRepo.create({
       id: 'cus-' + uuidv4().slice(0, 8),
@@ -6639,6 +6720,10 @@ app.post('/api/companies/:companyId/customers', requireAuth, async (req, res) =>
       notes: notes || null,
       status: status === 'ARCHIVED' ? 'ARCHIVED' : 'ACTIVE',
     });
+
+    if (customerBusinessId) {
+      notifyLinkedBusiness(companyId, customerBusinessId, 'customer');
+    }
 
     res.status(201).json(successResponse(newCustomer));
   } catch (e) {
@@ -6659,6 +6744,18 @@ app.patch('/api/companies/:companyId/customers/:customerId', requireAuth, async 
     }
 
     const { name, contactName, email, phone, address, notes, customerBusinessId, status } = req.body;
+
+    // Validate only when the link actually CHANGES, and never when it's being cleared.
+    // AddCustomerScreen always resends customerBusinessId, so checking unconditionally
+    // would reject an unrelated edit — changing a phone number on a row linked before
+    // this rule existed would start failing. Existing links stay valid; the rule applies
+    // to new claims (B-4).
+    const nextLink = customerBusinessId || null;
+    const linkChanged = customerBusinessId !== undefined && nextLink !== (customer.customerBusinessId || null);
+    if (linkChanged && nextLink) {
+      if (!(await requireLinkableBusiness(res, companyId, nextLink, 'customer'))) return;
+    }
+
     const updated = await repos.customerRepo.update(customerId, {
       ...(name !== undefined && { name }),
       ...(contactName !== undefined && { contactName }),
@@ -6670,6 +6767,10 @@ app.patch('/api/companies/:companyId/customers/:customerId', requireAuth, async 
       ...(status !== undefined && { status: status === 'ARCHIVED' ? 'ARCHIVED' : 'ACTIVE' }),
       updatedAt: new Date(),
     });
+
+    if (linkChanged && nextLink) {
+      notifyLinkedBusiness(companyId, nextLink, 'customer');
+    }
 
     res.json(successResponse(updated));
   } catch (e) {
@@ -9175,6 +9276,7 @@ app.post('/api/companies/:companyId/suppliers', requireAuth, procurementLimiter,
     if (!name || !name.trim()) {
       return res.status(400).json(errorResponse('Supplier name is required', 'VALIDATION_ERROR'));
     }
+    if (!(await requireLinkableBusiness(res, req.params.companyId, supplierBusinessId, 'supplier'))) return;
 
     const supplier = await repos.procurementRepo.createSupplier({
       id: 'SUP-' + uuidv4().slice(0, 8).toUpperCase(),
@@ -9190,6 +9292,10 @@ app.post('/api/companies/:companyId/suppliers', requireAuth, procurementLimiter,
       notes: notes || null,
       supplierBusinessId: supplierBusinessId || null,
     });
+
+    if (supplierBusinessId) {
+      notifyLinkedBusiness(req.params.companyId, supplierBusinessId, 'supplier');
+    }
 
     res.status(201).json(successResponse(supplier, 'Supplier created'));
   } catch (e) {
@@ -16559,6 +16665,12 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     const { filter = 'all', mode = 'business' } = req.query;
+    // Pagination is OPT-IN. With no limit param the response is byte-identical to
+    // before — the backend deploys on push while the app ships through EAS, so every
+    // already-installed build must keep working unchanged (N-12).
+    const paginate = req.query.limit !== undefined || req.query.offset !== undefined;
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
     // Verify user is requesting their own notifications
     const requestUserId = req.user?.id;
@@ -16569,6 +16681,13 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
     const formatCurrency = (amount) => `Rs ${Number(amount || 0).toFixed(2)}`;
     const THIRTY_DAYS_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     let notifications = [];
+
+    // Signup date, for the getting-started rows below. The handler previously loaded no
+    // User row at all — it only read req.user.id for the ownership check.
+    const me = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { createdAt: true },
+    });
 
     // =========================================================================
     // BUSINESS MODE — parallelized with DB-level filtering
@@ -16635,7 +16754,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
                 conns.push(...accepted
                   .filter(c => (c.updatedAt || c.createdAt) && new Date(c.updatedAt || c.createdAt) > THIRTY_DAYS_AGO)
                   .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
-                  .slice(0, 5)
+                  .slice(0, 15)
                   .map(c => ({ ...c, _sourceBizId: bizId })));
               } catch {}
             }
@@ -16649,7 +16768,9 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
             where: { businessId: { in: allBusinessIds }, status: 'PAID' },
             orderBy: { updatedAt: 'desc' },
             select: { id: true, totalAmount: true, updatedAt: true, createdAt: true },
-            take: 10,
+            // Raised from 10: the per-source caps are applied BEFORE the merge, so
+            // they — not `limit` — decide how far back the feed can be scrolled (N-12).
+            take: 40,
           })
         : Promise.resolve([]),
 
@@ -16659,7 +16780,9 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
             where: { businessId: { in: allBusinessIds }, deliveryStatus: DS.DELIVERED },
             orderBy: { updatedAt: 'desc' },
             select: { id: true, clientCompanyName: true, businessId: true, updatedAt: true, createdAt: true },
-            take: 10,
+            // Raised from 10: the per-source caps are applied BEFORE the merge, so
+            // they — not `limit` — decide how far back the feed can be scrolled (N-12).
+            take: 40,
           })
         : Promise.resolve([]),
 
@@ -16668,6 +16791,9 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
         ? prisma.stock.findMany({
             where: { businessId: { in: adminBusinessIds }, qtyOnHand: { lte: 10 } },
             include: { product: { select: { id: true, name: true, productPicture: true } } },
+            // Newest change first, so the cap keeps the alerts worth seeing. There was no
+            // ordering at all before, which didn't matter while every row claimed 'now' (N-13).
+            orderBy: { updatedAt: 'desc' },
             take: 20,
           })
         : Promise.resolve([]),
@@ -16679,7 +16805,9 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
             where: { businessId: { in: allBusinessIds }, status: { in: ['NEW', 'CANCELED', 'REJECTED', 'DONE', 'PENDING', 'ACCEPTED'] } },
             orderBy: { updatedAt: 'desc' },
             select: { id: true, status: true, customerName: true, businessId: true, updatedAt: true, createdAt: true },
-            take: 10,
+            // Raised from 10: the per-source caps are applied BEFORE the merge, so
+            // they — not `limit` — decide how far back the feed can be scrolled (N-12).
+            take: 40,
           })
         : Promise.resolve([]),
 
@@ -16706,7 +16834,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
                   // and sort on updatedAt (decline time) here — same as the accepted block.
                   .filter(c => (c.updatedAt || c.createdAt) && new Date(c.updatedAt || c.createdAt) > THIRTY_DAYS_AGO)
                   .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
-                  .slice(0, 5)
+                  .slice(0, 15)
                   .map(c => ({ ...c, _sourceBizId: bizId })));
               } catch {}
             }
@@ -16838,12 +16966,16 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
     // 8. Low stock alerts (product data already joined via include)
     for (const stock of extract(7)) {
       if (!stock.product) continue;
-      const stockTime = new Date(); // Stock model has no timestamps; use current time
+      // Real time now that Stock carries updatedAt (N-13). This used to be
+      // `new Date()` per request with a hardcoded 'now' label, so every low-stock alert
+      // sorted above genuinely recent activity forever and never aged. Fall back for
+      // rows written before the migration stamped them.
+      const stockTime = stock.updatedAt || new Date();
       notifications.push({
         id: `stock-low-${stock.id}`, type: 'stock_alert',
         title: 'Low stock alert',
         description: `${stock.product.name} has only ${stock.qtyOnHand} units remaining`,
-        time: 'now', timestamp: stockTime, read: false,
+        time: formatRelativeTime(stockTime), timestamp: stockTime, read: false,
         avatar: stock.product.productPicture || null,
         productData: { productId: stock.product.id, productName: stock.product.name, currentStock: stock.qtyOnHand, locationId: stock.locationId },
       });
@@ -16990,7 +17122,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
         const myAssignments = await repos.deliveryStaffRepo.getByUserId(userId);
         const recentAssignments = myAssignments
           .filter(a => a.assignedAt && new Date(a.assignedAt) > THIRTY_DAYS_AGO)
-          .slice(0, 10);
+          .slice(0, 30);
         for (const assignment of recentAssignments) {
           const del = assignment.delivery;
           const biz = del?.business;
@@ -17047,7 +17179,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
         const acceptedConns = await repos.connectionRepo.listByUserId(userId, 'accepted');
         const recentAccepted = acceptedConns
           .filter(c => (c.updatedAt || c.createdAt) && new Date(c.updatedAt || c.createdAt) > THIRTY_DAYS_AGO)
-          .slice(0, 5);
+          .slice(0, 15);
         for (const conn of recentAccepted) {
           const otherUser = conn.senderId === userId ? conn.receiver : conn.sender;
           notifications.push({
@@ -17077,7 +17209,7 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
           // Only the SENDER needs telling; the receiver is the one who declined.
           .filter(c => c.senderId === userId)
           .filter(c => (c.updatedAt || c.createdAt) && new Date(c.updatedAt || c.createdAt) > THIRTY_DAYS_AGO)
-          .slice(0, 5);
+          .slice(0, 15);
         for (const conn of recentRejected) {
           const otherUser = conn.receiver;
           const declinedAt = conn.updatedAt || conn.createdAt;
@@ -17107,6 +17239,68 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
         logger.error('Error fetching declined connections for personal notifications:', err);
       }
     } // end personal mode
+
+    // =========================================================================
+    // GETTING STARTED — derived like everything else, for both modes.
+    //
+    // These two cards used to be a client-side const prepended after the server's sort,
+    // with `read: false` HARDCODED. Tapping one marked it read optimistically and POSTed
+    // the key — which the server dutifully stored — but the next fetch re-created the
+    // constant, so it came back unread. The result was a permanent unread badge of 2
+    // that nothing could clear, for exactly the new users it was meant to help (N-11).
+    //
+    // Derived here they participate in read-state for free, and they sort by timestamp
+    // like everything else instead of always sitting on top.
+    // =========================================================================
+    try {
+      const signedUpAt = me?.createdAt ? new Date(me.createdAt) : null;
+      const isNewish = signedUpAt && signedUpAt > THIRTY_DAYS_AGO;
+
+      if (isNewish) {
+        notifications.push({
+          id: `welcome-${userId}`,
+          type: 'welcome',
+          title: 'Welcome to NouPro',
+          description: 'Add a photo and a headline so the businesses you deal with know who you are.',
+          time: formatRelativeTime(signedUpAt),
+          timestamp: signedUpAt,
+          read: false,
+          avatar: null,
+        });
+      }
+
+      // The two setup prompts, for anyone who still has no company. Personal mode only:
+      // in business mode you already have one by definition.
+      if (mode === 'personal') {
+        const memberships = await repos.memberRepo.getByUserId(userId);
+        const hasCompany = memberships.some(m => m.status === 'accepted');
+        if (!hasCompany) {
+          const promptTime = signedUpAt || new Date();
+          notifications.push({
+            id: `onboarding-create-business-${userId}`,
+            type: 'onboarding_create_business',
+            title: 'Create your Business profile',
+            description: 'Set up your own business and start managing your operations',
+            time: formatRelativeTime(promptTime),
+            timestamp: promptTime,
+            read: false,
+            avatar: null,
+          });
+          notifications.push({
+            id: `onboarding-join-company-${userId}`,
+            type: 'onboarding_join_company',
+            title: 'Join an existing Company',
+            description: 'Request to join a company and collaborate with your team',
+            time: formatRelativeTime(promptTime),
+            timestamp: promptTime,
+            read: false,
+            avatar: null,
+          });
+        }
+      }
+    } catch (err) {
+      logger.error('Error building getting-started notifications:', err);
+    }
 
     // Deduplicate by id (a user admin of multiple businesses could get the same notification twice)
     const _seenIds = new Set();
@@ -17169,7 +17363,26 @@ app.get('/api/users/:userId/notifications', requireAuth, async (req, res) => {
       );
     }
 
-    return res.json(successResponse({ notifications }));
+    // unreadCount is computed over the WHOLE filtered set, before any slicing. Two
+    // places derive the app-icon badge by counting unread items in this array — the
+    // notification context and the screen — so paginating without this would have made
+    // the badge silently report only the first page (N-12).
+    const unreadCount = notifications.filter(n => !n.read).length;
+    const total = notifications.length;
+
+    if (!paginate) {
+      return res.json(successResponse({ notifications, unreadCount, total }));
+    }
+
+    // Slice AFTER the filter chain: read-state is applied before filtering and the
+    // 'unread' filter depends on it, so slicing any earlier would return short pages.
+    const page = notifications.slice(offset, offset + limit);
+    return res.json(successResponse({
+      notifications: page,
+      unreadCount,
+      total,
+      hasMore: offset + limit < total,
+    }));
   } catch (err) {
     logger.error('Error fetching notifications:', err);
     return res.status(500).json(errorResponse('SERVER_ERROR', err.message || 'Failed to fetch notifications'));

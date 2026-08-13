@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import * as Notifications from 'expo-notifications';
 import { useProfileStore } from '@/shared/store/profileStore';
-import { getNotifications } from '@/features/notifications/notifications.service';
+import { getNotificationPage } from '@/features/notifications/notifications.service';
 
 // Notification Context Type
 export interface NotificationContextType {
@@ -90,8 +90,10 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     const userId = useProfileStore.getState().currentUser?.id;
     if (!userId) return;
     try {
-      const items = await getNotifications(userId);
-      const count = (items || []).filter((n: { read?: boolean }) => !n.read).length;
+      // Ask for one row and take the server's count. Counting the returned array would
+      // report only the first page once pagination is in use, and asking for the whole
+      // feed just to count it is wasteful — the server already knows (N-12).
+      const { unreadCount: count } = await getNotificationPage(userId, { limit: 1 });
       setUnreadCount(count);
       Notifications.setBadgeCountAsync(count).catch(() => {});
     } catch {
