@@ -21,6 +21,7 @@ import Avatar from '@/shared/components/ui/Avatar';
 import { SecondaryHeader } from '@/shared/components/layout/headers';
 import { DemoModeBadge } from '@/shared/components/ui/DemoModeBadge';
 import type { Language } from '@/shared/types/user';
+import { useTranslation } from '@/shared/i18n';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -33,6 +34,7 @@ const LANGUAGE_NAMES: Record<Language, string> = {
 export default function PersonalSettingsScreen() {
   const navigation = useNavigation();
   const { isDarkMode, toggleTheme, theme: appTheme } = useTheme();
+  const { t } = useTranslation();
 
   // Profile store
   const currentUser = useProfileStore((state) => state.currentUser);
@@ -88,17 +90,17 @@ export default function PersonalSettingsScreen() {
           // Previously this told simulator users to enable notifications in device
           // settings, where there is nothing to enable (N-10).
           AppAlert.alert(
-            'Not available here',
-            'Push notifications need a physical device — they cannot be enabled in the simulator.',
+            t('settings.notificationsUnsupportedTitle'),
+            t('settings.notificationsUnsupportedBody'),
             [{ text: 'OK' }],
           );
         } else {
           AppAlert.alert(
-            'Notifications blocked',
-            'Notifications are turned off for NouPro. Open Settings to allow them.',
+            t('settings.notificationsBlockedTitle'),
+            t('settings.notificationsBlockedBody'),
             [
-              { text: 'Not now', style: 'cancel' },
-              { text: 'Open Settings', onPress: () => { Linking.openSettings().catch(() => {}); } },
+              { text: t('common.notNow'), style: 'cancel' },
+              { text: t('common.openSettings'), onPress: () => { Linking.openSettings().catch(() => {}); } },
             ],
           );
         }
@@ -135,14 +137,14 @@ export default function PersonalSettingsScreen() {
 
   const handleChangeLanguage = () => {
     AppAlert.actionSheet({
-      title: 'Language',
-      message: 'Choose the language for the app.',
+      title: t('settings.language'),
+      message: t('settings.languageSheetMessage'),
       options: [
         ...(Object.keys(LANGUAGE_NAMES) as Language[]).map((code) => ({
           label: LANGUAGE_NAMES[code] + (code === language ? '  ✓' : ''),
           onPress: () => setLanguage(code),
         })),
-        { label: 'Cancel', cancel: true },
+        { label: t('common.cancel'), cancel: true },
       ],
     });
   };
@@ -396,7 +398,7 @@ export default function PersonalSettingsScreen() {
       >
         <View style={styles.settingLeft}>
           <Icon name="language-outline" size={24} color={appTheme.colors.iconColor} />
-          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Language</Text>
+          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>{t('settings.language')}</Text>
         </View>
         <View style={styles.settingRight}>
           <Text style={[styles.settingValue, { color: appTheme.colors.textSecondary }]}>
@@ -413,7 +415,7 @@ export default function PersonalSettingsScreen() {
       >
         <View style={styles.settingLeft}>
           <Icon name="document-text-outline" size={24} color={appTheme.colors.iconColor} />
-          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Privacy Policy</Text>
+          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>{t('settings.privacyPolicy')}</Text>
         </View>
         <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
       </TouchableOpacity>
@@ -425,7 +427,7 @@ export default function PersonalSettingsScreen() {
       >
         <View style={styles.settingLeft}>
           <Icon name="document-text-outline" size={24} color={appTheme.colors.iconColor} />
-          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>Terms of Service</Text>
+          <Text style={[styles.settingText, { color: appTheme.colors.text }]}>{t('settings.termsOfService')}</Text>
         </View>
         <Icon name="chevron-forward" size={20} color={appTheme.colors.iconMuted} />
       </TouchableOpacity>

@@ -17,6 +17,7 @@ import { AppButton, TextButton } from '@/shared/components/ui';
 import CodeInput from '@/shared/components/ui/CodeInput';
 import { authAPI } from '@/shared/services/api';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
+import { useTranslation } from '@/shared/i18n';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'EmailVerification'>;
 
@@ -24,6 +25,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'EmailVerification'>;
 
 export default function EmailVerificationScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { userData } = route.params;
   
@@ -100,7 +102,7 @@ export default function EmailVerificationScreen({ navigation, route }: Props) {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('auth.goBack')}
           accessibilityRole="button"
         >
           <Icon name="arrow-back" size={24} color={appTheme.colors.text} />
@@ -109,7 +111,7 @@ export default function EmailVerificationScreen({ navigation, route }: Props) {
         {/* Header Section */}
         <View style={styles.headerSection}>
           <Text style={[styles.title, { color: appTheme.colors.text }]}>
-            Enter the 6-digit code we emailed you
+            {t('auth.verifyEmailTitle')}
           </Text>
           <Text style={[styles.subtitle, { color: appTheme.colors.textSecondary }]}>
             Verify your email {userData.email}. This helps us keep your account secure by verifying that it's really you.
@@ -156,7 +158,7 @@ export default function EmailVerificationScreen({ navigation, route }: Props) {
           loading={isVerifying}
         />
         <TextButton
-          title="Resend Code"
+          title={t('auth.resendCode')}
           onPress={handleResendCode}
           disabled={isVerifying}
           tone="muted"

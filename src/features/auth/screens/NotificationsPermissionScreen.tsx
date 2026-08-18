@@ -30,30 +30,21 @@ import {
   registerForPushNotifications,
   registerTokenWithBackend,
 } from '@/shared/services/pushNotifications';
+import { useTranslation } from '@/shared/i18n';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'NotificationsPermission'>;
 
-const REASONS: { icon: string; title: string; body: string }[] = [
-  {
-    icon: 'chatbubble-outline',
-    title: 'Messages',
-    body: 'Know when a partner replies, without keeping the app open.',
-  },
-  {
-    icon: 'cube-outline',
-    title: 'Orders and deliveries',
-    body: 'Get told when an order is confirmed, shipped or delivered.',
-  },
-  {
-    icon: 'people-outline',
-    title: 'Requests',
-    body: 'See connection and join requests as they come in.',
-  },
-];
+/** Keys, not copy — the strings live in the locale files. */
+const REASONS = [
+  { icon: 'chatbubble-outline', key: 'messages' },
+  { icon: 'cube-outline', key: 'orders' },
+  { icon: 'people-outline', key: 'requests' },
+] as const;
 
 export default function NotificationsPermissionScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { pendingAuth } = route.params;
   const [loading, setLoading] = useState(false);
 
@@ -88,25 +79,25 @@ export default function NotificationsPermissionScreen({ navigation, route }: Pro
       <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
         <View style={styles.headerSection}>
           <Text style={[styles.title, { color: appTheme.colors.text }]}>
-            Stay in the loop
+            {t('notificationsPermission.title')}
           </Text>
           <Text style={[styles.subtitle, { color: appTheme.colors.textSecondary }]}>
-            Turn on notifications so you don&apos;t miss what needs you.
+            {t('notificationsPermission.subtitle')}
           </Text>
         </View>
 
         <View style={styles.reasons}>
           {REASONS.map((reason) => (
-            <View key={reason.title} style={styles.reasonRow}>
+            <View key={reason.key} style={styles.reasonRow}>
               <View style={[styles.reasonIcon, { backgroundColor: appTheme.colors.surface }]}>
                 <Icon name={reason.icon} size={20} color={appTheme.colors.primary} />
               </View>
               <View style={styles.reasonText}>
                 <Text style={[styles.reasonTitle, { color: appTheme.colors.text }]}>
-                  {reason.title}
+                  {t(`notificationsPermission.${reason.key}Title`)}
                 </Text>
                 <Text style={[styles.reasonBody, { color: appTheme.colors.textSecondary }]}>
-                  {reason.body}
+                  {t(`notificationsPermission.${reason.key}Body`)}
                 </Text>
               </View>
             </View>
@@ -114,20 +105,20 @@ export default function NotificationsPermissionScreen({ navigation, route }: Pro
         </View>
 
         <Text style={[styles.footnote, { color: appTheme.colors.textSecondary }]}>
-          You can change this any time in Settings.
+          {t('notificationsPermission.footnote')}
         </Text>
       </View>
 
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 16 }]}>
         <AppButton
-          title="Turn on notifications"
+          title={t('notificationsPermission.enable')}
           onPress={handleEnable}
           variant={loading ? 'disabled' : 'primary'}
           disabled={loading}
           loading={loading}
         />
         <TextButton
-          title="Not now"
+          title={t('common.notNow')}
           onPress={handleSkip}
           disabled={loading}
           tone="muted"

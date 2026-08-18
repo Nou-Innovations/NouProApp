@@ -96,8 +96,50 @@ for (const locale of locales) {
   console.log('');
 }
 
+// ── Keys referenced in code must exist ─────────────────────────────────────────
+//
+// The file-vs-file check above can't catch the mistake extraction actually makes: a
+// typo'd or renamed key. i18next renders the key itself when it can't resolve one, so
+// `t('setting.language')` puts the literal text "setting.language" on screen. That is
+// invisible to tsc, to lint, and to the checks above.
+//
+// Template keys — t(`ns.${x}Title`) — can't be resolved statically, so they're counted
+// and skipped rather than guessed at.
+const SRC = path.join(__dirname, '..', 'src');
+
+function walk(dir, files = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full, files);
+    else if (/\.tsx?$/.test(entry.name)) files.push(full);
+  }
+  return files;
+}
+
+const used = new Map(); // key -> first file that uses it
+let dynamic = 0;
+for (const file of walk(SRC)) {
+  const text = fs.readFileSync(file, 'utf8');
+  for (const m of text.matchAll(/\bt\(\s*(['"`])([^'"`$]+?)\1/g)) {
+    const key = m[2];
+    // Only dotted keys are ours; bare words are almost always another `t(...)`.
+    if (key.includes('.') && !used.has(key)) used.set(key, path.relative(SRC, file));
+  }
+  dynamic += [...text.matchAll(/\bt\(\s*`[^`]*\$\{/g)].length;
+}
+
+const unknown = [...used.entries()].filter(([k]) => !(k in base));
+console.log(`Keys referenced in code: ${used.size} static, ${dynamic} built dynamically (not checkable)`);
+if (unknown.length) {
+  failed = true;
+  console.log(`    ✗ NOT IN ${BASE}.json — renders the raw key to the user (${unknown.length}):`);
+  for (const [k, f] of unknown.slice(0, 15)) console.log(`      ${k}   ${f}`);
+  if (unknown.length > 15) console.log(`      … and ${unknown.length - 15} more`);
+}
+console.log('');
+
 if (failed) {
-  console.error('✗ Locale files are out of sync. Fix the items marked ✗ above.\n');
+  console.error('✗ Translation problems above. Fix the items marked ✗.\n');
   process.exit(1);
 }
-console.log('✓ Locale files are structurally sound.\n');
+console.log('✓ Locale files are sound and every key used in code exists.\n');

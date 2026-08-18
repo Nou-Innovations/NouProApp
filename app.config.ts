@@ -82,6 +82,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       ...(isProd ? [] : ['expo-dev-client' as const]),
+      // Declares the app's supported languages to the OS, which is what puts NouPro in
+      // iOS Settings → App → Language and makes getLocales() report a language the app
+      // can actually render. `expo install` couldn't add this itself because the config
+      // is dynamic (app.config.ts), so it printed the snippet and left it to us.
+      //
+      // NOTE: ios/ and android/ are committed in this repo, so this takes effect on the
+      // next prebuild or EAS build — not in the current dev client. Reading the device
+      // locale from JS works today regardless; only the OS-level language list waits.
+      'expo-localization' as const,
       [
         'expo-location',
         {

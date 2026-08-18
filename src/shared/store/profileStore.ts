@@ -146,6 +146,15 @@ interface ProfileState {
    * where there is no user at all.
    */
   language: Language;
+
+  /**
+   * True once the user has picked a language themselves.
+   *
+   * Without this, the device language would be re-applied on every launch and would
+   * silently overrule a deliberate choice — someone with a French phone who picked
+   * English would get French back next time they opened the app.
+   */
+  hasChosenLanguage: boolean;
   
   // Security settings (Personal mode only)
   twoFactorEnabled: boolean;
@@ -339,6 +348,7 @@ const initialState: ProfileState = {
   refreshToken: null,
   staySignedIn: true, // ON by default = users stay logged in across app restarts
   language: 'EN',
+  hasChosenLanguage: false,
   // Security settings
   twoFactorEnabled: false,
   biometricEnabled: false,
@@ -513,6 +523,7 @@ export const useProfileStore = create<ProfileStore>()(
           // Same reasoning: the sign-in screen you land on should be in the language
           // you chose, not reset to English because you signed out.
           language: get().language,
+          hasChosenLanguage: get().hasChosenLanguage,
         });
       },
 
@@ -773,7 +784,13 @@ export const useProfileStore = create<ProfileStore>()(
       setStaySignedIn: (value: boolean) => set({ staySignedIn: value }),
 
       setLanguage: (value: Language) => {
-        set({ language: value });
+        set({ language: value, hasChosenLanguage: true });
+        // Flip i18next too, or the store changes and the UI keeps rendering the old
+        // language until the next reload. Lazy require: the i18n module pulls in the
+        // polyfill and locale data, and the store is imported from everywhere.
+        try {
+          require('@/shared/i18n').setI18nLanguage(value);
+        } catch { /* i18n not initialised yet — initI18n will pick up the stored value */ }
         // Mirror onto currentUser so anything reading the server shape agrees, and
         // persist to the account. Fire-and-forget: the local change must apply
         // instantly even offline, and a failed sync self-heals on the next /auth/me.
@@ -885,6 +902,7 @@ export const useProfileStore = create<ProfileStore>()(
       partialize: (state: ProfileStore) => ({
         staySignedIn: state.staySignedIn,
         language: state.language,
+        hasChosenLanguage: state.hasChosenLanguage,
         twoFactorEnabled: state.twoFactorEnabled,
         biometricEnabled: state.biometricEnabled,
         // The two settings persist; isLocked/lastBackgroundedAt deliberately do NOT,

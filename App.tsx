@@ -60,6 +60,7 @@ import { offlineQueue } from '@/features/inbox/services/offlineQueue';
 import { syncOrderStatusMeta } from '@/shared/services/orderStatusSync';
 import { syncSubscriptionPricing } from '@/shared/services/subscriptionPricingSync';
 import { PUBLIC_WEB_URL } from '@/shared/config/urls';
+import { initI18n, deviceLanguage } from '@/shared/i18n';
 import * as Sentry from '@sentry/react-native';
 
 // Screens - Auth
@@ -955,6 +956,30 @@ const AppWithTheme = () => {
   useEffect(() => {
     if (isSignedIn) offlineQueue.flush().catch(() => {});
   }, [isSignedIn]);
+
+  /**
+   * Start translations before the first paint.
+   *
+   * Runs after rehydration so the stored choice is available — otherwise the app would
+   * flash English and then switch. On a first launch there is no stored choice, so the
+   * device language decides, and that answer is written back so it survives.
+   */
+  useEffect(() => {
+    if (!isRehydrated) return;
+    const state = useProfileStore.getState();
+    let language = state.language;
+    if (!state.hasChosenLanguage) {
+      const fromDevice = deviceLanguage();
+      if (fromDevice && fromDevice !== language) {
+        language = fromDevice;
+        // setState, not setLanguage: this is a default inferred from the phone, not a
+        // choice. setLanguage would flag it as chosen (freezing out future device
+        // changes) and PATCH it to the account as if the user had asked for it.
+        useProfileStore.setState({ language: fromDevice });
+      }
+    }
+    initI18n(language);
+  }, [isRehydrated]);
 
   // Hide native splash once resources AND auth tokens are ready
   const appReady = resourcesReady && isRehydrated;

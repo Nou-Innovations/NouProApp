@@ -16,6 +16,7 @@ import { useTheme } from '@/shared/theme/ThemeProvider';
 import { Text } from '@/shared/components/ui/Typography';
 import { AppButton, TextButton } from '@/shared/components/ui';
 import { KeyboardAwareScreen } from '@/shared/components/layout';
+import { useTranslation } from '@/shared/i18n';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'TwoFactorVerify'>;
 
@@ -43,6 +44,7 @@ function secondsLeft(token: string): number | null {
 
 export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
   const { theme: appTheme } = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { tempToken } = route.params;
 
@@ -84,7 +86,7 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
     }
 
     if (expired) {
-      setError('This sign-in request expired. Please start over.');
+      setError(t('auth.twoFactorExpired'));
       return;
     }
 
@@ -105,7 +107,7 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
         // Say what actually happened. This used to read "Invalid code", sending people
         // to re-check an authenticator app that was showing the right code (A-15).
         setRemaining(0);
-        setError('This sign-in request expired. Please start over.');
+        setError(t('auth.twoFactorExpired'));
       } else {
         setError(err.response?.message || err.message || 'Invalid code. Please try again.');
       }
@@ -131,7 +133,7 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('auth.goBack')}
             accessibilityRole="button"
           >
             <Icon name="arrow-back" size={24} color={appTheme.colors.text} />
@@ -140,12 +142,12 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
           {/* Header */}
           <View style={styles.headerSection}>
             <Text style={[styles.title, { color: appTheme.colors.text }]}>
-              Two-Factor Authentication
+              {t('auth.twoFactorTitle')}
             </Text>
             <Text style={[styles.subtitle, { color: appTheme.colors.textSecondary }]}>
               {isBackupMode
                 ? 'Enter one of your backup codes'
-                : 'Enter the 6-digit code from your authenticator app'}
+                : t('auth.twoFactorSubtitle')}
             </Text>
             {remaining !== null ? (
               <Text
@@ -155,8 +157,10 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
                 ]}
               >
                 {expired
-                  ? 'This request has expired'
-                  : `Expires in ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`}
+                  ? t('auth.twoFactorExpired')
+                  : t('auth.expiresIn', {
+                      time: `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`,
+                    })}
               </Text>
             ) : null}
           </View>
@@ -203,14 +207,14 @@ export default function TwoFactorVerifyScreen({ navigation, route }: Props) {
 
             {expired ? (
               <TextButton
-                title="Start over"
+                title={t('auth.startOver')}
                 onPress={handleStartOver}
                 style={styles.switchModeButton}
                 textStyle={styles.switchModeText}
               />
             ) : (
               <TextButton
-                title={isBackupMode ? 'Use authenticator app instead' : 'Use a backup code instead'}
+                title={t(isBackupMode ? 'auth.twoFactorAuthenticator' : 'auth.twoFactorBackup')}
                 onPress={toggleBackupMode}
                 style={styles.switchModeButton}
                 textStyle={styles.switchModeText}
